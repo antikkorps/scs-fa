@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.nuxt/
+.output/
+.nitro/
+.cache/
+*.log
+.env
+.env.local
+.env.*.local
+.DS_Store
+coverage/
+.turbo/
+.vite/
+*.tsbuildinfo
+
+# Drizzle
+apps/api/drizzle/
+
+# IDE
+.vscode/
+.idea/

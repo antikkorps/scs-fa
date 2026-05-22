@@ -1,0 +1,33 @@
+{
+  "name": "armurier-ecommerce",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter @armurier/api dev",
+    "dev:web": "pnpm --filter @armurier/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:watch": "pnpm -r test:watch",
+    "test:coverage": "pnpm -r test:coverage",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "./node_modules/.bin/biome lint .",
+    "format": "./node_modules/.bin/biome format --write .",
+    "format:check": "./node_modules/.bin/biome format .",
+    "check": "./node_modules/.bin/biome check --write .",
+    "verify": "./node_modules/.bin/biome ci . && pnpm -r typecheck && pnpm -r test",
+    "db:push": "pnpm --filter @armurier/api db:push",
+    "db:generate": "pnpm --filter @armurier/api db:generate",
+    "db:seed": "pnpm --filter @armurier/api db:seed",
+    "db:studio": "pnpm --filter @armurier/api db:studio",
+    "docker:up": "docker compose -f docker-compose.dev.yml up -d",
+    "docker:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:logs": "docker compose -f docker-compose.dev.yml logs -f"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.4"
+  },
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=22"
+  }
+}
