@@ -1,62 +1,62 @@
-# scsFirearm — E-commerce armurier
+# scsFirearm — Firearms e-commerce
 
-Monorepo Nuxt 4 + Fastify + Drizzle + Postgres pour un e-commerce armurier (armes, munitions, accessoires, Gun Art).
+Nuxt 4 + Fastify + Drizzle + Postgres monorepo for a firearms e-commerce platform (weapons, ammunition, accessories, Gun Art).
 
 ## Stack
 
-- **Frontend** : Nuxt 4, Vue 3, PrimeVue (theme Aura)
-- **Backend** : Fastify 5 (ESM), Drizzle ORM 0.45, PostgreSQL 17
-- **Shared** : Zod (validation), types & constantes partagés
-- **Outillage** : pnpm workspaces, Biome (lint+format), Vitest, TypeScript strict
-- **Sécurité** : `@fastify/helmet`, `@fastify/rate-limit`, JWT + refresh, argon2id (à venir)
+- **Frontend**: Nuxt 4, Vue 3, PrimeVue (Aura theme)
+- **Backend**: Fastify 5 (ESM), Drizzle ORM 0.45, PostgreSQL 17
+- **Shared**: Zod (validation), shared types & constants
+- **Tooling**: pnpm workspaces, Biome (lint + format), Vitest, strict TypeScript
+- **Security**: `@fastify/helmet`, `@fastify/rate-limit`, JWT access + opaque rotating refresh tokens, argon2id password hashing (OWASP 2024 parameters)
 
-## Prérequis
+## Requirements
 
 - Node ≥ 22 (LTS)
 - pnpm ≥ 10
-- Docker (pour Postgres dev)
+- Docker (for the dev Postgres)
 
 ## Quick start
 
 ```bash
-# 1. Installer les dépendances
+# 1. Install dependencies
 pnpm install
 
-# 2. Configurer l'env api (génère des secrets JWT random)
+# 2. Configure the API env (set random JWT secrets)
 cp apps/api/.env.example apps/api/.env
-# édite apps/api/.env si besoin (ports, S3, SMTP)
+# edit apps/api/.env if needed (ports, S3, SMTP)
 
-# 3. Démarrer Postgres (port hôte 5435)
+# 3. Start Postgres (host port 5435)
 pnpm docker:up
 
-# 4. Créer les tables + seeds (catégories légales + produits)
+# 4. Apply the schema + seeds (legal categories + products)
 pnpm db:push
 pnpm db:seed
 
-# 5. Démarrer l'API (port 8081)
+# 5. Start the API (port 8081)
 pnpm dev:api
-# vérifier : curl http://localhost:8081/health
+# sanity check: curl http://localhost:8081/health
 
-# 6. (autre terminal) Démarrer le front Nuxt (port 3000)
+# 6. (other terminal) Start the Nuxt front (port 3000)
 pnpm dev:web
 ```
 
-## Scripts utiles
+## Useful scripts
 
-| Commande              | Effet                                                    |
-| --------------------- | -------------------------------------------------------- |
-| `pnpm dev:api`        | API Fastify en watch                                     |
-| `pnpm dev:web`        | Nuxt en dev                                              |
-| `pnpm test`           | Vitest sur tous les packages                             |
-| `pnpm lint`           | Biome lint                                               |
-| `pnpm format`         | Biome format (auto-fix)                                  |
-| `pnpm check`          | Biome lint + format combinés                             |
-| `pnpm verify`         | `biome ci` + typecheck + tests (à passer avant commit)   |
-| `pnpm db:push`        | Pousse le schéma vers Postgres (dev, non versionné)      |
-| `pnpm db:generate`    | Génère une migration SQL (prod)                          |
-| `pnpm db:seed`        | Exécute les seeds                                        |
-| `pnpm db:studio`      | UI web Drizzle Studio                                    |
-| `pnpm docker:up/down` | Lifecycle du Postgres dev                                |
+| Command               | Purpose                                                    |
+| --------------------- | ---------------------------------------------------------- |
+| `pnpm dev:api`        | Fastify API in watch mode                                  |
+| `pnpm dev:web`        | Nuxt dev server                                            |
+| `pnpm test`           | Vitest across all packages                                 |
+| `pnpm lint`           | Biome lint                                                 |
+| `pnpm format`         | Biome format (auto-fix)                                    |
+| `pnpm check`          | Biome lint + format combined                               |
+| `pnpm verify`         | `biome ci` + typecheck + tests (must pass before commit)   |
+| `pnpm db:push`        | Push the schema to Postgres (dev only, unversioned)        |
+| `pnpm db:generate`    | Generate a SQL migration (prod)                            |
+| `pnpm db:seed`        | Run the seeds                                              |
+| `pnpm db:studio`      | Drizzle Studio web UI                                      |
+| `pnpm docker:up/down` | Dev Postgres lifecycle                                     |
 
 ## Structure
 
@@ -65,58 +65,69 @@ pnpm dev:web
 ├── apps/
 │   ├── api/                  # Fastify + Drizzle (port 8081)
 │   │   ├── src/
+│   │   │   ├── auth/              # register / login / refresh / logout
 │   │   │   ├── db/
-│   │   │   │   ├── schema.ts      # ⚠ source de vérité du schéma
+│   │   │   │   ├── schema.ts      # ⚠ schema source of truth
 │   │   │   │   ├── client.ts
 │   │   │   │   ├── seeds.ts
 │   │   │   │   └── seed-cli.ts
 │   │   │   ├── env.ts             # Zod-validated env
 │   │   │   ├── types.ts
+│   │   │   ├── app.ts             # buildApp() factory (used by tests)
 │   │   │   └── index.ts           # Fastify entry
 │   │   └── drizzle.config.ts
 │   └── web/                  # Nuxt 4 (port 3000)
 │       ├── app/app.vue
 │       └── nuxt.config.ts
 ├── packages/
-│   └── shared/               # Types, constants, Zod schemas partagés
+│   └── shared/               # Shared types, constants, Zod schemas
 │       └── src/{constants,types,validation}.ts
 ├── docs/
 │   ├── ADR/                  # Architecture Decision Records
-│   ├── PROMPT_CLAUDE_CODE.md
-│   ├── RESUME_SCHEMA.md
-│   ├── CLARIFICATIONS_A_TRANCHER.md
-│   └── seeds_and_workflows.ts  # workflow de référence (ts-nocheck, à porter)
-├── BACKLOG.md                # ⭐ source unique de vérité du roadmap
+│   └── ...
+├── BACKLOG.md                # ⭐ single source of truth for the roadmap
 ├── biome.json
+├── renovate.json             # 90-day quarantine, grouped updates
 ├── docker-compose.dev.yml
 └── pnpm-workspace.yaml
 ```
 
-## Principes d'engineering
+## Auth endpoints (current)
 
-1. **Tests-first** — Vitest sur chaque feature, pas de merge sans test.
-2. **DRY** — Types/validation/constantes partagés via `packages/shared`.
-3. **Security by design** — Zod aux frontières, RBAC, argon2, audit log.
-4. **Politique deps 90j** — Aucune dépendance < 90 jours (sauf fix de sécurité).
-5. **BMAD** — Stories avec critères d'acceptation, plan avant code, docs vivants.
-6. **Multi-machines** — État dans le repo (`BACKLOG.md`, `docs/`), pas dans la mémoire locale.
+| Method | Path                  | Notes                                                            |
+| ------ | --------------------- | ---------------------------------------------------------------- |
+| POST   | `/api/auth/register`  | argon2id, RGPD consent recorded, email lowercase normalization   |
+| POST   | `/api/auth/login`     | Lockout after 5 failed attempts (15 min auto-unlock), timing-safe |
+| POST   | `/api/auth/refresh`   | Rotates the refresh token (single-use), multi-device sessions    |
+| POST   | `/api/auth/logout`    | Revokes the supplied refresh token                               |
+
+Access tokens are JWTs (1 h TTL). Refresh tokens are opaque 32-byte values stored as SHA-256 hashes in the `refresh_tokens` table.
+
+## Engineering principles
+
+1. **Tests-first** — Vitest on every feature; no merge without a test.
+2. **DRY** — Shared types/validation/constants live in `packages/shared`.
+3. **Security by design** — Zod at boundaries, RBAC, argon2id, audit log.
+4. **90-day dependency policy** — No dependency newer than 90 days (except security fixes). Enforced by Renovate.
+5. **BMAD** — Stories with acceptance criteria, plan before code, living docs.
+6. **Multi-machine** — State lives in the repo (`BACKLOG.md`, `docs/`), not in local memory.
 
 ## Workflow
 
-1. Lire `BACKLOG.md` pour identifier la prochaine story.
-2. Créer une branche `feat/<story-id>-short-desc`.
-3. Écrire les tests, puis le code, puis vérifier `pnpm verify`.
-4. Mettre à jour le BACKLOG (case cochée, nouvelles découvertes en bas).
-5. Commit (conventional commits) + PR référençant la story.
+1. Read `BACKLOG.md` to identify the next story.
+2. Create a branch `feat/<story-id>-short-desc` from `main`.
+3. Write the tests, then the code, then make sure `pnpm verify` is green.
+4. Update the BACKLOG (tick the item, add new findings at the bottom).
+5. Commit using conventional commits and open a PR referencing the story.
 
-Voir `docs/ADR/` pour les décisions structurantes.
+See `docs/ADR/` for the structural decisions.
 
-## Cohabitation locale
+## Local cohabitation
 
-Si tu fais tourner d'autres projets Docker sur la machine :
+If you run other Docker projects on the same machine:
 
-- Postgres dev sur **5435** (5432–5434 souvent pris).
-- API dev sur **8081**.
-- Front sur **3000** (défaut Nuxt).
+- Dev Postgres on **5435** (5432–5434 are often taken).
+- Dev API on **8081**.
+- Front on **3000** (Nuxt default).
 
-Modifier `apps/api/.env` + `docker-compose.dev.yml` si conflit.
+Adjust `apps/api/.env` and `docker-compose.dev.yml` if you hit a conflict.
