@@ -123,6 +123,10 @@ export const users = pgTable(
     // JWT refresh token
     refreshTokenHash: varchar("refresh_token_hash", { length: 255 }),
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+
+    // RGPD consent (recorded at registration; version tracks ToS revision)
+    rgpdConsentAt: timestamp("rgpd_consent_at"),
+    rgpdConsentVersion: varchar("rgpd_consent_version", { length: 20 }),
   },
   (t) => [
      index("idx_users_email").on(t.email).where(sql`${t.deletedAt} IS NULL`),

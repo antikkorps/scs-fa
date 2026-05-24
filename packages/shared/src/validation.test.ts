@@ -2,34 +2,41 @@ import { describe, expect, it } from "vitest"
 import { cartItemSchema, loginSchema, registerSchema } from "./validation.js"
 
 describe("registerSchema", () => {
+  const base = {
+    email: "jean@example.fr",
+    password: "MotDePasseTresLong123",
+    firstName: "Jean",
+    lastName: "Dupont",
+    rgpdConsent: true as const,
+  }
+
   it("accepts valid input", () => {
-    const r = registerSchema.safeParse({
-      email: "jean@example.fr",
-      password: "MotDePasseTresLong123",
-      firstName: "Jean",
-      lastName: "Dupont",
-    })
-    expect(r.success).toBe(true)
+    expect(registerSchema.safeParse(base).success).toBe(true)
+  })
+
+  it("accepts optional phone", () => {
+    expect(registerSchema.safeParse({ ...base, phone: "+33 6 12 34 56 78" }).success).toBe(true)
   })
 
   it("rejects short password (<12)", () => {
-    const r = registerSchema.safeParse({
-      email: "jean@example.fr",
-      password: "court1",
-      firstName: "Jean",
-      lastName: "Dupont",
-    })
-    expect(r.success).toBe(false)
+    expect(registerSchema.safeParse({ ...base, password: "court1" }).success).toBe(false)
   })
 
   it("rejects invalid email", () => {
-    const r = registerSchema.safeParse({
-      email: "pas-un-email",
-      password: "MotDePasseTresLong123",
-      firstName: "Jean",
-      lastName: "Dupont",
-    })
-    expect(r.success).toBe(false)
+    expect(registerSchema.safeParse({ ...base, email: "pas-un-email" }).success).toBe(false)
+  })
+
+  it("rejects missing RGPD consent", () => {
+    const { rgpdConsent: _omit, ...withoutConsent } = base
+    expect(registerSchema.safeParse(withoutConsent).success).toBe(false)
+  })
+
+  it("rejects rgpdConsent=false", () => {
+    expect(registerSchema.safeParse({ ...base, rgpdConsent: false }).success).toBe(false)
+  })
+
+  it("rejects malformed phone", () => {
+    expect(registerSchema.safeParse({ ...base, phone: "abc-def" }).success).toBe(false)
   })
 })
 
