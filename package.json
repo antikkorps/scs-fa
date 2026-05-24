@@ -24,7 +24,7 @@
     "docker:logs": "docker compose -f docker-compose.dev.yml logs -f"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.4"
+    "@biomejs/biome": "2.4.15"
   },
   "packageManager": "pnpm@10.30.3",
   "engines": {
