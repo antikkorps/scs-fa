@@ -23,7 +23,14 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1),
+  deviceLabel: z.string().max(255).optional(),
 })
+
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(20).max(256),
+})
+
+export const logoutSchema = refreshSchema
 
 export const cartItemSchema = z
   .object({
@@ -52,5 +59,12 @@ export const productFiltersSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
+export type RefreshInput = z.infer<typeof refreshSchema>
 export type CreateOrderInput = z.infer<typeof createOrderSchema>
 export type ProductFilters = z.infer<typeof productFiltersSchema>
+
+export type AuthTokens = {
+  accessToken: string
+  refreshToken: string
+  expiresIn: number
+}

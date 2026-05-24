@@ -46,11 +46,13 @@
 - [x] Audit log `user.registered` inséré (IP + user-agent)
 - [x] Refactor : `buildApp()` factory pour tests via `fastify.inject`
 
-**Story 1.2** — Login + JWT
+**Story 1.2** — Login + JWT ✅
 
-- Critères : JWT access 1h + refresh 7d, refresh rotation, rate limit 5/min/IP
-- Tests : succès, mauvais password (timing-safe), compte verrouillé après N échecs
-- Endpoints : `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`
+- [x] Critères : JWT access 1h + refresh 7d (opaque, sha256-hashé), rotation à chaque /refresh, rate limit 5/min login & 10/min refresh, multi-device (table `refresh_tokens`)
+- [x] Lockout : 5 échecs → 15 min (auto-unlock), colonnes `failed_login_attempts` + `locked_until` sur `users`
+- [x] Tests : succès, mauvais password (timing-safe via DUMMY_HASH partagé), email inconnu (même 401, anti-énumération), lockout après 5 échecs (423), auto-unlock, refresh rotation + invalidation de l'ancien, refresh expiré (401), logout révoque, logout 204 même token inconnu
+- [x] Endpoints : `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`
+- [x] Audit logs : `user.login`, `user.token_refreshed`
 
 **Story 1.3** — Profil
 

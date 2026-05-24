@@ -120,9 +120,9 @@ export const users = pgTable(
     lastLoginAt: timestamp("last_login_at"),
     deletedAt: timestamp("deleted_at"), // Soft delete RGPD
 
-    // JWT refresh token
-    refreshTokenHash: varchar("refresh_token_hash", { length: 255 }),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    // Brute-force protection
+    failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+    lockedUntil: timestamp("locked_until"),
 
     // RGPD consent (recorded at registration; version tracks ToS revision)
     rgpdConsentAt: timestamp("rgpd_consent_at"),
@@ -145,9 +145,42 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   cartItems: many(cartItems),
   artworkCartItems: many(artworkCartItems),
   auditLogs: many(auditLogs),
+  refreshTokens: many(refreshTokens),
   verifiedByLogs: many(auditLogs, { relationName: "verifiedBy" }),
   legalVerifiedByUser: one(users, {
     fields: [users.legalVerifiedBy],
+    references: [users.id],
+  }),
+}))
+
+// ============================================================================
+// Refresh tokens (multi-device sessions; one row per active refresh token)
+// ============================================================================
+
+export const refreshTokens = pgTable(
+  "refresh_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    deviceLabel: varchar("device_label", { length: 255 }),
+    lastUsedAt: timestamp("last_used_at").defaultNow(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_refresh_tokens_user").on(t.userId),
+    index("idx_refresh_tokens_expires").on(t.expiresAt),
+    foreignKey({
+      columns: [t.userId],
+      foreignColumns: [users.id],
+    }).onDelete("cascade"),
+  ],
+)
+
+export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [refreshTokens.userId],
     references: [users.id],
   }),
 }))
