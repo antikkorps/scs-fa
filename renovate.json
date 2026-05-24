@@ -1,6 +1,25 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "extends": ["config:recommended"],
+  "minimumReleaseAge": "90 days",
+  "prCreation": "not-pending",
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": "0 days",
+    "labels": ["security"]
+  },
+  "packageRules": [
+    {
+      "description": "Group non-major npm updates into a single PR per ecosystem",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm non-major"
+    },
+    {
+      "description": "Group devDependency major updates",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["major"],
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "devDeps major"
+    }
   ]
 }
