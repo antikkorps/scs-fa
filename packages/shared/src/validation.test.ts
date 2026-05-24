@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { cartItemSchema, loginSchema, registerSchema } from "./validation.js"
+import { cartItemSchema, loginSchema, refreshSchema, registerSchema } from "./validation.js"
 
 describe("registerSchema", () => {
   const base = {
@@ -44,6 +44,25 @@ describe("loginSchema", () => {
   it("requires non-empty password", () => {
     const r = loginSchema.safeParse({ email: "jean@example.fr", password: "" })
     expect(r.success).toBe(false)
+  })
+
+  it("accepts optional deviceLabel", () => {
+    const r = loginSchema.safeParse({
+      email: "jean@example.fr",
+      password: "x",
+      deviceLabel: "MacBook Pro",
+    })
+    expect(r.success).toBe(true)
+  })
+})
+
+describe("refreshSchema", () => {
+  it("rejects short tokens", () => {
+    expect(refreshSchema.safeParse({ refreshToken: "short" }).success).toBe(false)
+  })
+
+  it("accepts a 32-byte base64url-like token", () => {
+    expect(refreshSchema.safeParse({ refreshToken: "a".repeat(43) }).success).toBe(true)
   })
 })
 
