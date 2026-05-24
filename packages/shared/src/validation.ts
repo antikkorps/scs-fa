@@ -3,12 +3,21 @@ import { LEGAL_CATEGORIES, PRODUCT_CATEGORIES } from "./constants.js"
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
+export const phoneSchema = z
+  .string()
+  .min(6)
+  .max(20)
+  .regex(/^[+0-9 ().-]+$/, "Invalid phone format")
+
+export const CURRENT_RGPD_CONSENT_VERSION = "1.0"
 
 export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
+  phone: phoneSchema.optional(),
+  rgpdConsent: z.literal(true, { message: "RGPD consent is required" }),
 })
 
 export const loginSchema = z.object({

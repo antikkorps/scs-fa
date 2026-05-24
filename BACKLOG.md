@@ -38,11 +38,13 @@
 
 ## PHASE 1 — Auth (security-first)
 
-**Story 1.1** — Inscription customer
+**Story 1.1** — Inscription customer ✅
 
-- Critères : email unique, password ≥12 chars, argon2id hash, RGPD consent stocké
-- Tests : succès, email dupliqué, password faible, payload invalide
-- Endpoint : `POST /api/auth/register`
+- [x] Critères : email unique (lowercase normalisé), password ≥12 chars, argon2id hash (OWASP 2024 params), RGPD consent stocké (`rgpd_consent_at` + `rgpd_consent_version`)
+- [x] Tests : succès (201), email dupliqué (409), password faible (400), payload invalide (400), consent manquant (400), normalisation email
+- [x] Endpoint : `POST /api/auth/register` (rate limit 5/min)
+- [x] Audit log `user.registered` inséré (IP + user-agent)
+- [x] Refactor : `buildApp()` factory pour tests via `fastify.inject`
 
 **Story 1.2** — Login + JWT
 
