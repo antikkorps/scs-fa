@@ -54,9 +54,11 @@
 - [x] Endpoints : `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`
 - [x] Audit logs : `user.login`, `user.token_refreshed`
 
-**Story 1.3** — Profil
+**Story 1.3** — Profil ✅
 
-- Critères : `GET /api/auth/me` (RBAC), `PATCH` (validation Zod stricte)
+- [x] Critères : `GET /api/auth/me` (RBAC via JWT authenticate preHandler), `PATCH /api/auth/me` (validation Zod stricte — firstName/lastName/phone/address only, rejects email/role changes)
+- [x] Tests : GET success (200), GET sans JWT (401), GET token invalide (401), PATCH update name, PATCH update address, PATCH phone nullable, PATCH audit log, PATCH body vide (400), PATCH email interdit (400), PATCH role interdit (400), PATCH sans JWT (401), PATCH phone invalide (400)
+- [x] Audit log `user.profile_updated` inséré (IP + user-agent + new values)
 
 **Story 1.4** — Reset password (email token)
 
