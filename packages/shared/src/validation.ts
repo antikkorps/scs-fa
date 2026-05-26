@@ -47,6 +47,18 @@ export const updateProfileSchema = z
     message: "At least one field must be provided",
   })
 
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+})
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(20).max(256),
+  password: passwordSchema,
+})
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
+
 export const cartItemSchema = z
   .object({
     variantId: z.string().uuid().optional(),

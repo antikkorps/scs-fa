@@ -154,6 +154,37 @@ export const usersRelations = relations(users, ({ many, one }) => ({
 }))
 
 // ============================================================================
+// Password reset tokens (single-use, 1h TTL)
+// ============================================================================
+
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_password_reset_tokens_user").on(t.userId),
+    index("idx_password_reset_tokens_expires").on(t.expiresAt),
+    foreignKey({
+      columns: [t.userId],
+      foreignColumns: [users.id],
+    }).onDelete("cascade"),
+  ],
+)
+
+export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [passwordResetTokens.userId],
+    references: [users.id],
+  }),
+}))
+
+// ============================================================================
 // Refresh tokens (multi-device sessions; one row per active refresh token)
 // ============================================================================
 
