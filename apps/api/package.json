@@ -35,7 +35,7 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
-    "@types/node": "22.19.11",
+    "@types/node": "24.10.13",
     "@types/nodemailer": "^8.0.0",
     "@types/pg": "8.16.0",
     "@vitest/coverage-v8": "4.0.18",
