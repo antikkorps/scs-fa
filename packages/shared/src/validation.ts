@@ -32,6 +32,21 @@ export const refreshSchema = z.object({
 
 export const logoutSchema = refreshSchema
 
+export const updateProfileSchema = z
+  .object({
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+    phone: phoneSchema.optional().nullable(),
+    addressStreet: z.string().max(255).optional().nullable(),
+    addressPostal: z.string().max(10).optional().nullable(),
+    addressCity: z.string().max(100).optional().nullable(),
+    addressCountry: z.string().length(2).optional(),
+  })
+  .strict()
+  .refine((o) => Object.keys(o).length > 0, {
+    message: "At least one field must be provided",
+  })
+
 export const cartItemSchema = z
   .object({
     variantId: z.string().uuid().optional(),
@@ -62,6 +77,8 @@ export type LoginInput = z.infer<typeof loginSchema>
 export type RefreshInput = z.infer<typeof refreshSchema>
 export type CreateOrderInput = z.infer<typeof createOrderSchema>
 export type ProductFilters = z.infer<typeof productFiltersSchema>
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
 
 export type AuthTokens = {
   accessToken: string
