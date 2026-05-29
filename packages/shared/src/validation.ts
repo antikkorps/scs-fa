@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { LEGAL_CATEGORIES, PRODUCT_CATEGORIES } from "./constants.js"
+import { LEGAL_CATEGORIES } from "./constants.js"
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
@@ -74,15 +74,26 @@ export const createOrderSchema = z.object({
   shippingAddressId: z.string().uuid(),
 })
 
-export const productFiltersSchema = z.object({
-  category: z.enum(PRODUCT_CATEGORIES).optional(),
-  legalCategory: z.enum(LEGAL_CATEGORIES).optional(),
-  search: z.string().max(200).optional(),
-  minPrice: z.coerce.number().nonnegative().optional(),
-  maxPrice: z.coerce.number().nonnegative().optional(),
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
-})
+// Product category slug (references product_categories.slug, e.g. "arme-poing")
+export const categorySlugSchema = z
+  .string()
+  .max(100)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid category slug")
+
+export const productFiltersSchema = z
+  .object({
+    category: categorySlugSchema.optional(),
+    legalCategory: z.enum(LEGAL_CATEGORIES).optional(),
+    search: z.string().trim().min(1).max(200).optional(),
+    minPrice: z.coerce.number().nonnegative().optional(),
+    maxPrice: z.coerce.number().nonnegative().optional(),
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+  })
+  .refine((f) => f.minPrice === undefined || f.maxPrice === undefined || f.maxPrice >= f.minPrice, {
+    message: "maxPrice must be greater than or equal to minPrice",
+    path: ["maxPrice"],
+  })
 
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>

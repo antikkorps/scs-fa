@@ -6,6 +6,7 @@ import { relations, sql } from "drizzle-orm"
 import {
   boolean,
   check,
+  customType,
   date,
   decimal,
   foreignKey,
@@ -20,6 +21,13 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core"
+
+// Postgres full-text search vector (no native Drizzle type)
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector"
+  },
+})
 
 // ============================================================================
 // ENUMS (Catégories légales FR, rôles, statuts, etc.)
@@ -390,6 +398,11 @@ export const products = pgTable(
     published: boolean("published").default(true),
     featured: boolean("featured").default(false),
 
+    // Recherche full-text (généré: name pondéré A, description B, longDescription C)
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      sql`setweight(to_tsvector('french', coalesce(name, '')), 'A') || setweight(to_tsvector('french', coalesce(description, '')), 'B') || setweight(to_tsvector('french', coalesce(long_description, '')), 'C')`,
+    ),
+
     // Métadonnées
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -402,6 +415,7 @@ export const products = pgTable(
      index("idx_products_requires_legal").on(
       t.requiresLegalVerification,
     ),
+     index("idx_products_search").using("gin", t.searchVector),
      foreignKey({
       columns: [t.categoryId],
       foreignColumns: [productCategories.id],

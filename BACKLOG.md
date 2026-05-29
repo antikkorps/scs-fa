@@ -66,9 +66,13 @@
 
 ## PHASE 2 — Produits & Catégories
 
-**Story 2.1** — Listing produits avec filtres
+**Story 2.1** — Listing produits avec filtres ✅
 
-- Critères : pagination, filtres (catégorie, prix, légale), search full-text
+- [x] Critères : pagination (page/limit, max 100), filtres catégorie (slug `product_categories`), prix (minPrice/maxPrice sur priceHt), légale (enum A/B/C/D/none), search full-text Postgres
+- [x] Endpoint public : `GET /api/products` (published-only, enveloppe `{ data, pagination }`, priceTtc calculé)
+- [x] Full-text : colonne générée `products.search_vector` (tsvector `french`, name=A/description=B/longDescription=C) + index GIN, ranking via `ts_rank` + `websearch_to_tsquery` (appliqué via psql ALTER + reflété dans schema.ts)
+- [x] Validation : `productFiltersSchema` (shared) — slug regex, refine maxPrice ≥ minPrice
+- [x] Tests (11) : pagination, published-only, filtre catégorie/légale/prix min+max, search full-text, priceTtc, 400 (prix négatif, maxPrice<minPrice, slug invalide)
 - Endpoint : `GET /api/products`
 
 **Story 2.2** — Détail produit
