@@ -1,5 +1,11 @@
-import { calculateOrderPaymentSplit, createOrderSchema, requiresVirement } from "@armurier/shared"
-import { and, eq, gte, sql } from "drizzle-orm"
+import {
+  calculateOrderPaymentSplit,
+  createOrderSchema,
+  paginationSchema,
+  requiresVirement,
+  uuidParamSchema,
+} from "@armurier/shared"
+import { and, desc, eq, gte, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { loadCart } from "../cart/service.js"
@@ -222,6 +228,102 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         paymentSplit: split,
         shippingAddress: shippingSnapshot,
         billingAddress: billingSnapshot,
+      },
+    })
+  })
+
+  // GET /api/orders — the authenticated user's orders (most recent first)
+  fastify.get("/", async (request, reply) => {
+    const parsed = paginationSchema.safeParse(request.query)
+    if (!parsed.success) {
+      return reply.code(400).send(validationError(parsed.error.issues))
+    }
+    const { page, limit } = parsed.data
+    const userId = request.user.sub
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(eq(orders.userId, userId))
+
+    const rows = await db
+      .select({
+        id: orders.id,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+        legalVerificationStatus: orders.legalVerificationStatus,
+        paymentStatus: orders.paymentStatus,
+        subtotalHt: orders.subtotalHt,
+        vatAmount: orders.vatAmount,
+        totalTtc: orders.totalTtc,
+        itemsJson: orders.itemsJson,
+      })
+      .from(orders)
+      .where(eq(orders.userId, userId))
+      .orderBy(desc(orders.createdAt))
+      .limit(limit)
+      .offset((page - 1) * limit)
+
+    const data = rows.map((r) => ({
+      id: r.id,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      legalVerificationStatus: r.legalVerificationStatus,
+      paymentStatus: r.paymentStatus,
+      subtotalHt: Number(r.subtotalHt),
+      vatAmount: Number(r.vatAmount),
+      totalTtc: Number(r.totalTtc),
+      itemCount: r.itemsJson.reduce((sum, i) => sum + i.qty, 0),
+    }))
+
+    return reply.code(200).send({
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total,
+      },
+    })
+  })
+
+  // GET /api/orders/:id — a single order owned by the authenticated user
+  fastify.get("/:id", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const userId = request.user.sub
+
+    const [order] = await db
+      .select({
+        id: orders.id,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+        legalVerificationStatus: orders.legalVerificationStatus,
+        paymentStatus: orders.paymentStatus,
+        subtotalHt: orders.subtotalHt,
+        vatAmount: orders.vatAmount,
+        totalTtc: orders.totalTtc,
+        items: orders.itemsJson,
+        shippingAddress: orders.shippingAddress,
+        billingAddress: orders.billingAddress,
+      })
+      .from(orders)
+      .where(and(eq(orders.id, params.data.id), eq(orders.userId, userId)))
+      .limit(1)
+
+    if (!order) {
+      return reply.code(404).send({ error: "NotFound", message: "Order not found" })
+    }
+
+    return reply.code(200).send({
+      data: {
+        ...order,
+        subtotalHt: Number(order.subtotalHt),
+        vatAmount: Number(order.vatAmount),
+        totalTtc: Number(order.totalTtc),
       },
     })
   })
