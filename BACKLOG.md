@@ -88,9 +88,11 @@
 - [x] Tests (7) : détail complet, priceTtc, objet légal complet, catégorie `none`, 404 non publié, 404 id inconnu, 400 id non-UUID
 - Variantes produit : différées (hors périmètre, non seedées) — à traiter dans une story ultérieure
 
-**Story 2.3** — Catégories légales (read-only public)
+**Story 2.3** — Catégories légales (read-only public) ✅
 
-- Endpoint : `GET /api/legal-categories`
+- [x] Endpoint public : `GET /api/legal-categories` (données de référence, enveloppe `{ data }`, sans pagination — 5 lignes seedées)
+- [x] Renvoie les 5 catégories A/B/C/D/none triées par ordre d'enum, avec name/description/requiresVerification/minAge/requiredDocTypes
+- [x] Tests (3) : 200 + 5 catégories ordonnées, shape complète par catégorie, `none` → requiresVerification false + docs vides
 
 ## PHASE 3 — Panier & Commandes
 
