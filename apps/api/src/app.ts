@@ -5,6 +5,7 @@ import fastifyRateLimit from "@fastify/rate-limit"
 import Fastify, { type FastifyInstance } from "fastify"
 import { authRoutes } from "./auth/index.js"
 import { env } from "./env.js"
+import { legalCategoryRoutes } from "./legal-categories/index.js"
 import { productRoutes } from "./products/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -50,6 +51,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await fastify.register(authRoutes, { prefix: "/api/auth" })
   await fastify.register(productRoutes, { prefix: "/api/products" })
+  await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
 
   return fastify
 }
