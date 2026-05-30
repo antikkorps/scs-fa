@@ -60,9 +60,13 @@
 - [x] Tests : GET success (200), GET sans JWT (401), GET token invalide (401), PATCH update name, PATCH update address, PATCH phone nullable, PATCH audit log, PATCH body vide (400), PATCH email interdit (400), PATCH role interdit (400), PATCH sans JWT (401), PATCH phone invalide (400)
 - [x] Audit log `user.profile_updated` inséré (IP + user-agent + new values)
 
-**Story 1.4** — Reset password (email token)
+**Story 1.4** — Reset password (email token) ✅
 
-- Critères : token jetable 1h, audit log, rate limit
+- [x] Critères : token jetable (single-use) 1h TTL, SHA-256 hashé en DB (`password_reset_tokens`), rate limit forgot-password 3/15min, réponse constante anti-énumération email
+- [x] Endpoints : `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
+- [x] Reset révoque tous les refresh tokens (re-login forcé sur chaque device), email via nodemailer (SMTP env)
+- [x] Audit logs : `user.password_reset_requested`, `user.password_reset`
+- [x] Tests (9) : forgot 200 + création token, forgot email inexistant (200 anti-énumération), forgot email invalide (400), reset succès, reset révoque refresh tokens, token expiré, token déjà utilisé, token bidon, password faible (400)
 
 ## PHASE 2 — Produits & Catégories
 
@@ -75,9 +79,14 @@
 - [x] Tests (11) : pagination, published-only, filtre catégorie/légale/prix min+max, search full-text, priceTtc, 400 (prix négatif, maxPrice<minPrice, slug invalide)
 - Endpoint : `GET /api/products`
 
-**Story 2.2** — Détail produit
+**Story 2.2** — Détail produit ✅
 
-- Endpoint : `GET /api/products/:id`
+- [x] Endpoint public : `GET /api/products/:id` (UUID), published-only
+- [x] Critères : détail enrichi vs listing — `longDescription`, `seo` (metaTitle/metaDescription/keywords), `ageMinRequired`, restrictions accessoires, objet `legalCategory` complet (name/description/requiresVerification/minAge/requiredDocTypes), `priceTtc` calculé
+- [x] Validation : `productIdParamSchema` (shared) — param UUID, 400 si invalide ; 404 si inexistant ou non publié
+- [x] DRY : helper `computePriceTtc` extrait dans `packages/shared` (réutilisé par listing 2.1)
+- [x] Tests (7) : détail complet, priceTtc, objet légal complet, catégorie `none`, 404 non publié, 404 id inconnu, 400 id non-UUID
+- Variantes produit : différées (hors périmètre, non seedées) — à traiter dans une story ultérieure
 
 **Story 2.3** — Catégories légales (read-only public)
 
