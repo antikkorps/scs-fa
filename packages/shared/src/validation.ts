@@ -69,6 +69,14 @@ export const cartItemSchema = z
     message: "Either variantId or printId must be provided, not both",
   })
 
+// Update the quantity of an existing (product-variant) cart line.
+export const updateCartItemSchema = z.object({
+  qty: z.number().int().positive().max(10),
+})
+
+export type AddCartItemInput = z.infer<typeof cartItemSchema>
+export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>
+
 export const createOrderSchema = z.object({
   items: z.array(cartItemSchema).min(1),
   shippingAddressId: z.string().uuid(),
@@ -95,10 +103,15 @@ export const productFiltersSchema = z
     path: ["maxPrice"],
   })
 
-// Product detail lookup by UUID (GET /api/products/:id)
-export const productIdParamSchema = z.object({
+// Generic UUID route param `{ id }` (e.g. GET /api/products/:id, cart item id)
+export const uuidParamSchema = z.object({
   id: z.string().uuid(),
 })
+
+export type UuidParam = z.infer<typeof uuidParamSchema>
+
+// Backwards-compatible alias used by the product detail route
+export const productIdParamSchema = uuidParamSchema
 
 export type ProductIdParam = z.infer<typeof productIdParamSchema>
 
