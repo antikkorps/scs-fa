@@ -29,11 +29,24 @@ const tsvector = customType<{ data: string }>({
   },
 })
 
+// Immutable snapshot of an address book entry, frozen onto an order
+export interface OrderAddressSnapshot {
+  firstName: string
+  lastName: string
+  line1: string
+  line2: string | null
+  postal: string
+  city: string
+  country: string
+  phone: string | null
+}
+
 // ============================================================================
 // ENUMS (Catégories légales FR, rôles, statuts, etc.)
 // ============================================================================
 
 export const userRoleEnum = pgEnum("user_role", ["customer", "vendor", "admin"])
+export const addressTypeEnum = pgEnum("address_type", ["shipping", "billing", "both"])
 export const legalCategoryEnum = pgEnum("legal_category", ["A", "B", "C", "D", "none"])
 export const docTypeEnum = pgEnum("doc_type", [
   "cni",
@@ -149,6 +162,7 @@ export const users = pgTable(
 
 export const usersRelations = relations(users, ({ many, one }) => ({
   legalDocuments: many(legalDocuments),
+  addresses: many(addresses),
   orders: many(orders),
   cartItems: many(cartItems),
   artworkCartItems: many(artworkCartItems),
@@ -157,6 +171,49 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   verifiedByLogs: many(auditLogs, { relationName: "verifiedBy" }),
   legalVerifiedByUser: one(users, {
     fields: [users.legalVerifiedBy],
+    references: [users.id],
+  }),
+}))
+
+// ============================================================================
+// Address book (multiple saved shipping/billing addresses per user)
+// ============================================================================
+
+export const addresses = pgTable(
+  "addresses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+
+    label: varchar("label", { length: 100 }), // e.g. "Domicile", "Bureau"
+    type: addressTypeEnum("type").notNull().default("both"),
+
+    firstName: varchar("first_name", { length: 100 }).notNull(),
+    lastName: varchar("last_name", { length: 100 }).notNull(),
+    line1: varchar("line1", { length: 255 }).notNull(),
+    line2: varchar("line2", { length: 255 }),
+    postal: varchar("postal", { length: 10 }).notNull(),
+    city: varchar("city", { length: 100 }).notNull(),
+    country: varchar("country", { length: 2 }).notNull().default("FR"),
+    phone: varchar("phone", { length: 20 }),
+
+    isDefault: boolean("is_default").notNull().default(false),
+
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_addresses_user").on(t.userId),
+    foreignKey({
+      columns: [t.userId],
+      foreignColumns: [users.id],
+    }).onDelete("cascade"),
+  ],
+)
+
+export const addressesRelations = relations(addresses, ({ one }) => ({
+  user: one(users, {
+    fields: [addresses.userId],
     references: [users.id],
   }),
 }))
@@ -866,6 +923,10 @@ export const orders = pgTable(
     shippingAddressStreet: varchar("shipping_address_street", { length: 255 }),
     shippingAddressPostal: varchar("shipping_address_postal", { length: 10 }),
     shippingAddressCity: varchar("shipping_address_city", { length: 100 }),
+
+    // Immutable address snapshots taken from the address book at order time
+    shippingAddress: jsonb("shipping_address").$type<OrderAddressSnapshot>(),
+    billingAddress: jsonb("billing_address").$type<OrderAddressSnapshot>(),
 
     // Henrri
     henrriInvoiceId: varchar("henrri_invoice_id", { length: 100 }).unique(),

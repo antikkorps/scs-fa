@@ -3,9 +3,12 @@ import fastifyHelmet from "@fastify/helmet"
 import fastifyJwt from "@fastify/jwt"
 import fastifyRateLimit from "@fastify/rate-limit"
 import Fastify, { type FastifyInstance } from "fastify"
+import { addressRoutes } from "./addresses/index.js"
 import { authRoutes } from "./auth/index.js"
+import { cartRoutes } from "./cart/index.js"
 import { env } from "./env.js"
 import { legalCategoryRoutes } from "./legal-categories/index.js"
+import { orderRoutes } from "./orders/index.js"
 import { productRoutes } from "./products/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -52,6 +55,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(authRoutes, { prefix: "/api/auth" })
   await fastify.register(productRoutes, { prefix: "/api/products" })
   await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
+  await fastify.register(cartRoutes, { prefix: "/api/cart" })
+  await fastify.register(addressRoutes, { prefix: "/api/addresses" })
+  await fastify.register(orderRoutes, { prefix: "/api/orders" })
 
   return fastify
 }

@@ -1,0 +1,228 @@
+import { calculateOrderPaymentSplit, createOrderSchema, requiresVirement } from "@armurier/shared"
+import { and, eq, gte, sql } from "drizzle-orm"
+import type { FastifyPluginAsync } from "fastify"
+import { authenticate } from "../auth/authenticate.js"
+import { loadCart } from "../cart/service.js"
+import { db } from "../db/client.js"
+import {
+  addresses,
+  artworkCartItems,
+  artworkPrints,
+  auditLogs,
+  cartItems,
+  type OrderAddressSnapshot,
+  orders,
+  productVariants,
+} from "../db/schema.js"
+import { validationError } from "../http.js"
+
+class OrderError extends Error {
+  constructor(
+    readonly statusCode: number,
+    readonly errorCode: string,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+const ADDRESS_FIELDS = {
+  firstName: addresses.firstName,
+  lastName: addresses.lastName,
+  line1: addresses.line1,
+  line2: addresses.line2,
+  postal: addresses.postal,
+  city: addresses.city,
+  country: addresses.country,
+  phone: addresses.phone,
+} as const
+
+function toSnapshot(a: {
+  firstName: string
+  lastName: string
+  line1: string
+  line2: string | null
+  postal: string
+  city: string
+  country: string
+  phone: string | null
+}): OrderAddressSnapshot {
+  return {
+    firstName: a.firstName,
+    lastName: a.lastName,
+    line1: a.line1,
+    line2: a.line2,
+    postal: a.postal,
+    city: a.city,
+    country: a.country,
+    phone: a.phone,
+  }
+}
+
+export const orderRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.addHook("preHandler", authenticate)
+
+  // POST /api/orders — turn the user's cart into an order with an automatic payment split
+  fastify.post("/", async (request, reply) => {
+    const userId = request.user.sub
+    const role = request.user.role
+
+    const parsed = createOrderSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.code(400).send(validationError(parsed.error.issues))
+    }
+    const { shippingAddressId, billingAddressId } = parsed.data
+
+    const cart = await loadCart(userId)
+    if (cart.summary.itemCount === 0) {
+      return reply.code(400).send({ error: "EmptyCart", message: "Cart is empty" })
+    }
+
+    const [shipping] = await db
+      .select(ADDRESS_FIELDS)
+      .from(addresses)
+      .where(and(eq(addresses.id, shippingAddressId), eq(addresses.userId, userId)))
+      .limit(1)
+    if (!shipping) {
+      return reply.code(404).send({ error: "NotFound", message: "Shipping address not found" })
+    }
+
+    let billing = shipping
+    if (billingAddressId && billingAddressId !== shippingAddressId) {
+      const [b] = await db
+        .select(ADDRESS_FIELDS)
+        .from(addresses)
+        .where(and(eq(addresses.id, billingAddressId), eq(addresses.userId, userId)))
+        .limit(1)
+      if (!b) {
+        return reply.code(404).send({ error: "NotFound", message: "Billing address not found" })
+      }
+      billing = b
+    }
+
+    const shippingSnapshot = toSnapshot(shipping)
+    const billingSnapshot = toSnapshot(billing)
+
+    const splitItems = [
+      ...cart.items.map((l) => ({
+        priceHt: l.lineHt,
+        vatPct: l.vatPct,
+        requiresPaymentVirement: requiresVirement(l.legalCategory),
+      })),
+      ...cart.artworkItems.map((l) => ({
+        priceHt: l.lineHt,
+        vatPct: l.vatPct,
+        requiresPaymentVirement: false,
+      })),
+    ]
+    const split = calculateOrderPaymentSplit(splitItems)
+
+    const needsLegalVerification = cart.items.some((l) => l.requiresLegalVerification)
+    const legalStatus = needsLegalVerification ? "pending" : "payment_pending"
+
+    const itemsJson = [
+      ...cart.items.map((l) => ({
+        variantId: l.variantId,
+        qty: l.qty,
+        priceHt: l.unitPriceHt,
+        name: l.name,
+        sku: l.sku,
+        category: l.categorySlug,
+        requiresPaymentVirement: requiresVirement(l.legalCategory),
+      })),
+      ...cart.artworkItems.map((l) => ({
+        printId: l.printId,
+        qty: 1,
+        priceHt: l.unitPriceHt,
+        name: l.title,
+        sku: l.printDesignation,
+        category: "gun-art",
+        requiresPaymentVirement: false,
+      })),
+    ]
+
+    let orderId: string
+    try {
+      orderId = await db.transaction(async (tx) => {
+        const [order] = await tx
+          .insert(orders)
+          .values({
+            userId,
+            legalVerificationStatus: legalStatus,
+            paymentStatus: "pending",
+            itemsJson,
+            subtotalHt: cart.summary.subtotalHt.toFixed(2),
+            vatAmount: cart.summary.vatAmount.toFixed(2),
+            totalTtc: cart.summary.totalTtc.toFixed(2),
+            shippingAddress: shippingSnapshot,
+            billingAddress: billingSnapshot,
+            shippingAddressStreet: shippingSnapshot.line1,
+            shippingAddressPostal: shippingSnapshot.postal,
+            shippingAddressCity: shippingSnapshot.city,
+          })
+          .returning({ id: orders.id })
+
+        // Decrement variant stock atomically (guard prevents overselling)
+        for (const line of cart.items) {
+          const updated = await tx
+            .update(productVariants)
+            .set({
+              stockQty: sql`${productVariants.stockQty} - ${line.qty}`,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(productVariants.id, line.variantId), gte(productVariants.stockQty, line.qty)))
+            .returning({ id: productVariants.id })
+          if (updated.length === 0) {
+            throw new OrderError(409, "InsufficientStock", `Insufficient stock for ${line.sku}`)
+          }
+        }
+
+        // Reserve artwork prints (only if still available)
+        for (const line of cart.artworkItems) {
+          const updated = await tx
+            .update(artworkPrints)
+            .set({ status: "reserved", orderId: order.id, updatedAt: new Date() })
+            .where(and(eq(artworkPrints.id, line.printId), eq(artworkPrints.status, "available")))
+            .returning({ id: artworkPrints.id })
+          if (updated.length === 0) {
+            throw new OrderError(409, "Conflict", `Print ${line.printDesignation} is no longer available`)
+          }
+        }
+
+        await tx.delete(cartItems).where(eq(cartItems.userId, userId))
+        await tx.delete(artworkCartItems).where(eq(artworkCartItems.userId, userId))
+
+        return order.id
+      })
+    } catch (err) {
+      if (err instanceof OrderError) {
+        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message })
+      }
+      throw err
+    }
+
+    await db.insert(auditLogs).values({
+      userId,
+      userRole: role,
+      entityType: "order",
+      entityId: orderId,
+      action: "order.created",
+      newValue: { totalTtc: cart.summary.totalTtc, splitType: split.splitType },
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] ?? null,
+    })
+
+    return reply.code(201).send({
+      data: {
+        id: orderId,
+        legalVerificationStatus: legalStatus,
+        paymentStatus: "pending",
+        requiresLegalVerification: needsLegalVerification,
+        totals: cart.summary,
+        paymentSplit: split,
+        shippingAddress: shippingSnapshot,
+        billingAddress: billingSnapshot,
+      },
+    })
+  })
+}
