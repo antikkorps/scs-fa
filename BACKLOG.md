@@ -60,9 +60,13 @@
 - [x] Tests : GET success (200), GET sans JWT (401), GET token invalide (401), PATCH update name, PATCH update address, PATCH phone nullable, PATCH audit log, PATCH body vide (400), PATCH email interdit (400), PATCH role interdit (400), PATCH sans JWT (401), PATCH phone invalide (400)
 - [x] Audit log `user.profile_updated` inséré (IP + user-agent + new values)
 
-**Story 1.4** — Reset password (email token)
+**Story 1.4** — Reset password (email token) ✅
 
-- Critères : token jetable 1h, audit log, rate limit
+- [x] Critères : token jetable (single-use) 1h TTL, SHA-256 hashé en DB (`password_reset_tokens`), rate limit forgot-password 3/15min, réponse constante anti-énumération email
+- [x] Endpoints : `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
+- [x] Reset révoque tous les refresh tokens (re-login forcé sur chaque device), email via nodemailer (SMTP env)
+- [x] Audit logs : `user.password_reset_requested`, `user.password_reset`
+- [x] Tests (9) : forgot 200 + création token, forgot email inexistant (200 anti-énumération), forgot email invalide (400), reset succès, reset révoque refresh tokens, token expiré, token déjà utilisé, token bidon, password faible (400)
 
 ## PHASE 2 — Produits & Catégories
 
