@@ -4,14 +4,8 @@ import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { db } from "../db/client.js"
 import { artworkCartItems, artworkPrints, cartItems, products, productVariants } from "../db/schema.js"
+import { validationError } from "../http.js"
 import { loadCart } from "./service.js"
-
-function validationError(issues: { path: PropertyKey[]; message: string }[]) {
-  return {
-    error: "ValidationError",
-    issues: issues.map((i) => ({ path: i.path.join("."), message: i.message })),
-  }
-}
 
 export const cartRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)

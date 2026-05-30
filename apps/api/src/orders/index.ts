@@ -1,10 +1,20 @@
-import { calculateOrderPaymentSplit, requiresVirement } from "@armurier/shared"
+import { calculateOrderPaymentSplit, createOrderSchema, requiresVirement } from "@armurier/shared"
 import { and, eq, gte, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { loadCart } from "../cart/service.js"
 import { db } from "../db/client.js"
-import { artworkCartItems, artworkPrints, auditLogs, cartItems, orders, productVariants, users } from "../db/schema.js"
+import {
+  addresses,
+  artworkCartItems,
+  artworkPrints,
+  auditLogs,
+  cartItems,
+  type OrderAddressSnapshot,
+  orders,
+  productVariants,
+} from "../db/schema.js"
+import { validationError } from "../http.js"
 
 class OrderError extends Error {
   constructor(
@@ -16,6 +26,39 @@ class OrderError extends Error {
   }
 }
 
+const ADDRESS_FIELDS = {
+  firstName: addresses.firstName,
+  lastName: addresses.lastName,
+  line1: addresses.line1,
+  line2: addresses.line2,
+  postal: addresses.postal,
+  city: addresses.city,
+  country: addresses.country,
+  phone: addresses.phone,
+} as const
+
+function toSnapshot(a: {
+  firstName: string
+  lastName: string
+  line1: string
+  line2: string | null
+  postal: string
+  city: string
+  country: string
+  phone: string | null
+}): OrderAddressSnapshot {
+  return {
+    firstName: a.firstName,
+    lastName: a.lastName,
+    line1: a.line1,
+    line2: a.line2,
+    postal: a.postal,
+    city: a.city,
+    country: a.country,
+    phone: a.phone,
+  }
+}
+
 export const orderRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
 
@@ -24,27 +67,41 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = request.user.sub
     const role = request.user.role
 
+    const parsed = createOrderSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.code(400).send(validationError(parsed.error.issues))
+    }
+    const { shippingAddressId, billingAddressId } = parsed.data
+
     const cart = await loadCart(userId)
     if (cart.summary.itemCount === 0) {
       return reply.code(400).send({ error: "EmptyCart", message: "Cart is empty" })
     }
 
-    const [user] = await db
-      .select({
-        addressStreet: users.addressStreet,
-        addressPostal: users.addressPostal,
-        addressCity: users.addressCity,
-      })
-      .from(users)
-      .where(eq(users.id, userId))
+    const [shipping] = await db
+      .select(ADDRESS_FIELDS)
+      .from(addresses)
+      .where(and(eq(addresses.id, shippingAddressId), eq(addresses.userId, userId)))
       .limit(1)
-
-    if (!user?.addressStreet || !user.addressPostal || !user.addressCity) {
-      return reply.code(400).send({
-        error: "AddressRequired",
-        message: "A complete shipping address is required on your profile",
-      })
+    if (!shipping) {
+      return reply.code(404).send({ error: "NotFound", message: "Shipping address not found" })
     }
+
+    let billing = shipping
+    if (billingAddressId && billingAddressId !== shippingAddressId) {
+      const [b] = await db
+        .select(ADDRESS_FIELDS)
+        .from(addresses)
+        .where(and(eq(addresses.id, billingAddressId), eq(addresses.userId, userId)))
+        .limit(1)
+      if (!b) {
+        return reply.code(404).send({ error: "NotFound", message: "Billing address not found" })
+      }
+      billing = b
+    }
+
+    const shippingSnapshot = toSnapshot(shipping)
+    const billingSnapshot = toSnapshot(billing)
 
     const splitItems = [
       ...cart.items.map((l) => ({
@@ -97,9 +154,11 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
             subtotalHt: cart.summary.subtotalHt.toFixed(2),
             vatAmount: cart.summary.vatAmount.toFixed(2),
             totalTtc: cart.summary.totalTtc.toFixed(2),
-            shippingAddressStreet: user.addressStreet,
-            shippingAddressPostal: user.addressPostal,
-            shippingAddressCity: user.addressCity,
+            shippingAddress: shippingSnapshot,
+            billingAddress: billingSnapshot,
+            shippingAddressStreet: shippingSnapshot.line1,
+            shippingAddressPostal: shippingSnapshot.postal,
+            shippingAddressCity: shippingSnapshot.city,
           })
           .returning({ id: orders.id })
 
@@ -161,6 +220,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         requiresLegalVerification: needsLegalVerification,
         totals: cart.summary,
         paymentSplit: split,
+        shippingAddress: shippingSnapshot,
+        billingAddress: billingSnapshot,
       },
     })
   })

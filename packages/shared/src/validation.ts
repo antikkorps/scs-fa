@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { LEGAL_CATEGORIES } from "./constants.js"
+import { ADDRESS_TYPES, LEGAL_CATEGORIES } from "./constants.js"
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
@@ -77,10 +77,53 @@ export const updateCartItemSchema = z.object({
 export type AddCartItemInput = z.infer<typeof cartItemSchema>
 export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>
 
-export const createOrderSchema = z.object({
-  items: z.array(cartItemSchema).min(1),
-  shippingAddressId: z.string().uuid(),
-})
+// Address book entry (create)
+export const createAddressSchema = z
+  .object({
+    label: z.string().max(100).optional(),
+    type: z.enum(ADDRESS_TYPES).optional().default("both"),
+    firstName: z.string().min(1).max(100),
+    lastName: z.string().min(1).max(100),
+    line1: z.string().min(1).max(255),
+    line2: z.string().max(255).optional(),
+    postal: z.string().min(1).max(10),
+    city: z.string().min(1).max(100),
+    country: z.string().length(2).optional().default("FR"),
+    phone: phoneSchema.optional(),
+    isDefault: z.boolean().optional(),
+  })
+  .strict()
+
+// Address book entry (partial update — defaults intentionally omitted)
+export const updateAddressSchema = z
+  .object({
+    label: z.string().max(100).nullable().optional(),
+    type: z.enum(ADDRESS_TYPES).optional(),
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+    line1: z.string().min(1).max(255).optional(),
+    line2: z.string().max(255).nullable().optional(),
+    postal: z.string().min(1).max(10).optional(),
+    city: z.string().min(1).max(100).optional(),
+    country: z.string().length(2).optional(),
+    phone: phoneSchema.nullable().optional(),
+    isDefault: z.boolean().optional(),
+  })
+  .strict()
+  .refine((o) => Object.keys(o).length > 0, {
+    message: "At least one field must be provided",
+  })
+
+export type CreateAddressInput = z.infer<typeof createAddressSchema>
+export type UpdateAddressInput = z.infer<typeof updateAddressSchema>
+
+// Order is built from the server-side cart; the body only carries address references
+export const createOrderSchema = z
+  .object({
+    shippingAddressId: z.string().uuid(),
+    billingAddressId: z.string().uuid().optional(),
+  })
+  .strict()
 
 // Product category slug (references product_categories.slug, e.g. "arme-poing")
 export const categorySlugSchema = z

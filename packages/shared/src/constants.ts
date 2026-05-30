@@ -5,6 +5,9 @@ export type LegalCategory = (typeof LEGAL_CATEGORIES)[number]
 export const USER_ROLES = ["customer", "vendor", "admin"] as const
 export type UserRole = (typeof USER_ROLES)[number]
 
+export const ADDRESS_TYPES = ["shipping", "billing", "both"] as const
+export type AddressType = (typeof ADDRESS_TYPES)[number]
+
 export const PRODUCT_CATEGORIES = ["firearm", "ammunition", "accessory", "gun_art"] as const
 export type ProductCategoryType = (typeof PRODUCT_CATEGORIES)[number]
 

@@ -12,9 +12,9 @@ export type PaymentSplitType = (typeof PAYMENT_SPLIT)[keyof typeof PAYMENT_SPLIT
 /**
  * Whether an item must be paid by bank transfer (virement) rather than card.
  *
- * Business rule (TO CONFIRM): regulated firearms in legal categories A/B/C
- * require a bank transfer; category D, unregulated ("none") items and Gun Art
- * are payable by card.
+ * Business rule: regulated firearms in legal categories A/B/C require a bank
+ * transfer; category D, unregulated ("none") items and Gun Art are payable by
+ * card.
  */
 export function requiresVirement(legalCategory: string | null | undefined): boolean {
   return legalCategory === "A" || legalCategory === "B" || legalCategory === "C"

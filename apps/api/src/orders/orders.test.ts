@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import {
+  addresses,
   artworkCartItems,
   artworkPrints,
   artworks,
@@ -21,8 +22,8 @@ import {
 
 const PREFIX = "TEST32-"
 const PASSWORD = "MotDePasseTresLong123!"
-const EMAIL_ADDR = "cart-test32@order-test.local"
-const EMAIL_NOADDR = "cart-test32-noaddr@order-test.local"
+const EMAIL = "cart-test32@order-test.local"
+const EMAIL_OTHER = "cart-test32-other@order-test.local"
 
 async function categoryId(slug: string): Promise<string> {
   const [row] = await db
@@ -47,9 +48,10 @@ async function legalCategoryId(code: "B" | "none"): Promise<string> {
 describe("orders (POST /api/orders)", () => {
   let app: FastifyInstance
   let userId: string
-  let noAddrUserId: string
+  let otherUserId: string
   let token: string
-  let noAddrToken: string
+  let shippingAddressId: string
+  let otherUserAddressId: string
   let regulatedVariantId: string
   let accessoryVariantId: string
   let printId: string
@@ -78,6 +80,7 @@ describe("orders (POST /api/orders)", () => {
       .where(inArray(artworkPrints.artworkId, artworkIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
     await db.delete(orders).where(inArray(orders.userId, userIds))
+    await db.delete(addresses).where(inArray(addresses.userId, userIds))
     await db.delete(artworkPrints).where(inArray(artworkPrints.artworkId, artworkIds))
     await db.delete(artworks).where(like(artworks.sku, `${PREFIX}%`))
     await db.delete(productVariants).where(like(productVariants.skuVariant, `${PREFIX}%`))
@@ -94,12 +97,9 @@ describe("orders (POST /api/orders)", () => {
     const [u1] = await db
       .insert(users)
       .values({
-        email: EMAIL_ADDR,
+        email: EMAIL,
         passwordHash,
         role: "customer",
-        addressStreet: "1 rue du Tir",
-        addressPostal: "75001",
-        addressCity: "Paris",
         rgpdConsentAt: new Date(),
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
@@ -108,14 +108,41 @@ describe("orders (POST /api/orders)", () => {
     const [u2] = await db
       .insert(users)
       .values({
-        email: EMAIL_NOADDR,
+        email: EMAIL_OTHER,
         passwordHash,
         role: "customer",
         rgpdConsentAt: new Date(),
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
       .returning({ id: users.id })
-    noAddrUserId = u2.id
+    otherUserId = u2.id
+
+    const [addr] = await db
+      .insert(addresses)
+      .values({
+        userId,
+        label: "Domicile",
+        firstName: "Jean",
+        lastName: "Tireur",
+        line1: "1 rue du Tir",
+        postal: "75001",
+        city: "Paris",
+        isDefault: true,
+      })
+      .returning({ id: addresses.id })
+    shippingAddressId = addr.id
+    const [otherAddr] = await db
+      .insert(addresses)
+      .values({
+        userId: otherUserId,
+        firstName: "Autre",
+        lastName: "Client",
+        line1: "2 avenue Ailleurs",
+        postal: "69002",
+        city: "Lyon",
+      })
+      .returning({ id: addresses.id })
+    otherUserAddressId = otherAddr.id
 
     const armeLongue = await categoryId("arme-longue")
     const accessoire = await categoryId("accessoire-tireur")
@@ -138,12 +165,7 @@ describe("orders (POST /api/orders)", () => {
       .returning({ id: products.id })
     const [regVariant] = await db
       .insert(productVariants)
-      .values({
-        productId: regulated.id,
-        skuVariant: `${PREFIX}reg-v1`,
-        finition: "Bois",
-        stockQty: 5,
-      })
+      .values({ productId: regulated.id, skuVariant: `${PREFIX}reg-v1`, finition: "Bois", stockQty: 5 })
       .returning({ id: productVariants.id })
     regulatedVariantId = regVariant.id
 
@@ -162,12 +184,7 @@ describe("orders (POST /api/orders)", () => {
       .returning({ id: products.id })
     const [accVariant] = await db
       .insert(productVariants)
-      .values({
-        productId: accessory.id,
-        skuVariant: `${PREFIX}acc-v1`,
-        couleur: "Vert",
-        stockQty: 5,
-      })
+      .values({ productId: accessory.id, skuVariant: `${PREFIX}acc-v1`, couleur: "Vert", stockQty: 5 })
       .returning({ id: productVariants.id })
     accessoryVariantId = accVariant.id
 
@@ -210,11 +227,10 @@ describe("orders (POST /api/orders)", () => {
       .returning({ id: artworkPrints.id })
     printId = print.id
 
-    const login = async (email: string) =>
-      (await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })).json()
-        .accessToken
-    token = await login(EMAIL_ADDR)
-    noAddrToken = await login(EMAIL_NOADDR)
+    const login = (
+      await app.inject({ method: "POST", url: "/api/auth/login", payload: { email: EMAIL, password: PASSWORD } })
+    ).json()
+    token = login.accessToken
   })
 
   afterAll(async () => {
@@ -223,14 +239,14 @@ describe("orders (POST /api/orders)", () => {
   })
 
   beforeEach(async () => {
-    await db.delete(cartItems).where(inArray(cartItems.userId, [userId, noAddrUserId]))
-    await db.delete(artworkCartItems).where(inArray(artworkCartItems.userId, [userId, noAddrUserId]))
+    await db.delete(cartItems).where(inArray(cartItems.userId, [userId, otherUserId]))
+    await db.delete(artworkCartItems).where(inArray(artworkCartItems.userId, [userId, otherUserId]))
     await db
       .update(artworkPrints)
       .set({ orderId: null, status: "available" })
       .where(eq(artworkPrints.artworkId, testArtworkId))
-    await db.delete(auditLogs).where(inArray(auditLogs.userId, [userId, noAddrUserId]))
-    await db.delete(orders).where(inArray(orders.userId, [userId, noAddrUserId]))
+    await db.delete(auditLogs).where(inArray(auditLogs.userId, [userId, otherUserId]))
+    await db.delete(orders).where(inArray(orders.userId, [userId, otherUserId]))
     await db
       .update(productVariants)
       .set({ stockQty: 5 })
@@ -243,31 +259,37 @@ describe("orders (POST /api/orders)", () => {
   function addToCart(t: string, payload: Record<string, unknown>) {
     return app.inject({ method: "POST", url: "/api/cart/items", headers: authHeaders(t), payload })
   }
-  function createOrder(t: string) {
-    return app.inject({ method: "POST", url: "/api/orders", headers: authHeaders(t) })
+  function createOrder(payload: Record<string, unknown> = { shippingAddressId }) {
+    return app.inject({ method: "POST", url: "/api/orders", headers: authHeaders(token), payload })
   }
 
   it("requires authentication", async () => {
-    const res = await app.inject({ method: "POST", url: "/api/orders" })
+    const res = await app.inject({ method: "POST", url: "/api/orders", payload: { shippingAddressId } })
     expect(res.statusCode).toBe(401)
   })
 
+  it("returns 400 when shippingAddressId is missing", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const res = await createOrder({})
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toBe("ValidationError")
+  })
+
   it("returns 400 when the cart is empty", async () => {
-    const res = await createOrder(token)
+    const res = await createOrder()
     expect(res.statusCode).toBe(400)
     expect(res.json().error).toBe("EmptyCart")
   })
 
-  it("returns 400 when the profile has no shipping address", async () => {
-    await addToCart(noAddrToken, { variantId: accessoryVariantId, qty: 1 })
-    const res = await createOrder(noAddrToken)
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toBe("AddressRequired")
+  it("returns 404 when the shipping address belongs to another user", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const res = await createOrder({ shippingAddressId: otherUserAddressId })
+    expect(res.statusCode).toBe(404)
   })
 
-  it("creates a virement-only order for a regulated firearm and flags legal verification", async () => {
+  it("creates a virement-only order for a regulated firearm and snapshots the address", async () => {
     await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
-    const res = await createOrder(token)
+    const res = await createOrder()
     expect(res.statusCode).toBe(201)
     const { data } = res.json()
     expect(data.requiresLegalVerification).toBe(true)
@@ -275,8 +297,8 @@ describe("orders (POST /api/orders)", () => {
     expect(data.paymentSplit.splitType).toBe("virement_only")
     expect(data.paymentSplit.virement.amountTtc).toBe(1200)
     expect(data.totals.totalTtc).toBe(1200)
+    expect(data.shippingAddress).toMatchObject({ line1: "1 rue du Tir", city: "Paris", country: "FR" })
 
-    // stock decremented and cart cleared
     const [variant] = await db
       .select({ stockQty: productVariants.stockQty })
       .from(productVariants)
@@ -288,7 +310,7 @@ describe("orders (POST /api/orders)", () => {
 
   it("creates a carte-only order for accessories without legal verification", async () => {
     await addToCart(token, { variantId: accessoryVariantId, qty: 2 })
-    const res = await createOrder(token)
+    const res = await createOrder()
     expect(res.statusCode).toBe(201)
     const { data } = res.json()
     expect(data.requiresLegalVerification).toBe(false)
@@ -301,7 +323,7 @@ describe("orders (POST /api/orders)", () => {
     await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
     await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
     await addToCart(token, { printId, qty: 1 })
-    const res = await createOrder(token)
+    const res = await createOrder()
     expect(res.statusCode).toBe(201)
     const { data } = res.json()
     expect(data.paymentSplit.splitType).toBe("mixed")
@@ -318,14 +340,12 @@ describe("orders (POST /api/orders)", () => {
 
   it("rolls back and returns 409 when stock ran out before checkout", async () => {
     await addToCart(token, { variantId: regulatedVariantId, qty: 2 })
-    // someone else drained the stock after it was added to the cart
     await db.update(productVariants).set({ stockQty: 1 }).where(eq(productVariants.id, regulatedVariantId))
 
-    const res = await createOrder(token)
+    const res = await createOrder()
     expect(res.statusCode).toBe(409)
     expect(res.json().error).toBe("InsufficientStock")
 
-    // no order persisted, cart preserved
     const orderRows = await db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))
     expect(orderRows).toHaveLength(0)
     const cart = await app.inject({ method: "GET", url: "/api/cart", headers: authHeaders(token) })
