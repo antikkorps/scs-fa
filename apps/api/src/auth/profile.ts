@@ -16,6 +16,9 @@ const PUBLIC_FIELDS = {
   addressPostal: users.addressPostal,
   addressCity: users.addressCity,
   addressCountry: users.addressCountry,
+  vipStatus: users.vipStatus,
+  vipActive: users.vipActive,
+  vipEligibleSince: users.vipEligibleSince,
   createdAt: users.createdAt,
 } as const
 
