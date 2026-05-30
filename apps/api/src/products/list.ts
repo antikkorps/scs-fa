@@ -1,10 +1,8 @@
-import { productFiltersSchema } from "@armurier/shared"
+import { computePriceTtc, productFiltersSchema } from "@armurier/shared"
 import { and, asc, desc, eq, gte, lte, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { legalCategories, productCategories, products } from "../db/schema.js"
-
-const round2 = (n: number) => Math.round(n * 100) / 100
 
 export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (request, reply) => {
@@ -85,7 +83,7 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
         description: r.description,
         priceHt,
         vatPct,
-        priceTtc: round2(priceHt * (1 + vatPct / 100)),
+        priceTtc: computePriceTtc(priceHt, vatPct),
         stockQty: r.stockQty,
         featured: r.featured,
         requiresLegalVerification: r.requiresLegalVerification,

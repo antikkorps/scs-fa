@@ -75,9 +75,14 @@
 - [x] Tests (11) : pagination, published-only, filtre catégorie/légale/prix min+max, search full-text, priceTtc, 400 (prix négatif, maxPrice<minPrice, slug invalide)
 - Endpoint : `GET /api/products`
 
-**Story 2.2** — Détail produit
+**Story 2.2** — Détail produit ✅
 
-- Endpoint : `GET /api/products/:id`
+- [x] Endpoint public : `GET /api/products/:id` (UUID), published-only
+- [x] Critères : détail enrichi vs listing — `longDescription`, `seo` (metaTitle/metaDescription/keywords), `ageMinRequired`, restrictions accessoires, objet `legalCategory` complet (name/description/requiresVerification/minAge/requiredDocTypes), `priceTtc` calculé
+- [x] Validation : `productIdParamSchema` (shared) — param UUID, 400 si invalide ; 404 si inexistant ou non publié
+- [x] DRY : helper `computePriceTtc` extrait dans `packages/shared` (réutilisé par listing 2.1)
+- [x] Tests (7) : détail complet, priceTtc, objet légal complet, catégorie `none`, 404 non publié, 404 id inconnu, 400 id non-UUID
+- Variantes produit : différées (hors périmètre, non seedées) — à traiter dans une story ultérieure
 
 **Story 2.3** — Catégories légales (read-only public)
 

@@ -95,6 +95,13 @@ export const productFiltersSchema = z
     path: ["maxPrice"],
   })
 
+// Product detail lookup by UUID (GET /api/products/:id)
+export const productIdParamSchema = z.object({
+  id: z.string().uuid(),
+})
+
+export type ProductIdParam = z.infer<typeof productIdParamSchema>
+
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type RefreshInput = z.infer<typeof refreshSchema>
