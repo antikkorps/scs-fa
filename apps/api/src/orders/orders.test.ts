@@ -50,6 +50,7 @@ describe("orders (POST /api/orders)", () => {
   let userId: string
   let otherUserId: string
   let token: string
+  let otherToken: string
   let shippingAddressId: string
   let otherUserAddressId: string
   let regulatedVariantId: string
@@ -227,10 +228,11 @@ describe("orders (POST /api/orders)", () => {
       .returning({ id: artworkPrints.id })
     printId = print.id
 
-    const login = (
-      await app.inject({ method: "POST", url: "/api/auth/login", payload: { email: EMAIL, password: PASSWORD } })
-    ).json()
-    token = login.accessToken
+    const loginAs = async (email: string) =>
+      (await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })).json()
+        .accessToken
+    token = await loginAs(EMAIL)
+    otherToken = await loginAs(EMAIL_OTHER)
   })
 
   afterAll(async () => {
@@ -350,5 +352,77 @@ describe("orders (POST /api/orders)", () => {
     expect(orderRows).toHaveLength(0)
     const cart = await app.inject({ method: "GET", url: "/api/cart", headers: authHeaders(token) })
     expect(cart.json().data.summary.itemCount).toBe(2)
+  })
+
+  // --- Story 3.3: order tracking (GET) ---
+
+  it("GET /api/orders requires authentication", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/orders" })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it("lists the user's orders newest-first with a paginated envelope", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 2 })
+    const created = (await createOrder()).json().data
+
+    const res = await app.inject({ method: "GET", url: "/api/orders", headers: authHeaders(token) })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.pagination).toMatchObject({ page: 1, limit: 20, total: 1, totalPages: 1, hasMore: false })
+    expect(body.data).toHaveLength(1)
+    expect(body.data[0]).toMatchObject({
+      id: created.id,
+      paymentStatus: "pending",
+      legalVerificationStatus: "payment_pending",
+      totalTtc: 120,
+      itemCount: 2,
+    })
+  })
+
+  it("does not leak another user's orders", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    await createOrder()
+    const res = await app.inject({ method: "GET", url: "/api/orders", headers: authHeaders(otherToken) })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data).toEqual([])
+  })
+
+  it("returns a single order with its items and address snapshots", async () => {
+    await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+    const created = (await createOrder()).json().data
+
+    const res = await app.inject({ method: "GET", url: `/api/orders/${created.id}`, headers: authHeaders(token) })
+    expect(res.statusCode).toBe(200)
+    const { data } = res.json()
+    expect(data).toMatchObject({
+      id: created.id,
+      legalVerificationStatus: "pending",
+      paymentStatus: "pending",
+      totalTtc: 1200,
+    })
+    expect(data.items).toHaveLength(1)
+    expect(data.items[0]).toMatchObject({ sku: `${PREFIX}reg`, qty: 1, requiresPaymentVirement: true })
+    expect(data.shippingAddress).toMatchObject({ line1: "1 rue du Tir", city: "Paris" })
+    expect(data.billingAddress).toMatchObject({ line1: "1 rue du Tir" })
+  })
+
+  it("returns 404 for an unknown order id", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/orders/00000000-0000-0000-0000-000000000000",
+      headers: authHeaders(token),
+    })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it("returns 404 when fetching another user's order by id", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const created = (await createOrder()).json().data
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/orders/${created.id}`,
+      headers: authHeaders(otherToken),
+    })
+    expect(res.statusCode).toBe(404)
   })
 })

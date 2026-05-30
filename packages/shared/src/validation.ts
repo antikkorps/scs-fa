@@ -146,6 +146,14 @@ export const productFiltersSchema = z
     path: ["maxPrice"],
   })
 
+// Generic pagination query (page/limit, max 100)
+export const paginationSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+})
+
+export type PaginationInput = z.infer<typeof paginationSchema>
+
 // Generic UUID route param `{ id }` (e.g. GET /api/products/:id, cart item id)
 export const uuidParamSchema = z.object({
   id: z.string().uuid(),
