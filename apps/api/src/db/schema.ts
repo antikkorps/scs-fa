@@ -891,6 +891,7 @@ export const orders = pgTable(
           name: string
           sku: string
           category: string
+          legalCategory?: string | null
           requiresPaymentVirement: boolean
         }>
       >()

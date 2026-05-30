@@ -3,6 +3,7 @@ import {
   createOrderSchema,
   paginationSchema,
   requiresVirement,
+  round2,
   uuidParamSchema,
 } from "@armurier/shared"
 import { and, desc, eq, gte, sql } from "drizzle-orm"
@@ -109,14 +110,15 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     const shippingSnapshot = toSnapshot(shipping)
     const billingSnapshot = toSnapshot(billing)
 
+    // Payment split is computed on the net (VIP-discounted) line amounts
     const splitItems = [
       ...cart.items.map((l) => ({
-        priceHt: l.lineHt,
+        priceHt: round2(l.lineHt - l.discountAmount),
         vatPct: l.vatPct,
         requiresPaymentVirement: requiresVirement(l.legalCategory),
       })),
       ...cart.artworkItems.map((l) => ({
-        priceHt: l.lineHt,
+        priceHt: round2(l.lineHt - l.discountAmount),
         vatPct: l.vatPct,
         requiresPaymentVirement: false,
       })),
@@ -134,6 +136,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         name: l.name,
         sku: l.sku,
         category: l.categorySlug,
+        legalCategory: l.legalCategory,
         requiresPaymentVirement: requiresVirement(l.legalCategory),
       })),
       ...cart.artworkItems.map((l) => ({
@@ -160,6 +163,11 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
             subtotalHt: cart.summary.subtotalHt.toFixed(2),
             vatAmount: cart.summary.vatAmount.toFixed(2),
             totalTtc: cart.summary.totalTtc.toFixed(2),
+            vipDiscountAmount: cart.summary.vipDiscountAmount.toFixed(2),
+            vipDiscountAppliedPct: (cart.summary.subtotalHt > 0
+              ? round2((cart.summary.vipDiscountAmount / cart.summary.subtotalHt) * 100)
+              : 0
+            ).toFixed(2),
             shippingAddress: shippingSnapshot,
             billingAddress: billingSnapshot,
             shippingAddressStreet: shippingSnapshot.line1,
@@ -306,6 +314,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         subtotalHt: orders.subtotalHt,
         vatAmount: orders.vatAmount,
         totalTtc: orders.totalTtc,
+        vipDiscountAmount: orders.vipDiscountAmount,
+        vipDiscountAppliedPct: orders.vipDiscountAppliedPct,
         items: orders.itemsJson,
         shippingAddress: orders.shippingAddress,
         billingAddress: orders.billingAddress,
@@ -324,6 +334,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         subtotalHt: Number(order.subtotalHt),
         vatAmount: Number(order.vatAmount),
         totalTtc: Number(order.totalTtc),
+        vipDiscountAmount: Number(order.vipDiscountAmount),
+        vipDiscountAppliedPct: Number(order.vipDiscountAppliedPct),
       },
     })
   })
