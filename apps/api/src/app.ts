@@ -1,6 +1,8 @@
+import { MAX_LEGAL_DOC_SIZE_BYTES } from "@armurier/shared"
 import fastifyCors from "@fastify/cors"
 import fastifyHelmet from "@fastify/helmet"
 import fastifyJwt from "@fastify/jwt"
+import fastifyMultipart from "@fastify/multipart"
 import fastifyRateLimit from "@fastify/rate-limit"
 import Fastify, { type FastifyInstance } from "fastify"
 import { addressRoutes } from "./addresses/index.js"
@@ -8,6 +10,7 @@ import { authRoutes } from "./auth/index.js"
 import { cartRoutes } from "./cart/index.js"
 import { env } from "./env.js"
 import { legalCategoryRoutes } from "./legal-categories/index.js"
+import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { orderRoutes } from "./orders/index.js"
 import { productRoutes } from "./products/index.js"
 
@@ -47,6 +50,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     sign: { expiresIn: env.JWT_EXPIRES_IN },
   })
 
+  await fastify.register(fastifyMultipart, {
+    limits: { fileSize: MAX_LEGAL_DOC_SIZE_BYTES, files: 1, fields: 10 },
+  })
+
   fastify.get("/health", async () => ({
     status: "ok",
     timestamp: new Date().toISOString(),
@@ -58,6 +65,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
   await fastify.register(addressRoutes, { prefix: "/api/addresses" })
   await fastify.register(orderRoutes, { prefix: "/api/orders" })
+  await fastify.register(legalDocumentRoutes, { prefix: "/api/legal-documents" })
 
   return fastify
 }

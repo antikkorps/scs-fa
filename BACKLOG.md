@@ -143,10 +143,17 @@
 
 ## PHASE 4 — Workflow légal (différenciateur métier)
 
-**Story 4.1** — Upload docs légaux (S3 Scaleway EU)
+**Story 4.1** — Upload docs légaux (stockage objet S3-compatible) ✅
 
-- Critères : types validés (CNI, permis, etc.), antivirus scan async, chiffrement at-rest
-  **Story 4.2** — Espace admin validation 48h SLA
+- [x] Critères : types validés (CNI, permis, etc.), antivirus scan async, chiffrement at-rest
+- [x] Upload multipart `POST /api/legal-documents` (`@fastify/multipart`), JWT user-scoped ; validation type MIME (pdf/jpeg/png) + taille (≤ 10 Mo)
+- [x] Abstraction stockage **provider-agnostique** `StorageService` (`put`/`getUrl`/`delete`) dans `apps/api/src/storage/` — impl S3-compatible (`@aws-sdk/client-s3`, marche AWS/Scaleway/MinIO via `endpoint`+`forcePathStyle`) + impl InMemory (tests/CI) ; pilotée par `STORAGE_DRIVER`
+- [x] Chiffrement at-rest via SSE-S3 (AES256) ; lecture par URL présignée courte (`@aws-sdk/s3-request-presigner`) sur `GET /:id`
+- [x] Antivirus = `scan_status` (pending/clean/infected) + hook async stubbé (`scanDocument` marque `clean` en dev ; ClamAV plus tard) ; upload → `pending`
+- [x] `GET /api/legal-documents` (liste user), `GET /:id` (+ downloadUrl présignée, ownership), `DELETE /:id` (objet + ligne)
+- [x] shared : `LEGAL_DOC_TYPES`, `ALLOWED_LEGAL_DOC_MIME_TYPES`, `MAX_LEGAL_DOC_SIZE_BYTES`, `legalDocumentMetaSchema` ; 13 tests d'intégration (multipart via `form-data`)
+
+**Story 4.2** — Espace admin validation 48h SLA
 - Critères : queue priorisée, motifs rejet standardisés (cf. `CLARIFICATIONS`), notification email
   **Story 4.3** — État légal commande visible customer
   **Story 4.4** — Alerte SLA dépassé (cron)

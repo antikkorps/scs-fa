@@ -26,5 +26,19 @@ export type PaymentStatus = (typeof PAYMENT_STATUS)[number]
 // SLA validation admin docs légaux (heures)
 export const LEGAL_DOC_REVIEW_SLA_HOURS = 48
 
+// Legal document types a customer can upload (matches the `doc_type` DB enum)
+export const LEGAL_DOC_TYPES = ["cni", "permis_chasse", "autorisation_det", "sia", "expertise"] as const
+export type LegalDocType = (typeof LEGAL_DOC_TYPES)[number]
+
+// Antivirus scan lifecycle (matches the `doc_scan_status` DB enum)
+export const LEGAL_DOC_SCAN_STATUS = ["pending", "clean", "infected"] as const
+export type LegalDocScanStatus = (typeof LEGAL_DOC_SCAN_STATUS)[number]
+
+// Accepted upload formats and size cap for legal documents
+export const ALLOWED_LEGAL_DOC_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const
+export type AllowedLegalDocMimeType = (typeof ALLOWED_LEGAL_DOC_MIME_TYPES)[number]
+
+export const MAX_LEGAL_DOC_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+
 // Gun Art - tirage limité
 export const GUN_ART_MAX_PRINTS = 25
