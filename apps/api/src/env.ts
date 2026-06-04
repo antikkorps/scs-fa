@@ -17,12 +17,18 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default("1h"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
 
-  // S3
+  // Storage (provider-agnostic; "memory" uses an in-process store for tests/CI)
+  STORAGE_DRIVER: z.enum(["s3", "memory"]).optional(),
   S3_ENDPOINT: z.string().url(),
   S3_ACCESS_KEY: z.string(),
   S3_SECRET_KEY: z.string(),
   S3_BUCKET: z.string(),
   S3_REGION: z.string(),
+  // Needed for S3-compatible providers (MinIO, some Scaleway setups)
+  S3_FORCE_PATH_STYLE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 
   // SMTP
   SMTP_HOST: z.string(),

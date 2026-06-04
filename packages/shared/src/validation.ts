@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ADDRESS_TYPES, LEGAL_CATEGORIES } from "./constants.js"
+import { ADDRESS_TYPES, LEGAL_CATEGORIES, LEGAL_DOC_TYPES } from "./constants.js"
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
@@ -124,6 +124,25 @@ export const createOrderSchema = z
     billingAddressId: z.string().uuid().optional(),
   })
   .strict()
+
+// Legal document metadata (the non-file fields of the multipart upload).
+// Multipart values arrive as strings, so dates are validated as ISO YYYY-MM-DD.
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected an ISO date (YYYY-MM-DD)")
+
+export const legalDocumentMetaSchema = z
+  .object({
+    docType: z.enum(LEGAL_DOC_TYPES),
+    docNumber: z.string().min(1).max(100).optional(),
+    issuedAt: isoDateSchema.optional(),
+    expiresAt: isoDateSchema.optional(),
+  })
+  .strict()
+  .refine((d) => d.issuedAt === undefined || d.expiresAt === undefined || d.expiresAt >= d.issuedAt, {
+    message: "expiresAt must be on or after issuedAt",
+    path: ["expiresAt"],
+  })
+
+export type LegalDocumentMetaInput = z.infer<typeof legalDocumentMetaSchema>
 
 // Product category slug (references product_categories.slug, e.g. "arme-poing")
 export const categorySlugSchema = z

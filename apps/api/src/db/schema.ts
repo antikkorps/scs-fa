@@ -61,6 +61,11 @@ export const docVerificationEnum = pgEnum("doc_verification_status", [
   "rejected",
   "expired",
 ])
+export const docScanEnum = pgEnum("doc_scan_status", [
+  "pending", // uploaded, antivirus scan not yet run
+  "clean", // scan passed — document is usable
+  "infected", // scan flagged the file — quarantined
+])
 export const orderLegalStatusEnum = pgEnum("order_legal_status", [
   "pending", // attente upload docs
   "docs_verifying", // en cours de vérif
@@ -297,6 +302,10 @@ export const legalDocuments = pgTable(
     s3Url: varchar("s3_url", { length: 512 }).notNull(),
     mimeType: varchar("mime_type", { length: 50 }),
     fileSize: integer("file_size"),
+
+    // Antivirus
+    scanStatus: docScanEnum("scan_status").notNull().default("pending"),
+    scannedAt: timestamp("scanned_at"),
 
     // Validité
     issuedAt: date("issued_at"),
