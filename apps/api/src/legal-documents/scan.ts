@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm"
 import { db } from "../db/client.js"
 import { legalDocuments } from "../db/schema.js"
+import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 
 // Antivirus scan — STUB.
 //
@@ -16,10 +17,14 @@ export async function scanDocument(documentId: string): Promise<"clean" | "infec
   // Real implementation: fetch object from storage, stream through ClamAV.
   const result: "clean" | "infected" = "clean"
 
-  await db
+  const [updated] = await db
     .update(legalDocuments)
     .set({ scanStatus: result, scannedAt: new Date() })
     .where(eq(legalDocuments.id, documentId))
+    .returning({ userId: legalDocuments.userId })
+
+  // An infected verdict pushes orders back to pending (re-upload required)
+  if (updated) await recomputeOrderLegalStatus(updated.userId)
 
   return result
 }

@@ -22,6 +22,7 @@ import {
   productVariants,
 } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 
 class OrderError extends Error {
   constructor(
@@ -336,6 +337,50 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         totalTtc: Number(order.totalTtc),
         vipDiscountAmount: Number(order.vipDiscountAmount),
         vipDiscountAppliedPct: Number(order.vipDiscountAppliedPct),
+      },
+    })
+  })
+
+  // GET /api/orders/:id/legal — the order's legal checklist for the customer:
+  // which doc types are required and where each one stands.
+  fastify.get("/:id/legal", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const userId = request.user.sub
+
+    // Self-healing read: re-derive statuses (e.g. an async scan flagged a file)
+    // before serving, so the stored state can never drift from the documents.
+    await recomputeOrderLegalStatus(userId)
+
+    const [order] = await db
+      .select({
+        id: orders.id,
+        legalVerificationStatus: orders.legalVerificationStatus,
+        legalRejectionReason: orders.legalRejectionReason,
+        legalVerifiedAt: orders.legalVerifiedAt,
+        itemsJson: orders.itemsJson,
+      })
+      .from(orders)
+      .where(and(eq(orders.id, params.data.id), eq(orders.userId, userId)))
+      .limit(1)
+    if (!order) {
+      return reply.code(404).send({ error: "NotFound", message: "Order not found" })
+    }
+
+    const requiredTypes = await requiredDocTypesFor(order.itemsJson)
+    const requiredDocs =
+      requiredTypes.length === 0 ? [] : buildRequiredDocsView(requiredTypes, await loadUserDocs(userId))
+
+    return reply.code(200).send({
+      data: {
+        orderId: order.id,
+        requiresVerification: requiredTypes.length > 0,
+        legalVerificationStatus: order.legalVerificationStatus,
+        legalRejectionReason: order.legalRejectionReason,
+        legalVerifiedAt: order.legalVerifiedAt,
+        requiredDocs,
       },
     })
   })

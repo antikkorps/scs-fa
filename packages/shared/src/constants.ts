@@ -44,6 +44,17 @@ export type LegalDocRejectionReason = (typeof LEGAL_DOC_REJECTION_REASONS)[numbe
 export const LEGAL_DOC_VERIFICATION_STATUS = ["pending", "approved", "rejected", "expired"] as const
 export type LegalDocVerificationStatus = (typeof LEGAL_DOC_VERIFICATION_STATUS)[number]
 
+// Customer-facing state of a required document on an order's legal checklist
+export const ORDER_REQUIRED_DOC_STATUS = [
+  "missing", // nothing uploaded for this doc type
+  "pending_scan", // uploaded, antivirus scan in progress
+  "infected", // scan flagged the file — re-upload needed
+  "pending_review", // clean, awaiting admin review
+  "approved",
+  "rejected", // re-upload allowed (clarification D1)
+] as const
+export type OrderRequiredDocStatus = (typeof ORDER_REQUIRED_DOC_STATUS)[number]
+
 // Legal document types a customer can upload (matches the `doc_type` DB enum)
 export const LEGAL_DOC_TYPES = ["cni", "permis_chasse", "autorisation_det", "sia", "expertise"] as const
 export type LegalDocType = (typeof LEGAL_DOC_TYPES)[number]
