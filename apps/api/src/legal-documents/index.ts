@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import {
   ALLOWED_LEGAL_DOC_MIME_TYPES,
   type AllowedLegalDocMimeType,
+  LEGAL_DOC_REVIEW_SLA_HOURS,
   legalDocumentMetaSchema,
   uuidParamSchema,
 } from "@armurier/shared"
@@ -112,6 +113,8 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
         expiresAt: meta.data.expiresAt,
         scanStatus: "pending",
         verificationStatus: "pending",
+        // Admin review SLA clock starts at upload
+        verificationDeadline: new Date(Date.now() + LEGAL_DOC_REVIEW_SLA_HOURS * 60 * 60 * 1000),
       })
       .returning(DOC_FIELDS)
       .then(([row]) => row)

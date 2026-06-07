@@ -1,5 +1,11 @@
 import { z } from "zod"
-import { ADDRESS_TYPES, LEGAL_CATEGORIES, LEGAL_DOC_TYPES } from "./constants.js"
+import {
+  ADDRESS_TYPES,
+  LEGAL_CATEGORIES,
+  LEGAL_DOC_REJECTION_REASONS,
+  LEGAL_DOC_TYPES,
+  LEGAL_DOC_VERIFICATION_STATUS,
+} from "./constants.js"
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
@@ -143,6 +149,29 @@ export const legalDocumentMetaSchema = z
   })
 
 export type LegalDocumentMetaInput = z.infer<typeof legalDocumentMetaSchema>
+
+// Admin review queue filters (status defaults to the actionable pending queue)
+export const legalDocQueueQuerySchema = z.object({
+  status: z.enum([...LEGAL_DOC_VERIFICATION_STATUS, "all"]).default("pending"),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+})
+
+export type LegalDocQueueQuery = z.infer<typeof legalDocQueueQuerySchema>
+
+// Admin rejection of a legal document — "other" must be explained in notes
+export const rejectLegalDocumentSchema = z
+  .object({
+    reason: z.enum(LEGAL_DOC_REJECTION_REASONS),
+    notes: z.string().trim().min(1).max(1000).optional(),
+  })
+  .strict()
+  .refine((d) => d.reason !== "other" || d.notes !== undefined, {
+    message: 'notes are required when the reason is "other"',
+    path: ["notes"],
+  })
+
+export type RejectLegalDocumentInput = z.infer<typeof rejectLegalDocumentSchema>
 
 // Product category slug (references product_categories.slug, e.g. "arme-poing")
 export const categorySlugSchema = z
