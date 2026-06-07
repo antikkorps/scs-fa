@@ -6,6 +6,8 @@ export default defineConfig({
     globals: false,
     env: {
       NODE_ENV: "test",
+      // Never hit a real bucket from tests, whatever the local .env says
+      STORAGE_DRIVER: "memory",
     },
     include: ["src/**/*.{test,spec}.ts"],
     coverage: {

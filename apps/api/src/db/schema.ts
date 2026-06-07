@@ -318,6 +318,7 @@ export const legalDocuments = pgTable(
     verifiedAt: timestamp("verified_at"),
     verifiedBy: uuid("verified_by"),
     verificationNotes: text("verification_notes"),
+    rejectionReason: varchar("rejection_reason", { length: 50 }), // standardized code (LEGAL_DOC_REJECTION_REASONS)
     verificationDeadline: timestamp("verification_deadline"), // pour SLA 48h
 
     // Métadonnées

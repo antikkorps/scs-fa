@@ -1,3 +1,4 @@
+import type { LegalDocRejectionReason, LegalDocType } from "@armurier/shared"
 import { createTransport } from "nodemailer"
 import { env } from "./env.js"
 
@@ -19,6 +20,71 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
       <p>You requested a password reset.</p>
       <p><a href="${resetUrl}">Reset my password</a> (valid 1 hour)</p>
       <p>If you did not request this, ignore this email.</p>
+    `,
+  })
+}
+
+/** Escape free-text values interpolated into HTML email bodies. */
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
+
+const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
+  cni: "identity card",
+  permis_chasse: "hunting permit",
+  autorisation_det: "detention authorization",
+  sia: "SIA certificate",
+  expertise: "expertise certificate",
+}
+
+const REJECTION_REASON_LABELS: Record<LegalDocRejectionReason, string> = {
+  document_expired: "the document has expired",
+  document_illegible: "the document is not legible",
+  wrong_document_type: "the document does not match the expected type",
+  information_mismatch: "the information does not match your account details",
+  document_incomplete: "the document is incomplete",
+  underage: "the legal age requirement is not met",
+  suspected_fraud: "the document could not be authenticated",
+  other: "see the details below",
+}
+
+export async function sendLegalDocApprovedEmail(to: string, doc: { docType: LegalDocType }): Promise<void> {
+  const label = DOC_TYPE_LABELS[doc.docType]
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: "Your legal document has been approved",
+    text: `Good news!\n\nYour ${label} has been reviewed and approved.\n\nYou can now proceed with your orders requiring this document.`,
+    html: `
+      <p>Good news!</p>
+      <p>Your <strong>${label}</strong> has been reviewed and <strong>approved</strong>.</p>
+      <p>You can now proceed with your orders requiring this document.</p>
+    `,
+  })
+}
+
+export async function sendLegalDocRejectedEmail(
+  to: string,
+  doc: { docType: LegalDocType; reason: LegalDocRejectionReason; notes?: string | null },
+): Promise<void> {
+  const label = DOC_TYPE_LABELS[doc.docType]
+  const reasonLabel = REJECTION_REASON_LABELS[doc.reason]
+  const notesText = doc.notes ? `\n\nDetails: ${doc.notes}` : ""
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: "Your legal document was rejected",
+    text: `Your ${label} has been reviewed and rejected.\n\nReason: ${reasonLabel}.${notesText}\n\nPlease upload a new document from your account.`,
+    html: `
+      <p>Your <strong>${label}</strong> has been reviewed and <strong>rejected</strong>.</p>
+      <p>Reason: ${reasonLabel}.</p>
+      ${doc.notes ? `<p>Details: ${escapeHtml(doc.notes)}</p>` : ""}
+      <p>Please upload a new document from your account.</p>
     `,
   })
 }

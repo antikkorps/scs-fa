@@ -26,6 +26,24 @@ export type PaymentStatus = (typeof PAYMENT_STATUS)[number]
 // SLA validation admin docs légaux (heures)
 export const LEGAL_DOC_REVIEW_SLA_HOURS = 48
 
+// Standardized rejection reasons for legal documents (admin review).
+// "other" requires a free-text note explaining the decision.
+export const LEGAL_DOC_REJECTION_REASONS = [
+  "document_expired",
+  "document_illegible",
+  "wrong_document_type",
+  "information_mismatch",
+  "document_incomplete",
+  "underage",
+  "suspected_fraud",
+  "other",
+] as const
+export type LegalDocRejectionReason = (typeof LEGAL_DOC_REJECTION_REASONS)[number]
+
+// Verification lifecycle (matches the `doc_verification_status` DB enum)
+export const LEGAL_DOC_VERIFICATION_STATUS = ["pending", "approved", "rejected", "expired"] as const
+export type LegalDocVerificationStatus = (typeof LEGAL_DOC_VERIFICATION_STATUS)[number]
+
 // Legal document types a customer can upload (matches the `doc_type` DB enum)
 export const LEGAL_DOC_TYPES = ["cni", "permis_chasse", "autorisation_det", "sia", "expertise"] as const
 export type LegalDocType = (typeof LEGAL_DOC_TYPES)[number]

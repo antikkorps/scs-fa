@@ -10,6 +10,7 @@ import { authRoutes } from "./auth/index.js"
 import { cartRoutes } from "./cart/index.js"
 import { env } from "./env.js"
 import { legalCategoryRoutes } from "./legal-categories/index.js"
+import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { orderRoutes } from "./orders/index.js"
 import { productRoutes } from "./products/index.js"
@@ -66,6 +67,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(addressRoutes, { prefix: "/api/addresses" })
   await fastify.register(orderRoutes, { prefix: "/api/orders" })
   await fastify.register(legalDocumentRoutes, { prefix: "/api/legal-documents" })
+  await fastify.register(adminLegalDocumentRoutes, { prefix: "/api/admin/legal-documents" })
 
   return fastify
 }
