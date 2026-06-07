@@ -13,6 +13,7 @@ import { db } from "../db/client.js"
 import { auditLogs, legalDocuments, users } from "../db/schema.js"
 import { sendLegalDocApprovedEmail, sendLegalDocRejectedEmail } from "../email.js"
 import { validationError } from "../http.js"
+import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { storage } from "../storage/index.js"
 
 // Reviewer-facing fields — raw storage URL stays internal, reads go through
@@ -183,6 +184,9 @@ export const adminLegalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
 
     await auditDecision(request, doc, "legal_doc_approved", { verificationStatus: "approved" })
 
+    // Move the customer's orders forward now that this document is approved
+    await recomputeOrderLegalStatus(doc.user.id)
+
     // Notification is best-effort: the decision is already committed.
     sendLegalDocApprovedEmail(doc.userEmail, { docType: doc.docType as LegalDocType }).catch((err) =>
       fastify.log.error({ err, docId: doc.id }, "approval email failed"),
@@ -228,6 +232,9 @@ export const adminLegalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     await auditDecision(request, doc, "legal_doc_rejected", { verificationStatus: "rejected", reason, notes }, reason)
+
+    // Flag the customer's affected orders as docs_rejected
+    await recomputeOrderLegalStatus(doc.user.id)
 
     sendLegalDocRejectedEmail(doc.userEmail, {
       docType: doc.docType as LegalDocType,

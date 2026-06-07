@@ -4,6 +4,9 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: false,
+    // Integration tests share one Postgres; global views (e.g. the admin
+    // review queue) make concurrent test files step on each other.
+    fileParallelism: false,
     env: {
       NODE_ENV: "test",
       // Never hit a real bucket from tests, whatever the local .env says

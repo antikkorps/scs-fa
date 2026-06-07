@@ -12,6 +12,7 @@ import { authenticate } from "../auth/authenticate.js"
 import { db } from "../db/client.js"
 import { legalDocuments } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { storage } from "../storage/index.js"
 import { scanDocument } from "./scan.js"
 
@@ -124,6 +125,9 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
         throw err
       })
 
+    // A new document may move the user's orders forward (e.g. after a rejection)
+    await recomputeOrderLegalStatus(userId)
+
     // Antivirus scan runs out of band; the response reports scanStatus "pending".
     void scanDocument(id).catch((err) => fastify.log.error({ err, id }, "legal document scan failed"))
 
@@ -177,6 +181,8 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     await storage.delete(deleted.s3Key).catch((err) => fastify.log.error({ err }, "storage delete failed"))
+    // Removing a document can regress orders still under review
+    await recomputeOrderLegalStatus(request.user.sub)
     return reply.code(204).send()
   })
 }
