@@ -1,14 +1,36 @@
 <script setup lang="ts">
+const config = useRuntimeConfig()
+const siteUrl = config.public.siteUrl as string
+
+// Site-wide SEO defaults; pages override title/description/canonical.
 useHead({
-  title: "Armurier",
-  meta: [{ name: "description", content: "E-commerce armurier" }],
+  titleTemplate: (t) => (t ? `${t} — SCS Firearm` : "SCS Firearm — Gun Art, tirages d'art en édition limitée"),
+})
+
+useSeoMeta({
+  ogSiteName: "SCS Firearm",
+  ogType: "website",
+  twitterCard: "summary_large_image",
+})
+
+// Organization JSON-LD (sitewide)
+useHead({
+  script: [
+    {
+      type: "application/ld+json",
+      innerHTML: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: "SCS Firearm",
+        url: siteUrl,
+      }),
+    },
+  ],
 })
 </script>
 
 <template>
-  <div style="padding: 2rem; font-family: system-ui, sans-serif">
-    <h1>Armurier</h1>
-    <p>Frontend Nuxt 4 + PrimeVue (Aura) — en cours d'initialisation.</p>
-    <Button label="Test PrimeVue" />
-  </div>
+  <NuxtLayout>
+    <NuxtPage />
+  </NuxtLayout>
 </template>

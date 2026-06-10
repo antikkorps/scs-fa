@@ -197,7 +197,15 @@
 - [x] Libération : retrait d'une ligne (`DELETE /api/cart/artwork-items/:id`) et vidage (`DELETE /api/cart`) repassent le(s) tirage(s) `in_cart→available`, en transaction
 - [x] Checkout (`POST /api/orders`) promeut le tirage `in_cart→reserved` via `reservePrintForOrder` (au lieu de `available→reserved`), garde anti-concurrence conservée
 - [x] Tests : 5 nouveaux (`reservation.test.ts` : helpers compare-and-set, **2 acheteurs concurrents → un seul gagne**, blocage tant que non libéré) + cart.test enrichi (in_cart à l'ajout, libération au retrait/vidage) ; orders.test inchangé (statut `reserved` après commande)
-**Story 5.3** — Page collection Gun Art (front)
+**Story 5.3** — Page collection Gun Art (front) ✅
+
+- [x] API publique lecture : `GET /api/artworks` (œuvres publiées, `availableCount`/`soldCount`/`priceFrom` HT+TTC agrégés) + `GET /api/artworks/:slug` (œuvre + tirages + formats), module `apps/api/src/artworks/public.ts` ; 4 tests d'intégration
+- [x] Seed Gun Art : 6 œuvres + tirages (prix par rareté via `calculateArtworkPrice`, quelques exemplaires `sold`), images placeholder **Lorem Picsum** déterministes (`featuredImageUrl`, modifiable depuis le back) ; nettoyage du code mort dupliqué dans `seeds.ts` (DRY)
+- [x] Front Nuxt 4 + PrimeVue : identité visuelle « galerie » sombre (laiton + serif Cormorant), **mobile-first** ; layout (header sticky + burger, footer), page d'accueil (hero), **page collection** (grille responsive 1→2→3 col), page détail (image + tirages dispo + prix)
+- [x] SEO : SSR, `useSeoMeta` (title/description/OG) par page, canonical, **JSON-LD** (Organization, ItemList, VisualArtwork, BreadcrumbList), `lang=fr`, `robots.txt`, 404 réel sur slug inconnu
+- [x] Perf/Lighthouse : images `width/height` + `aspect-ratio` (zéro CLS), `loading`/`fetchpriority` (LCP), `decoding=async`, polices `display=swap` + preconnect, `prefers-reduced-motion`, focus-visible
+- [x] `format.ts` (helpers purs : `formatEuros`, `artworkImage`/fallback Picsum, `availabilityLabel`) + 5 tests unitaires ; override Biome pour les SFC `.vue` (faux positifs unused var/import, le lint script reste actif)
+- Note : panier/checkout côté front = stories ultérieures (auth UI requise) ; le CTA « Acquérir » mène à la collection pour l'instant
 
 ## PHASE 6 — Paiements
 

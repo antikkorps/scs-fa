@@ -1,8 +1,10 @@
 // apps/api/src/db/seeds.ts
 // Données de base à insérer au démarrage
 
+import { calculateArtworkPrice } from "@armurier/shared"
+import { eq } from "drizzle-orm"
 import { db } from "./client.js"
-import { legalCategories, productCategories } from "./schema.js"
+import { artworkPrints, artworks, legalCategories, productCategories, products } from "./schema.js"
 
 export async function seedDatabase() {
   console.log("🌱 Seeding database...")
@@ -164,282 +166,190 @@ export async function seedDatabase() {
   }
 
   console.log("✅ Product categories seeded")
+
+  await seedGunArt()
+
   console.log("🌱 Seeding complete!")
 }
 
-// ========================================================================
-// WORKFLOWS & FORMULES
-// ========================================================================
+// ==========================================================================
+// GUN ART — œuvres en tirage limité (≤25) pour la page collection
+// ==========================================================================
 
-/**
- * WORKFLOW COMMANDE - PAIEMENT SPLITTÉ
- *
- * 1. Client ajoute au panier:
- *    - Arme neuve (cat B, C) → virement obligatoire
- *    - Accessoire (cat D) → CB possible
- *    - Gun Art → CB possible
- *
- * 2. À la création de la commande:
- *    - Vérifier si commande contient DES ARMES (cat A, B, C, D avec verification=true)
- *    - Si OUI → legalVerificationStatus = 'pending' (attente upload docs)
- *    - Si NON (accessoires + gun art) → passer directement à paiement
- *
- * 3. Workflow légal (si requis):
- *    a) pending → client upload docs (CNI, Permis, SIA, Auth préf selon cat)
- *    b) docs_verifying → admin Stéphane valide (SLA 48h)
- *    c) docs_verified → client peut payer
- *    d) docs_rejected → client peut réuploader immédiatement
- *
- * 4. Paiement (split automatique):
- *    Si commande mixte:
- *    a) Calculer montant virement (armes) vs montant CB (accessoires + gun art)
- *    b) Si montant CB > 0:
- *       - Créer paymentCarte entry
- *       - Rediriger vers Stripe
- *       - Une fois confirmé → paymentStatus = 'received'
- *    c) Si montant virement > 0:
- *       - Créer paymentVirement entry
- *       - Afficher IBAN + montant attendu
- *       - Client vire et signale
- *       - Admin rapproche et confirme
- *       - Une fois confirmé → paymentStatus = 'reconciled'
- *
- * 5. Après paiement complet:
- *    - Créer facture Henrri (invoice)
- *    - Envoyer confirmation client avec tracking
- *    - Passer à expédition
- */
+// Image placeholders: Lorem Picsum (real photos, deterministic per slug) so the
+// collection is visual out of the box. Replace `featuredImageUrl` from the admin
+// backend with the real artwork photography when available.
+const picsum = (seed: string) => `https://picsum.photos/seed/${seed}/1200/1500`
 
-export enum OrderPaymentSplit {
-  VIREMENT_ONLY = "virement_only", // Seulement armes, pas CB
-  CARTE_ONLY = "carte_only", // Accessoires + Gun Art, pas armes
-  MIXED = "mixed", // Armes + accessoires/Gun Art
-}
+// A4 print format (priceFactor 1.0) used to price every seeded numbered print;
+// rarity drives the increment (print 1 dearest, print N = base).
+const A4_FORMAT = { id: "A4", name: "A4 (21 × 29,7 cm)", widthCm: 21, heightCm: 29.7, priceFactor: 1.0 }
+const A3_FORMAT = { id: "A3", name: "A3 (29,7 × 42 cm)", widthCm: 29.7, heightCm: 42, priceFactor: 1.5 }
+const A2_FORMAT = { id: "A2", name: "A2 (42 × 59,4 cm)", widthCm: 42, heightCm: 59.4, priceFactor: 2.0 }
+const FORMATS = [A4_FORMAT, A3_FORMAT, A2_FORMAT]
 
-export function calculateOrderPaymentSplit(
-  items: Array<{
-    category: string
-    requiresPaymentVirement: boolean
-    priceHt: number
-    vatPct: number
-  }>,
-) {
-  let virementAmountHt = 0
-  let carteAmountHt = 0
-  let virementVat = 0
-  let carteVat = 0
-
-  for (const item of items) {
-    const itemVat = item.priceHt * (item.vatPct / 100)
-
-    if (item.requiresPaymentVirement) {
-      virementAmountHt += item.priceHt
-      virementVat += itemVat
-    } else {
-      carteAmountHt += item.priceHt
-      carteVat += itemVat
-    }
-  }
-
-  let splitType: OrderPaymentSplit
-  if (virementAmountHt > 0 && carteAmountHt === 0) {
-    splitType = OrderPaymentSplit.VIREMENT_ONLY
-  } else if (virementAmountHt === 0 && carteAmountHt > 0) {
-    splitType = OrderPaymentSplit.CARTE_ONLY
-  } else {
-    splitType = OrderPaymentSplit.MIXED
-  }
-
-  return {
-    splitType,
-    virement: {
-      amountHt: virementAmountHt,
-      vat: virementVat,
-      amountTtc: virementAmountHt + virementVat,
-    },
-    carte: {
-      amountHt: carteAmountHt,
-      vat: carteVat,
-      amountTtc: carteAmountHt + carteVat,
-    },
-  }
-}
-
-// ========================================================================
-// PRICING GUN ART
-// ========================================================================
-
-/**
- * Formule de pricing dynamique pour Gun Art:
- *
- * basePriceHt = 50€ (prix du 1er tirage petit format)
- * priceIncrementHt = 2€ (augmentation par tirage)
- * formatPriceFactor = 1.0 (petit), 1.5 (moyen), 2.0 (grand)
- * editionLimit = 25 (tirage limité)
- *
- * Pour un tirage N (ex: 5/25) en format moyen:
- * price = basePriceHt * formatPriceFactor + (priceIncrementHt * (editionLimit - N))
- * price = 50 * 1.5 + (2 * (25 - 5))
- * price = 75 + 40
- * price = 115€ HT
- *
- * Le DERNIER tirage (25/25) en grand format:
- * price = 50 * 2.0 + (2 * (25 - 25))
- * price = 100 + 0
- * price = 100€ HT
- *
- * Le PREMIER tirage (1/25) en grand format:
- * price = 50 * 2.0 + (2 * (25 - 1))
- * price = 100 + 48
- * price = 148€ HT
- */
-
-export interface ArtworkFormat {
-  id: string
-  name: string
-  widthCm: number
-  heightCm: number
-  priceFactor: number // 1.0, 1.5, 2.0, etc.
-}
-
-export function calculateArtworkPrice(
-  basePriceHt: number,
-  priceIncrementHt: number,
-  editionLimit: number,
-  printNumber: number,
-  format: ArtworkFormat,
-): number {
-  const formatAdjusted = basePriceHt * format.priceFactor
-  const rarityBonus = priceIncrementHt * (editionLimit - printNumber)
-  return formatAdjusted + rarityBonus
-}
-
-// ========================================================================
-// RÉDUCTIONS VIP
-// ========================================================================
-
-/**
- * Règles de réduction VIP:
- *
- * - Client doit avoir acheté AU MOINS 1 arme neuve (cat B, C, D)
- * - Une fois activé → VIP ILLIMITÉ (pas d'expiration)
- * - Réduction appliquée sur:
- *   ✅ Armes (toutes catégories)
- *   ✅ Accessoires
- *   ✅ Gun Art
- *   ❌ Munitions (EXCLUS de réduction)
- *   ❌ Promotions spécifiques (non cumulable)
- *
- * Montant réduction = Marge disponible * 50%
- * (C-à-d: si produit a 30% de marge, client VIP remise max 15%)
- */
-
-export function calculateVipDiscount(
-  productPriceHt: number,
-  productMarginPct: number,
-  vipStatus: string | null,
-): { discountAmount: number; discountPct: number } {
-  if (!vipStatus || productMarginPct <= 0) {
-    return { discountAmount: 0, discountPct: 0 }
-  }
-
-  // Réduction = 50% de la marge disponible
-  const maxDiscountPct = (productMarginPct * 0.5) / 100
-  const discountAmount = productPriceHt * maxDiscountPct
-
-  return {
-    discountAmount,
-    discountPct: maxDiscountPct * 100,
-  }
-}
-
-// ========================================================================
-// DOCUMENTS REQUIS PAR CATÉGORIE LÉGALE
-// ========================================================================
-
-export const LEGAL_CATEGORY_REQUIREMENTS: Record<
-  string,
+const GUN_ART_PIECES = [
   {
-    name: string
-    requiredDocs: string[]
-    minAge: number
-    description: string
-    paymentMethods: string[] // ['virement', 'carte']
-  }
-> = {
-  A: {
-    name: "Catégorie A",
-    requiredDocs: ["cni"], // Interdite, juste pour info
-    minAge: 21,
-    description: "Armes interdites (non vendables)",
-    paymentMethods: [],
+    slug: "eclat-de-bronze",
+    title: "Éclat de Bronze",
+    artistName: "Camille Vasseur",
+    description: "Un Luger P08 saisi dans une lumière dorée, hommage à l'âge d'or de l'armurerie de précision.",
+    longDescription:
+      "Tirage pigmentaire sur papier coton 310 g, signé et numéroté à la main. Chaque exemplaire est accompagné de son certificat d'authenticité.",
+    editionLimit: 25,
+    basePriceHt: 180,
+    priceIncrementHt: 12,
+    editionYear: 2025,
+    featured: true,
+    soldCount: 4,
   },
-  B: {
-    name: "Catégorie B",
-    requiredDocs: ["cni", "autorisation_det", "sia"],
-    minAge: 18,
-    description: "Autorisation préfectorale obligatoire",
-    paymentMethods: ["virement"],
+  {
+    slug: "acier-nocturne",
+    title: "Acier Nocturne",
+    artistName: "Jonas Lindqvist",
+    description: "Étude monochrome d'un revolver de collection, entre ombre et reflet métallique.",
+    longDescription:
+      "Impression fine art sur papier baryté, encadrement caisse américaine en option. Tirage strictement limité à 25 pièces.",
+    editionLimit: 25,
+    basePriceHt: 240,
+    priceIncrementHt: 16,
+    editionYear: 2025,
+    featured: true,
+    soldCount: 9,
   },
-  C: {
-    name: "Catégorie C",
-    requiredDocs: ["cni", "permis_chasse", "sia"],
-    minAge: 18,
-    description: "Permis de chasser obligatoire",
-    paymentMethods: ["virement"],
+  {
+    slug: "memoire-de-poudre",
+    title: "Mémoire de Poudre",
+    artistName: "Camille Vasseur",
+    description: "Nature morte contemporaine : douilles, cuir et laiton patiné sur fond charbon.",
+    longDescription: "Tirage pigmentaire signé, numéroté, livré avec certificat. Papier coton mat 310 g.",
+    editionLimit: 20,
+    basePriceHt: 160,
+    priceIncrementHt: 10,
+    editionYear: 2024,
+    featured: false,
+    soldCount: 6,
   },
-  D: {
-    name: "Catégorie D",
-    requiredDocs: ["cni"],
-    minAge: 18,
-    description: "Armes de défense (spray, bâton, etc.)",
-    paymentMethods: ["virement", "carte"],
+  {
+    slug: "ligne-de-mire",
+    title: "Ligne de Mire",
+    artistName: "Théo Marchand",
+    description: "Macro graphique d'une optique de tir, géométrie pure et profondeur de champ travaillée.",
+    longDescription: "Impression giclée haute densité, signée et numérotée. Édition limitée à 25 exemplaires.",
+    editionLimit: 25,
+    basePriceHt: 200,
+    priceIncrementHt: 14,
+    editionYear: 2025,
+    featured: false,
+    soldCount: 2,
   },
-  none: {
-    name: "Non réglementée",
-    requiredDocs: [],
-    minAge: 0,
-    description: "Accessoires, Gun Art, etc.",
-    paymentMethods: ["virement", "carte"],
+  {
+    slug: "patine-historique",
+    title: "Patine Historique",
+    artistName: "Jonas Lindqvist",
+    description: "Portrait d'une arme ancienne, bois noble et gravures, dans une lumière de musée.",
+    longDescription: "Tirage fine art sur baryté, certificat d'authenticité inclus. Pièce de collection.",
+    editionLimit: 15,
+    basePriceHt: 320,
+    priceIncrementHt: 20,
+    editionYear: 2024,
+    featured: true,
+    soldCount: 11,
   },
-}
-
-// ========================================================================
-// SLA VALIDATION DOCUMENTS
-// ========================================================================
-
-/**
- * SLA: 48 heures pour première réponse (Stéphane Chonez)
- *
- * À la création d'une commande avec arme:
- * - verification_deadline = NOW() + 48h
- *
- * Admin workflow:
- * 1. Notification "Docs en attente" apparaît
- * 2. Admin examine CNI, Permis, SIA, Auth préf
- * 3. Approval → status = 'docs_verified'
- * 4. Rejection → status = 'docs_rejected' + raison
- *    → Client reçoit email avec motif
- *    → Peut réuploader immédiatement
- * 5. Si deadline passée → alerte rouge "SLA dépassé"
- */
-
-export function getVerificationDeadline(): Date {
-  const deadline = new Date()
-  deadline.setHours(deadline.getHours() + 48)
-  return deadline
-}
-
-// ========================================================================
-// REJET MOTIFS (standardisés)
-// ========================================================================
-
-export const REJECTION_REASONS = [
-  "Document expiré",
-  "Document non lisible/illisible",
-  "Âge insuffisant",
-  "Adresse non conforme",
-  "Document refusé (faux)",
-  "Permis suspendu/révoqué",
-  "Autre (voir notes)",
+  {
+    slug: "silence-calibre",
+    title: "Silence Calibre .45",
+    artistName: "Théo Marchand",
+    description: "Composition minimaliste, un pistolet posé comme un objet de design intemporel.",
+    longDescription: "Impression pigmentaire signée et numérotée, papier coton 310 g. Édition de 25 pièces.",
+    editionLimit: 25,
+    basePriceHt: 190,
+    priceIncrementHt: 12,
+    editionYear: 2025,
+    featured: false,
+    soldCount: 0,
+  },
 ] as const
+
+async function seedGunArt() {
+  const [gunArtCat] = await db
+    .select({ id: productCategories.id })
+    .from(productCategories)
+    .where(eq(productCategories.slug, "gun-art"))
+    .limit(1)
+  const [legalNone] = await db
+    .select({ id: legalCategories.id })
+    .from(legalCategories)
+    .where(eq(legalCategories.category, "none"))
+    .limit(1)
+  if (!gunArtCat || !legalNone) {
+    console.warn("⚠️  Gun Art seed skipped: missing gun-art category or 'none' legal category")
+    return
+  }
+
+  for (const piece of GUN_ART_PIECES) {
+    // Idempotent: skip if this artwork already exists
+    const [existing] = await db.select({ id: artworks.id }).from(artworks).where(eq(artworks.slug, piece.slug)).limit(1)
+    if (existing) continue
+
+    const [product] = await db
+      .insert(products)
+      .values({
+        sku: `ART-${piece.slug}`,
+        slug: `art-${piece.slug}`,
+        name: piece.title,
+        categoryId: gunArtCat.id,
+        legalCategoryId: legalNone.id,
+        priceHt: piece.basePriceHt.toFixed(2),
+        requiresLegalVerification: false,
+        published: true,
+      })
+      .returning({ id: products.id })
+
+    const [artwork] = await db
+      .insert(artworks)
+      .values({
+        productId: product.id,
+        slug: piece.slug,
+        sku: `ART-${piece.slug}`,
+        title: piece.title,
+        description: piece.description,
+        longDescription: piece.longDescription,
+        artistName: piece.artistName,
+        editionLimit: piece.editionLimit,
+        editionYear: piece.editionYear,
+        availableFormats: FORMATS,
+        basePriceHt: piece.basePriceHt.toFixed(2),
+        priceIncrementHt: piece.priceIncrementHt.toFixed(2),
+        vatPct: "20",
+        featuredImageUrl: picsum(piece.slug),
+        featured: piece.featured,
+        published: true,
+      })
+      .returning({ id: artworks.id })
+
+    // Numbered prints; the first `soldCount` are sold to look like a live edition.
+    const printValues = Array.from({ length: piece.editionLimit }, (_, i) => {
+      const printNumber = i + 1
+      const priceHt = calculateArtworkPrice(
+        piece.basePriceHt,
+        piece.priceIncrementHt,
+        piece.editionLimit,
+        printNumber,
+        A4_FORMAT,
+      )
+      return {
+        artworkId: artwork.id,
+        printNumber,
+        totalPrints: piece.editionLimit,
+        printDesignation: `${printNumber}/${piece.editionLimit}`,
+        formatId: A4_FORMAT.id,
+        priceHtUnit: priceHt.toFixed(2),
+        status: (printNumber <= piece.soldCount ? "sold" : "available") as "sold" | "available",
+      }
+    })
+    await db.insert(artworkPrints).values(printValues)
+  }
+
+  console.log(`✅ Gun Art seeded (${GUN_ART_PIECES.length} artworks)`)
+}
