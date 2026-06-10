@@ -214,6 +214,13 @@ describe("cart (/api/cart)", () => {
   beforeEach(async () => {
     await db.delete(cartItems).where(eq(cartItems.userId, userId))
     await db.delete(artworkCartItems).where(eq(artworkCartItems.userId, userId))
+    // Adding a print now reserves it (available -> in_cart); reset the fixtures
+    // so each test starts from a known print status.
+    await db
+      .update(artworkPrints)
+      .set({ status: "available", orderId: null })
+      .where(eq(artworkPrints.id, availablePrintId))
+    await db.update(artworkPrints).set({ status: "sold", orderId: null }).where(eq(artworkPrints.id, soldPrintId))
   })
 
   it("requires authentication", async () => {
@@ -360,7 +367,7 @@ describe("cart (/api/cart)", () => {
     expect(get.json().data.items).toEqual([])
   })
 
-  it("adds an available artwork print", async () => {
+  it("adds an available artwork print and reserves it (in_cart)", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/cart/items",
@@ -372,6 +379,35 @@ describe("cart (/api/cart)", () => {
     expect(data.artworkItems).toHaveLength(1)
     expect(data.artworkItems[0]).toMatchObject({ printId: availablePrintId, unitPriceHt: 100 })
     expect(data.artworkItems[0].lineTtc).toBe(120)
+
+    const [print] = await db
+      .select({ status: artworkPrints.status })
+      .from(artworkPrints)
+      .where(eq(artworkPrints.id, availablePrintId))
+    expect(print.status).toBe("in_cart")
+  })
+
+  it("releases the print back to available when its cart line is removed", async () => {
+    const add = await app.inject({
+      method: "POST",
+      url: "/api/cart/items",
+      headers: await authHeaders(),
+      payload: { printId: availablePrintId, qty: 1 },
+    })
+    const artItemId = add.json().data.artworkItems[0].id
+
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/api/cart/artwork-items/${artItemId}`,
+      headers: await authHeaders(),
+    })
+    expect(del.statusCode).toBe(204)
+
+    const [print] = await db
+      .select({ status: artworkPrints.status })
+      .from(artworkPrints)
+      .where(eq(artworkPrints.id, availablePrintId))
+    expect(print.status).toBe("available")
   })
 
   it("rejects adding the same print twice", async () => {
@@ -421,5 +457,11 @@ describe("cart (/api/cart)", () => {
     expect(clear.statusCode).toBe(204)
     const get = await app.inject({ method: "GET", url: "/api/cart", headers: await authHeaders() })
     expect(get.json().data.summary.itemCount).toBe(0)
+
+    const [print] = await db
+      .select({ status: artworkPrints.status })
+      .from(artworkPrints)
+      .where(eq(artworkPrints.id, availablePrintId))
+    expect(print.status).toBe("available")
   })
 })

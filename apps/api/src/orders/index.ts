@@ -8,13 +8,13 @@ import {
 } from "@armurier/shared"
 import { and, desc, eq, gte, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { reservePrintForOrder } from "../artworks/reservation.js"
 import { authenticate } from "../auth/authenticate.js"
 import { loadCart } from "../cart/service.js"
 import { db } from "../db/client.js"
 import {
   addresses,
   artworkCartItems,
-  artworkPrints,
   auditLogs,
   cartItems,
   type OrderAddressSnapshot,
@@ -192,14 +192,10 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
-        // Reserve artwork prints (only if still available)
+        // Promote the cart-held prints to this order (in_cart -> reserved)
         for (const line of cart.artworkItems) {
-          const updated = await tx
-            .update(artworkPrints)
-            .set({ status: "reserved", orderId: order.id, updatedAt: new Date() })
-            .where(and(eq(artworkPrints.id, line.printId), eq(artworkPrints.status, "available")))
-            .returning({ id: artworkPrints.id })
-          if (updated.length === 0) {
+          const reserved = await reservePrintForOrder(line.printId, order.id, tx)
+          if (!reserved) {
             throw new OrderError(409, "Conflict", `Print ${line.printDesignation} is no longer available`)
           }
         }
