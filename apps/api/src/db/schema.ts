@@ -320,6 +320,7 @@ export const legalDocuments = pgTable(
     verificationNotes: text("verification_notes"),
     rejectionReason: varchar("rejection_reason", { length: 50 }), // standardized code (LEGAL_DOC_REJECTION_REASONS)
     verificationDeadline: timestamp("verification_deadline"), // pour SLA 48h
+    slaBreachNotifiedAt: timestamp("sla_breach_notified_at"), // SLA 4.4 : alerte breach envoyée une seule fois
 
     // Métadonnées
     uploadedAt: timestamp("uploaded_at").defaultNow(),
@@ -329,6 +330,10 @@ export const legalDocuments = pgTable(
      index("idx_legal_docs_user").on(t.userId),
      index("idx_legal_docs_status").on(t.verificationStatus),
      index("idx_legal_docs_expires").on(t.expiresAt),
+     // SLA 4.4 : scan ciblé des docs en attente jamais encore alertés
+     index("idx_legal_docs_sla_breach")
+      .on(t.verificationDeadline)
+      .where(sql`${t.verificationStatus} = 'pending' AND ${t.slaBreachNotifiedAt} IS NULL`),
      uniqueIndex("uniq_user_doc_type")
       .on(t.userId, t.docType)
       .where(sql`${t.verificationStatus} = 'approved'`),

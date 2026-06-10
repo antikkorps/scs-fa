@@ -68,6 +68,45 @@ export async function sendLegalDocApprovedEmail(to: string, doc: { docType: Lega
   })
 }
 
+export type SlaBreachItem = {
+  customerName: string
+  docType: LegalDocType
+  deadline: Date
+  hoursOverdue: number
+}
+
+/**
+ * Internal digest sent to admins when one or more legal documents have blown
+ * past their 48h review SLA. Best-effort, sent once per breach (see sla.ts).
+ */
+export async function sendLegalDocSlaBreachEmail(to: string[], breaches: SlaBreachItem[]): Promise<void> {
+  if (to.length === 0 || breaches.length === 0) return
+
+  const queueUrl = "https://armurier.fr/admin/legal-documents"
+  const line = (b: SlaBreachItem) =>
+    `${b.customerName} — ${DOC_TYPE_LABELS[b.docType]} (deadline ${b.deadline.toISOString()}, ${b.hoursOverdue}h overdue)`
+  const rows = breaches
+    .map(
+      (b) =>
+        `<li>${escapeHtml(b.customerName)} — <strong>${DOC_TYPE_LABELS[b.docType]}</strong> ` +
+        `(deadline ${b.deadline.toISOString()}, <strong>${b.hoursOverdue}h overdue</strong>)</li>`,
+    )
+    .join("")
+
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: `[Action required] ${breaches.length} legal document(s) past the 48h review SLA`,
+    text:
+      `${breaches.length} legal document(s) have exceeded the 48h validation SLA and are still pending:\n\n` +
+      `${breaches.map(line).join("\n")}\n\nReview them now: ${queueUrl}`,
+    html:
+      `<p><strong>${breaches.length}</strong> legal document(s) have exceeded the 48h validation SLA and are still pending:</p>` +
+      `<ul>${rows}</ul>` +
+      `<p><a href="${queueUrl}">Open the validation queue</a></p>`,
+  })
+}
+
 export async function sendLegalDocRejectedEmail(
   to: string,
   doc: { docType: LegalDocType; reason: LegalDocRejectionReason; notes?: string | null },

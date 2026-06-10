@@ -12,6 +12,7 @@ import { env } from "./env.js"
 import { legalCategoryRoutes } from "./legal-categories/index.js"
 import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
+import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { orderRoutes } from "./orders/index.js"
 import { productRoutes } from "./products/index.js"
 
@@ -68,6 +69,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(orderRoutes, { prefix: "/api/orders" })
   await fastify.register(legalDocumentRoutes, { prefix: "/api/legal-documents" })
   await fastify.register(adminLegalDocumentRoutes, { prefix: "/api/admin/legal-documents" })
+
+  // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
+  startLegalDocSlaScheduler(fastify)
 
   return fastify
 }

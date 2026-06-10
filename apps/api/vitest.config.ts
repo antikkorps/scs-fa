@@ -16,7 +16,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
-      exclude: ["src/db/seeds.ts", "src/db/seed-cli.ts", "src/db/schema.ts", "**/*.test.ts"],
+      exclude: [
+        "src/db/seeds.ts",
+        "src/db/seed-cli.ts",
+        "src/db/schema.ts",
+        "src/legal-documents/sla-cli.ts",
+        "**/*.test.ts",
+      ],
     },
   },
 })

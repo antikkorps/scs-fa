@@ -162,6 +162,7 @@
 - [x] SLA : `verification_deadline = upload + 48h` (`LEGAL_DOC_REVIEW_SLA_HOURS`) ; colonne `rejection_reason` ajoutée
 - [x] Motifs standardisés (réponse C1) : `document_expired`, `document_illegible`, `wrong_document_type`, `information_mismatch`, `document_incomplete`, `underage`, `suspected_fraud`, `other`
 - [x] Audit trail (`audit_logs`) + emails `sendLegalDocApprovedEmail`/`sendLegalDocRejectedEmail` (best-effort) ; 18 tests d'intégration
+
 **Story 4.3** — État légal commande visible customer ✅
 
 - [x] `GET /api/orders/:id/legal` (JWT, ownership) — checklist actionnable : statut global + par doc requis `{ docType, status: missing|pending_scan|infected|pending_review|approved|rejected, rejectionReason?, documentId? }`
@@ -169,7 +170,15 @@
 - [x] Service `recomputeOrderLegalStatus(userId)` (`apps/api/src/orders/legal-status.ts`) : les décisions admin font avancer les commandes — hooks sur upload, delete, résultat scan, approve/reject ; lecture self-healing sur `GET /:id/legal`
 - [x] Transitions : pending → docs_verifying (dossier complet) → docs_verified (tout approuvé, `legalVerifiedAt/By`) / docs_rejected (motif copié sur l'order) ; `docs_verified` ne régresse jamais ; réupload après rejet → docs_verifying (réponse D1 : réupload autorisé)
 - [x] shared : `ORDER_REQUIRED_DOC_STATUS` ; 14 tests d'intégration ; vitest API passe en `fileParallelism: false` (queue admin globale = état partagé entre fichiers)
-  **Story 4.4** — Alerte SLA dépassé (cron)
+
+**Story 4.4** — Alerte SLA dépassé (cron) ✅
+
+- [x] Cœur testable `runLegalDocSlaBreachCheck(now)` (`apps/api/src/legal-documents/sla.ts`) : détecte les docs `pending` dont `verification_deadline < now` jamais encore alertés
+- [x] Anti-spam idempotent : colonne `sla_breach_notified_at` + index partiel `idx_legal_docs_sla_breach` (pending & non alertés) ; un breach n'est notifié qu'une fois
+- [x] Alerte = email **digest** aux admins (`role = 'admin'`) `sendLegalDocSlaBreachEmail` ; envoi **avant** le marquage (un échec de livraison réessaie au run suivant au lieu d'avaler l'alerte) ; pas d'admin → rien marqué (retry)
+- [x] Audit trail : entrée `audit_logs` par breach (`action = 'legal_doc_sla_breached'`, acteur `system`/userId null, `newValue = { deadline, hoursOverdue }`) ; marquage + audit dans une transaction
+- [x] Câblage : scheduler in-process `startLegalDocSlaScheduler` (`SLA_CHECK_INTERVAL_MINUTES`, défaut 60 ; 0 ou test = no-op ; `clearInterval` sur `onClose`) + CLI `sla-cli.ts` / script `sla:check` pour cron externe (Docker, Phase 8)
+- [x] 7 tests d'intégration (breach détecté/marqué/audité/emailé, idempotence, deadline future ignorée, docs non-pending ignorés, sans-deadline ignorés, digest multi-docs/multi-admins, branche sans admin)
 
 ## PHASE 5 — Gun Art (tirage limité ≤25)
 
