@@ -6,6 +6,7 @@ import fastifyMultipart from "@fastify/multipart"
 import fastifyRateLimit from "@fastify/rate-limit"
 import Fastify, { type FastifyInstance } from "fastify"
 import { addressRoutes } from "./addresses/index.js"
+import { artworkRoutes } from "./artworks/index.js"
 import { authRoutes } from "./auth/index.js"
 import { cartRoutes } from "./cart/index.js"
 import { env } from "./env.js"
@@ -63,6 +64,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await fastify.register(authRoutes, { prefix: "/api/auth" })
   await fastify.register(productRoutes, { prefix: "/api/products" })
+  await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
   await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
   await fastify.register(addressRoutes, { prefix: "/api/addresses" })
