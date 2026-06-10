@@ -229,6 +229,37 @@
 **Story 8.5** — Monitoring uptime + alertes
 **Story 8.6** — Pentest interne avant mise en ligne
 
+## PHASE 9 — Front, SEO & Découvrabilité (transverse)
+
+> Remarques Franck (2026-06-10, après démo front 5.3). Palette laiton + charbon **validée** — à conserver.
+
+**Story 9.1** — Recherche globale (armes + Gun Art)
+
+- Barre de recherche unifiée header + page résultats, couvrant les produits **et** les œuvres
+- API : produits ont déjà `searchVector` + `websearch_to_tsquery('french', …)` (cf. `products/list.ts`) ; ajouter la recherche côté `artworks` (titre/artiste/description) et un endpoint agrégé ou deux sources fusionnées côté front
+- Mobile-first, états vide/erreur, debounced
+
+**Story 9.2** — Page 404 soignée
+
+- `app/error.vue` Nuxt cohérent avec l'identité galerie (visuel, message, CTA retour collection / accueil), bon status HTTP, SEO `noindex`
+
+**Story 9.3** — Œuvres en orientation portrait ET paysage
+
+- Aujourd'hui carte + détail figés en `aspect-ratio: 4/5` (portrait). **Le gros du catalogue sera paysage** → prévoir le cas dès maintenant
+- Data : dériver l'orientation/ratio (champ `orientation` ou dimensions image, ou `availableFormats`) ; media responsive qui s'adapte (object-fit, aspect-ratio dynamique) sans casser la grille
+- Cartes : grille robuste quel que soit le ratio (hauteur homogène ou masonry léger)
+
+**Story 9.4** — Blog (SEO-first)
+
+- Section éditoriale, **d'abord pour le référencement** (peut ne pas être exploitée fonctionnellement au début)
+- Modèle de contenu (articles : slug, titre, extrait, corps, meta, image), index + article, JSON-LD `Article`/`BlogPosting`, sitemap, fil RSS éventuel
+- Back : CRUD admin (rejoint Phase 7) ; front : SSR + SEO complet
+
+**Story 9.5** — Agent-ready / découvrabilité IA
+
+- Être visible dans les recherches d'**agents LLM** : `llms.txt` (+ `llms-full.txt`), `sitemap.xml`, structured data complète et valide (Product/VisualArtwork/Offer/Breadcrumb/Organization déjà amorcés), contenu sémantique propre, métadonnées riches
+- Étudier un format/endpoints pensés pour agents (réponses structurées, éventuellement exposition MCP en lecture)
+
 ---
 
 ## Backlog non priorisé / Idées
