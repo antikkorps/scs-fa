@@ -1,6 +1,7 @@
 import { cartItemSchema, updateCartItemSchema, uuidParamSchema } from "@armurier/shared"
 import { and, eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { releasePrintFromCart, reservePrintForCart } from "../artworks/reservation.js"
 import { authenticate } from "../auth/authenticate.js"
 import { db } from "../db/client.js"
 import { artworkCartItems, artworkPrints, cartItems, products, productVariants } from "../db/schema.js"
@@ -74,38 +75,38 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(201).send({ data: cart })
     }
 
-    // printId path (artwork): each print is a unique, single-quantity item
-    const [print] = await db
-      .select({
-        status: artworkPrints.status,
-        priceHtUnit: artworkPrints.priceHtUnit,
-      })
-      .from(artworkPrints)
-      .where(eq(artworkPrints.id, printId as string))
-      .limit(1)
+    // printId path (artwork): each print is a unique, single-quantity item.
+    const id = printId as string
 
+    const [print] = await db
+      .select({ id: artworkPrints.id })
+      .from(artworkPrints)
+      .where(eq(artworkPrints.id, id))
+      .limit(1)
     if (!print) {
       return reply.code(404).send({ error: "NotFound", message: "Print not found" })
-    }
-    if (print.status !== "available") {
-      return reply.code(409).send({ error: "Conflict", message: "Print is not available" })
     }
 
     const [existing] = await db
       .select({ id: artworkCartItems.id })
       .from(artworkCartItems)
-      .where(and(eq(artworkCartItems.userId, userId), eq(artworkCartItems.printId, printId as string)))
+      .where(and(eq(artworkCartItems.userId, userId), eq(artworkCartItems.printId, id)))
       .limit(1)
-
     if (existing) {
       return reply.code(409).send({ error: "Conflict", message: "Print already in cart" })
     }
 
-    await db.insert(artworkCartItems).values({
-      userId,
-      printId: printId as string,
-      priceHtAtTime: print.priceHtUnit,
+    // Claim the print and create the cart line atomically: if the claim loses the
+    // race (or the insert fails) the whole reservation rolls back — no orphan hold.
+    const claimed = await db.transaction(async (tx) => {
+      const reserved = await reservePrintForCart(id, tx)
+      if (!reserved) return null
+      await tx.insert(artworkCartItems).values({ userId, printId: id, priceHtAtTime: reserved.priceHtUnit })
+      return reserved
     })
+    if (!claimed) {
+      return reply.code(409).send({ error: "Conflict", message: "Print is not available" })
+    }
 
     const cart = await loadCart(userId)
     return reply.code(201).send({ data: cart })
@@ -173,22 +174,36 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(400).send(validationError(params.error.issues))
     }
     const userId = request.user.sub
-    const deleted = await db
-      .delete(artworkCartItems)
-      .where(and(eq(artworkCartItems.id, params.data.id), eq(artworkCartItems.userId, userId)))
-      .returning({ id: artworkCartItems.id })
+    // Remove the line and release its print back to available, atomically.
+    const removed = await db.transaction(async (tx) => {
+      const [deleted] = await tx
+        .delete(artworkCartItems)
+        .where(and(eq(artworkCartItems.id, params.data.id), eq(artworkCartItems.userId, userId)))
+        .returning({ printId: artworkCartItems.printId })
+      if (!deleted) return false
+      await releasePrintFromCart(deleted.printId, tx)
+      return true
+    })
 
-    if (deleted.length === 0) {
+    if (!removed) {
       return reply.code(404).send({ error: "NotFound", message: "Cart item not found" })
     }
     return reply.code(204).send()
   })
 
-  // DELETE /api/cart — clear the whole cart
+  // DELETE /api/cart — clear the whole cart, releasing every reserved print
   fastify.delete("/", async (request, reply) => {
     const userId = request.user.sub
-    await db.delete(cartItems).where(eq(cartItems.userId, userId))
-    await db.delete(artworkCartItems).where(eq(artworkCartItems.userId, userId))
+    await db.transaction(async (tx) => {
+      await tx.delete(cartItems).where(eq(cartItems.userId, userId))
+      const removed = await tx
+        .delete(artworkCartItems)
+        .where(eq(artworkCartItems.userId, userId))
+        .returning({ printId: artworkCartItems.printId })
+      for (const r of removed) {
+        await releasePrintFromCart(r.printId, tx)
+      }
+    })
     return reply.code(204).send()
   })
 }

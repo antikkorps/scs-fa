@@ -190,7 +190,13 @@
 - [x] `ArtworkFormat` (type partagé) + `calculateArtworkPriceBreakdown(...)` → `{ priceHt, priceTtc }` via `computePriceTtc`
 - [x] 11 tests unitaires (exemples de référence 5/25, 25/25, 1/25, monotonie rareté, scaling format, arrondi, édition 1/1, bornes invalides)
 - Building block branché en 5.2 (réservation atomique d'un tirage) / 5.3 (page collection), comme `calculateVipDiscount` l'a été en Phase 6
-**Story 5.2** — Réservation atomique d'un numéro de tirage (transaction)
+**Story 5.2** — Réservation atomique d'un numéro de tirage (transaction) ✅
+
+- [x] Module `apps/api/src/artworks/reservation.ts` : `reservePrintForCart` (available→in_cart), `releasePrintFromCart` (in_cart→available), `reservePrintForOrder` (in_cart→reserved + orderId) — chacun en **compare-and-set** (garde de statut dans le WHERE), exécutable sur `db` ou une transaction (`DbExecutor`)
+- [x] Correctif race : l'ajout panier réserve désormais le tirage **au moment de l'ajout** (avant, le statut restait `available` → 2 clients pouvaient détenir le même numéro et le 2ᵉ ne le découvrait qu'au checkout). Claim + insert ligne panier dans **une transaction** (rollback = pas de hold orphelin)
+- [x] Libération : retrait d'une ligne (`DELETE /api/cart/artwork-items/:id`) et vidage (`DELETE /api/cart`) repassent le(s) tirage(s) `in_cart→available`, en transaction
+- [x] Checkout (`POST /api/orders`) promeut le tirage `in_cart→reserved` via `reservePrintForOrder` (au lieu de `available→reserved`), garde anti-concurrence conservée
+- [x] Tests : 5 nouveaux (`reservation.test.ts` : helpers compare-and-set, **2 acheteurs concurrents → un seul gagne**, blocage tant que non libéré) + cart.test enrichi (in_cart à l'ajout, libération au retrait/vidage) ; orders.test inchangé (statut `reserved` après commande)
 **Story 5.3** — Page collection Gun Art (front)
 
 ## PHASE 6 — Paiements
