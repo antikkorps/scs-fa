@@ -182,7 +182,14 @@
 
 ## PHASE 5 — Gun Art (tirage limité ≤25)
 
-**Story 5.1** — Pricing dynamique par rareté (`calculateArtworkPrice`)
+**Story 5.1** — Pricing dynamique par rareté (`calculateArtworkPrice`) ✅
+
+- [x] Fonction pure `calculateArtworkPrice(basePriceHt, priceIncrementHt, editionLimit, printNumber, format)` dans `packages/shared/src/artwork.ts` : `base * format.priceFactor + increment * (editionLimit - printNumber)`, arrondi `round2` (cf. formule `docs/seeds_and_workflows.ts`)
+- [x] Rareté = bonus décroissant : tirage 1/25 le plus cher, 25/25 = base seule ; le format ne scale que la base, jamais le bonus
+- [x] Garde-fous (`RangeError`) : `printNumber` entier ∈ [1, editionLimit], `editionLimit ≥ 1`, `priceFactor > 0`, prix ≥ 0 (aligné sur `chk_print_number` en base)
+- [x] `ArtworkFormat` (type partagé) + `calculateArtworkPriceBreakdown(...)` → `{ priceHt, priceTtc }` via `computePriceTtc`
+- [x] 11 tests unitaires (exemples de référence 5/25, 25/25, 1/25, monotonie rareté, scaling format, arrondi, édition 1/1, bornes invalides)
+- Building block branché en 5.2 (réservation atomique d'un tirage) / 5.3 (page collection), comme `calculateVipDiscount` l'a été en Phase 6
 **Story 5.2** — Réservation atomique d'un numéro de tirage (transaction)
 **Story 5.3** — Page collection Gun Art (front)
 
