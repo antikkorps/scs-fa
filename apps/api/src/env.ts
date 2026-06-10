@@ -36,6 +36,10 @@ const envSchema = z.object({
   SMTP_USER: z.string(),
   SMTP_PASS: z.string(),
   SMTP_FROM: z.string().email(),
+
+  // Legal doc SLA breach scheduler — in-process check every N minutes (0 disables;
+  // disabled in tests regardless). External cron can call the sla CLI instead.
+  SLA_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
 })
 
 export const env = envSchema.parse(process.env)
