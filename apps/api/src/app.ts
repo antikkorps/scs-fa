@@ -15,6 +15,7 @@ import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { orderRoutes } from "./orders/index.js"
+import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
 import { productRoutes } from "./products/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -69,6 +70,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
   await fastify.register(addressRoutes, { prefix: "/api/addresses" })
   await fastify.register(orderRoutes, { prefix: "/api/orders" })
+  await fastify.register(paymentRoutes, { prefix: "/api/payments" })
+  await fastify.register(stripeWebhookRoutes, { prefix: "/api/webhooks/stripe" })
   await fastify.register(legalDocumentRoutes, { prefix: "/api/legal-documents" })
   await fastify.register(adminLegalDocumentRoutes, { prefix: "/api/admin/legal-documents" })
 

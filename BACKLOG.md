@@ -209,7 +209,17 @@
 
 ## PHASE 6 — Paiements
 
-**Story 6.1** — Intégration Stripe (CB) — webhooks signés
+**Story 6.1** — Intégration Stripe (CB) — webhooks signés ✅
+
+- [x] Dépendance `stripe@20.4.1` (quarantaine 90j respectée), wrapper mince `apps/api/src/payments/stripe.ts` (`createPaymentIntent` / `retrievePaymentIntent` / `constructWebhookEvent`) — tout l'I/O réseau isolé derrière 3 fonctions → mockable, zéro clé en test
+- [x] Env `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (validés `env.ts`, documentés `.env.example`, valeurs factices dans `vitest.config.ts`)
+- [x] Persistance du bucket carte **à la création de commande** : ligne `payment_carte` (montant = `split.carte.amountTtc`) insérée dans la transaction (l'`itemsJson` immuable ne stocke pas la TVA par ligne → le montant carte est figé ici, pas recalculé)
+- [x] `POST /api/payments/stripe/intent` (JWT, ownership 404) : crée/réutilise un PaymentIntent pour le montant carte, renvoie `clientSecret` ; **idempotent** (réutilise un intent encore en attente au lieu d'en empiler) ; 400 si commande virement-only, 409 si déjà payé
+- [x] `POST /api/webhooks/stripe` (no-auth, **raw body** + vérif signature) : parser `application/json` en Buffer encapsulé au plugin ; `payment_intent.succeeded/payment_failed/canceled` → transition `payment_carte` ; signature KO/absente → 400
+- [x] `recomputeOrderPaymentStatus` : la commande passe `received` **seulement quand tous les buckets dus sont réglés** (carte 6.1 + virement 6.2) → forward-compatible ; le flip déclenche `recomputeVipStatus` + `recomputeOrderLegalStatus`
+- [x] 13 tests (`payments.test.ts`, Stripe mocké) : création→`payment_carte`, init (création/réutilisation/404/400/409/401), webhook (succeeded carte_only→received, mixed reste pending, failed, intent inconnu no-op, signature KO/absente)
+- Note : UI de paiement (Stripe Elements) = **Phase 10** (tunnel d'achat, dépend de l'auth front) ; 6.1 = backend complet, consommable tel quel
+
 **Story 6.2** — Virement : génération RIB + référence unique
 **Story 6.3** — Rapprochement bancaire admin (import CSV ou API banque)
 **Story 6.4** — Remboursement (full + partiel)
@@ -228,6 +238,74 @@
 **Story 8.4** — Backups Postgres automatisés
 **Story 8.5** — Monitoring uptime + alertes
 **Story 8.6** — Pentest interne avant mise en ligne
+
+## PHASE 9 — Front, SEO & Découvrabilité (transverse)
+
+> Remarques Franck (2026-06-10, après démo front 5.3). Palette laiton + charbon **validée** — à conserver.
+
+**Story 9.1** — Recherche globale (armes + Gun Art)
+
+- Barre de recherche unifiée header + page résultats, couvrant les produits **et** les œuvres
+- API : produits ont déjà `searchVector` + `websearch_to_tsquery('french', …)` (cf. `products/list.ts`) ; ajouter la recherche côté `artworks` (titre/artiste/description) et un endpoint agrégé ou deux sources fusionnées côté front
+- Mobile-first, états vide/erreur, debounced
+
+**Story 9.2** — Page 404 soignée
+
+- `app/error.vue` Nuxt cohérent avec l'identité galerie (visuel, message, CTA retour collection / accueil), bon status HTTP, SEO `noindex`
+
+**Story 9.3** — Œuvres en orientation portrait ET paysage
+
+- Aujourd'hui carte + détail figés en `aspect-ratio: 4/5` (portrait). **Le gros du catalogue sera paysage** → prévoir le cas dès maintenant
+- Data : dériver l'orientation/ratio (champ `orientation` ou dimensions image, ou `availableFormats`) ; media responsive qui s'adapte (object-fit, aspect-ratio dynamique) sans casser la grille
+- Cartes : grille robuste quel que soit le ratio (hauteur homogène ou masonry léger)
+
+**Story 9.4** — Blog (SEO-first)
+
+- Section éditoriale, **d'abord pour le référencement** (peut ne pas être exploitée fonctionnellement au début)
+- Modèle de contenu (articles : slug, titre, extrait, corps, meta, image), index + article, JSON-LD `Article`/`BlogPosting`, sitemap, fil RSS éventuel
+- Back : CRUD admin (rejoint Phase 7) ; front : SSR + SEO complet
+
+**Story 9.5** — Agent-ready / découvrabilité IA
+
+- Être visible dans les recherches d'**agents LLM** : `llms.txt` (+ `llms-full.txt`), `sitemap.xml`, structured data complète et valide (Product/VisualArtwork/Offer/Breadcrumb/Organization déjà amorcés), contenu sémantique propre, métadonnées riches
+- Étudier un format/endpoints pensés pour agents (réponses structurées, éventuellement exposition MCP en lecture)
+
+## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
+
+> Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
+
+**Story 10.1** — UI Auth (inscription, connexion, reset)
+
+- Pages Nuxt inscription / connexion / mot de passe oublié / reset (API Phase 1)
+- Gestion de session côté client (stockage token + refresh), middleware de route protégée, état connecté dans le header
+- Mobile-first, validations alignées sur `shared`, états erreur/lockout/anti-énumération respectés
+
+**Story 10.2** — Catalogue armurerie (listing + filtres + recherche)
+
+- Page boutique : grille produits, filtres catégorie / catégorie légale / prix, recherche full-text (API 2.1, `{ data, pagination }`)
+- Mobile-first, SSR + SEO, états vide/erreur ; recoupe la recherche globale 9.1 (à coordonner)
+
+**Story 10.3** — Fiche produit armurerie
+
+- Page détail (API 2.2) : variants, prix TTC, **mentions légales** (catégorie, âge mini, docs requis), restrictions ; ajout au panier
+- SEO `Product` JSON-LD ; gère un produit sans variant seedé (cf. note 2.2)
+
+**Story 10.4** — Panier & tunnel d'achat (commun aux 2 univers)
+
+- Page panier (produits + tirages), récap totaux, **remise VIP affichée**, retrait de lignes (libération tirage)
+- Choix/saisie adresses depuis le carnet (API 3.x), récap du **split paiement** virement/CB, création commande (API 3.2)
+- Débouche sur le paiement (Phase 6) → ensemble = « achetable de bout en bout »
+
+**Story 10.5** — Espace compte (commandes + documents légaux)
+
+- Profil (API 1.3), liste + détail commandes avec statut légal/paiement (API 3.3)
+- **Upload & suivi des documents légaux** (API 4.1) + checklist légale par commande (API 4.3) : statut par doc, motif de rejet, réupload
+- Cœur de l'expérience réglementée côté client
+
+**Story 10.6** — Accueil unifié & navigation 2 univers
+
+- Page d'accueil présentant **armurerie + Gun Art** (aujourd'hui hero centré Gun Art), navigation header vers les deux univers
+- Cohérence de marque entre la boutique réglementée et la galerie d'art
 
 ---
 

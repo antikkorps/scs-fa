@@ -37,6 +37,10 @@ const envSchema = z.object({
   SMTP_PASS: z.string(),
   SMTP_FROM: z.string().email(),
 
+  // Stripe (card payments). Webhook secret signs the events Stripe POSTs us.
+  STRIPE_SECRET_KEY: z.string().min(1),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1),
+
   // Legal doc SLA breach scheduler — in-process check every N minutes (0 disables;
   // disabled in tests regardless). External cron can call the sla CLI instead.
   SLA_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),

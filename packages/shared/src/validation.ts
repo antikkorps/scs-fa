@@ -209,6 +209,13 @@ export const uuidParamSchema = z.object({
 
 export type UuidParam = z.infer<typeof uuidParamSchema>
 
+// Story 6.1 — initiate a Stripe card payment for an order
+export const createStripePaymentSchema = z.object({
+  orderId: z.string().uuid(),
+})
+
+export type CreateStripePaymentInput = z.infer<typeof createStripePaymentSchema>
+
 // Backwards-compatible alias used by the product detail route
 export const productIdParamSchema = uuidParamSchema
 
