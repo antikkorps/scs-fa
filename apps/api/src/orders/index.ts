@@ -19,6 +19,7 @@ import {
   cartItems,
   type OrderAddressSnapshot,
   orders,
+  paymentCarte,
   productVariants,
 } from "../db/schema.js"
 import { validationError } from "../http.js"
@@ -198,6 +199,19 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
           if (!reserved) {
             throw new OrderError(409, "Conflict", `Print ${line.printDesignation} is no longer available`)
           }
+        }
+
+        // Persist the card-payable amount now (split is computed here, and the
+        // immutable itemsJson snapshot does not store VAT per line). Story 6.1
+        // attaches a Stripe PaymentIntent to this row; the virement counterpart
+        // lands in Story 6.2.
+        if (split.carte.amountTtc > 0) {
+          await tx.insert(paymentCarte).values({
+            orderId: order.id,
+            amountTtc: split.carte.amountTtc.toFixed(2),
+            currency: "EUR",
+            paymentStatus: "pending",
+          })
         }
 
         await tx.delete(cartItems).where(eq(cartItems.userId, userId))

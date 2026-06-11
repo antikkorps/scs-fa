@@ -209,7 +209,17 @@
 
 ## PHASE 6 — Paiements
 
-**Story 6.1** — Intégration Stripe (CB) — webhooks signés
+**Story 6.1** — Intégration Stripe (CB) — webhooks signés ✅
+
+- [x] Dépendance `stripe@20.4.1` (quarantaine 90j respectée), wrapper mince `apps/api/src/payments/stripe.ts` (`createPaymentIntent` / `retrievePaymentIntent` / `constructWebhookEvent`) — tout l'I/O réseau isolé derrière 3 fonctions → mockable, zéro clé en test
+- [x] Env `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (validés `env.ts`, documentés `.env.example`, valeurs factices dans `vitest.config.ts`)
+- [x] Persistance du bucket carte **à la création de commande** : ligne `payment_carte` (montant = `split.carte.amountTtc`) insérée dans la transaction (l'`itemsJson` immuable ne stocke pas la TVA par ligne → le montant carte est figé ici, pas recalculé)
+- [x] `POST /api/payments/stripe/intent` (JWT, ownership 404) : crée/réutilise un PaymentIntent pour le montant carte, renvoie `clientSecret` ; **idempotent** (réutilise un intent encore en attente au lieu d'en empiler) ; 400 si commande virement-only, 409 si déjà payé
+- [x] `POST /api/webhooks/stripe` (no-auth, **raw body** + vérif signature) : parser `application/json` en Buffer encapsulé au plugin ; `payment_intent.succeeded/payment_failed/canceled` → transition `payment_carte` ; signature KO/absente → 400
+- [x] `recomputeOrderPaymentStatus` : la commande passe `received` **seulement quand tous les buckets dus sont réglés** (carte 6.1 + virement 6.2) → forward-compatible ; le flip déclenche `recomputeVipStatus` + `recomputeOrderLegalStatus`
+- [x] 13 tests (`payments.test.ts`, Stripe mocké) : création→`payment_carte`, init (création/réutilisation/404/400/409/401), webhook (succeeded carte_only→received, mixed reste pending, failed, intent inconnu no-op, signature KO/absente)
+- Note : UI de paiement (Stripe Elements) = **Phase 10** (tunnel d'achat, dépend de l'auth front) ; 6.1 = backend complet, consommable tel quel
+
 **Story 6.2** — Virement : génération RIB + référence unique
 **Story 6.3** — Rapprochement bancaire admin (import CSV ou API banque)
 **Story 6.4** — Remboursement (full + partiel)

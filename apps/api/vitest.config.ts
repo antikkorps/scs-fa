@@ -11,6 +11,9 @@ export default defineConfig({
       NODE_ENV: "test",
       // Never hit a real bucket from tests, whatever the local .env says
       STORAGE_DRIVER: "memory",
+      // Stripe is mocked in tests; these just satisfy env validation
+      STRIPE_SECRET_KEY: "sk_test_dummy",
+      STRIPE_WEBHOOK_SECRET: "whsec_test_dummy",
     },
     include: ["src/**/*.{test,spec}.ts"],
     coverage: {
