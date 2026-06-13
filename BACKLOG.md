@@ -220,7 +220,17 @@
 - [x] 13 tests (`payments.test.ts`, Stripe mocké) : création→`payment_carte`, init (création/réutilisation/404/400/409/401), webhook (succeeded carte_only→received, mixed reste pending, failed, intent inconnu no-op, signature KO/absente)
 - Note : UI de paiement (Stripe Elements) = **Phase 10** (tunnel d'achat, dépend de l'auth front) ; 6.1 = backend complet, consommable tel quel
 
-**Story 6.2** — Virement : génération RIB + référence unique
+**Story 6.2** — Virement : génération RIB + référence unique ✅
+
+- [x] Helper pur `virementReferenceFromBytes` (`packages/shared/src/orders.ts`) : référence `SCS-XXXX-XXXX` en base32 **Crockford** (sans I/L/O/U → robuste à la saisie manuelle / dictée), entropie injectée par l'appelant (testable), unicité déléguée à la DB ; 4 tests unitaires
+- [x] RIB de réception SCS en **variables d'env** (`VIREMENT_IBAN`/`BIC`/`BANK_NAME`/`ACCOUNT_HOLDER`, validées `env.ts`, documentées `.env.example`, valeurs factices dans `vitest.config.ts`) — cohérent avec le pattern `STRIPE_*`
+- [x] Schéma : colonne `bic_recipient` ajoutée à `payment_virements` + **contrainte UNIQUE** sur `payment_reference` (appliquées en base via `ALTER TABLE`)
+- [x] Persistance du bucket virement **à la création de commande** (en miroir de `payment_carte` 6.1) : ligne `payment_virement` insérée dans la transaction quand `split.virement.amountTtc > 0` ; RIB **figé** sur la ligne (un changement d'env ne réécrit pas les instructions déjà émises) ; référence unique allouée avec retry anti-collision (5 tentatives)
+- [x] `GET /api/payments/virement/:id` (JWT, ownership 404) : renvoie les instructions RIB (référence, montant attendu, IBAN/BIC/banque/titulaire, statut) ; 400 si commande carte-only (`NoBankTransfer`), 401 sans token
+- [x] `recomputeOrderPaymentStatus` (déjà forward-compatible depuis 6.1) consomme désormais un vrai bucket virement ; le passage `received` attend toujours **tous** les buckets dus
+- [x] 8 tests d'intégration ajoutés (`payments.test.ts`) : création virement-only/mixte (réf unique + RIB snapshoté), distinction des réf entre commandes, lecture RIB, 404 cross-user/inconnu, 400 carte-only, 400 uuid malformé, 401 ; suite API complète au vert (189 tests)
+- Note : la **réconciliation** (statut → `reconciled`, settle du bucket virement, claim client) = Story 6.3 ; 6.2 = génération + lecture des instructions
+
 **Story 6.3** — Rapprochement bancaire admin (import CSV ou API banque)
 **Story 6.4** — Remboursement (full + partiel)
 

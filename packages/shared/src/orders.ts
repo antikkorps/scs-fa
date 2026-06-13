@@ -23,6 +23,32 @@ export function requiresVirement(legalCategory: string | null | undefined): bool
   return legalCategory === "A" || legalCategory === "B" || legalCategory === "C"
 }
 
+/**
+ * Crockford base32 alphabet — excludes I, L, O and U so the reference is robust
+ * to manual transcription (no 1/I, 0/O confusion). The customer copies the
+ * reference into their bank's transfer label and the admin matches on it during
+ * reconciliation (Story 6.3), so legibility matters more than density.
+ */
+export const VIREMENT_REF_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+/**
+ * Format a bank-transfer payment reference from raw random bytes.
+ *
+ * Produces `SCS-XXXX-XXXX` (8 Crockford base32 symbols). Pure and injectable:
+ * the caller supplies entropy (≥8 bytes) so this stays trivially testable, and
+ * uniqueness is enforced by the DB rather than relied upon here.
+ */
+export function virementReferenceFromBytes(bytes: Uint8Array): string {
+  if (bytes.length < 8) {
+    throw new Error("virementReferenceFromBytes needs at least 8 bytes of entropy")
+  }
+  let out = ""
+  for (let i = 0; i < 8; i++) {
+    out += VIREMENT_REF_ALPHABET[bytes[i] % 32]
+  }
+  return `SCS-${out.slice(0, 4)}-${out.slice(4)}`
+}
+
 export interface PaymentSplitItem {
   priceHt: number
   vatPct: number

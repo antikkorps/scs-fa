@@ -1064,9 +1064,10 @@ export const paymentVirement = pgTable(
 
     // Instruction
     ibanRecipient: varchar("iban_recipient", { length: 50 }).notNull(),
+    bicRecipient: varchar("bic_recipient", { length: 11 }),
     bankName: varchar("bank_name", { length: 255 }),
     accountHolderName: varchar("account_holder_name", { length: 255 }),
-    paymentReference: varchar("payment_reference", { length: 100 }),
+    paymentReference: varchar("payment_reference", { length: 100 }).unique(),
 
     // Suivi
     paymentStatus: paymentStatusEnum("payment_status")

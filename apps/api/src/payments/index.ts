@@ -1,9 +1,9 @@
-import { createStripePaymentSchema } from "@armurier/shared"
+import { createStripePaymentSchema, uuidParamSchema } from "@armurier/shared"
 import type { FastifyPluginAsync } from "fastify"
 import type Stripe from "stripe"
 import { authenticate } from "../auth/authenticate.js"
 import { validationError } from "../http.js"
-import { handleStripeEvent, initStripePayment, PaymentError } from "./service.js"
+import { getVirementInstructions, handleStripeEvent, initStripePayment, PaymentError } from "./service.js"
 import { constructWebhookEvent } from "./stripe.js"
 
 // Authenticated card-payment routes. Mounted under /api/payments.
@@ -20,6 +20,24 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const result = await initStripePayment(parsed.data.orderId, request.user.sub)
       return reply.code(201).send({ data: result })
+    } catch (err) {
+      if (err instanceof PaymentError) {
+        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message })
+      }
+      throw err
+    }
+  })
+
+  // GET /api/payments/virement/:id — bank-transfer (RIB) instructions for an order
+  fastify.get("/virement/:id", async (request, reply) => {
+    const parsed = uuidParamSchema.safeParse(request.params)
+    if (!parsed.success) {
+      return reply.code(400).send(validationError(parsed.error.issues))
+    }
+
+    try {
+      const result = await getVirementInstructions(parsed.data.id, request.user.sub)
+      return reply.code(200).send({ data: result })
     } catch (err) {
       if (err instanceof PaymentError) {
         return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message })
