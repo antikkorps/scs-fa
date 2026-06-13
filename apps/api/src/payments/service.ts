@@ -114,6 +114,52 @@ export async function initStripePayment(orderId: string, userId: string): Promis
   }
 }
 
+export interface VirementInstructions {
+  reference: string
+  amountTtc: string
+  currency: string
+  iban: string
+  bic: string | null
+  bankName: string | null
+  accountHolder: string | null
+  paymentStatus: string
+}
+
+/**
+ * Return the bank-transfer (RIB) instructions for an order: the SCS receiving
+ * account snapshotted at creation plus the order's unique payment reference and
+ * expected amount.
+ *
+ * Ownership is enforced and reported as 404 so we never leak existence. An order
+ * with no bank-transfer bucket (card-only) is a 400 — there is nothing to wire.
+ */
+export async function getVirementInstructions(orderId: string, userId: string): Promise<VirementInstructions> {
+  const [order] = await db
+    .select({ id: orders.id, userId: orders.userId })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1)
+  if (!order || order.userId !== userId) {
+    throw new PaymentError(404, "NotFound", "Order not found")
+  }
+
+  const [virement] = await db.select().from(paymentVirement).where(eq(paymentVirement.orderId, orderId)).limit(1)
+  if (!virement) {
+    throw new PaymentError(400, "NoBankTransfer", "This order has no bank-transfer amount")
+  }
+
+  return {
+    reference: virement.paymentReference ?? "",
+    amountTtc: virement.amountExpectedTtc,
+    currency: virement.currency ?? "EUR",
+    iban: virement.ibanRecipient,
+    bic: virement.bicRecipient,
+    bankName: virement.bankName,
+    accountHolder: virement.accountHolderName,
+    paymentStatus: virement.paymentStatus,
+  }
+}
+
 /** Pull last4/brand from a PaymentIntent's card details, best-effort. */
 function cardDetails(intent: Stripe.PaymentIntent): { last4: string | null; brand: string | null } {
   // Depending on the API version, the charge may be inlined under `charges`.

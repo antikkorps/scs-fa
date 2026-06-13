@@ -41,6 +41,15 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
 
+  // Bank transfer (virement) — the SCS receiving account printed on the RIB we
+  // hand the customer for regulated-firearm orders (Story 6.2). Snapshotted onto
+  // each payment_virement row at order creation, so changing these later does
+  // not rewrite instructions already issued.
+  VIREMENT_IBAN: z.string().min(1),
+  VIREMENT_BIC: z.string().min(1),
+  VIREMENT_BANK_NAME: z.string().min(1),
+  VIREMENT_ACCOUNT_HOLDER: z.string().min(1),
+
   // Legal doc SLA breach scheduler — in-process check every N minutes (0 disables;
   // disabled in tests regardless). External cron can call the sla CLI instead.
   SLA_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),

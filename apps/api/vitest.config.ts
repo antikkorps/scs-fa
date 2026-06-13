@@ -14,6 +14,11 @@ export default defineConfig({
       // Stripe is mocked in tests; these just satisfy env validation
       STRIPE_SECRET_KEY: "sk_test_dummy",
       STRIPE_WEBHOOK_SECRET: "whsec_test_dummy",
+      // Bank-transfer RIB is snapshotted onto orders; these satisfy validation
+      VIREMENT_IBAN: "FR7630006000011234567890189",
+      VIREMENT_BIC: "AGRIFRPP",
+      VIREMENT_BANK_NAME: "Banque Test",
+      VIREMENT_ACCOUNT_HOLDER: "SCS Firearm SAS",
     },
     include: ["src/**/*.{test,spec}.ts"],
     coverage: {

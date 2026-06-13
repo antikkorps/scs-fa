@@ -5,9 +5,12 @@ import {
   requiresVirement,
   round2,
   uuidParamSchema,
+  virementReferenceFromBytes,
 } from "@armurier/shared"
+import { randomBytes } from "node:crypto"
 import { and, desc, eq, gte, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { env } from "../env.js"
 import { reservePrintForOrder } from "../artworks/reservation.js"
 import { authenticate } from "../auth/authenticate.js"
 import { loadCart } from "../cart/service.js"
@@ -20,6 +23,7 @@ import {
   type OrderAddressSnapshot,
   orders,
   paymentCarte,
+  paymentVirement,
   productVariants,
 } from "../db/schema.js"
 import { validationError } from "../http.js"
@@ -203,14 +207,41 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Persist the card-payable amount now (split is computed here, and the
         // immutable itemsJson snapshot does not store VAT per line). Story 6.1
-        // attaches a Stripe PaymentIntent to this row; the virement counterpart
-        // lands in Story 6.2.
+        // attaches a Stripe PaymentIntent to this row.
         if (split.carte.amountTtc > 0) {
           await tx.insert(paymentCarte).values({
             orderId: order.id,
             amountTtc: split.carte.amountTtc.toFixed(2),
             currency: "EUR",
             paymentStatus: "pending",
+          })
+        }
+
+        // Persist the bank-transfer bucket (Story 6.2). The RIB is snapshotted
+        // from env onto the row so later config changes never rewrite an order's
+        // already-issued instructions, and a unique, typo-resistant reference is
+        // allocated for the customer's transfer label / admin reconciliation.
+        if (split.virement.amountTtc > 0) {
+          let reference = virementReferenceFromBytes(randomBytes(8))
+          for (let attempt = 0; attempt < 5; attempt++) {
+            const [clash] = await tx
+              .select({ id: paymentVirement.id })
+              .from(paymentVirement)
+              .where(eq(paymentVirement.paymentReference, reference))
+              .limit(1)
+            if (!clash) break
+            reference = virementReferenceFromBytes(randomBytes(8))
+          }
+          await tx.insert(paymentVirement).values({
+            orderId: order.id,
+            amountExpectedTtc: split.virement.amountTtc.toFixed(2),
+            currency: "EUR",
+            ibanRecipient: env.VIREMENT_IBAN,
+            bicRecipient: env.VIREMENT_BIC,
+            bankName: env.VIREMENT_BANK_NAME,
+            accountHolderName: env.VIREMENT_ACCOUNT_HOLDER,
+            paymentReference: reference,
+            paymentStatus: "awaiting_transfer",
           })
         }
 
