@@ -7,8 +7,16 @@ export default defineConfig({
     // Integration tests share one Postgres; global views (e.g. the admin
     // review queue) make concurrent test files step on each other.
     fileParallelism: false,
+    // Provision a throwaway test database (cloned from dev) before the run, so
+    // tests never touch the dev DB / wipe the seeded demo admin. See
+    // src/test/global-setup.ts.
+    globalSetup: ["./src/test/global-setup.ts"],
     env: {
       NODE_ENV: "test",
+      // Run against the dedicated test database, never the dev one. A dedicated
+      // var (TEST_DATABASE_URL) lets CI override without a stray DATABASE_URL leaking in.
+      DATABASE_URL:
+        process.env.TEST_DATABASE_URL ?? "postgresql://armurier:armurier_dev_password@localhost:5435/armurier_test",
       // Never hit a real bucket from tests, whatever the local .env says
       STORAGE_DRIVER: "memory",
       // Stripe is mocked in tests; these just satisfy env validation
