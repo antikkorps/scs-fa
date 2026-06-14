@@ -19,6 +19,9 @@ jobs:
           POSTGRES_USER: armurier
           POSTGRES_PASSWORD: armurier_test_password
           POSTGRES_DB: armurier_test
+          # Ephemeral, isolated CI database: accept any password so a credential
+          # mismatch between the runner env and the job env can't fail the suite.
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
