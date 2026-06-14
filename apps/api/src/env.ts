@@ -68,6 +68,10 @@ const envSchema = z.object({
   // Partner commission rate (Story 7.3). Shown transparently on the admin metrics
   // dashboard as the partner's share of net revenue. Percent, default 5%.
   COMMISSION_RATE_PCT: z.coerce.number().min(0).max(100).default(5),
+
+  // Canonical public front URL. Used for the CORS origin in production and for
+  // the links embedded in transactional emails. Override per environment.
+  WEB_BASE_URL: z.string().url().default("https://www.scs-firearms.com"),
 })
 
 export const env = envSchema.parse(process.env)

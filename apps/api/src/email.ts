@@ -9,7 +9,7 @@ const transporter = createTransport({
 })
 
 export async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
-  const resetUrl = `https://armurier.fr/reset-password?token=${token}`
+  const resetUrl = `${env.WEB_BASE_URL}/reset-password?token=${token}`
 
   await transporter.sendMail({
     from: env.SMTP_FROM,
@@ -82,7 +82,7 @@ export type SlaBreachItem = {
 export async function sendLegalDocSlaBreachEmail(to: string[], breaches: SlaBreachItem[]): Promise<void> {
   if (to.length === 0 || breaches.length === 0) return
 
-  const queueUrl = "https://armurier.fr/admin/legal-documents"
+  const queueUrl = `${env.WEB_BASE_URL}/admin/legal-documents`
   const line = (b: SlaBreachItem) =>
     `${b.customerName} — ${DOC_TYPE_LABELS[b.docType]} (deadline ${b.deadline.toISOString()}, ${b.hoursOverdue}h overdue)`
   const rows = breaches

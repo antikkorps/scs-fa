@@ -331,7 +331,14 @@
 - [x] `tsx` déplacé en **dependency** de l'API (entrée prod) ; `pnpm.onlyBuiltDependencies` (argon2/esbuild) au niveau racine ; `start` API = `tsx src/index.ts` ; `.dockerignore` racine (exclut node_modules/.output/.env/secrets)
 - [x] **Vérifié en réel** (docker build + run) : API → `/health` 200 + **login admin OK** (argon2 natif + DB + shared tous fonctionnels en conteneur), image **451 MB** ; web → `/admin/login` & `/` rendus 200, logs propres, image **360 MB**
 - Note : bases `node:22-slim` (Debian) choisies pour la fiabilité des modules natifs (argon2/esbuild) vs alpine/musl ; slim possible plus tard si on veut réduire la taille
-**Story 8.2** — Caddyfile (HTTPS auto, headers sécurité)
+**Story 8.2** — Caddyfile (HTTPS auto, headers sécurité) ✅
+
+- [x] `Caddyfile` reverse proxy : **HTTPS automatique** (Let's Encrypt via `{$ACME_EMAIL}`), domaine `{$DOMAIN}` paramétrable. Hôte canonique **`www.scs-firearms.com`** ; l'apex redirige (301) vers www
+- [x] **Single-origin** : `/api/*` + `/health` → backend `api:8080`, tout le reste → `web:3000` (Nitro) → front et API sur la même origine = **pas de CORS navigateur** ; `encode zstd gzip`
+- [x] **Headers de sécurité** sur toutes les réponses : HSTS (1 an, preload), `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, **CSP** (self + Google Fonts + hôtes images ; `'unsafe-inline'` script/style = réalité SSR Nuxt, à durcir en nonces plus tard), `-Server`
+- [x] **Domaine réel corrigé** : les références périmées `armurier.fr` (CORS `app.ts`, URLs d'emails reset + file admin dans `email.ts`) remplacées par une variable **`WEB_BASE_URL`** (`env.ts`, défaut `https://www.scs-firearms.com`, documentée `.env.example`)
+- [x] **Vérifié** : `caddy validate` → *Valid configuration* (auto HTTP→HTTPS confirmé), `caddy fmt` ; suite API au vert (**259 tests**) après migration CORS/email, typecheck OK
+- Note : les noms de service `api`/`web` résolvent sur le réseau du compose prod (Story 8.3, qui fournira `DOMAIN`/`ACME_EMAIL`/`WEB_BASE_URL`/`SITE_URL`/`NUXT_PUBLIC_API_BASE`)
 **Story 8.3** — docker-compose.prod.yml + déploiement Hetzner
 **Story 8.4** — Backups Postgres automatisés
 **Story 8.5** — Monitoring uptime + alertes

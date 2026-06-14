@@ -44,7 +44,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   }
 
   await fastify.register(fastifyCors, {
-    origin: env.NODE_ENV === "production" ? "https://armurier.fr" : "http://localhost:3000",
+    origin: env.NODE_ENV === "production" ? env.WEB_BASE_URL : "http://localhost:3000",
     credentials: true,
   })
 

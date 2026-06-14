@@ -1,0 +1,50 @@
+# Caddy reverse proxy — automatic HTTPS (Let's Encrypt) + security headers.
+# Single public origin: the API is served under /api on the same domain as the
+# front, so browser → API calls are same-origin (no CORS). Backend service names
+# (`api`, `web`) resolve on the prod compose network (Story 8.3).
+#
+# Canonical host is www.{$DOMAIN}; the apex redirects to it.
+# Configure via env: DOMAIN (e.g. scs-firearms.com) and ACME_EMAIL.
+{
+	email {$ACME_EMAIL}
+	# Uncomment to test against Let's Encrypt staging (avoids rate limits):
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Canonical site.
+www.{$DOMAIN} {
+	encode zstd gzip
+
+	# --- Security headers (applied to every response) ---
+	header {
+		# HSTS: force HTTPS for a year, including subdomains (preload-ready).
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		# Content Security Policy. 'unsafe-inline' on script/style is the SSR
+		# reality (Nuxt hydration payload + PrimeVue inline styles) — tighten with
+		# nonces later. External origins match the app: Google Fonts + image hosts.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		# Don't advertise the server software.
+		-Server
+	}
+
+	# --- API + webhooks + health → the Fastify backend ---
+	@api path /api/* /health
+	handle @api {
+		reverse_proxy api:8080
+	}
+
+	# --- Everything else → the Nuxt (Nitro) server ---
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+# Apex → canonical www.
+{$DOMAIN} {
+	redir https://www.{$DOMAIN}{uri} permanent
+}
