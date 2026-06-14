@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { artworkImage, availabilityLabel, fallbackImage, formatEuros } from "./format.js"
+import { artworkImage, availabilityLabel, fallbackImage, formatDate, formatDateTime, formatEuros } from "./format.js"
 
 describe("formatEuros", () => {
   it("formats an amount in EUR (fr-FR)", () => {
@@ -23,6 +23,21 @@ describe("artwork images", () => {
     expect(artworkImage("https://cdn.example/x.jpg", "slug")).toBe("https://cdn.example/x.jpg")
     expect(artworkImage(null, "slug", 400, 500)).toBe("https://picsum.photos/seed/slug/400/500")
     expect(artworkImage("", "slug", 400, 500)).toBe("https://picsum.photos/seed/slug/400/500")
+  })
+})
+
+describe("date formatting", () => {
+  it("formats an ISO date and date+time in fr-FR", () => {
+    expect(formatDate("2026-06-14T10:30:00.000Z")).toContain("2026")
+    expect(formatDateTime("2026-06-14T10:30:00.000Z")).toContain("2026")
+  })
+
+  it("returns an em dash for missing or invalid input", () => {
+    expect(formatDate(null)).toBe("—")
+    expect(formatDate(undefined)).toBe("—")
+    expect(formatDate("not-a-date")).toBe("—")
+    expect(formatDateTime("")).toBe("—")
+    expect(formatDateTime("garbage")).toBe("—")
   })
 })
 

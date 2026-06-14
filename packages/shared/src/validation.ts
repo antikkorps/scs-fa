@@ -6,7 +6,7 @@ import {
   LEGAL_DOC_TYPES,
   LEGAL_DOC_VERIFICATION_STATUS,
 } from "./constants.js"
-import { REFUND_CHANNELS } from "./orders.js"
+import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
@@ -290,6 +290,17 @@ export const createRefundSchema = z
   .strict()
 
 export type CreateRefundInput = z.infer<typeof createRefundSchema>
+
+// Story 7.1 — admin orders list filters. `search` matches the customer email.
+export const adminOrderQuerySchema = z.object({
+  paymentStatus: z.enum(ORDER_PAYMENT_STATUSES).optional(),
+  legalStatus: z.enum(ORDER_LEGAL_STATUSES).optional(),
+  search: z.string().trim().min(1).max(255).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+})
+
+export type AdminOrderQuery = z.infer<typeof adminOrderQuerySchema>
 
 // Backwards-compatible alias used by the product detail route
 export const productIdParamSchema = uuidParamSchema

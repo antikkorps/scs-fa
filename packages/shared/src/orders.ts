@@ -18,6 +18,33 @@ export const PAID_PAYMENT_STATUSES: readonly string[] = ["received", "reconciled
 export const REFUND_CHANNELS = ["carte", "virement"] as const
 export type RefundChannel = (typeof REFUND_CHANNELS)[number]
 
+// Order status value sets, mirroring the `payment_status` / `order_legal_status`
+// Postgres enums exactly. Used by the admin dashboard for filters and status
+// tags. (The older ORDER_LEGAL_STATUS / PAYMENT_STATUS constants in constants.ts
+// predate the real schema and are not authoritative — prefer these.)
+export const ORDER_PAYMENT_STATUSES = [
+  "pending",
+  "awaiting_transfer",
+  "transfer_claimed",
+  "received",
+  "reconciled",
+  "failed",
+  "cancelled",
+  "partially_refunded",
+  "refunded",
+] as const
+export type OrderPaymentStatus = (typeof ORDER_PAYMENT_STATUSES)[number]
+
+export const ORDER_LEGAL_STATUSES = [
+  "pending",
+  "docs_verifying",
+  "docs_verified",
+  "docs_rejected",
+  "payment_pending",
+  "completed",
+] as const
+export type OrderLegalStatusValue = (typeof ORDER_LEGAL_STATUSES)[number]
+
 /**
  * Whether an item must be paid by bank transfer (virement) rather than card.
  *
