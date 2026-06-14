@@ -1,8 +1,8 @@
 name: CI
 
-# Lint, typecheck and test on every PR and on pushes to main. Requires a
-# registered Gitea Actions runner (act_runner). Jobs run inside a container, so
-# the Postgres service is reached by its service name `postgres`.
+# Lint, typecheck and test on every PR and on pushes to main. Runs on a Forgejo
+# Actions runner (forgejo-runner with the Docker backend). Jobs run inside a
+# container, so the Postgres service is reached by its service name `postgres`.
 on:
   push:
     branches: [main]

@@ -60,9 +60,9 @@ pnpm dev:web
 
 ## CI
 
-`.gitea/workflows/ci.yml` runs Biome, typecheck and the full test suite on every
-pull request and on pushes to `main` (Gitea Actions — requires a registered
-`act_runner`). It spins up a Postgres service, creates the schema with
+`.forgejo/workflows/ci.yml` runs Biome, typecheck and the full test suite on every
+pull request and on pushes to `main` (Forgejo Actions — requires a registered
+`forgejo-runner` with the Docker backend). It spins up a Postgres service, creates the schema with
 `drizzle-kit push --force` (schema.ts is the source of truth — no migration
 baseline), then runs the tests against it with `TEST_DB_SKIP_PROVISION=true` so
 the vitest global setup seeds the CI database instead of cloning a local dev one.
