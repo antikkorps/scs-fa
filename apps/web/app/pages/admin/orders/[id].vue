@@ -9,7 +9,7 @@ const route = useRoute()
 const api = useApi()
 const id = route.params.id as string
 
-const { data, pending, error } = await useAsyncData(
+const { data, pending, error, refresh } = await useAsyncData(
   `admin-order-${id}`,
   () => api<{ data: AdminOrderDetail }>(`/admin/orders/${id}`),
   { server: false },
@@ -17,6 +17,74 @@ const { data, pending, error } = await useAsyncData(
 const order = computed(() => data.value?.data)
 
 useHead({ title: () => `Commande ${id.slice(0, 8)} — Administration SCS` })
+
+const PAID = ["received", "reconciled", "partially_refunded"]
+
+// What is still refundable on each channel: amount paid minus refunds already
+// recorded on that channel (the API enforces the same cap; this guides the form).
+const refundable = computed(() => {
+  const o = order.value
+  if (!o) return { carte: 0, virement: 0 }
+  const sumRefunds = (channel: string) =>
+    o.payment.refunds
+      .filter((r) => r.channel === channel && r.status !== "failed" && r.status !== "cancelled")
+      .reduce((acc, r) => acc + Number(r.amountTtc), 0)
+  const carte =
+    o.payment.carte && PAID.includes(o.payment.carte.paymentStatus)
+      ? Number(o.payment.carte.amountTtc) - sumRefunds("carte")
+      : 0
+  const v = o.payment.virement
+  const virement =
+    v && PAID.includes(v.paymentStatus)
+      ? Number(v.amountReceivedTtc ?? v.amountExpectedTtc) - sumRefunds("virement")
+      : 0
+  return { carte: Math.max(0, Math.round(carte * 100) / 100), virement: Math.max(0, Math.round(virement * 100) / 100) }
+})
+const canRefund = computed(() => refundable.value.carte > 0 || refundable.value.virement > 0)
+
+// Refund modal
+const showRefund = ref(false)
+const refundChannel = ref<"carte" | "virement">("carte")
+const refundAmount = ref<number | null>(null)
+const refundReason = ref("")
+const refundBusy = ref(false)
+const refundError = ref("")
+
+function openRefund() {
+  refundError.value = ""
+  refundChannel.value = refundable.value.carte > 0 ? "carte" : "virement"
+  refundAmount.value = refundable.value[refundChannel.value]
+  refundReason.value = ""
+  showRefund.value = true
+}
+watch(refundChannel, (c) => {
+  refundAmount.value = refundable.value[c]
+})
+
+async function submitRefund() {
+  if (!refundAmount.value || refundAmount.value <= 0) {
+    refundError.value = "Montant invalide."
+    return
+  }
+  refundBusy.value = true
+  refundError.value = ""
+  try {
+    await api(`/admin/payments/orders/${id}/refunds`, {
+      method: "POST",
+      body: {
+        channel: refundChannel.value,
+        amount: refundAmount.value,
+        ...(refundReason.value.trim() ? { reason: refundReason.value.trim() } : {}),
+      },
+    })
+    showRefund.value = false
+    await refresh()
+  } catch (err) {
+    refundError.value = (err as { data?: { message?: string } })?.data?.message ?? "Le remboursement a échoué."
+  } finally {
+    refundBusy.value = false
+  }
+}
 
 function num(v: unknown): number | null {
   return v == null ? null : Number(v)
@@ -106,9 +174,55 @@ function num(v: unknown): number | null {
               <AdminStatusTag v-bind="refundStatus(r.status)" />
             </div>
           </template>
+
+          <button v-if="canRefund" type="button" class="btn btn-ghost refund-btn" @click="openRefund">
+            Rembourser
+          </button>
         </section>
       </div>
     </template>
+
+    <!-- Refund modal -->
+    <div v-if="showRefund && order" class="modal-scrim" @click.self="showRefund = false">
+      <div class="modal" role="dialog" aria-label="Rembourser la commande">
+        <h2 class="modal__title">Rembourser</h2>
+        <form @submit.prevent="submitRefund">
+          <label class="field">
+            <span>Canal</span>
+            <select v-model="refundChannel" class="ctl">
+              <option v-if="refundable.carte > 0" value="carte">Carte (max {{ formatEuros(refundable.carte) }})</option>
+              <option v-if="refundable.virement > 0" value="virement">
+                Virement (max {{ formatEuros(refundable.virement) }})
+              </option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Montant (€)</span>
+            <input
+              v-model.number="refundAmount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              :max="refundable[refundChannel]"
+              class="ctl"
+            />
+          </label>
+          <label class="field">
+            <span>Motif (optionnel)</span>
+            <input v-model="refundReason" type="text" maxlength="255" class="ctl" />
+          </label>
+          <p v-if="refundError" class="modal__error" role="alert">{{ refundError }}</p>
+          <div class="modal__actions">
+            <button type="submit" class="btn btn-primary" :disabled="refundBusy">
+              {{ refundBusy ? "En cours…" : "Confirmer le remboursement" }}
+            </button>
+            <button type="button" class="btn btn-ghost" :disabled="refundBusy" @click="showRefund = false">
+              Annuler
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -256,6 +370,70 @@ function num(v: unknown): number | null {
 }
 .state--error {
   color: var(--danger);
+}
+.refund-btn {
+  margin-top: 1.2rem;
+  width: 100%;
+  justify-content: center;
+}
+
+/* Refund modal */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+.modal {
+  width: min(420px, 100%);
+  background: var(--ink-soft);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  padding: 1.6rem;
+  box-shadow: var(--shadow);
+}
+.modal__title {
+  font-size: 1.4rem;
+  margin-bottom: 1.2rem;
+}
+.field {
+  display: block;
+  margin-bottom: 1rem;
+}
+.field span {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin-bottom: 0.4rem;
+}
+.ctl {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  background: var(--ink);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  color: var(--paper);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+.ctl:focus {
+  outline: none;
+  border-color: var(--brass);
+}
+.modal__error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+.modal__actions {
+  display: flex;
+  gap: 0.7rem;
+  margin-top: 0.5rem;
 }
 
 @media (min-width: 860px) {
