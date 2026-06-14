@@ -33,6 +33,14 @@ describe("legal doc SLA breach check (runLegalDocSlaBreachCheck)", () => {
     await db.delete(auditLogs).where(inArray(auditLogs.entityId, myDocs))
     await db.delete(legalDocuments).where(inArray(legalDocuments.userId, myUsers))
     await db.delete(users).where(like(users.email, `${PREFIX}%`))
+
+    // These tests assert on the GLOBAL admin set — the breach check emails *every*
+    // admin, and one scenario needs *zero* admins. A seeded/demo admin (or any
+    // left by another suite) would skew both, so this suite owns the admin table:
+    // drop all admins, clearing their audit rows first to satisfy the FK.
+    const adminIds = db.select({ id: users.id }).from(users).where(eq(users.role, "admin"))
+    await db.delete(auditLogs).where(inArray(auditLogs.userId, adminIds))
+    await db.delete(users).where(eq(users.role, "admin"))
   }
 
   async function makeUser(suffix: string, role: "customer" | "admin") {

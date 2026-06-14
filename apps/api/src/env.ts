@@ -53,6 +53,17 @@ const envSchema = z.object({
   // Legal doc SLA breach scheduler — in-process check every N minutes (0 disables;
   // disabled in tests regardless). External cron can call the sla CLI instead.
   SLA_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
+
+  // Observability (Story 7.2). LOG_LEVEL overrides the per-env default (silent in
+  // test, info in prod, debug locally). Server errors (5xx) email the admins,
+  // throttled per error signature to avoid alert storms; alerts are off outside
+  // production unless explicitly enabled (so dev/staging don't hit SMTP).
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),
+  ERROR_ALERT_COOLDOWN_MINUTES: z.coerce.number().int().min(0).default(15),
+  ERROR_ALERTS_ENABLED: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
 })
 
 export const env = envSchema.parse(process.env)

@@ -274,7 +274,17 @@
 - [x] Smoke test réel : login admin → 3 endpoints admin 200 / 401 sans token ; front `/admin/login` rendu 200, gardes `/admin` & `/admin/orders` → 302 vers login. Suite complète au vert (**236 API, 51 shared, 8 web**), typecheck (shared/api/web) + Biome OK
 - Note : réconciliation virement / remboursements pilotables depuis l'UI = itération suivante (les API existent déjà, 6.3/6.4) ; le détail commande les affiche en lecture seule
 
-**Story 7.2** — Logs structurés + alerting (Pino + Loki ?)
+**Story 7.2** — Logs structurés + alerting (Pino + Loki ?) ✅
+
+- [x] Logger Pino durci (`apps/api/src/logging/logger.ts`) : `buildLoggerOptions(env)` — JSON structuré en prod (prêt pour un agrégateur type Loki/Phase 8), `pino-pretty` en dev, `silent` en test ; niveau résolu par env + override `LOG_LEVEL` ; **redaction** des chemins sensibles (`authorization`/`cookie`/`stripe-signature`/`set-cookie` + `*.password`/`*.token`/`*.accessToken`…) ; chaque ligne taguée `service`/`env`
+- [x] Corrélation : `genReqId` honore un `x-request-id` entrant (tracé proxy/front propagé) sinon UUID, longueur plafonnée (anti-abus) — propagé sur `incoming request` → `request completed`
+- [x] Alerting throttlé (`logging/alerting.ts`) : `createAlerter` pur/injectable — au plus **une alerte par signature d'erreur** par fenêtre de cooldown (`ERROR_ALERT_COOLDOWN_MINUTES`, défaut 15), best-effort (jamais d'exception dans la requête), purge anti-croissance de la map
+- [x] Error handler centralisé (`logging/error-handler.ts`) : les 4xx repassent tels quels ; les **5xx** sont loggés (reqId/route/stack) + déclenchent l'alerte throttlée ; corps **générique en prod** (zéro fuite de stack/SQL/chemin), détaillé en dev
+- [x] Email d'alerte admin (`sendErrorAlertEmail`) ; câblage (`logging/index.ts` `setupErrorAlerting`) : alertes **off hors prod** sauf `ERROR_ALERTS_ENABLED=true` (dev/test ne touchent jamais SMTP), lookup admins **paresseux** (un admin créé après le boot reçoit les alertes sans redémarrage)
+- [x] 16 tests (8 logger : niveaux/redaction/base/transport/reqId ; 4 alerting : dispatch/throttle/signatures distinctes/échec avalé ; 4 error handler : 500 shaped+alerte, message dev vs prod générique, 4xx passthrough sans alerte) ; **fix d'isolation** : `sla.test` possède désormais l'ensemble global des admins (le check SLA notifie *tous* les admins → un admin seedé faussait le compte)
+- [x] Smoke réel (boot prod) : logs JSON `service`/`env`, `reqId` repris de `x-request-id` et propagé incoming→completed, `responseTime`/`statusCode`. Suite complète au vert (**252 API, 51 shared, 8 web**), typecheck + Biome OK
+- Note : expédition vers un agrégateur (Loki/Grafana) = Phase 8 (infra) ; ici tout est prêt côté applicatif (JSON sur stdout)
+
 **Story 7.3** — Métriques business (CA, conversion, SLA légal)
 
 ## PHASE 8 — Mise en prod
