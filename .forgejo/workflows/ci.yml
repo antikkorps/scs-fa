@@ -2,7 +2,8 @@ name: CI
 
 # Lint, typecheck and test on every PR and on pushes to main. Runs on a Forgejo
 # Actions runner (forgejo-runner with the Docker backend). Jobs run inside a
-# container, so the Postgres service is reached by its service name `postgres`.
+# container, so the Postgres service is reached by its service name `testdb`
+# (deliberately not `postgres`, which collided with another DB on the runner net).
 on:
   push:
     branches: [main]
@@ -39,13 +40,6 @@ jobs:
       TEST_DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
       TEST_DB_SKIP_PROVISION: "true"
       STORAGE_DRIVER: memory
-      # Neutralise any PG* the runner injects globally (it also runs Renovate),
-      # so nothing can redirect a connection at another database.
-      PGHOST: testdb
-      PGPORT: "5432"
-      PGUSER: armurier
-      PGDATABASE: armurier_test
-      PGPASSWORD: ""
       # All other vars are required by env.ts; safe dummies — tests make no
       # external calls (Stripe is mocked, storage is in-memory, no mail is sent).
       JWT_SECRET: ci_jwt_secret_at_least_32_characters_long
@@ -84,15 +78,6 @@ jobs:
 
       - name: Typecheck
         run: pnpm -r typecheck
-
-      - name: DB connectivity probe
-        run: |
-          echo "== PG/DB env injected into the job =="
-          env | grep -iE '^(PG|POSTGRES|DATABASE_URL|TEST_DATABASE_URL)=' | sed -E 's/(PASS|PASSWORD)=.*/\1=***/' || echo "(none)"
-          echo "== resolve testdb =="
-          getent hosts testdb || echo "(testdb not in /etc/hosts via getent)"
-          echo "== connect probe =="
-          pnpm --filter @armurier/api exec node -e "const pg=require('pg');(async()=>{const c=new pg.Client(process.env.DATABASE_URL);await c.connect();const r=await c.query('select current_user, current_database(), inet_server_addr() as host');console.log('CONNECTED', r.rows[0]);await c.end()})().catch(e=>{console.error('CONN FAIL', e.code, e.message);process.exit(1)})"
 
       - name: Apply database schema
         run: pnpm --filter @armurier/api exec drizzle-kit push --force
