@@ -300,6 +300,14 @@
 
 ## PHASE 8 — Mise en prod
 
+**Story 8.0** — Base de test dédiée (isolation tests / dev) ✅
+
+- [x] `globalSetup` vitest (`apps/api/src/test/global-setup.ts`) : provisionne une base **jetable `armurier_test`** avant la suite — drop+create, **clone du schéma dev** via `pg_dump -s` (le dev est la source de vérité, pas de baseline de migration), puis seed des données de référence. Recréée à neuf à chaque run → départ propre garanti
+- [x] `vitest.config` pointe `DATABASE_URL` sur la base de test (var dédiée `TEST_DATABASE_URL` pour override CI, sans qu'un `DATABASE_URL` traînant ne redirige vers dev) ; overrides `TEST_DB_SKIP_PROVISION`/`TEST_DB_NAME`/`TEST_DB_SOURCE`/`TEST_DB_CONTAINER` documentés `.env.example`
+- [x] **Résout** le couplage 7.x : `sla.test`/`metrics.test` opèrent sur l'état global (admins/commandes) → ne touchent plus jamais la base dev. **L'admin démo survit désormais à `pnpm test`** (vérifié : présent dans `armurier_dev` après run complet ; `armurier_test` provisionnée avec 5 cat. légales / 10 cat. produit)
+- [x] Suite complète au vert contre la base de test (**259 API, 51 shared, 8 web**), typecheck + Biome OK
+- Note : pour CI (Phase 8.3+), `TEST_DATABASE_URL` + `TEST_DB_SKIP_PROVISION=true` ciblent un Postgres de CI sans docker
+
 **Story 8.1** — Dockerfiles api + web
 **Story 8.2** — Caddyfile (HTTPS auto, headers sécurité)
 **Story 8.3** — docker-compose.prod.yml + déploiement Hetzner
