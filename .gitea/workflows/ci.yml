@@ -1,0 +1,81 @@
+name: CI
+
+# Lint, typecheck and test on every PR and on pushes to main. Requires a
+# registered Gitea Actions runner (act_runner). Jobs run inside a container, so
+# the Postgres service is reached by its service name `postgres`.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: armurier
+          POSTGRES_PASSWORD: armurier_test_password
+          POSTGRES_DB: armurier_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U armurier -d armurier_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
+    env:
+      # The suite runs against the CI Postgres directly: the schema is created by
+      # `drizzle-kit push` (below) and TEST_DB_SKIP_PROVISION makes the vitest
+      # global setup seed it without trying to clone a local dev DB via docker.
+      DATABASE_URL: postgresql://armurier:armurier_test_password@postgres:5432/armurier_test
+      TEST_DATABASE_URL: postgresql://armurier:armurier_test_password@postgres:5432/armurier_test
+      TEST_DB_SKIP_PROVISION: "true"
+      STORAGE_DRIVER: memory
+      # All other vars are required by env.ts; safe dummies — tests make no
+      # external calls (Stripe is mocked, storage is in-memory, no mail is sent).
+      JWT_SECRET: ci_jwt_secret_at_least_32_characters_long
+      JWT_REFRESH_SECRET: ci_jwt_refresh_secret_at_least_32_characters
+      S3_ENDPOINT: http://localhost:9000
+      S3_ACCESS_KEY: ci
+      S3_SECRET_KEY: ci
+      S3_BUCKET: ci
+      S3_REGION: eu-west-1
+      SMTP_HOST: localhost
+      SMTP_USER: ci
+      SMTP_PASS: ci
+      SMTP_FROM: ci@example.com
+      STRIPE_SECRET_KEY: sk_test_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_test_dummy
+      VIREMENT_IBAN: FR7630006000011234567890189
+      VIREMENT_BIC: AGRIFRPP
+      VIREMENT_BANK_NAME: Banque CI
+      VIREMENT_ACCOUNT_HOLDER: SCS Firearm SAS
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (Biome)
+        run: pnpm exec biome ci .
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Apply database schema
+        run: pnpm --filter @armurier/api exec drizzle-kit push --force
+
+      - name: Test
+        run: pnpm -r test
