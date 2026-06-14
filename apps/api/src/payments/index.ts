@@ -1,9 +1,15 @@
-import { createStripePaymentSchema, uuidParamSchema } from "@armurier/shared"
+import { claimVirementSchema, createStripePaymentSchema, uuidParamSchema } from "@armurier/shared"
 import type { FastifyPluginAsync } from "fastify"
 import type Stripe from "stripe"
 import { authenticate } from "../auth/authenticate.js"
 import { validationError } from "../http.js"
-import { getVirementInstructions, handleStripeEvent, initStripePayment, PaymentError } from "./service.js"
+import {
+  claimVirementTransfer,
+  getVirementInstructions,
+  handleStripeEvent,
+  initStripePayment,
+  PaymentError,
+} from "./service.js"
 import { constructWebhookEvent } from "./stripe.js"
 
 // Authenticated card-payment routes. Mounted under /api/payments.
@@ -37,6 +43,28 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
 
     try {
       const result = await getVirementInstructions(parsed.data.id, request.user.sub)
+      return reply.code(200).send({ data: result })
+    } catch (err) {
+      if (err instanceof PaymentError) {
+        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message })
+      }
+      throw err
+    }
+  })
+
+  // POST /api/payments/virement/:id/claim — customer declares the transfer is sent
+  fastify.post("/virement/:id/claim", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const body = claimVirementSchema.safeParse(request.body ?? {})
+    if (!body.success) {
+      return reply.code(400).send(validationError(body.error.issues))
+    }
+
+    try {
+      const result = await claimVirementTransfer(params.data.id, request.user.sub, body.data)
       return reply.code(200).send({ data: result })
     } catch (err) {
       if (err instanceof PaymentError) {

@@ -216,6 +216,66 @@ export const createStripePaymentSchema = z.object({
 
 export type CreateStripePaymentInput = z.infer<typeof createStripePaymentSchema>
 
+// Story 6.3 — bank-transfer reconciliation
+
+// A positive money amount accepted from a JSON body (number) and pinned to cents.
+const moneyAmountSchema = z.coerce
+  .number()
+  .positive()
+  .max(10_000_000)
+  .refine((n) => Number.isFinite(n), "Invalid amount")
+
+// Customer declares "I have sent the transfer". Every field is optional — it is
+// a helpful heads-up for the admin, not authoritative; the bank statement is.
+export const claimVirementSchema = z
+  .object({
+    reportedIban: z.string().trim().min(8).max(50).optional(),
+    reportedDate: isoDateSchema.optional(),
+    reportedAmount: moneyAmountSchema.optional(),
+    notes: z.string().trim().max(1000).optional(),
+  })
+  .strict()
+
+export type ClaimVirementInput = z.infer<typeof claimVirementSchema>
+
+// Admin queue filter for bank-transfer buckets awaiting / under reconciliation.
+export const VIREMENT_RECONCILE_STATUSES = [
+  "awaiting_transfer",
+  "transfer_claimed",
+  "reconciled",
+  "failed",
+  "cancelled",
+] as const
+
+export const virementQueueQuerySchema = z.object({
+  status: z.enum([...VIREMENT_RECONCILE_STATUSES, "all"]).default("awaiting_transfer"),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+})
+
+export type VirementQueueQuery = z.infer<typeof virementQueueQuerySchema>
+
+// Admin manually marks a bank-transfer bucket as received & reconciled.
+export const reconcileVirementSchema = z
+  .object({
+    amountReceived: moneyAmountSchema,
+    receivedFromIban: z.string().trim().min(8).max(50).optional(),
+    receivedAt: isoDateSchema.optional(),
+    notes: z.string().trim().max(1000).optional(),
+  })
+  .strict()
+
+export type ReconcileVirementInput = z.infer<typeof reconcileVirementSchema>
+
+// Admin uploads a bank statement CSV for automatic matching by reference.
+export const importBankStatementSchema = z
+  .object({
+    csv: z.string().min(1).max(2_000_000),
+  })
+  .strict()
+
+export type ImportBankStatementInput = z.infer<typeof importBankStatementSchema>
+
 // Backwards-compatible alias used by the product detail route
 export const productIdParamSchema = uuidParamSchema
 

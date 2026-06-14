@@ -1,11 +1,30 @@
-import { PAID_PAYMENT_STATUSES } from "@armurier/shared"
-import { eq } from "drizzle-orm"
+import {
+  amountsMatchToCent,
+  type ClaimVirementInput,
+  extractTransferReference,
+  PAID_PAYMENT_STATUSES,
+  parseBankStatementCsv,
+  type ReconcileVirementInput,
+} from "@armurier/shared"
+import { and, eq, inArray } from "drizzle-orm"
 import type Stripe from "stripe"
 import { db } from "../db/client.js"
 import { auditLogs, orders, paymentCarte, paymentVirement } from "../db/schema.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import { createPaymentIntent, retrievePaymentIntent } from "./stripe.js"
+
+// Bank-transfer bucket states an admin (or CSV import) may still act on: the
+// money has not been confirmed yet. A bucket already in PAID_PAYMENT_STATUSES is
+// settled and must not be reconciled twice.
+const RECONCILABLE_VIREMENT_STATUSES = ["awaiting_transfer", "transfer_claimed"] as const
+
+/** Parse a bank-supplied date string, returning undefined for anything invalid. */
+function safeDate(value: string | null | undefined): Date | undefined {
+  if (!value) return undefined
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? undefined : d
+}
 
 export class PaymentError extends Error {
   constructor(
@@ -158,6 +177,272 @@ export async function getVirementInstructions(orderId: string, userId: string): 
     accountHolder: virement.accountHolderName,
     paymentStatus: virement.paymentStatus,
   }
+}
+
+/**
+ * Record a customer's "I have sent the bank transfer" declaration on their
+ * order's virement bucket.
+ *
+ * Ownership is enforced and reported as 404 so we never leak existence. The
+ * declaration is advisory — it flips the bucket to `transfer_claimed` to help
+ * the admin prioritise, but the authoritative settlement still comes from the
+ * bank statement during reconciliation. A bucket that is already settled
+ * (received/reconciled) is a 409; a card-only order is a 400.
+ */
+export async function claimVirementTransfer(orderId: string, userId: string, input: ClaimVirementInput) {
+  const [order] = await db
+    .select({ id: orders.id, userId: orders.userId })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1)
+  if (!order || order.userId !== userId) {
+    throw new PaymentError(404, "NotFound", "Order not found")
+  }
+
+  const [virement] = await db.select().from(paymentVirement).where(eq(paymentVirement.orderId, orderId)).limit(1)
+  if (!virement) {
+    throw new PaymentError(400, "NoBankTransfer", "This order has no bank-transfer amount")
+  }
+  if (PAID_PAYMENT_STATUSES.includes(virement.paymentStatus)) {
+    throw new PaymentError(409, "AlreadyReconciled", "This bank transfer is already reconciled")
+  }
+  if (virement.paymentStatus === "failed" || virement.paymentStatus === "cancelled") {
+    throw new PaymentError(409, "NotClaimable", `This bank transfer is ${virement.paymentStatus}`)
+  }
+
+  const [updated] = await db
+    .update(paymentVirement)
+    .set({
+      paymentStatus: "transfer_claimed",
+      clientReportedIban: input.reportedIban ?? null,
+      clientReportedDate: input.reportedDate ?? null,
+      clientReportedAmount: input.reportedAmount?.toFixed(2) ?? null,
+      clientReportedRef: virement.paymentReference,
+      clientNotes: input.notes ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(paymentVirement.id, virement.id))
+    .returning()
+
+  await db.insert(auditLogs).values({
+    userId,
+    entityType: "payment_virement",
+    entityId: virement.id,
+    action: "payment.virement.claimed",
+    oldValue: { paymentStatus: virement.paymentStatus },
+    newValue: { paymentStatus: "transfer_claimed", reportedAmount: input.reportedAmount ?? null },
+  })
+
+  return {
+    reference: updated.paymentReference ?? "",
+    amountTtc: updated.amountExpectedTtc,
+    paymentStatus: updated.paymentStatus,
+  }
+}
+
+export interface ReconcileResult {
+  id: string
+  orderId: string
+  paymentStatus: string
+  amountReceivedTtc: string | null
+  amountMatched: boolean
+}
+
+/**
+ * Settle a bank-transfer bucket: record the received amount/date/source IBAN and
+ * flip it to `reconciled`, then recompute the order's overall payment status.
+ *
+ * Reusable core shared by the manual admin route and the CSV importer. The
+ * status guard is repeated in the WHERE clause so two concurrent reconciliations
+ * cannot both settle the same bucket. Returns whether the received amount
+ * matched the expected amount to the cent — the caller decides what to surface;
+ * the settlement happens regardless (the admin owns the decision to accept).
+ */
+export async function reconcileVirementBucket(
+  virementId: string,
+  input: { amountReceivedTtc: string; receivedFromIban?: string | null; receivedAt?: Date; notes?: string | null },
+  adminId: string,
+): Promise<ReconcileResult> {
+  const [virement] = await db.select().from(paymentVirement).where(eq(paymentVirement.id, virementId)).limit(1)
+  if (!virement) {
+    throw new PaymentError(404, "NotFound", "Bank-transfer record not found")
+  }
+  if (PAID_PAYMENT_STATUSES.includes(virement.paymentStatus)) {
+    throw new PaymentError(409, "AlreadyReconciled", "This bank transfer is already reconciled")
+  }
+
+  const now = new Date()
+  const [updated] = await db
+    .update(paymentVirement)
+    .set({
+      paymentStatus: "reconciled",
+      amountReceivedTtc: input.amountReceivedTtc,
+      receivedAt: input.receivedAt ?? now,
+      receivedFromIban: input.receivedFromIban ?? null,
+      reconciledAt: now,
+      reconciledBy: adminId,
+      reconciliationNotes: input.notes ?? null,
+      updatedAt: now,
+    })
+    // Repeat the guard so a concurrent reconcile cannot double-settle.
+    .where(
+      and(eq(paymentVirement.id, virement.id), inArray(paymentVirement.paymentStatus, RECONCILABLE_VIREMENT_STATUSES)),
+    )
+    .returning()
+  if (!updated) {
+    throw new PaymentError(409, "AlreadyReconciled", "This bank transfer was reconciled concurrently")
+  }
+
+  const amountMatched = amountsMatchToCent(Number(input.amountReceivedTtc), Number(virement.amountExpectedTtc))
+
+  await db.insert(auditLogs).values({
+    userId: adminId,
+    entityType: "payment_virement",
+    entityId: virement.id,
+    action: "payment.virement.reconciled",
+    oldValue: { paymentStatus: virement.paymentStatus },
+    newValue: {
+      paymentStatus: "reconciled",
+      amountReceivedTtc: input.amountReceivedTtc,
+      amountExpectedTtc: virement.amountExpectedTtc,
+      amountMatched,
+    },
+  })
+
+  // Settled bucket → may flip the order to received (then VIP + legal workflow).
+  await recomputeOrderPaymentStatus(virement.orderId)
+
+  return {
+    id: updated.id,
+    orderId: updated.orderId,
+    paymentStatus: updated.paymentStatus,
+    amountReceivedTtc: updated.amountReceivedTtc,
+    amountMatched,
+  }
+}
+
+/** Adapt the admin manual-reconcile request body into the core reconcile call. */
+export async function reconcileVirementManually(
+  virementId: string,
+  input: ReconcileVirementInput,
+  adminId: string,
+): Promise<ReconcileResult> {
+  return reconcileVirementBucket(
+    virementId,
+    {
+      amountReceivedTtc: input.amountReceived.toFixed(2),
+      receivedFromIban: input.receivedFromIban ?? null,
+      receivedAt: safeDate(input.receivedAt),
+      notes: input.notes ?? null,
+    },
+    adminId,
+  )
+}
+
+export type BankImportOutcome = "reconciled" | "amount_mismatch" | "unknown_reference" | "no_reference" | "not_a_credit"
+
+export interface BankImportLine {
+  label: string
+  amount: number
+  reference: string | null
+  outcome: BankImportOutcome
+  orderId?: string
+  virementId?: string
+  amountExpectedTtc?: string
+}
+
+export interface BankImportReport {
+  total: number
+  reconciled: number
+  needsReview: number
+  lines: BankImportLine[]
+}
+
+/**
+ * Import a bank statement CSV and auto-reconcile incoming credits that match an
+ * outstanding bank-transfer reference by amount.
+ *
+ * Conservative by design: a row is only auto-settled when (a) its label carries
+ * one of our references, (b) that reference maps to a bucket still awaiting
+ * payment, and (c) the credited amount matches the expected amount to the cent.
+ * Anything else — no reference, unknown reference, debit, or amount mismatch —
+ * is reported for manual review and never silently settled. Idempotent: a
+ * statement re-imported after settlement reports the buckets as already paid
+ * (unknown to the awaiting-set) rather than double-counting.
+ */
+export async function importBankStatement(csv: string, adminId: string): Promise<BankImportReport> {
+  let transactions: ReturnType<typeof parseBankStatementCsv>
+  try {
+    transactions = parseBankStatementCsv(csv)
+  } catch (err) {
+    throw new PaymentError(400, "InvalidStatement", err instanceof Error ? err.message : "Unparseable bank statement")
+  }
+
+  const lines: BankImportLine[] = []
+  let reconciled = 0
+
+  for (const tx of transactions) {
+    const reference = extractTransferReference(tx.label)
+    const base: BankImportLine = { label: tx.label, amount: tx.amount, reference, outcome: "no_reference" }
+
+    if (!reference) {
+      lines.push(base)
+      continue
+    }
+    if (tx.amount <= 0) {
+      lines.push({ ...base, outcome: "not_a_credit" })
+      continue
+    }
+
+    // Only an outstanding bucket can be reconciled — settled refs are not re-matched.
+    const [virement] = await db
+      .select()
+      .from(paymentVirement)
+      .where(
+        and(
+          eq(paymentVirement.paymentReference, reference),
+          inArray(paymentVirement.paymentStatus, RECONCILABLE_VIREMENT_STATUSES),
+        ),
+      )
+      .limit(1)
+    if (!virement) {
+      lines.push({ ...base, outcome: "unknown_reference" })
+      continue
+    }
+
+    const expected = virement.amountExpectedTtc
+    if (!amountsMatchToCent(tx.amount, Number(expected))) {
+      lines.push({
+        ...base,
+        outcome: "amount_mismatch",
+        orderId: virement.orderId,
+        virementId: virement.id,
+        amountExpectedTtc: expected,
+      })
+      continue
+    }
+
+    await reconcileVirementBucket(
+      virement.id,
+      {
+        amountReceivedTtc: tx.amount.toFixed(2),
+        receivedFromIban: tx.counterpartyIban,
+        receivedAt: safeDate(tx.date),
+        notes: "Auto-reconciled from bank statement import",
+      },
+      adminId,
+    )
+    reconciled++
+    lines.push({
+      ...base,
+      outcome: "reconciled",
+      orderId: virement.orderId,
+      virementId: virement.id,
+      amountExpectedTtc: expected,
+    })
+  }
+
+  return { total: lines.length, reconciled, needsReview: lines.length - reconciled, lines }
 }
 
 /** Pull last4/brand from a PaymentIntent's card details, best-effort. */

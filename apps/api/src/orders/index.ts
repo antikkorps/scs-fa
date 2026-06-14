@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto"
 import {
   calculateOrderPaymentSplit,
   createOrderSchema,
@@ -7,10 +8,8 @@ import {
   uuidParamSchema,
   virementReferenceFromBytes,
 } from "@armurier/shared"
-import { randomBytes } from "node:crypto"
 import { and, desc, eq, gte, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
-import { env } from "../env.js"
 import { reservePrintForOrder } from "../artworks/reservation.js"
 import { authenticate } from "../auth/authenticate.js"
 import { loadCart } from "../cart/service.js"
@@ -26,6 +25,7 @@ import {
   paymentVirement,
   productVariants,
 } from "../db/schema.js"
+import { env } from "../env.js"
 import { validationError } from "../http.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 
