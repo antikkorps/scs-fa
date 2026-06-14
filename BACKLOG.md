@@ -324,7 +324,13 @@
 - Pré-requis : un **`forgejo-runner` (backend Docker) enregistré** ; les jobs tournent en conteneur → le service Postgres est joint par son nom de service. Label `ubuntu-latest` (= runner Renovate). Actions `actions/checkout`/`pnpm/action-setup`/`actions/setup-node` résolues depuis github.com
 - Piège résolu : le service nommé `postgres` **entrait en collision** avec une autre base du réseau du runner (qui sert aussi Renovate contre la base dev) → les connexions tombaient sur la mauvaise base (auth `armurier` rejetée). Service **renommé `testdb`** + auth `trust` (base CI éphémère) → vérifié vert de bout en bout (lint + typecheck + 318 tests)
 
-**Story 8.1** — Dockerfiles api + web
+**Story 8.1** — Dockerfiles api + web ✅
+
+- [x] `apps/api/Dockerfile` multi-stage (build context = racine) : stage build `pnpm install --frozen-lockfile` + **`pnpm deploy --legacy --prod /app`** (bundle autonome : API + `@armurier/shared` en source TS + node_modules prod **dont tsx**) ; runtime `node:22-slim` non-root, healthcheck `/health`, **`CMD tsx src/index.ts`** — l'API tourne la source TS via tsx, ce qui résout le paquet workspace `@armurier/shared` (publié en TS, pas de build JS)
+- [x] `apps/web/Dockerfile` multi-stage : build `nuxt build` → `.output` (Nitro bundle tout, dont shared) ; runtime `node:22-slim` non-root, **`.output` auto-contenu** (zéro node_modules), `CMD node .output/server/index.mjs` ; URLs injectées au runtime via `NUXT_PUBLIC_*` → image agnostique de l'environnement
+- [x] `tsx` déplacé en **dependency** de l'API (entrée prod) ; `pnpm.onlyBuiltDependencies` (argon2/esbuild) au niveau racine ; `start` API = `tsx src/index.ts` ; `.dockerignore` racine (exclut node_modules/.output/.env/secrets)
+- [x] **Vérifié en réel** (docker build + run) : API → `/health` 200 + **login admin OK** (argon2 natif + DB + shared tous fonctionnels en conteneur), image **451 MB** ; web → `/admin/login` & `/` rendus 200, logs propres, image **360 MB**
+- Note : bases `node:22-slim` (Debian) choisies pour la fiabilité des modules natifs (argon2/esbuild) vs alpine/musl ; slim possible plus tard si on veut réduire la taille
 **Story 8.2** — Caddyfile (HTTPS auto, headers sécurité)
 **Story 8.3** — docker-compose.prod.yml + déploiement Hetzner
 **Story 8.4** — Backups Postgres automatisés
