@@ -261,7 +261,19 @@
 
 ## PHASE 7 — Admin & Observabilité
 
-**Story 7.1** — Dashboard admin (commandes, validations docs)
+**Story 7.1** — Dashboard admin (commandes, validations docs) ✅
+
+- [x] API admin commandes (`apps/api/src/orders/admin.ts`, `requireRole("admin")`, monté `/api/admin/orders`) : `GET /` (liste tous clients, filtres `paymentStatus`/`legalStatus`/`search` email + pagination, jointe au client), `GET /:id` (détail complet + buckets carte/virement + remboursements), `GET /summary` (compteurs dashboard — déclaré avant `/:id` pour ne pas être capté comme un id). 12 tests d'intégration (auth 403/401, liste, filtres, recherche, 400 statut hors-bornes, détail+refunds, 404/400, summary)
+- [x] Constantes exactes `ORDER_PAYMENT_STATUSES`/`ORDER_LEGAL_STATUSES` (shared) alignées sur les enums DB (les anciennes `ORDER_LEGAL_STATUS`/`PAYMENT_STATUS` de `constants.ts` étaient périmées — laissées intactes, non autoritatives) + `adminOrderQuerySchema`
+- [x] **Front admin** (Nuxt 4 — première brique authentifiée). Fondation auth : `useAuth` (token + user en cookies SSR-safe, login via `/api/auth/login`), `useApi` (`$fetch` avec bearer + bascule login sur 401), middleware `admin` (garde rôle → redirect), page `/admin/login` autonome
+- [x] Shell admin (`layouts/admin.vue` : sidebar responsive + topbar + déconnexion) + dashboard `/admin` (cartes d'indicateurs depuis `/summary`, deep-links filtrés)
+- [x] `/admin/orders` (tableau filtrable + pagination, filtres miroir dans l'URL) + `/admin/orders/[id]` (articles, totaux, client/adresse, buckets paiement, remboursements)
+- [x] `/admin/legal-docs` (file de validation, onglets de statut, drawer détail avec URL de téléchargement présignée, **approuver/rejeter** avec motif normalisé + note — consomme l'API admin 4.2 existante)
+- [x] Composant `AdminStatusTag` + utils `status.ts` (libellés FR + sévérité couleur) + `format.ts` étendu (`formatDate`/`formatDateTime`, +2 tests)
+- [x] Seed admin **idempotent** (`ADMIN_SEED_EMAIL`/`ADMIN_SEED_PASSWORD`, défauts dev documentés `.env.example`) → backoffice utilisable dès le seed
+- [x] Smoke test réel : login admin → 3 endpoints admin 200 / 401 sans token ; front `/admin/login` rendu 200, gardes `/admin` & `/admin/orders` → 302 vers login. Suite complète au vert (**236 API, 51 shared, 8 web**), typecheck (shared/api/web) + Biome OK
+- Note : réconciliation virement / remboursements pilotables depuis l'UI = itération suivante (les API existent déjà, 6.3/6.4) ; le détail commande les affiche en lecture seule
+
 **Story 7.2** — Logs structurés + alerting (Pino + Loki ?)
 **Story 7.3** — Métriques business (CA, conversion, SLA légal)
 

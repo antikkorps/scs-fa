@@ -8,6 +8,23 @@ export function formatEuros(amount: number | null | undefined): string {
   return EUROS.format(amount)
 }
 
+const DATETIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" })
+const DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" })
+
+/** Format an ISO date string as a fr-FR date+time, or an em dash when absent/invalid. */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "—" : DATETIME.format(d)
+}
+
+/** Format an ISO date string as a fr-FR date (no time), or an em dash when absent/invalid. */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "—" : DATE.format(d)
+}
+
 /** Deterministic real-photo placeholder when an artwork has no image yet. */
 export function fallbackImage(seed: string, w = 1200, h = 1500): string {
   return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`

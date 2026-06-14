@@ -1,13 +1,16 @@
 // apps/api/src/db/seeds.ts
 // Données de base à insérer au démarrage
 
-import { calculateArtworkPrice } from "@armurier/shared"
+import { calculateArtworkPrice, CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { hash } from "@node-rs/argon2"
 import { eq } from "drizzle-orm"
 import { db } from "./client.js"
-import { artworkPrints, artworks, legalCategories, productCategories, products } from "./schema.js"
+import { artworkPrints, artworks, legalCategories, productCategories, products, users } from "./schema.js"
 
 export async function seedDatabase() {
   console.log("🌱 Seeding database...")
+
+  await seedAdminUser()
 
   // ========================================================================
   // CATÉGORIES LÉGALES FRANÇAISES (Classification préfectorale)
@@ -270,6 +273,32 @@ const GUN_ART_PIECES = [
     soldCount: 0,
   },
 ] as const
+
+// Idempotent admin account so the backoffice is usable right after a seed.
+// Credentials come from env (ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD) with dev
+// defaults — override them in any shared/staging environment.
+async function seedAdminUser() {
+  const email = process.env.ADMIN_SEED_EMAIL ?? "admin@scs-firearm.local"
+  const password = process.env.ADMIN_SEED_PASSWORD ?? "AdminSCS-ChangeMe-2026!"
+
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
+  if (existing) {
+    console.log(`✅ Admin user already present (${email})`)
+    return
+  }
+
+  const passwordHash = await hash(password, { memoryCost: 19_456, timeCost: 2, parallelism: 1 })
+  await db.insert(users).values({
+    email,
+    passwordHash,
+    role: "admin",
+    firstname: "Admin",
+    lastname: "SCS",
+    rgpdConsentAt: new Date(),
+    rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
+  })
+  console.log(`✅ Admin user seeded (${email})`)
+}
 
 async function seedGunArt() {
   const [gunArtCat] = await db
