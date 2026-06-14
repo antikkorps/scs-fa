@@ -7,6 +7,8 @@ import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import {
   addresses,
+  artworkPrints,
+  artworks,
   auditLogs,
   cartItems,
   legalCategories,
@@ -16,6 +18,7 @@ import {
   productCategories,
   products,
   productVariants,
+  refunds,
   users,
 } from "../db/schema.js"
 
@@ -24,10 +27,12 @@ import {
 vi.mock("./stripe.js", () => ({
   createPaymentIntent: vi.fn(),
   retrievePaymentIntent: vi.fn(),
+  createRefund: vi.fn(),
   constructWebhookEvent: vi.fn(),
 }))
 
-import { constructWebhookEvent, createPaymentIntent, retrievePaymentIntent } from "./stripe.js"
+import { recomputeVipStatus } from "../vip/service.js"
+import { constructWebhookEvent, createPaymentIntent, createRefund, retrievePaymentIntent } from "./stripe.js"
 
 const PREFIX = "TESTPAY-"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -81,6 +86,13 @@ describe("payments — Stripe card (Story 6.1)", () => {
 
     await db.delete(auditLogs).where(inArray(auditLogs.entityId, carteIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
+    await db.delete(refunds).where(inArray(refunds.orderId, orderIds))
+    // Prints still attached to a test order must be released before the order is
+    // deleted (orderId FK has no cascade); released/seeded prints go with the
+    // product cascade below.
+    await db.delete(artworkPrints).where(inArray(artworkPrints.orderId, orderIds))
+    await db.delete(artworkPrints).where(like(artworkPrints.printDesignation, `${PREFIX}%`))
+    await db.delete(artworks).where(like(artworks.sku, `${PREFIX}%`))
     await db.delete(paymentVirement).where(inArray(paymentVirement.orderId, orderIds))
     await db.delete(paymentCarte).where(inArray(paymentCarte.orderId, orderIds))
     await db.delete(cartItems).where(inArray(cartItems.variantId, variantIds))
@@ -271,6 +283,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
   beforeEach(() => {
     vi.mocked(createPaymentIntent).mockReset()
     vi.mocked(retrievePaymentIntent).mockReset()
+    vi.mocked(createRefund).mockReset()
     vi.mocked(constructWebhookEvent).mockReset()
   })
 
@@ -933,6 +946,348 @@ describe("payments — Stripe card (Story 6.1)", () => {
         })
         expect(res.statusCode).toBe(400)
         expect(res.json().error).toBe("InvalidStatement")
+      })
+    })
+  })
+
+  describe("refunds (Story 6.4)", () => {
+    const adminAuth = (t = adminToken) => ({ authorization: `Bearer ${t}` })
+
+    async function insertCustomer(suffix: string) {
+      const [u] = await db
+        .insert(users)
+        .values({
+          email: `pay-test61-${suffix}@pay-test.local`,
+          passwordHash: "x",
+          role: "customer",
+          rgpdConsentAt: new Date(),
+          rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
+        })
+        .returning({ id: users.id })
+      return u.id
+    }
+
+    async function seedPaidCardOrder(owner: string, amount: string, items: ItemsJson, intentId: string) {
+      const [o] = await db
+        .insert(orders)
+        .values({
+          userId: owner,
+          itemsJson: items,
+          subtotalHt: amount,
+          vatAmount: "0.00",
+          totalTtc: amount,
+          paymentStatus: "received",
+        })
+        .returning({ id: orders.id })
+      await db.insert(paymentCarte).values({
+        orderId: o.id,
+        amountTtc: amount,
+        currency: "EUR",
+        paymentStatus: "received",
+        stripePaymentIntentId: intentId,
+      })
+      return o.id
+    }
+
+    async function seedPaidVirementOrder(owner: string, amount: string, items: ItemsJson) {
+      const [o] = await db
+        .insert(orders)
+        .values({
+          userId: owner,
+          itemsJson: items,
+          subtotalHt: amount,
+          vatAmount: "0.00",
+          totalTtc: amount,
+          paymentStatus: "received",
+        })
+        .returning({ id: orders.id })
+      await db.insert(paymentVirement).values({
+        orderId: o.id,
+        amountExpectedTtc: amount,
+        amountReceivedTtc: amount,
+        currency: "EUR",
+        ibanRecipient: "FR7630006000011234567890189",
+        paymentReference: `REF-${o.id}`,
+        paymentStatus: "reconciled",
+        reconciledAt: new Date(),
+      })
+      return o.id
+    }
+
+    function refund(orderId: string, body: object, t = adminToken) {
+      return app.inject({
+        method: "POST",
+        url: `/api/admin/payments/orders/${orderId}/refunds`,
+        headers: { authorization: `Bearer ${t}` },
+        payload: body,
+      })
+    }
+
+    describe("card refunds (Stripe)", () => {
+      it("partial refund flags the order partially_refunded and calls Stripe with the cents amount", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_rf_p1")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_p1", status: "succeeded" } as never)
+
+        const res = await refund(orderId, { channel: "carte", amount: 40 })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data).toMatchObject({
+          status: "succeeded",
+          orderPaymentStatus: "partially_refunded",
+          stripeRefundId: "re_p1",
+        })
+        expect(vi.mocked(createRefund)).toHaveBeenCalledWith(
+          expect.objectContaining({ payment_intent: "pi_rf_p1", amount: 4000 }),
+        )
+        const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+        expect(order.paymentStatus).toBe("partially_refunded")
+      })
+
+      it("full refund flips the order to refunded", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_rf_f1")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_f1", status: "succeeded" } as never)
+
+        const res = await refund(orderId, { channel: "carte", amount: 100 })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data.orderPaymentStatus).toBe("refunded")
+        const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+        expect(order.paymentStatus).toBe("refunded")
+      })
+
+      it("restores variant stock on a full refund of a real order", async () => {
+        const [beforeRow] = await db
+          .select({ stock: productVariants.stockQty })
+          .from(productVariants)
+          .where(eq(productVariants.id, accessoryVariantId))
+        const startStock = beforeRow.stock ?? 0
+
+        await db.insert(cartItems).values({ userId, variantId: accessoryVariantId, qty: 1, priceHtAtTime: "50.00" })
+        const created = (
+          await app.inject({
+            method: "POST",
+            url: "/api/orders",
+            headers: adminAuth(token),
+            payload: { shippingAddressId },
+          })
+        ).json().data
+        const [afterOrder] = await db
+          .select({ stock: productVariants.stockQty })
+          .from(productVariants)
+          .where(eq(productVariants.id, accessoryVariantId))
+        expect(afterOrder.stock).toBe(startStock - 1)
+
+        // Simulate the card payment having settled
+        await db
+          .update(paymentCarte)
+          .set({ paymentStatus: "received", stripePaymentIntentId: "pi_stock" })
+          .where(eq(paymentCarte.orderId, created.id))
+        await db.update(orders).set({ paymentStatus: "received" }).where(eq(orders.id, created.id))
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_stock", status: "succeeded" } as never)
+
+        const res = await refund(created.id, { channel: "carte", amount: created.totals.totalTtc })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data.orderPaymentStatus).toBe("refunded")
+        const [restored] = await db
+          .select({ stock: productVariants.stockQty })
+          .from(productVariants)
+          .where(eq(productVariants.id, accessoryVariantId))
+        expect(restored.stock).toBe(startStock)
+      })
+
+      it("releases reserved Gun Art prints on a full refund", async () => {
+        const [product] = await db
+          .insert(products)
+          .values({
+            sku: `${PREFIX}art`,
+            slug: `${PREFIX}art`,
+            name: "Oeuvre",
+            categoryId: await categoryId("accessoire-tireur"),
+            legalCategoryId: await legalCategoryId("none"),
+            priceHt: "200.00",
+            requiresLegalVerification: false,
+            published: true,
+          })
+          .returning({ id: products.id })
+        const [artwork] = await db
+          .insert(artworks)
+          .values({
+            productId: product.id,
+            slug: `${PREFIX}art`,
+            sku: `${PREFIX}art`,
+            title: "Oeuvre",
+            editionLimit: 25,
+            basePriceHt: "200.00",
+            priceIncrementHt: "10.00",
+          })
+          .returning({ id: artworks.id })
+        const [print] = await db
+          .insert(artworkPrints)
+          .values({
+            artworkId: artwork.id,
+            printNumber: 1,
+            totalPrints: 25,
+            printDesignation: `${PREFIX}1/25`,
+            formatId: "a4",
+            priceHtUnit: "200.00",
+            status: "reserved",
+          })
+          .returning({ id: artworkPrints.id })
+        const orderId = await seedPaidCardOrder(
+          userId,
+          "200.00",
+          [
+            {
+              printId: print.id,
+              qty: 1,
+              priceHt: 200,
+              name: "Oeuvre",
+              sku: `${PREFIX}art`,
+              category: "gun-art",
+              requiresPaymentVirement: false,
+            },
+          ],
+          "pi_print",
+        )
+        await db.update(artworkPrints).set({ orderId }).where(eq(artworkPrints.id, print.id))
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_print", status: "succeeded" } as never)
+
+        const res = await refund(orderId, { channel: "carte", amount: 200 })
+        expect(res.statusCode).toBe(201)
+        const [released] = await db.select().from(artworkPrints).where(eq(artworkPrints.id, print.id))
+        expect(released.status).toBe("available")
+        expect(released.orderId).toBeNull()
+      })
+
+      it("settles a pending card refund only when the webhook confirms it (idempotent)", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_async")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_async", status: "pending" } as never)
+
+        const res = await refund(orderId, { channel: "carte", amount: 100 })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data).toMatchObject({ status: "pending", orderPaymentStatus: "received" })
+        const [pending] = await db.select().from(orders).where(eq(orders.id, orderId))
+        expect(pending.paymentStatus).toBe("received") // not refunded until confirmed
+
+        vi.mocked(constructWebhookEvent).mockReturnValue({
+          type: "charge.refunded",
+          data: { object: { refunds: { data: [{ id: "re_async", status: "succeeded" }] } } },
+        } as never)
+        const fire = () =>
+          app.inject({
+            method: "POST",
+            url: "/api/webhooks/stripe",
+            headers: { "stripe-signature": "sig", "content-type": "application/json" },
+            payload: JSON.stringify({}),
+          })
+
+        expect((await fire()).statusCode).toBe(200)
+        const [settled] = await db.select().from(orders).where(eq(orders.id, orderId))
+        expect(settled.paymentStatus).toBe("refunded")
+
+        // Replaying the same event changes nothing
+        expect((await fire()).statusCode).toBe(200)
+        const settledRefunds = await db.select().from(refunds).where(eq(refunds.stripeRefundId, "re_async"))
+        expect(settledRefunds).toHaveLength(1)
+        expect(settledRefunds[0].status).toBe("succeeded")
+      })
+    })
+
+    describe("bank-transfer refunds (manual) + VIP cascade", () => {
+      it("full refund revokes VIP earned from that order (no Stripe call)", async () => {
+        const vipUser = await insertCustomer("rvip1")
+        const orderId = await seedPaidVirementOrder(vipUser, "1200.00", [FIREARM_ITEM])
+        expect(await recomputeVipStatus(vipUser)).toBe(true)
+
+        const res = await refund(orderId, { channel: "virement", amount: 1200 })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data).toMatchObject({
+          status: "succeeded",
+          orderPaymentStatus: "refunded",
+          stripeRefundId: null,
+        })
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+
+        const [u] = await db.select({ vipActive: users.vipActive }).from(users).where(eq(users.id, vipUser))
+        expect(u.vipActive).toBe(false)
+      })
+
+      it("partial refund keeps the order paid and VIP intact", async () => {
+        const vipUser = await insertCustomer("rvip2")
+        const orderId = await seedPaidVirementOrder(vipUser, "1200.00", [FIREARM_ITEM])
+        expect(await recomputeVipStatus(vipUser)).toBe(true)
+
+        const res = await refund(orderId, { channel: "virement", amount: 300 })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data.orderPaymentStatus).toBe("partially_refunded")
+
+        const [u] = await db.select({ vipActive: users.vipActive }).from(users).where(eq(users.id, vipUser))
+        expect(u.vipActive).toBe(true)
+      })
+    })
+
+    describe("guards", () => {
+      it("rejects an amount above what is refundable (400)", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_guard1")
+        const res = await refund(orderId, { channel: "carte", amount: 150 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json().error).toBe("AmountExceedsRefundable")
+      })
+
+      it("caps cumulative refunds at the amount paid (400 on the overflow)", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_guard2")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_g2", status: "succeeded" } as never)
+        expect((await refund(orderId, { channel: "carte", amount: 60 })).statusCode).toBe(201)
+        const res = await refund(orderId, { channel: "carte", amount: 60 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json().error).toBe("AmountExceedsRefundable")
+      })
+
+      it("rejects refunding a channel the order did not pay (400)", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_guard3")
+        const res = await refund(orderId, { channel: "virement", amount: 10 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json().error).toBe("ChannelNotPaid")
+      })
+
+      it("rejects refunding an unpaid order (400)", async () => {
+        const orderId = await insertOrder(userId, [CARD_ITEM])
+        await insertCarte(orderId)
+        const res = await refund(orderId, { channel: "carte", amount: 10 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json().error).toBe("NotRefundable")
+      })
+
+      it("returns 404 for an unknown order", async () => {
+        const res = await refund("00000000-0000-0000-0000-000000000000", { channel: "carte", amount: 10 })
+        expect(res.statusCode).toBe(404)
+      })
+
+      it("requires the admin role (403 customer, 401 anonymous)", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_guard4")
+        expect((await refund(orderId, { channel: "carte", amount: 10 }, token)).statusCode).toBe(403)
+        const anon = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/orders/${orderId}/refunds`,
+          payload: { channel: "carte", amount: 10 },
+        })
+        expect(anon.statusCode).toBe(401)
+      })
+    })
+
+    describe("GET /api/admin/payments/orders/:orderId/refunds", () => {
+      it("lists the refund history for an order", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_list")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_list", status: "succeeded" } as never)
+        await refund(orderId, { channel: "carte", amount: 25, reason: "goodwill" })
+
+        const res = await app.inject({
+          method: "GET",
+          url: `/api/admin/payments/orders/${orderId}/refunds`,
+          headers: adminAuth(),
+        })
+        expect(res.statusCode).toBe(200)
+        const { data } = res.json()
+        expect(data).toHaveLength(1)
+        expect(data[0]).toMatchObject({ channel: "carte", amountTtc: "25.00", status: "succeeded", reason: "goodwill" })
       })
     })
   })

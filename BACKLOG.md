@@ -243,7 +243,21 @@
 - [x] 21 tests d'intégration ajoutés (`payments.test.ts`) : claim (succès/vide/404 cross-user/409 réconcilié/400 carte-only/401), garde de rôle admin (403 client/401 anonyme), file/détail (200/404), reconcile manuel (settle+commande `received`/mismatch flaggé/409/404/400 montant), import CSV (auto-réconciliation/mismatch/classification mixte/idempotence/400 illisible) — suite API complète au vert (**210 tests**), shared (**51 tests**)
 - Note : pas de connecteur API banque temps réel (DSP2/Bridge) en 6.3 — l'import CSV couvre le besoin opérationnel ; l'UI d'admin du rapprochement = Phase 7 (dashboard admin)
 
-**Story 6.4** — Remboursement (full + partiel)
+**Story 6.4** — Remboursement (full + partiel) ✅
+
+- [x] Schéma : table `refunds` (une ligne par action de remboursement, canal `carte`/`virement`, montant, statut, `stripe_refund_id`, `initiated_by`, audit) + enums `refund_channel`/`refund_status` + valeurs `partially_refunded`/`refunded` ajoutées à `payment_status` (appliqués en base via psql `ALTER TYPE`/`CREATE`)
+- [x] `PAID_PAYMENT_STATUSES` inclut désormais `partially_refunded` (achat toujours abouti, biens conservés) ; `refunded` n'en fait pas partie → sort des commandes payées
+- [x] Wrapper Stripe : `createRefund` (refund total/partiel sur PaymentIntent, montant en centimes)
+- [x] Cœur `createOrderRefund` (par canal) : garde « commande payée » (400 sinon), montant **plafonné** au remboursable restant par canal (pending + succeeded décomptés → 400 dépassement, 409 si canal déjà soldé) ; **carte** via Stripe (peut être `pending` → finalisé par webhook) ; **virement** = remboursement manuel enregistré `succeeded` (le virement retour est hors-ligne, l'admin l'atteste, zéro appel Stripe)
+- [x] Cascade `applyRefundEffects` : remboursement **total** (cumul succeeded ≥ total commande) → commande `refunded` **en une seule transition** (compare-and-set) qui **restocke les variantes**, **libère les tirages Gun Art réservés** (`reserved`→`available`, `orderId` null) et **recalcule le VIP** ; **partiel** → `partially_refunded`. Idempotent : un webhook rejoué ne restocke jamais deux fois
+- [x] `recomputeVipStatus` rendu **bidirectionnel** (révocable) : accorde ou **révoque** le VIP selon l'existence d'une commande payée qualifiante ; un remboursement total qui était la seule commande qualifiante retire le VIP, un remboursement partiel le conserve ; état déjà correct laissé tel quel (`vipEligibleSince` préservé)
+- [x] Webhook Stripe étendu : `charge.refunded` / `refund.updated` / `refund.created` → `settleStripeRefund` (match par `stripe_refund_id`, idempotent, déclenche la cascade quand le refund passe `succeeded`)
+- [x] Routes admin (`requireRole("admin")`) : `POST /api/admin/payments/orders/:orderId/refunds` (201), `GET .../refunds` (historique)
+- [x] Audit log sur chaque remboursement (`entityType: refund`, `userId` = admin)
+- [x] 32 tests d'intégration ajoutés (`payments.test.ts`) : carte partiel/total (montant Stripe en centimes, statut commande), restauration stock (commande réelle), libération tirage, webhook async + idempotence, virement total→révocation VIP / partiel→VIP conservé, plafonds (montant > remboursable, cumul, canal non payé, commande non payée), 404, gardes rôle 403/401, historique — suite API complète au vert (**224 tests**), shared (**51 tests**)
+- Note : remboursement déclenché côté admin (UI = Phase 7) ; pas de génération d'avoir comptable Henrri ici (Phase facturation)
+
+**Phase 6 — COMPLÈTE** (6.1 CB Stripe, 6.2 virement RIB, 6.3 rapprochement, 6.4 remboursement)
 
 ## PHASE 7 — Admin & Observabilité
 

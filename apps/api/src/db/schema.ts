@@ -82,7 +82,15 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "reconciled",
   "failed",
   "cancelled",
+  "partially_refunded",
+  "refunded",
 ])
+// Refund channel mirrors the two payment buckets: card (Stripe) and bank transfer
+// (recorded manually — the actual wire-back happens out of band).
+export const refundChannelEnum = pgEnum("refund_channel", ["carte", "virement"])
+// A card refund may settle asynchronously (pending → succeeded via webhook); a
+// manually-recorded virement refund is asserted succeeded by the admin.
+export const refundStatusEnum = pgEnum("refund_status", ["pending", "succeeded", "failed", "cancelled"])
 export const printStatusEnum = pgEnum("print_status", [
   "available",
   "in_cart",
@@ -1155,6 +1163,49 @@ export const paymentCarteRelations = relations(paymentCarte, ({ one }) => ({
   order: one(orders, {
     fields: [paymentCarte.orderId],
     references: [orders.id],
+  }),
+}))
+
+// ============================================================================
+// 8b. REMBOURSEMENTS (Story 6.4) — one row per refund action, on either bucket
+// ============================================================================
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id").notNull(),
+    channel: refundChannelEnum("channel").notNull(),
+    amountTtc: decimal("amount_ttc", { precision: 10, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).default("EUR"),
+    reason: varchar("reason", { length: 255 }),
+    notes: text("notes"),
+
+    status: refundStatusEnum("status").notNull().default("pending"),
+    // Set for card refunds; null for manually-recorded bank-transfer refunds.
+    stripeRefundId: varchar("stripe_refund_id", { length: 255 }).unique(),
+    failureReason: text("failure_reason"),
+
+    initiatedBy: uuid("initiated_by"),
+    processedAt: timestamp("processed_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_refunds_order").on(t.orderId),
+    index("idx_refunds_status").on(t.status),
+    foreignKey({ columns: [t.orderId], foreignColumns: [orders.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.initiatedBy], foreignColumns: [users.id] }),
+  ],
+)
+
+export const refundsRelations = relations(refunds, ({ one }) => ({
+  order: one(orders, {
+    fields: [refunds.orderId],
+    references: [orders.id],
+  }),
+  initiatedByUser: one(users, {
+    fields: [refunds.initiatedBy],
+    references: [users.id],
   }),
 }))
 

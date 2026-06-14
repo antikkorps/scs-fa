@@ -10,7 +10,13 @@ export const PAYMENT_SPLIT = {
 export type PaymentSplitType = (typeof PAYMENT_SPLIT)[keyof typeof PAYMENT_SPLIT]
 
 // Payment statuses that count as a completed purchase (e.g. for VIP eligibility).
-export const PAID_PAYMENT_STATUSES: readonly string[] = ["received", "reconciled"]
+// A partially-refunded order is still a completed purchase (goods kept, only part
+// of the money returned); a fully `refunded` order is not and drops out.
+export const PAID_PAYMENT_STATUSES: readonly string[] = ["received", "reconciled", "partially_refunded"]
+
+// The two channels a refund can be issued on, mirroring the payment buckets.
+export const REFUND_CHANNELS = ["carte", "virement"] as const
+export type RefundChannel = (typeof REFUND_CHANNELS)[number]
 
 /**
  * Whether an item must be paid by bank transfer (virement) rather than card.

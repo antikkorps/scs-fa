@@ -12,6 +12,7 @@ import { db } from "../db/client.js"
 import { auditLogs, orders, paymentCarte, paymentVirement } from "../db/schema.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { recomputeVipStatus } from "../vip/service.js"
+import { settleStripeRefund } from "./refunds.js"
 import { createPaymentIntent, retrievePaymentIntent } from "./stripe.js"
 
 // Bank-transfer bucket states an admin (or CSV import) may still act on: the
@@ -489,6 +490,20 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case "payment_intent.canceled": {
       const intent = event.data.object as Stripe.PaymentIntent
       await settleCartePayment(intent.id, { paymentStatus: "cancelled" })
+      return
+    }
+    case "refund.updated":
+    case "refund.created": {
+      const refund = event.data.object as Stripe.Refund
+      await settleStripeRefund(refund.id, refund.status ?? "")
+      return
+    }
+    case "charge.refunded": {
+      // The charge carries its refunds inline; settle each one we know about.
+      const charge = event.data.object as Stripe.Charge
+      for (const refund of charge.refunds?.data ?? []) {
+        await settleStripeRefund(refund.id, refund.status ?? "")
+      }
       return
     }
     default:
