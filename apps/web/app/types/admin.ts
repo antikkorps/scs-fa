@@ -100,6 +100,28 @@ export interface OrdersSummary {
   byLegalStatus: Record<string, number>
 }
 
+export interface MetricsResult {
+  period: { from: string; to: string }
+  revenue: { grossTtc: number; refundedTtc: number; netTtc: number; paidOrders: number }
+  commission: { ratePct: number; amount: number }
+  funnel: {
+    totalOrders: number
+    paidOrders: number
+    pendingOrders: number
+    failedOrders: number
+    refundedOrders: number
+    conversionPct: number
+  }
+  legalSla: {
+    reviewed: number
+    withinSla: number
+    withinSlaPct: number
+    avgReviewHours: number | null
+    pendingOverdue: number
+  }
+  timeseries: Array<{ date: string; grossTtc: number }>
+}
+
 export interface LegalDocQueueItem {
   id: string
   docType: string

@@ -15,6 +15,7 @@ import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
+import { adminMetricsRoutes } from "./metrics/admin.js"
 import { adminOrderRoutes } from "./orders/admin.js"
 import { orderRoutes } from "./orders/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
@@ -74,6 +75,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminLegalDocumentRoutes, { prefix: "/api/admin/legal-documents" })
   await fastify.register(adminPaymentRoutes, { prefix: "/api/admin/payments" })
   await fastify.register(adminOrderRoutes, { prefix: "/api/admin/orders" })
+  await fastify.register(adminMetricsRoutes, { prefix: "/api/admin/metrics" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)

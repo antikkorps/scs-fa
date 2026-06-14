@@ -285,7 +285,18 @@
 - [x] Smoke réel (boot prod) : logs JSON `service`/`env`, `reqId` repris de `x-request-id` et propagé incoming→completed, `responseTime`/`statusCode`. Suite complète au vert (**252 API, 51 shared, 8 web**), typecheck + Biome OK
 - Note : expédition vers un agrégateur (Loki/Grafana) = Phase 8 (infra) ; ici tout est prêt côté applicatif (JSON sur stdout)
 
-**Story 7.3** — Métriques business (CA, conversion, SLA légal)
+**Story 7.3** — Métriques business (CA, conversion, SLA légal) ✅
+
+- [x] Service métriques (`apps/api/src/metrics/service.ts`) : `computeMetrics({from,to,commissionRatePct})` — tout en agrégats SQL (sum/count/group-by/filter), zéro ligne tirée en JS, sur les commandes placées dans `[from, to)`
+- [x] **CA net** = brut TTC des commandes payées (`received`/`reconciled`/`partially_refunded`) − remboursements `succeeded` sur ces commandes ; **commission** = `COMMISSION_RATE_PCT` % du net (défaut 5%, env, documenté `.env.example`) — **reporting transparent** de la part partenaire
+- [x] **Entonnoir + conversion** (total/payées/en attente/remboursées/échouées, `conversionPct`) ; **SLA légal** (docs décidés dans la période : `withinSlaPct` `verifiedAt ≤ deadline`, `avgReviewHours`, + `pendingOverdue` point-in-time) ; **timeseries** CA brut quotidien (ordonné)
+- [x] `GET /api/admin/metrics?from=&to=` (`requireRole("admin")`, fenêtre 30j par défaut, `to` inclusif fin-de-journée) + `adminMetricsQuerySchema` (shared, `from ≤ to`)
+- [x] Front `/admin/metrics` : cartes KPI (CA net, commission 5%, conversion, SLA 48h), sélecteur 7/30/90j, **mini-graphe CA/jour en CSS inline** (zéro dépendance de charting — respecte la quarantaine deps), entonnoir détaillé ; lien dans la nav admin
+- [x] 7 tests d'intégration sur **période historique (mars 2025)** → isolation déterministe malgré la base partagée (les données `now`-datées des autres suites tombent hors fenêtre) : revenu net+commission, entonnoir+conversion, SLA, timeseries exacte, défaut 30j, 400 période inversée, gardes 403/401
+- [x] Smoke réel : endpoint sur serveur live → `netTtc 240 / commission 12 (=5%) / conversion 100% / timeseries`; page guardée (302). Suite complète au vert (**259 API, 51 shared, 8 web**), typecheck + Biome OK
+- Reco suivi : **base de test séparée** — tests et dev partagent un Postgres ; `sla.test` doit posséder l'ensemble global des admins (le check notifie *tous* les admins), ce qui supprime l'admin démo seedé à chaque run (re-seed idempotent nécessaire). Une DB de test dédiée éliminerait ce couplage (à cadrer Phase 8 infra)
+
+**PHASE 7 — COMPLÈTE** (7.1 dashboard admin, 7.2 logs+alerting, 7.3 métriques+commission)
 
 ## PHASE 8 — Mise en prod
 
