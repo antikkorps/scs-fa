@@ -2,7 +2,7 @@
 # Build context is the repo root: docker build -f apps/api/Dockerfile -t scs-api .
 
 # ---- build: install the workspace, then extract a self-contained API bundle ----
-FROM node:22-slim AS build
+FROM node:24-slim AS build
 ENV CI=1
 RUN corepack enable
 WORKDIR /repo
@@ -13,7 +13,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @armurier/api deploy --legacy --prod /app
 
 # ---- runtime ----
-FROM node:22-slim AS runtime
+FROM node:24-slim AS runtime
 ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=8080

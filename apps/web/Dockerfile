@@ -2,7 +2,7 @@
 # Build context is the repo root: docker build -f apps/web/Dockerfile -t scs-web .
 
 # ---- build: install the workspace and produce the Nitro output ----
-FROM node:22-slim AS build
+FROM node:24-slim AS build
 ENV CI=1
 RUN corepack enable
 WORKDIR /repo
@@ -12,7 +12,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @armurier/web build
 
 # ---- runtime: the Nitro output is self-contained, no node_modules needed ----
-FROM node:22-slim AS runtime
+FROM node:24-slim AS runtime
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000
