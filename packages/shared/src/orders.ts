@@ -49,6 +49,151 @@ export function virementReferenceFromBytes(bytes: Uint8Array): string {
   return `SCS-${out.slice(0, 4)}-${out.slice(4)}`
 }
 
+/**
+ * Matches a bank-transfer reference (`SCS-XXXX-XXXX`, Crockford base32) anywhere
+ * inside a free-form bank statement label. Case-insensitive so a bank that
+ * upper/lower-cases the label still matches. Story 6.3 reconciliation.
+ */
+export const VIREMENT_REF_REGEX = new RegExp(`SCS-[${VIREMENT_REF_ALPHABET}]{4}-[${VIREMENT_REF_ALPHABET}]{4}`, "i")
+
+/**
+ * Pull our payment reference out of a bank statement label, normalised to the
+ * canonical upper-case `SCS-XXXX-XXXX` form, or null when the label carries no
+ * recognisable reference. Pure — the DB lookup happens in the service.
+ */
+export function extractTransferReference(label: string): string | null {
+  const match = label.match(VIREMENT_REF_REGEX)
+  return match ? match[0].toUpperCase() : null
+}
+
+/**
+ * Parse a decimal money amount as written by banks, tolerating thousands
+ * separators and both comma- and dot-decimal conventions:
+ * `"1 234,56"`, `"1,234.56"`, `"1234.56"`, `"+1200,00"` → 1234.56 / 1200.
+ * Returns NaN for anything unparseable so callers can reject the row.
+ */
+export function parseBankAmount(raw: string): number {
+  let s = raw.replace(/[\s  ]/g, "").replace(/[€$£]/g, "")
+  if (s === "") return Number.NaN
+  const lastComma = s.lastIndexOf(",")
+  const lastDot = s.lastIndexOf(".")
+  if (lastComma !== -1 && lastDot !== -1) {
+    // Both present: the right-most is the decimal separator, the other groups.
+    const decimalSep = lastComma > lastDot ? "," : "."
+    const groupSep = decimalSep === "," ? "." : ","
+    s = s.split(groupSep).join("").replace(decimalSep, ".")
+  } else if (lastComma !== -1) {
+    s = s.replace(",", ".")
+  }
+  const n = Number(s)
+  return Number.isFinite(n) ? n : Number.NaN
+}
+
+export interface BankTransaction {
+  date: string | null
+  label: string
+  amount: number
+  counterpartyIban: string | null
+}
+
+// Header aliases (accent/space-insensitive) for the columns we need from a CSV.
+const CSV_HEADER_ALIASES: Record<keyof Omit<BankTransaction, never>, string[]> = {
+  date: ["date", "dateoperation", "datedoperation", "datecomptabilisation", "datevaleur"],
+  label: ["libelle", "label", "description", "communication", "motif", "intitule", "nature"],
+  amount: ["montant", "amount", "credit", "montantcredit", "valeur"],
+  counterpartyIban: ["iban", "ibanemetteur", "contrepartie", "counterparty", "compteemetteur"],
+}
+
+function normaliseHeader(h: string): string {
+  return h
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "")
+}
+
+/** Split one CSV record on `delimiter`, honouring double-quoted fields. */
+function splitCsvLine(line: string, delimiter: string): string[] {
+  const out: string[] = []
+  let field = ""
+  let quoted = false
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]
+    if (quoted) {
+      if (c === '"') {
+        if (line[i + 1] === '"') {
+          field += '"'
+          i++
+        } else {
+          quoted = false
+        }
+      } else {
+        field += c
+      }
+    } else if (c === '"') {
+      quoted = true
+    } else if (c === delimiter) {
+      out.push(field)
+      field = ""
+    } else {
+      field += c
+    }
+  }
+  out.push(field)
+  return out.map((f) => f.trim())
+}
+
+/**
+ * Parse a bank statement CSV export into structured transactions.
+ *
+ * Tolerant by design — French and English banks differ on delimiter (`;` vs
+ * `,`), header naming and amount formatting. The header row is matched against
+ * known aliases (accent/space-insensitive); `label` and `amount` are required,
+ * `date` and `counterpartyIban` optional. Rows whose amount is unparseable are
+ * skipped. Throws when no usable header is found so the caller can 400.
+ */
+export function parseBankStatementCsv(csv: string): BankTransaction[] {
+  const lines = csv
+    .split(/\r\n|\r|\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+  if (lines.length < 2) return []
+
+  const delimiter = (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ";" : ","
+  const headers = splitCsvLine(lines[0], delimiter).map(normaliseHeader)
+
+  const indexFor = (key: keyof BankTransaction): number => {
+    const aliases = CSV_HEADER_ALIASES[key]
+    return headers.findIndex((h) => aliases.includes(h))
+  }
+  const labelIdx = indexFor("label")
+  const amountIdx = indexFor("amount")
+  const dateIdx = indexFor("date")
+  const ibanIdx = indexFor("counterpartyIban")
+  if (labelIdx === -1 || amountIdx === -1) {
+    throw new Error("Unrecognised bank statement: a label and an amount column are required")
+  }
+
+  const transactions: BankTransaction[] = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = splitCsvLine(lines[i], delimiter)
+    const amount = parseBankAmount(cols[amountIdx] ?? "")
+    if (Number.isNaN(amount)) continue
+    transactions.push({
+      date: dateIdx === -1 ? null : (cols[dateIdx] ?? null) || null,
+      label: cols[labelIdx] ?? "",
+      amount,
+      counterpartyIban: ibanIdx === -1 ? null : (cols[ibanIdx]?.replace(/\s/g, "") ?? null) || null,
+    })
+  }
+  return transactions
+}
+
+/** True when two money amounts are equal to the cent (avoids float drift). */
+export function amountsMatchToCent(a: number, b: number): boolean {
+  return Math.round(a * 100) === Math.round(b * 100)
+}
+
 export interface PaymentSplitItem {
   priceHt: number
   vatPct: number

@@ -231,7 +231,18 @@
 - [x] 8 tests d'intégration ajoutés (`payments.test.ts`) : création virement-only/mixte (réf unique + RIB snapshoté), distinction des réf entre commandes, lecture RIB, 404 cross-user/inconnu, 400 carte-only, 400 uuid malformé, 401 ; suite API complète au vert (189 tests)
 - Note : la **réconciliation** (statut → `reconciled`, settle du bucket virement, claim client) = Story 6.3 ; 6.2 = génération + lecture des instructions
 
-**Story 6.3** — Rapprochement bancaire admin (import CSV ou API banque)
+**Story 6.3** — Rapprochement bancaire admin (import CSV ou API banque) ✅
+
+- [x] Helpers purs (`packages/shared/src/orders.ts`, 9 tests unitaires) : `extractTransferReference` (repère `SCS-XXXX-XXXX` dans un libellé bancaire libre, normalise en majuscules, ignore I/L/O/U hors alphabet), `parseBankAmount` (FR `1 234,56` / EN `1,234.56` / signe / symbole devise), `parseBankStatementCsv` (délimiteur `;`/`,` auto, en-têtes accent/espace-insensibles, champs entre guillemets, colonnes `label`+`amount` requises → throw sinon), `amountsMatchToCent` (comparaison au centime, anti-drift flottant)
+- [x] Schémas zod (`claimVirementSchema`, `virementQueueQuerySchema`, `reconcileVirementSchema`, `importBankStatementSchema`) + `VIREMENT_RECONCILE_STATUSES`
+- [x] Claim client : `POST /api/payments/virement/:id/claim` (JWT, ownership 404) — déclaration « j'ai fait le virement » → bucket `awaiting_transfer`→`transfer_claimed`, stocke `client_reported_*` (advisory ; le relevé bancaire reste la source de vérité) ; 409 si déjà réconcilié, 400 carte-only
+- [x] Cœur réutilisable `reconcileVirementBucket` : settle le bucket (`amount_received_ttc`, `received_at`, `received_from_iban`, `reconciled_at/by`, notes) → statut `reconciled`, garde de statut **répétée dans le WHERE** (anti double-settle concurrent), puis `recomputeOrderPaymentStatus` → la commande bascule `received` quand tous les buckets dus sont réglés ; renvoie `amountMatched` (le settle a lieu quoi qu'il arrive, l'admin assume la décision)
+- [x] Admin (`requireRole("admin")`, monté `/api/admin/payments`) : `GET /virements` (file d'attente filtrable par statut + pagination, jointe au client), `GET /virements/:id` (détail), `POST /virements/:id/reconcile` (settle manuel), `POST /import` (CSV → auto-réconciliation)
+- [x] Import CSV **conservateur** : n'auto-settle qu'au triple match (référence connue + bucket en attente + montant au centime) ; tout le reste classé pour revue manuelle sans toucher l'état (`unknown_reference`/`no_reference`/`not_a_credit`/`amount_mismatch`) ; **idempotent** (un relevé ré-importé ne re-settle rien — la réf n'est plus dans l'ensemble « en attente »)
+- [x] Audit log sur claim + reconcile (oldValue/newValue, `userId` = client ou admin)
+- [x] 21 tests d'intégration ajoutés (`payments.test.ts`) : claim (succès/vide/404 cross-user/409 réconcilié/400 carte-only/401), garde de rôle admin (403 client/401 anonyme), file/détail (200/404), reconcile manuel (settle+commande `received`/mismatch flaggé/409/404/400 montant), import CSV (auto-réconciliation/mismatch/classification mixte/idempotence/400 illisible) — suite API complète au vert (**210 tests**), shared (**51 tests**)
+- Note : pas de connecteur API banque temps réel (DSP2/Bridge) en 6.3 — l'import CSV couvre le besoin opérationnel ; l'UI d'admin du rapprochement = Phase 7 (dashboard admin)
+
 **Story 6.4** — Remboursement (full + partiel)
 
 ## PHASE 7 — Admin & Observabilité

@@ -33,6 +33,7 @@ const PREFIX = "TESTPAY-"
 const PASSWORD = "MotDePasseTresLong123!"
 const EMAIL = "pay-test61@pay-test.local"
 const EMAIL_OTHER = "pay-test61-other@pay-test.local"
+const EMAIL_ADMIN = "pay-test61-admin@pay-test.local"
 
 type ItemsJson = (typeof orders.$inferInsert)["itemsJson"]
 
@@ -60,6 +61,8 @@ describe("payments — Stripe card (Story 6.1)", () => {
   let userId: string
   let token: string
   let otherToken: string
+  let adminId: string
+  let adminToken: string
   let shippingAddressId: string
   let accessoryVariantId: string
   let regulatedVariantId: string
@@ -141,7 +144,11 @@ describe("payments — Stripe card (Story 6.1)", () => {
 
   async function insertVirement(
     orderId: string,
-    opts: { amountTtc?: string; reference?: string; status?: "awaiting_transfer" | "received" } = {},
+    opts: {
+      amountTtc?: string
+      reference?: string
+      status?: "awaiting_transfer" | "transfer_claimed" | "received" | "reconciled"
+    } = {},
   ) {
     const [v] = await db
       .insert(paymentVirement)
@@ -184,6 +191,17 @@ describe("payments — Stripe card (Story 6.1)", () => {
       rgpdConsentAt: new Date(),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
     })
+    const [admin] = await db
+      .insert(users)
+      .values({
+        email: EMAIL_ADMIN,
+        passwordHash,
+        role: "admin",
+        rgpdConsentAt: new Date(),
+        rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
+      })
+      .returning({ id: users.id })
+    adminId = admin.id
 
     const [addr] = await db
       .insert(addresses)
@@ -242,6 +260,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         .accessToken
     token = await loginAs(EMAIL)
     otherToken = await loginAs(EMAIL_OTHER)
+    adminToken = await loginAs(EMAIL_ADMIN)
   })
 
   afterAll(async () => {
@@ -620,6 +639,300 @@ describe("payments — Stripe card (Story 6.1)", () => {
           url: "/api/payments/virement/00000000-0000-0000-0000-000000000000",
         })
         expect(res.statusCode).toBe(401)
+      })
+    })
+  })
+
+  describe("reconciliation (Story 6.3)", () => {
+    const adminAuth = (token = adminToken) => ({ authorization: `Bearer ${token}` })
+
+    async function freshVirementOrder(reference: string, amountTtc = "1200.00") {
+      const orderId = await insertOrder(userId, [FIREARM_ITEM])
+      const virementId = await insertVirement(orderId, { amountTtc, reference })
+      return { orderId, virementId }
+    }
+
+    describe("POST /api/payments/virement/:id/claim (customer)", () => {
+      it("flips the bucket to transfer_claimed and stores the declaration (200)", async () => {
+        const { orderId, virementId } = await freshVirementOrder("SCS-CLA1-0001")
+
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/payments/virement/${orderId}/claim`,
+          headers: adminAuth(token),
+          payload: { reportedIban: "FR7630006000011234567890189", reportedDate: "2026-06-12", reportedAmount: 1200 },
+        })
+
+        expect(res.statusCode).toBe(200)
+        expect(res.json().data).toMatchObject({ reference: "SCS-CLA1-0001", paymentStatus: "transfer_claimed" })
+        const [row] = await db.select().from(paymentVirement).where(eq(paymentVirement.id, virementId))
+        expect(row.paymentStatus).toBe("transfer_claimed")
+        expect(row.clientReportedIban).toBe("FR7630006000011234567890189")
+        expect(Number(row.clientReportedAmount)).toBeCloseTo(1200, 2)
+        expect(row.clientReportedRef).toBe("SCS-CLA1-0001")
+      })
+
+      it("accepts an empty body (declaration without details)", async () => {
+        const { orderId } = await freshVirementOrder("SCS-CLA2-0002")
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/payments/virement/${orderId}/claim`,
+          headers: adminAuth(token),
+          payload: {},
+        })
+        expect(res.statusCode).toBe(200)
+        expect(res.json().data.paymentStatus).toBe("transfer_claimed")
+      })
+
+      it("returns 404 for an order owned by someone else (no leak)", async () => {
+        const { orderId } = await freshVirementOrder("SCS-CLA3-0003")
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/payments/virement/${orderId}/claim`,
+          headers: adminAuth(otherToken),
+          payload: {},
+        })
+        expect(res.statusCode).toBe(404)
+      })
+
+      it("returns 409 when the transfer is already reconciled", async () => {
+        const orderId = await insertOrder(userId, [FIREARM_ITEM])
+        await insertVirement(orderId, { reference: "SCS-CLA4-0004", status: "reconciled" })
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/payments/virement/${orderId}/claim`,
+          headers: adminAuth(token),
+          payload: {},
+        })
+        expect(res.statusCode).toBe(409)
+        expect(res.json().error).toBe("AlreadyReconciled")
+      })
+
+      it("returns 400 for a card-only order", async () => {
+        const orderId = await insertOrder(userId, [CARD_ITEM])
+        await insertCarte(orderId)
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/payments/virement/${orderId}/claim`,
+          headers: adminAuth(token),
+          payload: {},
+        })
+        expect(res.statusCode).toBe(400)
+        expect(res.json().error).toBe("NoBankTransfer")
+      })
+
+      it("returns 401 without a token", async () => {
+        const res = await app.inject({ method: "POST", url: `/api/payments/virement/${userId}/claim`, payload: {} })
+        expect(res.statusCode).toBe(401)
+      })
+    })
+
+    describe("admin reconciliation routes require the admin role", () => {
+      it("rejects a customer on the queue with 403", async () => {
+        const res = await app.inject({ method: "GET", url: "/api/admin/payments/virements", headers: adminAuth(token) })
+        expect(res.statusCode).toBe(403)
+      })
+
+      it("rejects an unauthenticated caller with 401", async () => {
+        const res = await app.inject({ method: "GET", url: "/api/admin/payments/virements" })
+        expect(res.statusCode).toBe(401)
+      })
+    })
+
+    describe("GET /api/admin/payments/virements (queue)", () => {
+      it("lists outstanding transfers with the order owner and supports the status filter", async () => {
+        await freshVirementOrder("SCS-QUE1-0001")
+
+        const res = await app.inject({
+          method: "GET",
+          url: "/api/admin/payments/virements?status=awaiting_transfer&limit=100",
+          headers: adminAuth(),
+        })
+        expect(res.statusCode).toBe(200)
+        const { data, pagination } = res.json()
+        expect(pagination).toMatchObject({ page: 1, limit: 100 })
+        const mine = data.find((r: { paymentReference: string }) => r.paymentReference === "SCS-QUE1-0001")
+        expect(mine).toBeTruthy()
+        expect(mine.user.email).toBe(EMAIL)
+        expect(mine.paymentStatus).toBe("awaiting_transfer")
+      })
+    })
+
+    describe("GET /api/admin/payments/virements/:id (detail)", () => {
+      it("returns the full reconciliation detail by bucket id (200)", async () => {
+        const { virementId } = await freshVirementOrder("SCS-DET1-0001")
+        const res = await app.inject({
+          method: "GET",
+          url: `/api/admin/payments/virements/${virementId}`,
+          headers: adminAuth(),
+        })
+        expect(res.statusCode).toBe(200)
+        expect(res.json().data).toMatchObject({ id: virementId, paymentReference: "SCS-DET1-0001" })
+      })
+
+      it("returns 404 for an unknown bucket id", async () => {
+        const res = await app.inject({
+          method: "GET",
+          url: "/api/admin/payments/virements/00000000-0000-0000-0000-000000000000",
+          headers: adminAuth(),
+        })
+        expect(res.statusCode).toBe(404)
+      })
+    })
+
+    describe("POST /api/admin/payments/virements/:id/reconcile (manual)", () => {
+      it("settles the bucket, records the receipt and flips the order to received (200)", async () => {
+        const { orderId, virementId } = await freshVirementOrder("SCS-REC1-0001")
+
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/virements/${virementId}/reconcile`,
+          headers: adminAuth(),
+          payload: { amountReceived: 1200, receivedFromIban: "FR761111", receivedAt: "2026-06-12", notes: "ok" },
+        })
+        expect(res.statusCode).toBe(200)
+        expect(res.json().data).toMatchObject({ paymentStatus: "reconciled", amountMatched: true })
+
+        const [row] = await db.select().from(paymentVirement).where(eq(paymentVirement.id, virementId))
+        expect(row.paymentStatus).toBe("reconciled")
+        expect(row.reconciledBy).toBe(adminId)
+        expect(Number(row.amountReceivedTtc)).toBeCloseTo(1200, 2)
+        // virement-only order → settling the bucket settles the order
+        const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+        expect(order.paymentStatus).toBe("received")
+      })
+
+      it("settles but flags amountMatched=false on an amount mismatch", async () => {
+        const { virementId } = await freshVirementOrder("SCS-REC2-0002")
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/virements/${virementId}/reconcile`,
+          headers: adminAuth(),
+          payload: { amountReceived: 999.99 },
+        })
+        expect(res.statusCode).toBe(200)
+        expect(res.json().data).toMatchObject({ paymentStatus: "reconciled", amountMatched: false })
+      })
+
+      it("returns 409 when the bucket is already reconciled", async () => {
+        const orderId = await insertOrder(userId, [FIREARM_ITEM])
+        const virementId = await insertVirement(orderId, { reference: "SCS-REC3-0003", status: "reconciled" })
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/virements/${virementId}/reconcile`,
+          headers: adminAuth(),
+          payload: { amountReceived: 1200 },
+        })
+        expect(res.statusCode).toBe(409)
+        expect(res.json().error).toBe("AlreadyReconciled")
+      })
+
+      it("returns 404 for an unknown bucket id", async () => {
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/admin/payments/virements/00000000-0000-0000-0000-000000000000/reconcile",
+          headers: adminAuth(),
+          payload: { amountReceived: 1200 },
+        })
+        expect(res.statusCode).toBe(404)
+      })
+
+      it("returns 400 on an invalid amount", async () => {
+        const { virementId } = await freshVirementOrder("SCS-REC4-0004")
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/virements/${virementId}/reconcile`,
+          headers: adminAuth(),
+          payload: { amountReceived: -5 },
+        })
+        expect(res.statusCode).toBe(400)
+      })
+    })
+
+    describe("POST /api/admin/payments/import (CSV)", () => {
+      it("auto-reconciles a matching credit and reports the outcome", async () => {
+        const { orderId, virementId } = await freshVirementOrder("SCS-CSV1-0001", "1200.00")
+        const csv = [
+          "Date;Libellé;Montant;IBAN",
+          "2026-06-12;VIR SEPA SCS-CSV1-0001 JEAN TIREUR;1 200,00;FR761111",
+        ].join("\n")
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/admin/payments/import",
+          headers: adminAuth(),
+          payload: { csv },
+        })
+        expect(res.statusCode).toBe(200)
+        const { data } = res.json()
+        expect(data).toMatchObject({ total: 1, reconciled: 1, needsReview: 0 })
+        expect(data.lines[0]).toMatchObject({ outcome: "reconciled", reference: "SCS-CSV1-0001", virementId })
+
+        const [row] = await db.select().from(paymentVirement).where(eq(paymentVirement.id, virementId))
+        expect(row.paymentStatus).toBe("reconciled")
+        expect(row.receivedFromIban).toBe("FR761111")
+        const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+        expect(order.paymentStatus).toBe("received")
+      })
+
+      it("flags an amount mismatch for manual review instead of settling", async () => {
+        const { virementId } = await freshVirementOrder("SCS-CSV2-0002", "1200.00")
+        const csv = ["Libellé;Montant", "VIR SCS-CSV2-0002;1 100,00"].join("\n")
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/admin/payments/import",
+          headers: adminAuth(),
+          payload: { csv },
+        })
+        expect(res.statusCode).toBe(200)
+        const { data } = res.json()
+        expect(data).toMatchObject({ reconciled: 0, needsReview: 1 })
+        expect(data.lines[0]).toMatchObject({ outcome: "amount_mismatch", amountExpectedTtc: "1200.00" })
+        const [row] = await db.select().from(paymentVirement).where(eq(paymentVirement.id, virementId))
+        expect(row.paymentStatus).toBe("awaiting_transfer") // untouched
+      })
+
+      it("classifies unknown references, missing references and debits", async () => {
+        const csv = [
+          "Libellé;Montant",
+          "VIR SCS-ZZZZ-ZZZZ INCONNU;1 200,00",
+          "ACHAT CARTE SANS REF;50,00",
+          "VIR SCS-CSV3-0003 REMBOURSEMENT;-30,00",
+        ].join("\n")
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/admin/payments/import",
+          headers: adminAuth(),
+          payload: { csv },
+        })
+        expect(res.statusCode).toBe(200)
+        const outcomes = res.json().data.lines.map((l: { outcome: string }) => l.outcome)
+        expect(outcomes).toEqual(["unknown_reference", "no_reference", "not_a_credit"])
+      })
+
+      it("is idempotent: re-importing a settled statement reconciles nothing new", async () => {
+        await freshVirementOrder("SCS-CSV4-0004", "1200.00")
+        const csv = ["Libellé;Montant", "VIR SCS-CSV4-0004;1 200,00"].join("\n")
+        const inject = () =>
+          app.inject({ method: "POST", url: "/api/admin/payments/import", headers: adminAuth(), payload: { csv } })
+
+        expect((await inject()).json().data.reconciled).toBe(1)
+        const second = (await inject()).json().data
+        expect(second.reconciled).toBe(0)
+        expect(second.lines[0].outcome).toBe("unknown_reference") // ref no longer outstanding
+      })
+
+      it("returns 400 on an unparseable statement", async () => {
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/admin/payments/import",
+          headers: adminAuth(),
+          payload: { csv: "foo;bar\n1;2" },
+        })
+        expect(res.statusCode).toBe(400)
+        expect(res.json().error).toBe("InvalidStatement")
       })
     })
   })
