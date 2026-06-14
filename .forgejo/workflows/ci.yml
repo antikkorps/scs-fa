@@ -13,14 +13,15 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      postgres:
+      # Named `testdb` (not `postgres`) to avoid colliding with any pre-existing
+      # `postgres` host on the runner network. Trust auth + no password in the URL
+      # means a connection by the armurier role is accepted no matter what — the
+      # CI database is ephemeral and isolated.
+      testdb:
         image: postgres:17-alpine
         env:
           POSTGRES_USER: armurier
-          POSTGRES_PASSWORD: armurier_test_password
           POSTGRES_DB: armurier_test
-          # Ephemeral, isolated CI database: accept any password so a credential
-          # mismatch between the runner env and the job env can't fail the suite.
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
@@ -34,10 +35,17 @@ jobs:
       # The suite runs against the CI Postgres directly: the schema is created by
       # `drizzle-kit push` (below) and TEST_DB_SKIP_PROVISION makes the vitest
       # global setup seed it without trying to clone a local dev DB via docker.
-      DATABASE_URL: postgresql://armurier:armurier_test_password@postgres:5432/armurier_test
-      TEST_DATABASE_URL: postgresql://armurier:armurier_test_password@postgres:5432/armurier_test
+      DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
+      TEST_DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
       TEST_DB_SKIP_PROVISION: "true"
       STORAGE_DRIVER: memory
+      # Neutralise any PG* the runner injects globally (it also runs Renovate),
+      # so nothing can redirect a connection at another database.
+      PGHOST: testdb
+      PGPORT: "5432"
+      PGUSER: armurier
+      PGDATABASE: armurier_test
+      PGPASSWORD: ""
       # All other vars are required by env.ts; safe dummies — tests make no
       # external calls (Stripe is mocked, storage is in-memory, no mail is sent).
       JWT_SECRET: ci_jwt_secret_at_least_32_characters_long
@@ -76,6 +84,15 @@ jobs:
 
       - name: Typecheck
         run: pnpm -r typecheck
+
+      - name: DB connectivity probe
+        run: |
+          echo "== PG/DB env injected into the job =="
+          env | grep -iE '^(PG|POSTGRES|DATABASE_URL|TEST_DATABASE_URL)=' | sed -E 's/(PASS|PASSWORD)=.*/\1=***/' || echo "(none)"
+          echo "== resolve testdb =="
+          getent hosts testdb || echo "(testdb not in /etc/hosts via getent)"
+          echo "== connect probe =="
+          pnpm --filter @armurier/api exec node -e "const pg=require('pg');(async()=>{const c=new pg.Client(process.env.DATABASE_URL);await c.connect();const r=await c.query('select current_user, current_database(), inet_server_addr() as host');console.log('CONNECTED', r.rows[0]);await c.end()})().catch(e=>{console.error('CONN FAIL', e.code, e.message);process.exit(1)})"
 
       - name: Apply database schema
         run: pnpm --filter @armurier/api exec drizzle-kit push --force
