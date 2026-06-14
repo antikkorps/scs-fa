@@ -67,6 +67,27 @@ export interface RefundRow {
   createdAt: string
 }
 
+export interface PaymentCarte {
+  id: string
+  amountTtc: string
+  currency: string | null
+  paymentStatus: string
+  stripePaymentIntentId: string | null
+  last4: string | null
+  brand: string | null
+}
+
+export interface PaymentVirement {
+  id: string
+  amountExpectedTtc: string
+  amountReceivedTtc: string | null
+  currency: string | null
+  paymentReference: string | null
+  paymentStatus: string
+  receivedFromIban: string | null
+  reconciliationNotes: string | null
+}
+
 export interface AdminOrderDetail {
   id: string
   createdAt: string
@@ -83,10 +104,49 @@ export interface AdminOrderDetail {
   billingAddress: AddressSnapshot | null
   user: OrderCustomer
   payment: {
-    carte: Record<string, unknown> | null
-    virement: Record<string, unknown> | null
+    carte: PaymentCarte | null
+    virement: PaymentVirement | null
     refunds: RefundRow[]
   }
+}
+
+// Story 6.3/6.4 admin payment actions
+export interface VirementRow {
+  id: string
+  orderId: string
+  amountExpectedTtc: string
+  amountReceivedTtc: string | null
+  currency: string | null
+  paymentReference: string | null
+  paymentStatus: string
+  clientReportedIban: string | null
+  clientReportedDate: string | null
+  clientReportedAmount: string | null
+  clientReportedRef: string | null
+  clientNotes: string | null
+  receivedAt: string | null
+  receivedFromIban: string | null
+  reconciledAt: string | null
+  reconciliationNotes: string | null
+  createdAt: string
+  user: OrderCustomer
+}
+
+export interface BankImportLine {
+  label: string
+  amount: number
+  reference: string | null
+  outcome: "reconciled" | "amount_mismatch" | "unknown_reference" | "no_reference" | "not_a_credit"
+  orderId?: string
+  virementId?: string
+  amountExpectedTtc?: string
+}
+
+export interface BankImportReport {
+  total: number
+  reconciled: number
+  needsReview: number
+  lines: BankImportLine[]
 }
 
 export interface OrdersSummary {

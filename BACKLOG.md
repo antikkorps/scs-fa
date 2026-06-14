@@ -296,7 +296,15 @@
 - [x] Smoke réel : endpoint sur serveur live → `netTtc 240 / commission 12 (=5%) / conversion 100% / timeseries`; page guardée (302). Suite complète au vert (**259 API, 51 shared, 8 web**), typecheck + Biome OK
 - Reco suivi : **base de test séparée** — tests et dev partagent un Postgres ; `sla.test` doit posséder l'ensemble global des admins (le check notifie *tous* les admins), ce qui supprime l'admin démo seedé à chaque run (re-seed idempotent nécessaire). Une DB de test dédiée éliminerait ce couplage (à cadrer Phase 8 infra)
 
-**PHASE 7 — COMPLÈTE** (7.1 dashboard admin, 7.2 logs+alerting, 7.3 métriques+commission)
+**Story 7.4** — Backoffice : actions paiement (réconciliation + remboursement) ✅
+
+- [x] **Remboursement depuis le détail commande** (`/admin/orders/[id]`) : calcul du **remboursable par canal** (montant payé − remboursements `pending`/`succeeded` déjà enregistrés ; le backend applique le même plafond), bouton « Rembourser » → modal (canal limité aux canaux payés, montant ≤ remboursable, motif) → `POST /api/admin/payments/orders/:id/refunds` → refresh. Types paiement affinés (`PaymentCarte`/`PaymentVirement` au lieu de `Record<string,unknown>`)
+- [x] **Page file de réconciliation virements** (`/admin/payments/virements`, miroir de la file docs) : onglets de statut (En attente / Déclarés / Rapprochés / Tous), tableau (référence, client + date déclarée, attendu/reçu, statut), pagination ; drawer détail montrant les **infos déclarées par le client** (IBAN/date/montant/note) + formulaire **Marquer reçu & rapprocher** (montant reçu pré-rempli à l'attendu, IBAN émetteur, note) → `POST .../virements/:id/reconcile` ; lecture seule si déjà rapproché
+- [x] **Import CSV** intégré (panneau dépliable) : textarea → `POST /api/admin/payments/import` → rapport inline (rapprochées / à revoir + libellé d'`outcome` par ligne) ; lien « Virements » ajouté à la nav admin
+- [x] Front-only (les API 6.3/6.4 existaient) ; smoke réel sur serveur live : **réconciliation → virement `reconciled` + commande `received`** (cascade), **remboursement virement → `partially_refunded`** ; pages guardées (302). Suite complète au vert (**259 API, 51 shared, 8 web**), typecheck (shared/api/web) + Biome OK
+- Correctif IDE : `import process from "node:process"` dans `vitest.config.ts` (fichier hors `include` tsconfig → le global `process` n'était pas typé pour l'éditeur)
+
+**PHASE 7 — COMPLÈTE** (7.1 dashboard admin, 7.2 logs+alerting, 7.3 métriques+commission, 7.4 actions paiement UI)
 
 ## PHASE 8 — Mise en prod
 
