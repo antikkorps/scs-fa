@@ -6,6 +6,7 @@ import {
   LEGAL_DOC_TYPES,
   LEGAL_DOC_VERIFICATION_STATUS,
 } from "./constants.js"
+import { REFUND_CHANNELS } from "./orders.js"
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
@@ -275,6 +276,20 @@ export const importBankStatementSchema = z
   .strict()
 
 export type ImportBankStatementInput = z.infer<typeof importBankStatementSchema>
+
+// Story 6.4 — admin issues a refund on a paid order, per channel (card/transfer).
+// `amount` is the gross (TTC) amount to return; the service caps it at what is
+// still refundable on that channel.
+export const createRefundSchema = z
+  .object({
+    channel: z.enum(REFUND_CHANNELS),
+    amount: moneyAmountSchema,
+    reason: z.string().trim().min(1).max(255).optional(),
+    notes: z.string().trim().max(1000).optional(),
+  })
+  .strict()
+
+export type CreateRefundInput = z.infer<typeof createRefundSchema>
 
 // Backwards-compatible alias used by the product detail route
 export const productIdParamSchema = uuidParamSchema

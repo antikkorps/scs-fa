@@ -22,6 +22,11 @@ export function retrievePaymentIntent(id: string): Promise<Stripe.PaymentIntent>
   return client().paymentIntents.retrieve(id)
 }
 
+/** Issue a refund against a PaymentIntent (full when `amount` is omitted, else partial, in cents). */
+export function createRefund(params: Stripe.RefundCreateParams): Promise<Stripe.Refund> {
+  return client().refunds.create(params)
+}
+
 /** Verify a webhook payload's signature and return the parsed event. Throws on a bad signature. */
 export function constructWebhookEvent(payload: Buffer, signature: string): Stripe.Event {
   return client().webhooks.constructEvent(payload, signature, env.STRIPE_WEBHOOK_SECRET)

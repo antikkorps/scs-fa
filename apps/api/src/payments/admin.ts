@@ -1,4 +1,5 @@
 import {
+  createRefundSchema,
   importBankStatementSchema,
   reconcileVirementSchema,
   uuidParamSchema,
@@ -6,12 +7,16 @@ import {
 } from "@armurier/shared"
 import { asc, count, eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { z } from "zod"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { orders, paymentVirement, users } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { createOrderRefund, listOrderRefunds } from "./refunds.js"
 import { importBankStatement, PaymentError, reconcileVirementManually } from "./service.js"
+
+const orderIdParamSchema = z.object({ orderId: z.string().uuid() })
 
 // Reconciliation-facing columns of a bank-transfer bucket, joined to the order's
 // owner so the admin sees who is waiting on the transfer.
@@ -138,5 +143,37 @@ export const adminPaymentRoutes: FastifyPluginAsync = async (fastify) => {
       }
       throw err
     }
+  })
+
+  // POST /api/admin/payments/orders/:orderId/refunds — issue a refund (Story 6.4)
+  fastify.post("/orders/:orderId/refunds", async (request, reply) => {
+    const params = orderIdParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const body = createRefundSchema.safeParse(request.body)
+    if (!body.success) {
+      return reply.code(400).send(validationError(body.error.issues))
+    }
+
+    try {
+      const result = await createOrderRefund(params.data.orderId, body.data, request.user.sub)
+      return reply.code(201).send({ data: result })
+    } catch (err) {
+      if (err instanceof PaymentError) {
+        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message })
+      }
+      throw err
+    }
+  })
+
+  // GET /api/admin/payments/orders/:orderId/refunds — refund history for an order
+  fastify.get("/orders/:orderId/refunds", async (request, reply) => {
+    const params = orderIdParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const rows = await listOrderRefunds(params.data.orderId)
+    return reply.code(200).send({ data: rows })
   })
 }

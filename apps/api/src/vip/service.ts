@@ -4,19 +4,22 @@ import { db } from "../db/client.js"
 import { orders, users } from "../db/schema.js"
 
 /**
- * Recompute a user's VIP status.
+ * Recompute a user's VIP status from scratch.
  *
- * A user becomes VIP (unlimited, no expiry) once they have a **paid** order
+ * A user is VIP (unlimited, no expiry) when they have a **paid** order
  * containing at least one **new firearm** (legal category B/C/D, not
- * second-hand/antique). Idempotent: once VIP, stays VIP.
+ * second-hand/antique). Bidirectional and idempotent: it grants VIP when an
+ * eligible paid order exists and **revokes** it when none does — a full refund
+ * (Story 6.4) drops the order out of `PAID_PAYMENT_STATUSES`, so the user loses
+ * VIP if it was their only qualifying purchase. A partial refund keeps the order
+ * paid, so VIP stands. Already-correct state is left untouched (the original
+ * `vipEligibleSince` is preserved rather than re-stamped).
  *
- * Intended to be called on payment confirmation (Phase 6). Returns whether the
- * user is VIP after the check.
+ * Called on payment confirmation and on refund. Returns the resulting status.
  */
 export async function recomputeVipStatus(userId: string): Promise<boolean> {
   const [user] = await db.select({ vipActive: users.vipActive }).from(users).where(eq(users.id, userId)).limit(1)
   if (!user) return false
-  if (user.vipActive) return true
 
   const userOrders = await db
     .select({
@@ -38,16 +41,16 @@ export async function recomputeVipStatus(userId: string): Promise<boolean> {
     }
   }
 
-  if (!eligibleSince) return false
+  const shouldBeVip = eligibleSince !== null
+  if (shouldBeVip === user.vipActive) return shouldBeVip // no transition — leave state as-is
 
   await db
     .update(users)
-    .set({
-      vipActive: true,
-      vipStatus: "premium",
-      vipEligibleSince: eligibleSince,
-      updatedAt: new Date(),
-    })
+    .set(
+      shouldBeVip
+        ? { vipActive: true, vipStatus: "premium", vipEligibleSince: eligibleSince, updatedAt: new Date() }
+        : { vipActive: false, vipStatus: null, vipEligibleSince: null, updatedAt: new Date() },
+    )
     .where(eq(users.id, userId))
-  return true
+  return shouldBeVip
 }
