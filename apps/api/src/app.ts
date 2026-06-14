@@ -14,6 +14,7 @@ import { legalCategoryRoutes } from "./legal-categories/index.js"
 import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
+import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
 import { adminOrderRoutes } from "./orders/admin.js"
 import { orderRoutes } from "./orders/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
@@ -22,18 +23,13 @@ import { productRoutes } from "./products/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
-    logger: {
-      level: env.NODE_ENV === "production" ? "info" : env.NODE_ENV === "test" ? "silent" : "debug",
-      transport:
-        env.NODE_ENV === "development"
-          ? {
-              target: "pino-pretty",
-              options: { translateTime: "HH:MM:ss", ignore: "pid,hostname" },
-            }
-          : undefined,
-    },
+    logger: buildLoggerOptions(env),
+    genReqId: (req) => genReqId(req),
     trustProxy: env.NODE_ENV === "production",
   })
+
+  // Centralised error handling + throttled admin alerting on 5xx (Story 7.2).
+  setupErrorAlerting(fastify, env)
 
   await fastify.register(fastifyHelmet, {
     contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,

@@ -107,6 +107,42 @@ export async function sendLegalDocSlaBreachEmail(to: string[], breaches: SlaBrea
   })
 }
 
+export type ErrorAlertItem = {
+  signature: string
+  statusCode: number
+  method: string
+  url: string
+  reqId: string
+  message: string
+  stack?: string
+}
+
+/**
+ * Internal alert sent to admins when the API returns a server error (5xx).
+ * Throttled per error signature upstream (see logging/alerting.ts) so this is at
+ * most one mail per distinct failure per cooldown window. Best-effort.
+ */
+export async function sendErrorAlertEmail(to: string[], item: ErrorAlertItem): Promise<void> {
+  if (to.length === 0) return
+
+  const summary = `${item.method} ${item.url} → ${item.statusCode}`
+  const stackText = item.stack ? `\n\nStack:\n${item.stack}` : ""
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: `[API error] ${item.statusCode} on ${item.method} ${item.url}`,
+    text:
+      `A server error occurred.\n\n${summary}\nRequest id: ${item.reqId}\nError: ${item.message}` +
+      `${stackText}\n\n(Further occurrences of this error are throttled.)`,
+    html:
+      `<p>A server error occurred.</p>` +
+      `<p><strong>${escapeHtml(summary)}</strong><br/>Request id: <code>${escapeHtml(item.reqId)}</code></p>` +
+      `<p>Error: ${escapeHtml(item.message)}</p>` +
+      (item.stack ? `<pre>${escapeHtml(item.stack)}</pre>` : "") +
+      `<p><em>Further occurrences of this error are throttled.</em></p>`,
+  })
+}
+
 export async function sendLegalDocRejectedEmail(
   to: string,
   doc: { docType: LegalDocType; reason: LegalDocRejectionReason; notes?: string | null },
