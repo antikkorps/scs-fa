@@ -1,0 +1,20 @@
+# Keep the build context small and never ship local/dev artefacts or secrets.
+**/node_modules
+.git
+.gitea
+.forgejo
+**/dist
+**/.nuxt
+**/.output
+**/.nitro
+**/.cache
+**/.pnpm-store
+**/coverage
+**/*.log
+**/.DS_Store
+.vscode
+.idea
+# Secrets — only .env.example may ship, real envs are injected at runtime.
+**/.env
+**/.env.*
+!**/.env.example
