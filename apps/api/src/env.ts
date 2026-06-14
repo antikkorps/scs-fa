@@ -64,6 +64,10 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
+
+  // Partner commission rate (Story 7.3). Shown transparently on the admin metrics
+  // dashboard as the partner's share of net revenue. Percent, default 5%.
+  COMMISSION_RATE_PCT: z.coerce.number().min(0).max(100).default(5),
 })
 
 export const env = envSchema.parse(process.env)

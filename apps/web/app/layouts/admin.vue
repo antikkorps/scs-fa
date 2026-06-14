@@ -5,6 +5,7 @@ const nav = [
   { to: "/admin", label: "Tableau de bord", icon: "▤", exact: true },
   { to: "/admin/orders", label: "Commandes", icon: "▦" },
   { to: "/admin/legal-docs", label: "Documents", icon: "▣" },
+  { to: "/admin/metrics", label: "Métriques", icon: "▥" },
 ]
 
 const mobileOpen = ref(false)

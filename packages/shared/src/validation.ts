@@ -302,6 +302,20 @@ export const adminOrderQuerySchema = z.object({
 
 export type AdminOrderQuery = z.infer<typeof adminOrderQuerySchema>
 
+// Story 7.3 — admin metrics period. ISO dates (YYYY-MM-DD); both optional, the
+// route defaults to a trailing window and enforces from <= to.
+export const adminMetricsQuerySchema = z
+  .object({
+    from: isoDateSchema.optional(),
+    to: isoDateSchema.optional(),
+  })
+  .refine((d) => d.from === undefined || d.to === undefined || d.from <= d.to, {
+    message: "from must be on or before to",
+    path: ["from"],
+  })
+
+export type AdminMetricsQuery = z.infer<typeof adminMetricsQuerySchema>
+
 // Backwards-compatible alias used by the product detail route
 export const productIdParamSchema = uuidParamSchema
 
