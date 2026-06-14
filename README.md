@@ -58,6 +58,19 @@ pnpm dev:web
 | `pnpm db:studio`      | Drizzle Studio web UI                                      |
 | `pnpm docker:up/down` | Dev Postgres lifecycle                                     |
 
+## CI
+
+`.forgejo/workflows/ci.yml` runs Biome, typecheck and the full test suite on every
+pull request and on pushes to `main` (Forgejo Actions — requires a registered
+`forgejo-runner` with the Docker backend). It spins up a Postgres service, creates the schema with
+`drizzle-kit push --force` (schema.ts is the source of truth — no migration
+baseline), then runs the tests against it with `TEST_DB_SKIP_PROVISION=true` so
+the vitest global setup seeds the CI database instead of cloning a local dev one.
+
+Locally, tests auto-provision a throwaway `armurier_test` database (cloned from
+`armurier_dev`) — see `apps/api/src/test/global-setup.ts` — so they never touch
+dev data. Run the same gate locally with `pnpm verify`.
+
 ## Structure
 
 ```

@@ -7,6 +7,16 @@
     "minimumReleaseAge": "0 days",
     "labels": ["security"]
   },
+  "customManagers": [
+    {
+      "description": "Keep the biome.json $schema URL in sync with the @biomejs/biome version",
+      "customType": "regex",
+      "managerFilePatterns": ["biome.json"],
+      "matchStrings": ["https://biomejs\\.dev/schemas/(?<currentValue>[^/\"]+)/schema\\.json"],
+      "depNameTemplate": "@biomejs/biome",
+      "datasourceTemplate": "npm"
+    }
+  ],
   "packageRules": [
     {
       "description": "Group non-major npm updates into a single PR per ecosystem",
