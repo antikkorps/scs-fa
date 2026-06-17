@@ -339,7 +339,14 @@
 - [x] **Domaine réel corrigé** : les références périmées `armurier.fr` (CORS `app.ts`, URLs d'emails reset + file admin dans `email.ts`) remplacées par une variable **`WEB_BASE_URL`** (`env.ts`, défaut `https://www.scs-firearms.com`, documentée `.env.example`)
 - [x] **Vérifié** : `caddy validate` → *Valid configuration* (auto HTTP→HTTPS confirmé), `caddy fmt` ; suite API au vert (**259 tests**) après migration CORS/email, typecheck OK
 - Note : les noms de service `api`/`web` résolvent sur le réseau du compose prod (Story 8.3, qui fournira `DOMAIN`/`ACME_EMAIL`/`WEB_BASE_URL`/`SITE_URL`/`NUXT_PUBLIC_API_BASE`)
-**Story 8.3** — docker-compose.prod.yml + déploiement Hetzner
+**Story 8.3** — docker-compose.prod.yml + déploiement Hetzner ✅
+
+- [x] `docker-compose.prod.yml` : stack complète **Postgres + API + Web + Caddy** sur un réseau privé `internal` ; **seul Caddy publie** 80/443 (+ 443/udp HTTP/3), tout le reste joignable par nom de service. `api`/`web` buildés depuis leurs Dockerfiles (contexte = racine), `depends_on` avec `condition: service_healthy` sur Postgres. Volumes nommés persistants : `postgres_data` (DB) + `caddy_data` (certs/ACME)
+- [x] **Source unique de secrets** : `.env` (copié de `.env.prod.example`) lu **deux fois** — interpolation compose `${VAR}` (postgres/web/caddy) **et** injecté dans le conteneur API via `env_file`. `DATABASE_URL` posé par compose vers le service `postgres` (donc absent de l'exemple) ; web câblé en single-origin via `NUXT_PUBLIC_API_BASE`/`NUXT_PUBLIC_SITE_URL` (surcharge runtime de `runtimeConfig.public`)
+- [x] **Schéma prod** : service `migrate` gated par profil (`--profile migrate`) buildant le **stage build** de l'API (qui a `drizzle-kit` en devDep, absent de l'image runtime prod-only) → `drizzle-kit push --force` (schema.ts = source de vérité, pas de baseline). Seed via `exec api tsx src/db/seed-cli.ts`
+- [x] Guide `docs/DEPLOY.md` : provisioning VM Hetzner (ufw 22/80/443, user `deploy`, Docker), DNS apex+www, déploiement first-boot (migrate → up --build → seed), updates, ops (logs/psql/restart), gotchas (staging ACME, volumes persistants)
+- [x] **Vérifié** : `docker compose config` OK pour le up par défaut **et** le profil migrate ; `.env` bien gitignoré (`.env.prod.example` suivi), seul Caddy expose des ports
+- Note : backups Postgres = Story 8.4, monitoring uptime = Story 8.5 ; en attendant, snapshot VM Hetzner avant changement risqué
 **Story 8.4** — Backups Postgres automatisés
 **Story 8.5** — Monitoring uptime + alertes
 **Story 8.6** — Pentest interne avant mise en ligne
