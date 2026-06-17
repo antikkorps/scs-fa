@@ -104,9 +104,38 @@ docker compose -f docker-compose.prod.yml exec postgres psql -U armurier -d armu
 
 **Persistent state** lives in named volumes: `postgres_data` (the database) and
 `caddy_data` (TLS certs + ACME account — losing it re-issues certs and can hit
-rate limits). Automated Postgres backups are **Story 8.4**; uptime monitoring is
-**Story 8.5**. Until then, snapshot the VM from the Hetzner console before risky
-changes.
+rate limits). Snapshot the VM from the Hetzner console before risky changes;
+uptime monitoring is **Story 8.5**.
+
+## 6. Backups (automated)
+
+The `backup` service runs `pg_dump` on a cron schedule (default **03:00 UTC
+daily**) and uploads a compressed custom-format dump to S3 — off-site, separate
+from the VM. It reuses the app's `S3_*` credentials and keeps the newest
+`BACKUP_RETENTION_COUNT` dumps (default 14), pruning older ones. Tunables live in
+`.env` (`BACKUP_CRON`, `BACKUP_RETENTION_COUNT`, `BACKUP_S3_PREFIX`, optional
+`BACKUP_S3_BUCKET`). It starts with the stack — no extra step.
+
+```bash
+# On-demand backup (same path the cron uses)
+docker compose -f docker-compose.prod.yml run --rm backup backup.sh
+
+# List dumps in the bucket
+docker compose -f docker-compose.prod.yml run --rm backup \
+  sh -c 'aws --endpoint-url "$S3_ENDPOINT" --region "$S3_REGION" s3 ls "s3://$S3_BUCKET/$BACKUP_S3_PREFIX/"'
+
+# Restore — latest, or a named dump. DESTRUCTIVE (pg_restore --clean).
+docker compose -f docker-compose.prod.yml run --rm backup restore.sh
+docker compose -f docker-compose.prod.yml run --rm backup restore.sh armurier_prod_20260617T030000Z.dump
+```
+
+Verify scheduling and the last run in the logs: `docker compose -f
+docker-compose.prod.yml logs -f backup`. **Test a restore periodically** — a
+backup you've never restored is a hypothesis, not a backup.
+
+> The dump contains customer PII. The bucket should be private with scoped
+> credentials; consider enabling object-lock/versioning and, for extra
+> defence-in-depth, at-rest encryption (e.g. SSE) on the backup bucket.
 
 ## Notes / gotchas
 

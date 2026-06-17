@@ -347,7 +347,14 @@
 - [x] Guide `docs/DEPLOY.md` : provisioning VM Hetzner (ufw 22/80/443, user `deploy`, Docker), DNS apex+www, déploiement first-boot (migrate → up --build → seed), updates, ops (logs/psql/restart), gotchas (staging ACME, volumes persistants)
 - [x] **Vérifié** : `docker compose config` OK pour le up par défaut **et** le profil migrate ; `.env` bien gitignoré (`.env.prod.example` suivi), seul Caddy expose des ports
 - Note : backups Postgres = Story 8.4, monitoring uptime = Story 8.5 ; en attendant, snapshot VM Hetzner avant changement risqué
-**Story 8.4** — Backups Postgres automatisés
+**Story 8.4** — Backups Postgres automatisés ✅
+
+- [x] Service `backup` (sidecar `postgres:17-alpine` + `aws-cli`, `infra/backup/`) ajouté au compose prod : **`pg_dump -Fc -Z9` planifié par cron** (défaut `0 3 * * *` UTC) → upload **off-site vers S3** (réutilise les credentials `S3_*` Scaleway de l'app, mappés en `AWS_*`). Démarre avec la stack (`restart: unless-stopped`), healthcheck `pgrep crond`
+- [x] **Rotation** par rétention : conserve les `BACKUP_RETENTION_COUNT` derniers dumps (défaut 14), purge les plus anciens (noms horodatés `YYYYMMDDTHHMMSSZ` → tri lexical = chronologique ; `sort -r | tail -n +N` portable busybox)
+- [x] **Restore** (`restore.sh`) : dernier dump auto-détecté ou fichier nommé, `pg_restore --clean --if-exists --no-owner`. On-demand : `docker compose run --rm backup backup.sh|restore.sh`
+- [x] Piège busybox crond résolu : les jobs cron tournent avec un **env vide** → l'entrypoint persiste l'environnement (`export -p > /etc/backup.env`) que les scripts sourcent ; sortie des jobs redirigée vers `/proc/1/fd/*` (crond = PID 1) pour apparaître dans `docker logs`
+- [x] **Vérifié en réel e2e** (Postgres + MinIO éphémères) : build image OK (pg_dump 17.10, aws-cli 2.34), 3 backups avec rétention=2 → 2 conservés + le plus ancien purgé, puis **drop table → restore → données récupérées**. Vars documentées (`.env.prod.example`) + procédure complète (`docs/DEPLOY.md` §6, avec note PII/chiffrement bucket)
+- Note : dump = PII clients → bucket privé à credentials scopés ; object-lock/versioning + SSE recommandés (defence-in-depth)
 **Story 8.5** — Monitoring uptime + alertes
 **Story 8.6** — Pentest interne avant mise en ligne
 
