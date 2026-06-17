@@ -85,6 +85,35 @@ services:
       - api
     networks: [internal]
 
+  # Automated logical backups: pg_dump on a cron schedule → S3 (off-site), with
+  # rotation. Reuses the app's S3 credentials. On-demand:
+  #   docker compose -f docker-compose.prod.yml run --rm backup backup.sh
+  #   docker compose -f docker-compose.prod.yml run --rm backup restore.sh [file]
+  backup:
+    build:
+      context: ./infra/backup
+    image: scs-backup:latest
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-armurier}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PGDATABASE: ${POSTGRES_DB:-armurier_prod}
+      # aws-cli reads the standard AWS_* names; map the app's S3_* secrets.
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION}
+      # Defaults to the app bucket; override BACKUP_S3_BUCKET for a separate one.
+      S3_BUCKET: ${BACKUP_S3_BUCKET:-${S3_BUCKET}}
+      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-backups/postgres}
+      BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
+      RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
