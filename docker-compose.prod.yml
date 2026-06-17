@@ -1,0 +1,114 @@
+# Production stack — Postgres + API + Web + Caddy, on a single private network.
+# Only Caddy is published (80/443); everything else is reachable only by service
+# name on the internal network. Caddy terminates TLS and routes /api → api:8080,
+# everything else → web:3000 (see Caddyfile) — one public origin, no browser CORS.
+#
+# Setup:  cp .env.prod.example .env  &&  edit .env  (secrets + DOMAIN + ACME_EMAIL)
+# Schema: docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
+# Up:     docker compose -f docker-compose.prod.yml up -d --build
+# Seed:   docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/db/seed-cli.ts
+#
+# Compose interpolation (${VAR}) reads the project-dir `.env`; the API also loads
+# that same file via env_file, so there is a single source of truth for secrets.
+
+name: scs-firearm
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-armurier}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-armurier_prod}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-armurier} -d ${POSTGRES_DB:-armurier_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  # One-off schema push (drizzle-kit lives in dev deps → use the build stage,
+  # which has the full workspace). Gated behind the `migrate` profile so it never
+  # runs on a normal `up`. `schema.ts` is the source of truth (no migration
+  # baseline yet — see BACKLOG); --force applies without interactive prompts.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    profiles: ["migrate"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-armurier}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-armurier_prod}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["pnpm", "--filter", "@armurier/api", "exec", "drizzle-kit", "push", "--force"]
+    networks: [internal]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: scs-api:latest
+    restart: unless-stopped
+    # All API secrets (JWT, S3, SMTP, Stripe, RIB, admin seed…) come from .env.
+    env_file: [.env]
+    # These override .env to wire the API to the in-network services + prod mode.
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: 8080
+      DATABASE_URL: postgresql://${POSTGRES_USER:-armurier}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-armurier_prod}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: scs-web:latest
+    restart: unless-stopped
+    # Nuxt runtimeConfig.public is overridable at runtime via NUXT_PUBLIC_*.
+    # Single origin → the front talks to the API at https://www.DOMAIN/api.
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      NUXT_PUBLIC_API_BASE: https://www.${DOMAIN:?set DOMAIN in .env}/api
+      NUXT_PUBLIC_SITE_URL: https://www.${DOMAIN}
+    depends_on:
+      - api
+    networks: [internal]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 (QUIC)
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificates + ACME account — must persist
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+    networks: [internal]
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    driver: bridge
