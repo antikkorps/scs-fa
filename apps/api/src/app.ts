@@ -50,7 +50,10 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await fastify.register(fastifyJwt, {
     secret: env.JWT_SECRET,
-    sign: { expiresIn: env.JWT_EXPIRES_IN },
+    // Pin the algorithm on both sign and verify so a token can never be accepted
+    // under an unexpected algorithm (defence-in-depth vs. alg-confusion).
+    sign: { algorithm: "HS256", expiresIn: env.JWT_EXPIRES_IN },
+    verify: { algorithms: ["HS256"] },
   })
 
   await fastify.register(fastifyMultipart, {

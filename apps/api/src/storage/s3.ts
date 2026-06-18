@@ -44,9 +44,24 @@ export class S3StorageService implements StorageService {
   }
 
   async getUrl(key: string, options?: GetUrlOptions): Promise<string> {
-    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
-      expiresIn: options?.expiresInSeconds ?? DEFAULT_GET_URL_TTL_SECONDS,
-    })
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        // Force a download instead of inline rendering — defence-in-depth so a
+        // file that ever slips past type checks can't execute in the browser.
+        ResponseContentDisposition: "attachment",
+      }),
+      { expiresIn: options?.expiresInSeconds ?? DEFAULT_GET_URL_TTL_SECONDS },
+    )
+  }
+
+  async getBytes(key: string): Promise<Buffer> {
+    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }))
+    if (!response.Body) throw new Error(`Object not found: ${key}`)
+    const bytes = await response.Body.transformToByteArray()
+    return Buffer.from(bytes)
   }
 
   async delete(key: string): Promise<void> {

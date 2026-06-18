@@ -28,6 +28,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
   # One-off schema push (drizzle-kit lives in dev deps → use the build stage,
@@ -62,9 +63,36 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 8080
       DATABASE_URL: postgresql://${POSTGRES_USER:-armurier}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-armurier_prod}
+      # Antivirus on uploaded legal docs (Story 8.6) — scan via the clamd sidecar.
+      CLAMAV_ENABLED: "true"
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
     depends_on:
       postgres:
         condition: service_healthy
+      # Wait for the virus DB to finish loading: a document uploaded while clamd
+      # is unavailable stays "pending" (unscannable) and would need a re-scan.
+      clamav:
+        condition: service_healthy
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+
+  # ClamAV daemon (clamd) — antivirus for uploaded legal documents (Story 8.6).
+  # The API streams each upload here over TCP (INSTREAM) and gates the document's
+  # usability on the verdict. Ships freshclam, which keeps the virus DB current.
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    volumes:
+      - clamav_data:/var/lib/clamav # virus DB — persist so restarts don't re-download
+    healthcheck:
+      # clamdcheck.sh PINGs the running daemon; unhealthy until the DB has loaded.
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 180s # initial DB download can take a couple of minutes
+    security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
   web:
@@ -83,6 +111,7 @@ services:
       NUXT_PUBLIC_SITE_URL: https://www.${DOMAIN}
     depends_on:
       - api
+    security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
   # Automated logical backups: pg_dump on a cron schedule → S3 (off-site), with
@@ -112,6 +141,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
   caddy:
@@ -131,12 +161,14 @@ services:
     depends_on:
       - api
       - web
+    security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
 volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+  clamav_data:
 
 networks:
   internal:

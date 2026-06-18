@@ -19,6 +19,12 @@ export class InMemoryStorageService implements StorageService {
     return `memory://${key}`
   }
 
+  async getBytes(key: string): Promise<Buffer> {
+    const object = this.objects.get(key)
+    if (!object) throw new Error(`Object not found: ${key}`)
+    return object.body
+  }
+
   async delete(key: string): Promise<void> {
     this.objects.delete(key)
   }

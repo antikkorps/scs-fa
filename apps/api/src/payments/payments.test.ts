@@ -462,6 +462,36 @@ describe("payments — Stripe card (Story 6.1)", () => {
       expect(order.paymentStatus).toBe("pending") // virement bucket not settled yet (Story 6.2)
     })
 
+    it("does NOT settle when Stripe reports a paid amount below the order total", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { intentId: "pi_short_1", amountTtc: "120.00" })
+
+      const res = await post({
+        type: "payment_intent.succeeded",
+        data: { object: { id: "pi_short_1", amount_received: 5000 } }, // 50€ < 120€ due
+      })
+
+      expect(res.statusCode).toBe(200)
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(carte.paymentStatus).toBe("pending") // shortfall → not marked received
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+      expect(order.paymentStatus).toBe("pending")
+    })
+
+    it("settles when the reported paid amount covers the order total", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { intentId: "pi_exact_1", amountTtc: "120.00" })
+
+      const res = await post({
+        type: "payment_intent.succeeded",
+        data: { object: { id: "pi_exact_1", amount_received: 12000 } }, // 120€ == due
+      })
+
+      expect(res.statusCode).toBe(200)
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(carte.paymentStatus).toBe("received")
+    })
+
     it("payment_intent.payment_failed marks the card failed, order stays pending", async () => {
       const orderId = await insertOrder(userId, [CARD_ITEM])
       await insertCarte(orderId, { intentId: "pi_fail_1" })
