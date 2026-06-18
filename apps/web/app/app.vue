@@ -18,7 +18,7 @@ useHead({
   script: [
     {
       type: "application/ld+json",
-      innerHTML: JSON.stringify({
+      innerHTML: serializeJsonLd({
         "@context": "https://schema.org",
         "@type": "Organization",
         name: "SCS Firearm",

@@ -44,7 +44,7 @@ useHead({
     {
       type: "application/ld+json",
       innerHTML: computed(() =>
-        JSON.stringify({
+        serializeJsonLd({
           "@context": "https://schema.org",
           "@type": "VisualArtwork",
           name: art.value.title,
@@ -68,7 +68,7 @@ useHead({
     },
     {
       type: "application/ld+json",
-      innerHTML: JSON.stringify({
+      innerHTML: serializeJsonLd({
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         itemListElement: [

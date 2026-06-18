@@ -1,6 +1,6 @@
 import { CURRENT_RGPD_CONSENT_VERSION, MAX_LEGAL_DOC_SIZE_BYTES } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
-import { inArray, like } from "drizzle-orm"
+import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import FormData from "form-data"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
@@ -130,6 +130,21 @@ describe("legal documents (/api/legal-documents)", () => {
     expect(res.json().error).toBe("UnsupportedMediaType")
   })
 
+  it("rejects a spoofed Content-Type (payload bytes don't match the declared type)", async () => {
+    // An HTML/JS payload announced as image/png — passes the allowlist on the
+    // header alone, but the magic-byte check must catch the mismatch.
+    const res = await upload({
+      fields: { docType: "cni" },
+      file: {
+        buffer: Buffer.from("<!DOCTYPE html><script>alert(1)</script>"),
+        filename: "evil.png",
+        contentType: "image/png",
+      },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toBe("UnsupportedMediaType")
+  })
+
   it("rejects invalid metadata", async () => {
     const res = await upload({ fields: { docType: "not-a-type" }, file: validPdf })
     expect(res.statusCode).toBe(400)
@@ -190,9 +205,22 @@ describe("legal documents (/api/legal-documents)", () => {
     expect(data.every((d: { docType: string }) => d.docType !== "sia")).toBe(true)
   })
 
-  it("returns a download URL on detail and enforces ownership", async () => {
+  it("issues a download URL only once the scan is clean, and enforces ownership", async () => {
     const created = (await upload({ fields: { docType: "cni" }, file: validPdf })).json().data
 
+    // While the scan is unresolved (pending/infected) no bytes are served. Force
+    // the state deterministically — the async scan is fire-and-forget on upload.
+    await db.update(legalDocuments).set({ scanStatus: "pending" }).where(eq(legalDocuments.id, created.id))
+    const beforeScan = await app.inject({
+      method: "GET",
+      url: `/api/legal-documents/${created.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(beforeScan.statusCode).toBe(200)
+    expect(beforeScan.json().data.downloadUrl).toBeNull()
+
+    // Once clean, the short-lived presigned URL is handed out.
+    await scanDocument(created.id)
     const mine = await app.inject({
       method: "GET",
       url: `/api/legal-documents/${created.id}`,

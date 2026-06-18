@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import {
   ALLOWED_LEGAL_DOC_MIME_TYPES,
   type AllowedLegalDocMimeType,
+  fileContentMatchesDeclaredMime,
   LEGAL_DOC_REVIEW_SLA_HOURS,
   legalDocumentMetaSchema,
   uuidParamSchema,
@@ -87,6 +88,15 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
         message: `Unsupported file type. Allowed: ${ALLOWED_LEGAL_DOC_MIME_TYPES.join(", ")}`,
       })
     }
+    // Never trust the client-declared Content-Type: sniff the real type from the
+    // payload's magic bytes and require it to match. Blocks mislabeled/polyglot
+    // uploads (e.g. an SVG/HTML XSS payload announced as image/png).
+    if (!fileContentMatchesDeclaredMime(file.buffer, file.mimetype)) {
+      return reply.code(400).send({
+        error: "UnsupportedMediaType",
+        message: "File content does not match its declared type",
+      })
+    }
 
     const meta = legalDocumentMetaSchema.safeParse(fields)
     if (!meta.success) {
@@ -161,7 +171,9 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const { s3Key, ...doc } = row
-    const downloadUrl = await storage.getUrl(s3Key)
+    // Only ever serve bytes that passed antivirus. A pending/infected document
+    // yields no URL so neither the owner nor a reviewer can fetch unsafe content.
+    const downloadUrl = doc.scanStatus === "clean" ? await storage.getUrl(s3Key) : null
     return reply.code(200).send({ data: { ...doc, downloadUrl } })
   })
 

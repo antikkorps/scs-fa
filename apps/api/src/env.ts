@@ -65,6 +65,17 @@ const envSchema = z.object({
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
 
+  // Antivirus (Story 8.6). Uploaded legal documents are streamed to a ClamAV
+  // daemon (clamd) over TCP. Disabled by default so dev/test/CI need no daemon;
+  // MUST be enabled in production. When enabled and the daemon is unreachable the
+  // scan resolves to "error" → the document stays unusable (never silently clean).
+  CLAMAV_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  CLAMAV_HOST: z.string().default("clamav"),
+  CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
+
   // Partner commission rate (Story 7.3). Shown transparently on the admin metrics
   // dashboard as the partner's share of net revenue. Percent, default 5%.
   COMMISSION_RATE_PCT: z.coerce.number().min(0).max(100).default(5),

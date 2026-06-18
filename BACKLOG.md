@@ -355,8 +355,20 @@
 - [x] Piège busybox crond résolu : les jobs cron tournent avec un **env vide** → l'entrypoint persiste l'environnement (`export -p > /etc/backup.env`) que les scripts sourcent ; sortie des jobs redirigée vers `/proc/1/fd/*` (crond = PID 1) pour apparaître dans `docker logs`
 - [x] **Vérifié en réel e2e** (Postgres + MinIO éphémères) : build image OK (pg_dump 17.10, aws-cli 2.34), 3 backups avec rétention=2 → 2 conservés + le plus ancien purgé, puis **drop table → restore → données récupérées**. Vars documentées (`.env.prod.example`) + procédure complète (`docs/DEPLOY.md` §6, avec note PII/chiffrement bucket)
 - Note : dump = PII clients → bucket privé à credentials scopés ; object-lock/versioning + SSE recommandés (defence-in-depth)
-**Story 8.5** — Monitoring uptime + alertes
-**Story 8.6** — Pentest interne avant mise en ligne
+**Story 8.5** — Monitoring uptime + alertes — ⏸️ **DIFFÉRÉE** (2026-06-18)
+
+- Approche à trancher (Uptime Kuma auto-hébergé vs service externe vs stack Prometheus/Grafana/Loki) ; reprise ultérieure. L'alerting applicatif sur 5xx existe déjà (Story 7.2).
+
+**Story 8.6** — Pentest interne avant mise en ligne ✅
+
+- [x] **Audit complet** des 6 surfaces d'attaque (auth/authz, paiements, upload/PII, injection, infra/secrets) → rapport `docs/SECURITY_PENTEST_8.6.md`. Base saine confirmée (IDOR scoping, `requireRole`, argon2id, webhook Stripe signé, autorité prix côté serveur, Drizzle paramétré, redaction erreurs).
+- [x] **Critique — upload durci** : validation par **magic bytes** (`packages/shared/src/file-signature.ts`) — le type sniffé doit être autorisé ET correspondre au `Content-Type` déclaré (bloque les payloads HTML/SVG déguisés en image). + tests unitaires shared & rejet API d'un Content-Type usurpé
+- [x] **Critique — ClamAV câblé** : `getBytes` sur l'abstraction storage + client `clamd` INSTREAM sans dépendance (`legal-documents/clamav.ts`) ; `scan.ts` scanne réellement, **gated par `CLAMAV_ENABLED`** (off en dev/test, on en prod via sidecar `clamav` dans le compose, volume DB virale persistant + healthcheck). Échec daemon/storage → `error` → document reste `pending` (jamais « clean » silencieux)
+- [x] **Critique — CVE deps patchées** (bypass quarantaine 90j) : fastify 5.8.5, drizzle-orm 0.45.2, form-data 4.0.6, nodemailer 9, nuxt 4.4.8, vitest 4.1.9, vite 7.3.5 → `pnpm audit` **0 high/critical**
+- [x] **High — téléchargement gated sur le scan** : URL présignée émise seulement si `scanStatus === "clean"` (routes client + admin) — bytes non scannés/infectés jamais servis
+- [x] **Medium** : escape JSON-LD (`serializeJsonLd`, anti-XSS stocké, 4 sites) ; vérif montant webhook Stripe (`amount_received` ≥ dû, sinon non encaissé + audit) ; algo JWT épinglé HS256 ; `Content-Disposition: attachment` sur les présignés ; `no-new-privileges` sur tous les services prod
+- [x] **Vérifié** : typecheck clean (shared/api/web), **262 API / 56 shared / 10 web** au vert (nouvelle couverture : magic-bytes, Content-Type usurpé, download gated, JSON-LD, montant Stripe), compose prod valide
+- Différé (documenté) : baseline de migration (vs `push --force`), rotation des secrets, clé S3 dédiée least-privilege pour les backups, nonce CSP (drop `unsafe-inline`), 3 moderates `pnpm audit` dev/build-time uniquement, durcissement conteneur avancé (cap_drop/read_only) à valider en staging
 
 ## PHASE 9 — Front, SEO & Découvrabilité (transverse)
 

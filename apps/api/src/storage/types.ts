@@ -26,6 +26,8 @@ export interface StorageService {
   put(params: PutObjectParams): Promise<StoredObject>
   /** Return a short-lived, access-controlled URL to read the object. */
   getUrl(key: string, options?: GetUrlOptions): Promise<string>
+  /** Fetch the raw object bytes (used by the antivirus scanner). */
+  getBytes(key: string): Promise<Buffer>
   /** Delete an object. Idempotent: deleting a missing key must not throw. */
   delete(key: string): Promise<void>
 }

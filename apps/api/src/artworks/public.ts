@@ -63,6 +63,10 @@ export const listArtworksRoute: FastifyPluginAsync = async (fastify) => {
 export const getArtworkRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/:slug", async (request, reply) => {
     const slug = (request.params as { slug: string }).slug
+    // Bound the param (consistency with the rest of the API; slugs are short).
+    if (typeof slug !== "string" || slug.length === 0 || slug.length > 200) {
+      return reply.code(404).send({ error: "NotFound", message: "Artwork not found" })
+    }
 
     const [art] = await db
       .select({

@@ -470,13 +470,20 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case "payment_intent.succeeded": {
       const intent = event.data.object as Stripe.PaymentIntent
       const { last4, brand } = cardDetails(intent)
-      await settleCartePayment(intent.id, {
-        paymentStatus: "received",
-        processedAt: new Date(),
-        last4,
-        brand,
-        failureReason: null,
-      })
+      await settleCartePayment(
+        intent.id,
+        {
+          paymentStatus: "received",
+          processedAt: new Date(),
+          last4,
+          brand,
+          failureReason: null,
+        },
+        // Defence-in-depth: assert Stripe actually collected at least the amount
+        // due before marking the order paid (the intent is created server-side,
+        // but never trust the webhook's effect without checking the figure).
+        intent.amount_received,
+      )
       return
     }
     case "payment_intent.payment_failed": {
@@ -513,13 +520,34 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
 
 type CarteUpdate = Partial<typeof paymentCarte.$inferInsert>
 
-async function settleCartePayment(paymentIntentId: string, update: CarteUpdate): Promise<void> {
+async function settleCartePayment(
+  paymentIntentId: string,
+  update: CarteUpdate,
+  paidAmountCents?: number,
+): Promise<void> {
   const [carte] = await db
-    .select({ id: paymentCarte.id, orderId: paymentCarte.orderId })
+    .select({ id: paymentCarte.id, orderId: paymentCarte.orderId, amountTtc: paymentCarte.amountTtc })
     .from(paymentCarte)
     .where(eq(paymentCarte.stripePaymentIntentId, paymentIntentId))
     .limit(1)
   if (!carte) return // unknown / superseded intent — nothing to do
+
+  // Guard against settling an order for less than its due amount. If the figure
+  // Stripe reports as collected falls short, do NOT mark the order paid: record
+  // the discrepancy for an operator and leave the bucket untouched (no retry
+  // storm — the amount won't change on a webhook redelivery).
+  if (update.paymentStatus === "received" && paidAmountCents !== undefined) {
+    const expectedCents = Math.round(Number(carte.amountTtc) * 100)
+    if (paidAmountCents < expectedCents) {
+      await db.insert(auditLogs).values({
+        entityType: "payment_carte",
+        entityId: carte.id,
+        action: "payment.stripe.amount_mismatch",
+        newValue: { orderId: carte.orderId, paymentIntentId, expectedCents, paidAmountCents },
+      })
+      return
+    }
+  }
 
   await db
     .update(paymentCarte)

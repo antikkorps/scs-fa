@@ -31,7 +31,7 @@ useHead({
     {
       type: "application/ld+json",
       innerHTML: computed(() =>
-        JSON.stringify({
+        serializeJsonLd({
           "@context": "https://schema.org",
           "@type": "ItemList",
           name: "Collection Gun Art",

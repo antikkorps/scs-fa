@@ -142,7 +142,10 @@ export const adminLegalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const { s3Key, userEmail: _userEmail, ...doc } = row
-    const downloadUrl = await storage.getUrl(s3Key)
+    // Reviewers are only ever handed bytes that passed antivirus — a document
+    // that isn't "clean" can't be approved anyway (see the approve gate below),
+    // so we never deliver unscanned/infected content to an admin's browser.
+    const downloadUrl = doc.scanStatus === "clean" ? await storage.getUrl(s3Key) : null
     return reply.code(200).send({ data: { ...withOverdue(doc), downloadUrl } })
   })
 
