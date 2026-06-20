@@ -316,6 +316,15 @@ export const adminMetricsQuerySchema = z
 
 export type AdminMetricsQuery = z.infer<typeof adminMetricsQuerySchema>
 
+// Story 9.1 — global search query (firearms catalogue + Gun Art). `q` is the
+// full-text term; `limit` caps results returned *per source*.
+export const searchQuerySchema = z.object({
+  q: z.string().trim().min(1).max(200),
+  limit: z.coerce.number().int().positive().max(50).default(10),
+})
+
+export type SearchQuery = z.infer<typeof searchQuerySchema>
+
 // Backwards-compatible alias used by the product detail route
 export const productIdParamSchema = uuidParamSchema
 
