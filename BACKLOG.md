@@ -374,11 +374,13 @@
 
 > Remarques Franck (2026-06-10, après démo front 5.3). Palette laiton + charbon **validée** — à conserver.
 
-**Story 9.1** — Recherche globale (armes + Gun Art)
+**Story 9.1** — Recherche globale (armes + Gun Art) ✅
 
-- Barre de recherche unifiée header + page résultats, couvrant les produits **et** les œuvres
-- API : produits ont déjà `searchVector` + `websearch_to_tsquery('french', …)` (cf. `products/list.ts`) ; ajouter la recherche côté `artworks` (titre/artiste/description) et un endpoint agrégé ou deux sources fusionnées côté front
-- Mobile-first, états vide/erreur, debounced
+- [x] **Schéma** : colonne générée `search_vector` + index GIN `idx_artworks_search` sur `artworks` (titre A / artiste B / description C), miroir de `products` (ALTER appliqué sur `armurier_dev`, clonée par la test DB)
+- [x] **API agrégée** `GET /api/search?q=&limit=` (`search/global.ts`) : produits **et** œuvres matchés sur leur `search_vector` via `websearch_to_tsquery('french', …)`, classés par `ts_rank` ; publiés uniquement ; envelope `{ query, products, artworks }`. Dédup : les produits qui adossent une œuvre Gun Art ne remontent que comme œuvres (`not exists`). Validation `searchQuerySchema` (shared)
+- [x] **Front** : composant `SearchBar` réutilisable dans le header (desktop + mobile, navigue vers `/recherche?q=`) ; page `/recherche` SSR avec recherche live **debouncée** (300 ms, URL `?q=` en `replace`), états vide/erreur, mobile-first, SEO `noindex`
+- Périmètre : la page résultats affiche **les œuvres** (lien `/collection/:slug`) ; les résultats « armes » sont déjà renvoyés par l'API mais seront branchés au front en **Phase 10** (la boutique armurerie n'existe pas encore) → pas de liens morts
+- [x] **Vérifié** : typecheck clean (shared/api/web), **266 API** (4 nouveaux : envelope, produit non publié masqué, dédup œuvre, priceTtc/dispo, requête sans résultat) / 56 shared / 10 web au vert, Biome clean
 
 **Story 9.2** — Page 404 soignée
 

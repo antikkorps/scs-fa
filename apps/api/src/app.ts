@@ -21,6 +21,7 @@ import { orderRoutes } from "./orders/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
 import { productRoutes } from "./products/index.js"
+import { searchRoutes } from "./search/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -68,6 +69,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(authRoutes, { prefix: "/api/auth" })
   await fastify.register(productRoutes, { prefix: "/api/products" })
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
+  await fastify.register(searchRoutes, { prefix: "/api/search" })
   await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
   await fastify.register(addressRoutes, { prefix: "/api/addresses" })

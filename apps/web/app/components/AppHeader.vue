@@ -21,6 +21,7 @@ watch(
       <nav class="nav" aria-label="Navigation principale">
         <NuxtLink to="/collection" class="nav__link">Collection</NuxtLink>
         <a href="#about" class="nav__link">La maison</a>
+        <SearchBar class="nav__search" />
         <NuxtLink to="/collection" class="nav__cta btn btn-primary">Acquérir</NuxtLink>
       </nav>
 
@@ -36,6 +37,7 @@ watch(
     </div>
 
     <nav v-show="open" id="mobile-nav" class="mnav" aria-label="Navigation mobile">
+      <SearchBar class="mnav__search" @submit="open = false" />
       <NuxtLink to="/collection" class="mnav__link">Collection</NuxtLink>
       <a href="#about" class="mnav__link">La maison</a>
       <NuxtLink to="/collection" class="mnav__link mnav__cta">Acquérir une œuvre</NuxtLink>
@@ -90,6 +92,9 @@ watch(
 .nav__link:hover {
   color: var(--paper);
 }
+.nav__search {
+  width: 230px;
+}
 .nav__cta {
   padding: 0.6rem 1.2rem;
 }
@@ -141,6 +146,9 @@ watch(
   flex-direction: column;
   padding: 0.5rem var(--gutter) 1.25rem;
   border-top: 1px solid var(--ink-line);
+}
+.mnav__search {
+  margin: 0.25rem 0 0.75rem;
 }
 .mnav__link {
   padding: 0.9rem 0;

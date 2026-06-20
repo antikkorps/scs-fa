@@ -710,6 +710,11 @@ export const artworks = pgTable(
     metaDescription: varchar("meta_description", { length: 500 }),
     keywords: varchar("keywords", { length: 500 }),
 
+    // Recherche full-text (généré: title pondéré A, artist_name B, description C)
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      sql`setweight(to_tsvector('french', coalesce(title, '')), 'A') || setweight(to_tsvector('french', coalesce(artist_name, '')), 'B') || setweight(to_tsvector('french', coalesce(description, '')), 'C')`,
+    ),
+
     // Métadonnées
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -718,6 +723,7 @@ export const artworks = pgTable(
      index("idx_artworks_slug").on(t.slug),
      index("idx_artworks_published").on(t.published),
      index("idx_artworks_available").on(t.availableFrom, t.availableUntil),
+     index("idx_artworks_search").using("gin", t.searchVector),
      foreignKey({
       columns: [t.productId],
       foreignColumns: [products.id],

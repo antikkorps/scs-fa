@@ -13,6 +13,30 @@ export interface ArtworkListItem {
   priceFromTtc: number | null
 }
 
+// Story 9.1 — a firearm catalogue hit from GET /api/search. The public storefront
+// (Phase 10) will render these; for now the search page surfaces artworks only.
+export interface SearchProductItem {
+  id: string
+  sku: string
+  slug: string
+  name: string
+  description: string | null
+  priceHt: number
+  vatPct: number
+  priceTtc: number
+  stockQty: number | null
+  requiresLegalVerification: boolean | null
+  featuredImageUrl: string | null
+  category: { slug: string | null; name: string | null }
+  legalCategory: string | null
+}
+
+export interface SearchResponse {
+  query: string
+  products: SearchProductItem[]
+  artworks: ArtworkListItem[]
+}
+
 export interface ArtworkFormat {
   id: string
   name: string
