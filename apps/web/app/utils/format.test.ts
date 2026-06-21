@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { artworkImage, availabilityLabel, fallbackImage, formatDate, formatDateTime, formatEuros } from "./format.js"
+import {
+  artworkGeometry,
+  artworkImage,
+  availabilityLabel,
+  fallbackImage,
+  formatDate,
+  formatDateTime,
+  formatEuros,
+} from "./format.js"
 
 describe("formatEuros", () => {
   it("formats an amount in EUR (fr-FR)", () => {
@@ -23,6 +31,22 @@ describe("artwork images", () => {
     expect(artworkImage("https://cdn.example/x.jpg", "slug")).toBe("https://cdn.example/x.jpg")
     expect(artworkImage(null, "slug", 400, 500)).toBe("https://picsum.photos/seed/slug/400/500")
     expect(artworkImage("", "slug", 400, 500)).toBe("https://picsum.photos/seed/slug/400/500")
+  })
+})
+
+describe("artworkGeometry", () => {
+  it("returns a taller-than-wide ratio for portrait (the default)", () => {
+    expect(artworkGeometry("portrait")).toEqual({ ratio: "4 / 5", width: 800, height: 1000 })
+  })
+
+  it("returns a wider-than-tall ratio for landscape", () => {
+    const g = artworkGeometry("landscape")
+    expect(g.ratio).toBe("3 / 2")
+    expect(g.width).toBeGreaterThan(g.height)
+  })
+
+  it("returns a 1:1 ratio for square", () => {
+    expect(artworkGeometry("square")).toEqual({ ratio: "1 / 1", width: 1000, height: 1000 })
   })
 })
 

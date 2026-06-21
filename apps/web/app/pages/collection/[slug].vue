@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtworkDetail } from "~/types/artwork"
-import { artworkImage, availabilityLabel, formatEuros } from "~/utils/format"
+import { artworkGeometry, artworkImage, availabilityLabel, formatEuros } from "~/utils/format"
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -18,7 +18,10 @@ if (error.value || !data.value?.data) {
 
 // Safe: we throw a fatal 404 above when data is missing, so this only renders with data.
 const art = computed(() => data.value?.data as ArtworkDetail)
-const hero = computed(() => artworkImage(art.value.featuredImageUrl, art.value.slug, 1000, 1250))
+const heroGeometry = computed(() => artworkGeometry(art.value.orientation))
+const hero = computed(() =>
+  artworkImage(art.value.featuredImageUrl, art.value.slug, heroGeometry.value.width, heroGeometry.value.height),
+)
 const formatName = (id: string) => art.value.availableFormats?.find((f) => f.id === id)?.name ?? id
 const availablePrints = computed(() => art.value.prints.filter((p) => p.status === "available"))
 const soldOut = computed(() => availablePrints.value.length === 0)
@@ -91,12 +94,12 @@ useHead({
       </nav>
 
       <div class="detail__grid">
-        <figure class="detail__media">
+        <figure class="detail__media" :style="{ aspectRatio: heroGeometry.ratio }">
           <img
             :src="hero"
             :alt="`${art.title}${art.artistName ? ` — ${art.artistName}` : ''}`"
-            width="1000"
-            height="1250"
+            :width="heroGeometry.width"
+            :height="heroGeometry.height"
             fetchpriority="high"
             decoding="async"
           />
@@ -191,9 +194,10 @@ useHead({
   box-shadow: var(--shadow);
 }
 .detail__media img {
+  /* The figure carries the orientation aspect-ratio (bound inline); the image
+     fills it so portrait and landscape pieces both display uncropped at scale. */
   width: 100%;
-  height: auto;
-  aspect-ratio: 4 / 5;
+  height: 100%;
   object-fit: cover;
 }
 .detail__title {

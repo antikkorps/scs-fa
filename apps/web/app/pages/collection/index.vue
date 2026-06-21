@@ -95,6 +95,9 @@ useHead({
   display: grid;
   gap: clamp(1.5rem, 4vw, 2.75rem);
   grid-template-columns: 1fr;
+  /* Cards mix portrait/landscape/square ratios — align to the top so rows read
+     as a light gallery hang instead of stretching shorter cards. */
+  align-items: start;
 }
 .state {
   color: var(--paper-dim);

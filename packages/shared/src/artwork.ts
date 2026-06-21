@@ -10,6 +10,22 @@ export interface ArtworkFormat {
 }
 
 /**
+ * How an artwork is framed. Orientation is a property of the *image*, not of the
+ * print paper, so it is stored explicitly rather than derived from formats: the
+ * same photo can be offered in several paper sizes, and the backoffice must be
+ * able to set it directly. The collection grid and detail media adapt their
+ * aspect-ratio to this value. `portrait` is the historical default the gallery
+ * layout was originally built around.
+ */
+export const ARTWORK_ORIENTATIONS = ["portrait", "landscape", "square"] as const
+export type ArtworkOrientation = (typeof ARTWORK_ORIENTATIONS)[number]
+
+/** Narrow an arbitrary DB/string value to a known orientation, defaulting to `portrait`. */
+export function normalizeOrientation(value: unknown): ArtworkOrientation {
+  return ARTWORK_ORIENTATIONS.includes(value as ArtworkOrientation) ? (value as ArtworkOrientation) : "portrait"
+}
+
+/**
  * Dynamic Gun Art price (HT) for one numbered print.
  *
  *   priceHt = basePriceHt * format.priceFactor + priceIncrementHt * (editionLimit - printNumber)

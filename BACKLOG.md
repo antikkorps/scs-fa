@@ -389,11 +389,13 @@
 - [x] Bon status HTTP (404 réel renvoyé sur slug inconnu) ; SEO `robots: noindex, follow`
 - [x] **Vérifié** : SSR sur route inconnue → 404 + page galerie rendue (chiffre 404, titre, CTA, noindex) ; 10 tests web au vert, Biome clean (typecheck `nuxt typecheck` KO sur cette machine — toolchain `vue-tsc`/`vue-router` 5.0.3, indépendant du changement)
 
-**Story 9.3** — Œuvres en orientation portrait ET paysage
+**Story 9.3** — Œuvres en orientation portrait ET paysage ✅
 
-- Aujourd'hui carte + détail figés en `aspect-ratio: 4/5` (portrait). **Le gros du catalogue sera paysage** → prévoir le cas dès maintenant
-- Data : dériver l'orientation/ratio (champ `orientation` ou dimensions image, ou `availableFormats`) ; media responsive qui s'adapte (object-fit, aspect-ratio dynamique) sans casser la grille
-- Cartes : grille robuste quel que soit le ratio (hauteur homogène ou masonry léger)
+- [x] **Data** : colonne `orientation` (`portrait` | `landscape` | `square`, défaut `portrait`) sur `artworks` — propriété de l'image, pas du format papier, donc stockée explicitement et éditable au backoffice (ALTER appliqué sur `armurier_dev`, cloné par la test DB). Type + garde `normalizeOrientation` dans `shared`
+- [x] **API** : `orientation` exposée par `GET /api/artworks` (liste), `GET /api/artworks/:slug` (détail) et `GET /api/search`
+- [x] **Front** : helper `artworkGeometry(orientation)` → `{ ratio, width, height }` ; carte (`ArtworkCard`) et hero détail à `aspect-ratio` dynamique (object-fit cover, plus de `4/5` figé), `width`/`height` intrinsèques alignés (anti-CLS) ; grilles collection + recherche en `align-items: start` (hang galerie léger quel que soit le ratio)
+- [x] **Seeds** : orientations variées (3 paysage / 2 portrait / 1 carré) + image picsum aux dimensions correspondantes
+- [x] **Vérifié** : payload API (orientation par œuvre), SSR collection (2× `4/5`, 3× `3/2`, 1× `1/1`) + détail paysage `3/2` / portrait `4/5` ; **266 API** / 58 shared (`normalizeOrientation`) / 13 web (`artworkGeometry`) au vert, Biome clean
 
 **Story 9.4** — Blog (SEO-first)
 

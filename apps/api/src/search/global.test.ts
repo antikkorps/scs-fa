@@ -94,6 +94,7 @@ describe("GET /api/search", () => {
         basePriceHt: "300.00",
         priceIncrementHt: "10.00",
         vatPct: "20",
+        orientation: "square",
         published: true,
       })
       .returning({ id: artworks.id })
@@ -147,6 +148,7 @@ describe("GET /api/search", () => {
     expect(gun.category).toMatchObject({ slug: "arme-poing" })
 
     const art = body.artworks.find((a: { slug: string }) => a.slug === `${PREFIX}art`)
+    expect(art.orientation).toBe("square")
     expect(art.availableCount).toBe(1)
     expect(art.priceFromHt).toBe(300)
     expect(art.priceFromTtc).toBe(360)

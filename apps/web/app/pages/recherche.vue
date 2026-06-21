@@ -165,6 +165,7 @@ useSeoMeta({
   display: grid;
   gap: clamp(1.5rem, 4vw, 2.75rem);
   grid-template-columns: 1fr;
+  align-items: start;
 }
 .sr-only {
   position: absolute;
