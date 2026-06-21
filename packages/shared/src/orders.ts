@@ -197,8 +197,7 @@ export function parseBankStatementCsv(csv: string): BankTransaction[] {
   // Guarded by the length check above; bind to a non-optional local so the
   // header parsing stays clean under noUncheckedIndexedAccess.
   const headerLine = lines[0] ?? ""
-  const delimiter =
-    (headerLine.match(/;/g)?.length ?? 0) >= (headerLine.match(/,/g)?.length ?? 0) ? ";" : ","
+  const delimiter = (headerLine.match(/;/g)?.length ?? 0) >= (headerLine.match(/,/g)?.length ?? 0) ? ";" : ","
   const headers = splitCsvLine(headerLine, delimiter).map(normaliseHeader)
 
   const indexFor = (key: keyof BankTransaction): number => {
