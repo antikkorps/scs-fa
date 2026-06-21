@@ -9,6 +9,7 @@ import { addressRoutes } from "./addresses/index.js"
 import { artworkRoutes } from "./artworks/index.js"
 import { authRoutes } from "./auth/index.js"
 import { adminBlogRoutes } from "./blog/admin.js"
+import { adminBlogImageRoutes, blogImageRoutes } from "./blog/images.js"
 import { blogRoutes } from "./blog/index.js"
 import { cartRoutes } from "./cart/index.js"
 import { env } from "./env.js"
@@ -72,6 +73,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(productRoutes, { prefix: "/api/products" })
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
   await fastify.register(blogRoutes, { prefix: "/api/blog" })
+  await fastify.register(blogImageRoutes, { prefix: "/api/blog/images" })
   await fastify.register(searchRoutes, { prefix: "/api/search" })
   await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
@@ -84,6 +86,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminPaymentRoutes, { prefix: "/api/admin/payments" })
   await fastify.register(adminOrderRoutes, { prefix: "/api/admin/orders" })
   await fastify.register(adminBlogRoutes, { prefix: "/api/admin/blog" })
+  await fastify.register(adminBlogImageRoutes, { prefix: "/api/admin/blog/images" })
   await fastify.register(adminMetricsRoutes, { prefix: "/api/admin/metrics" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)

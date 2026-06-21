@@ -68,10 +68,10 @@ function onTitleInput() {
         <textarea v-model="model.excerpt" class="ctl" rows="2" maxlength="500" />
       </label>
 
-      <label class="field field--wide">
-        <span class="field__label">Contenu (HTML) *</span>
-        <textarea v-model="model.content" class="ctl ctl--mono" rows="14" required />
-      </label>
+      <div class="field field--wide">
+        <span class="field__label">Contenu *</span>
+        <RichTextEditor v-model="model.content" />
+      </div>
 
       <label class="field">
         <span class="field__label">Image (URL)</span>

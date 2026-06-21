@@ -6,6 +6,7 @@ import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { blogPosts, users } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { sanitizeArticleHtml } from "./sanitize.js"
 
 const AUTHOR_NAME = sql<string | null>`nullif(trim(concat_ws(' ', ${users.firstname}, ${users.lastname})), '')`
 
@@ -115,7 +116,7 @@ export const adminBlogRoutes: FastifyPluginAsync = async (fastify) => {
           slug: data.slug,
           title: data.title,
           excerpt: data.excerpt,
-          content: data.content,
+          content: sanitizeArticleHtml(data.content),
           category: data.category,
           tags: data.tags,
           featuredImageUrl: data.featuredImageUrl,
@@ -152,6 +153,7 @@ export const adminBlogRoutes: FastifyPluginAsync = async (fastify) => {
     if (!existing) return reply.code(404).send({ error: "NotFound", message: "Article not found" })
 
     const patch: Record<string, unknown> = { ...body.data, updatedAt: new Date() }
+    if (body.data.content !== undefined) patch.content = sanitizeArticleHtml(body.data.content)
     if (body.data.published === true && !existing.publishedAt) patch.publishedAt = new Date()
     if (body.data.published === false) patch.publishedAt = null
 

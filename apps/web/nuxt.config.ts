@@ -27,6 +27,20 @@ export default defineNuxtConfig({
     },
   },
 
+  // Dev only: relative `/api/**` (e.g. blog image URLs embedded in articles)
+  // resolve to the API origin. In production a single origin (Caddy) routes /api,
+  // so no proxy is needed there. `useFetch` uses the absolute apiBase and bypasses this.
+  nitro: {
+    devProxy: {
+      // Nitro strips the matched "/api" prefix, so the target must re-add it:
+      // /api/blog/images/x → <apiBase>/blog/images/x.
+      "/api": {
+        target: process.env.API_BASE_URL ?? "http://localhost:8081/api",
+        changeOrigin: true,
+      },
+    },
+  },
+
   app: {
     head: {
       htmlAttrs: { lang: "fr" },

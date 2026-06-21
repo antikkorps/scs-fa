@@ -151,6 +151,19 @@ describe("blog API (Story 9.4)", () => {
       expect(data.publishedAt).not.toBeNull()
     })
 
+    it("sanitises the content HTML on save (strips scripts, keeps safe tags)", async () => {
+      const res = await adminReq("POST", "/api/admin/blog", adminToken, {
+        slug: `${PREFIX}xss`,
+        title: "XSS",
+        content: '<p>ok</p><script>alert(1)</script><img src="/api/blog/images/x.webp" onerror="alert(1)">',
+      })
+      expect(res.statusCode).toBe(201)
+      const content = res.json().data.content as string
+      expect(content).toContain("<p>ok</p>")
+      expect(content).not.toContain("<script>")
+      expect(content).not.toContain("onerror")
+    })
+
     it("rejects an invalid body (400) and a duplicate slug (409)", async () => {
       expect((await adminReq("POST", "/api/admin/blog", adminToken, { slug: "x", title: "" })).statusCode).toBe(400)
       const dup = await adminReq("POST", "/api/admin/blog", adminToken, {
