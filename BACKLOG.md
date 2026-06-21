@@ -382,9 +382,12 @@
 - Périmètre : la page résultats affiche **les œuvres** (lien `/collection/:slug`) ; les résultats « armes » sont déjà renvoyés par l'API mais seront branchés au front en **Phase 10** (la boutique armurerie n'existe pas encore) → pas de liens morts
 - [x] **Vérifié** : typecheck clean (shared/api/web), **266 API** (4 nouveaux : envelope, produit non publié masqué, dédup œuvre, priceTtc/dispo, requête sans résultat) / 56 shared / 10 web au vert, Biome clean
 
-**Story 9.2** — Page 404 soignée
+**Story 9.2** — Page 404 soignée ✅
 
-- `app/error.vue` Nuxt cohérent avec l'identité galerie (visuel, message, CTA retour collection / accueil), bon status HTTP, SEO `noindex`
+- [x] `app/error.vue` Nuxt cohérent avec l'identité galerie (canvas charbon + laiton, `eyebrow` « Erreur 404 », chiffre géant en hairline, message distinct 404 / 500), wrappé dans `NuxtLayout` (header + footer conservés)
+- [x] CTA « Voir la collection » (primary) + « Retour à l'accueil » (ghost) via `clearError({ redirect })` (réinitialise la frontière d'erreur avant navigation, contrairement à un lien nu)
+- [x] Bon status HTTP (404 réel renvoyé sur slug inconnu) ; SEO `robots: noindex, follow`
+- [x] **Vérifié** : SSR sur route inconnue → 404 + page galerie rendue (chiffre 404, titre, CTA, noindex) ; 10 tests web au vert, Biome clean (typecheck `nuxt typecheck` KO sur cette machine — toolchain `vue-tsc`/`vue-router` 5.0.3, indépendant du changement)
 
 **Story 9.3** — Œuvres en orientation portrait ET paysage
 
