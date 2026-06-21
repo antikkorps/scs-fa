@@ -20,6 +20,7 @@ watch(
 
       <nav class="nav" aria-label="Navigation principale">
         <NuxtLink to="/collection" class="nav__link">Collection</NuxtLink>
+        <NuxtLink to="/blog" class="nav__link">Journal</NuxtLink>
         <a href="#about" class="nav__link">La maison</a>
         <SearchBar class="nav__search" />
         <NuxtLink to="/collection" class="nav__cta btn btn-primary">Acquérir</NuxtLink>
@@ -39,6 +40,7 @@ watch(
     <nav v-show="open" id="mobile-nav" class="mnav" aria-label="Navigation mobile">
       <SearchBar class="mnav__search" @submit="open = false" />
       <NuxtLink to="/collection" class="mnav__link">Collection</NuxtLink>
+      <NuxtLink to="/blog" class="mnav__link">Journal</NuxtLink>
       <a href="#about" class="mnav__link">La maison</a>
       <NuxtLink to="/collection" class="mnav__link mnav__cta">Acquérir une œuvre</NuxtLink>
     </nav>
