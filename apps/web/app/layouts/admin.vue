@@ -4,6 +4,7 @@ const { user, logout } = useAuth()
 const nav = [
   { to: "/admin", label: "Tableau de bord", icon: "▤", exact: true },
   { to: "/admin/orders", label: "Commandes", icon: "▦" },
+  { to: "/admin/blog", label: "Journal", icon: "✎" },
   { to: "/admin/legal-docs", label: "Documents", icon: "▣" },
   { to: "/admin/payments/virements", label: "Virements", icon: "▤" },
   { to: "/admin/metrics", label: "Métriques", icon: "▥" },

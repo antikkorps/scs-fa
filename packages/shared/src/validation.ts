@@ -343,3 +343,69 @@ export type AuthTokens = {
   refreshToken: string
   expiresIn: number
 }
+
+// ============================================================================
+// Story 9.4 — Blog (SEO-first). The `blog_posts` table backs an editorial
+// section authored from the backoffice. `content` is sanitised HTML authored by
+// an admin; `excerpt` feeds cards and the meta description.
+
+// Blog post slug (references blog_posts.slug, e.g. "histoire-du-luger-p08").
+export const blogSlugSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid blog slug")
+
+// Admin list query: optional published filter + free-text search, paginated.
+export const blogQuerySchema = z.object({
+  // `published` arrives as a string on the query string; coerce the two literals.
+  published: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  search: z.string().trim().min(1).max(255).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+})
+
+export type BlogQuery = z.infer<typeof blogQuerySchema>
+
+// Create a blog post (admin). `authorId` is taken from the session, never the body.
+export const blogArticleCreateSchema = z
+  .object({
+    slug: blogSlugSchema,
+    title: z.string().min(1).max(255),
+    excerpt: z.string().max(500).nullable().optional(),
+    content: z.string().min(1),
+    category: z.string().max(100).nullable().optional(),
+    tags: z.string().max(500).nullable().optional(),
+    featuredImageUrl: z.string().url().max(512).nullable().optional(),
+    metaTitle: z.string().max(255).nullable().optional(),
+    metaDescription: z.string().max(500).nullable().optional(),
+    published: z.boolean().optional().default(false),
+    featured: z.boolean().optional().default(false),
+  })
+  .strict()
+
+// Partial update (admin) — at least one field; defaults intentionally omitted.
+export const blogArticleUpdateSchema = z
+  .object({
+    slug: blogSlugSchema.optional(),
+    title: z.string().min(1).max(255).optional(),
+    excerpt: z.string().max(500).nullable().optional(),
+    content: z.string().min(1).optional(),
+    category: z.string().max(100).nullable().optional(),
+    tags: z.string().max(500).nullable().optional(),
+    featuredImageUrl: z.string().url().max(512).nullable().optional(),
+    metaTitle: z.string().max(255).nullable().optional(),
+    metaDescription: z.string().max(500).nullable().optional(),
+    published: z.boolean().optional(),
+    featured: z.boolean().optional(),
+  })
+  .strict()
+  .refine((o) => Object.keys(o).length > 0, {
+    message: "At least one field must be provided",
+  })
+
+export type BlogArticleCreateInput = z.infer<typeof blogArticleCreateSchema>
+export type BlogArticleUpdateInput = z.infer<typeof blogArticleUpdateSchema>

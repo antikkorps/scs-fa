@@ -1406,7 +1406,7 @@ export const blogPosts = pgTable(
      foreignKey({
       columns: [t.authorId],
       foreignColumns: [users.id],
-    }),
+    }).onDelete("set null"),
   ],
 )
 

@@ -5,7 +5,15 @@ import { calculateArtworkPrice, CURRENT_RGPD_CONSENT_VERSION } from "@armurier/s
 import { hash } from "@node-rs/argon2"
 import { eq } from "drizzle-orm"
 import { db } from "./client.js"
-import { artworkPrints, artworks, legalCategories, productCategories, products, users } from "./schema.js"
+import {
+  artworkPrints,
+  artworks,
+  blogPosts,
+  legalCategories,
+  productCategories,
+  products,
+  users,
+} from "./schema.js"
 
 export async function seedDatabase() {
   console.log("🌱 Seeding database...")
@@ -171,6 +179,7 @@ export async function seedDatabase() {
   console.log("✅ Product categories seeded")
 
   await seedGunArt()
+  await seedBlog()
 
   console.log("🌱 Seeding complete!")
 }
@@ -398,4 +407,86 @@ async function seedGunArt() {
   }
 
   console.log(`✅ Gun Art seeded (${GUN_ART_PIECES.length} artworks)`)
+}
+
+// ==========================================================================
+// BLOG — section éditoriale SEO-first (Story 9.4)
+// ==========================================================================
+
+const BLOG_POSTS = [
+  {
+    slug: "histoire-du-luger-p08",
+    title: "Le Luger P08, une icône d'ingénierie",
+    excerpt:
+      "Retour sur l'arme de poing qui a marqué le XXe siècle, devenue objet de collection et sujet photographique de prédilection.",
+    category: "Histoire",
+    tags: "luger, collection, histoire",
+    orientation: "landscape" as const,
+    content:
+      "<p>Conçu par Georg Luger au tournant du XXe siècle, le P08 reste l'une des armes de poing les plus reconnaissables jamais produites.</p>" +
+      "<h2>Une silhouette inimitable</h2>" +
+      "<p>Son système à genouillère, son équilibre et sa ligne tendue en ont fait un objet de fascination bien au-delà de son usage d'origine.</p>" +
+      "<h2>Objet de collection</h2>" +
+      "<p>Aujourd'hui, le P08 se contemple autant qu'il se collectionne. C'est cette tension entre mémoire et esthétique que nos tirages explorent.</p>",
+    featured: true,
+  },
+  {
+    slug: "photographier-l-acier",
+    title: "Photographier l'acier : lumière et matière",
+    excerpt: "Comment nos artistes révèlent la patine, les reflets et la géométrie des armes de collection.",
+    category: "Atelier",
+    tags: "photographie, atelier, lumière",
+    orientation: "portrait" as const,
+    content:
+      "<p>Photographier le métal, c'est d'abord apprivoiser la lumière.</p>" +
+      "<h2>La patine comme récit</h2>" +
+      "<p>Chaque éraflure raconte une histoire ; le travail du photographe consiste à la rendre lisible sans la trahir.</p>" +
+      "<blockquote>Le reflet n'est pas un défaut : c'est le sujet.</blockquote>" +
+      "<p>De ce dialogue entre ombre et acier naissent les tirages de la collection Gun Art.</p>",
+    featured: false,
+  },
+  {
+    slug: "edition-limitee-pourquoi",
+    title: "Pourquoi l'édition strictement limitée ?",
+    excerpt: "Signature, numérotation, certificat : ce qui fait la valeur d'un tirage d'art à tirage restreint.",
+    category: "Collection",
+    tags: "édition limitée, certificat, valeur",
+    orientation: "landscape" as const,
+    content:
+      "<p>Une édition limitée n'est pas qu'un argument commercial : c'est un engagement.</p>" +
+      "<h2>Rareté et confiance</h2>" +
+      "<p>Chaque tirage est signé, numéroté et accompagné de son certificat d'authenticité — une traçabilité qui protège le collectionneur.</p>" +
+      "<p>La rareté, ici, est au service de l'œuvre et de celles et ceux qui la font vivre.</p>",
+    featured: false,
+  },
+] as const
+
+async function seedBlog() {
+  const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1)
+  const now = Date.now()
+
+  for (let i = 0; i < BLOG_POSTS.length; i++) {
+    const post = BLOG_POSTS[i]
+    const [existing] = await db.select({ id: blogPosts.id }).from(blogPosts).where(eq(blogPosts.slug, post.slug)).limit(1)
+    if (existing) continue
+
+    // Stagger publication dates so the index reads as a real timeline.
+    const publishedAt = new Date(now - i * 7 * 24 * 60 * 60 * 1000)
+    await db.insert(blogPosts).values({
+      slug: post.slug,
+      title: post.title,
+      excerpt: post.excerpt,
+      content: post.content,
+      category: post.category,
+      tags: post.tags,
+      featuredImageUrl: picsum(`blog-${post.slug}`, post.orientation),
+      metaDescription: post.excerpt,
+      authorId: admin?.id ?? null,
+      published: true,
+      featured: post.featured,
+      publishedAt,
+    })
+  }
+
+  console.log(`✅ Blog seeded (${BLOG_POSTS.length} posts)`)
 }

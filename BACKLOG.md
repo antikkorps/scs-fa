@@ -397,11 +397,17 @@
 - [x] **Seeds** : orientations variées (3 paysage / 2 portrait / 1 carré) + image picsum aux dimensions correspondantes
 - [x] **Vérifié** : payload API (orientation par œuvre), SSR collection (2× `4/5`, 3× `3/2`, 1× `1/1`) + détail paysage `3/2` / portrait `4/5` ; **266 API** / 58 shared (`normalizeOrientation`) / 13 web (`artworkGeometry`) au vert, Biome clean
 
-**Story 9.4** — Blog (SEO-first)
+**Story 9.4** — Blog (SEO-first) ✅
 
-- Section éditoriale, **d'abord pour le référencement** (peut ne pas être exploitée fonctionnellement au début)
-- Modèle de contenu (articles : slug, titre, extrait, corps, meta, image), index + article, JSON-LD `Article`/`BlogPosting`, sitemap, fil RSS éventuel
-- Back : CRUD admin (rejoint Phase 7) ; front : SSR + SEO complet
+- [x] **Data** : table `blog_posts` déjà présente (slug, title, excerpt, content, authorId FK users, category, tags, featuredImageUrl, meta\*, published, featured, publishedAt) — réutilisée ; FK `author_id` passée en `ON DELETE SET NULL` (un admin supprimé ne bloque plus / n'orpheline plus ses articles)
+- [x] **Shared** : `blogSlugSchema`, `blogArticleCreateSchema` (.strict), `blogArticleUpdateSchema` (.strict.refine), `blogQuerySchema` (published+search+pagination) + types + tests
+- [x] **API public** : `GET /api/blog` (publiés, newest-first, paginé, auteur joint) + `GET /api/blog/:slug` (contenu complet, 404 sur brouillon/inconnu)
+- [x] **API admin** : `/api/admin/blog` CRUD (`requireRole("admin")`) — liste filtrable, get, create (auteur=session, `publishedAt` auto), update (bascule publication → stamp/clear `publishedAt`), delete ; 409 slug en double
+- [x] **Front public** : `/blog` (SSR, SEO, JSON-LD `Blog`/`BlogPosting`, lien RSS) + `/blog/:slug` (SSR, JSON-LD `BlogPosting` + `BreadcrumbList`, corps HTML, 404 réel) ; `BlogCard` ; liens header + footer
+- [x] **Front admin** : `/admin/blog` (liste + filtres + pager), `/admin/blog/new` + `/admin/blog/:id` (formulaire partagé `AdminBlogForm`, slugify auto, suppression) ; entrée nav backoffice
+- [x] **RSS** : route Nitro `/blog/rss.xml` (RSS 2.0, cache 10 min) ; `<link rel=alternate>` sur l'index. (`sitemap.xml` global → story 9.5)
+- [x] **Seed** : 3 articles de démo (Histoire / Atelier / Collection) avec images picsum
+- [x] **Vérifié** : `pnpm -r typecheck` clean, **279 API** (13 blog) / 65 shared / 13 web au vert (suite API stable ×3), Biome clean ; smoke SSR `/blog`, `/blog/:slug`, 404, RSS OK
 
 **Story 9.5** — Agent-ready / découvrabilité IA
 

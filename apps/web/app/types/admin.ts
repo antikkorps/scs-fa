@@ -203,3 +203,50 @@ export interface LegalDocDetail extends LegalDocQueueItem {
   verificationNotes: string | null
   downloadUrl: string
 }
+
+// Story 9.4 — blog backoffice
+export interface AdminBlogListItem {
+  id: string
+  slug: string
+  title: string
+  category: string | null
+  published: boolean
+  featured: boolean
+  publishedAt: string | null
+  updatedAt: string
+  authorName: string | null
+}
+
+export interface AdminBlogArticle {
+  id: string
+  slug: string
+  title: string
+  excerpt: string | null
+  content: string
+  category: string | null
+  tags: string | null
+  featuredImageUrl: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+  published: boolean
+  featured: boolean
+  publishedAt: string | null
+  authorId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// Editable fields posted to create/update (mirrors the shared zod schemas).
+export interface BlogFormValues {
+  slug: string
+  title: string
+  excerpt: string
+  content: string
+  category: string
+  tags: string
+  featuredImageUrl: string
+  metaTitle: string
+  metaDescription: string
+  published: boolean
+  featured: boolean
+}

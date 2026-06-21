@@ -17,6 +17,7 @@ const year = new Date().getFullYear()
       <nav class="ft__col" aria-label="Explorer">
         <h2 class="ft__h">Explorer</h2>
         <NuxtLink to="/collection">La collection</NuxtLink>
+        <NuxtLink to="/blog">Le Journal</NuxtLink>
         <NuxtLink to="/">Accueil</NuxtLink>
       </nav>
 

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { cartItemSchema, loginSchema, refreshSchema, registerSchema } from "./validation.js"
+import {
+  blogArticleCreateSchema,
+  blogArticleUpdateSchema,
+  blogQuerySchema,
+  cartItemSchema,
+  loginSchema,
+  refreshSchema,
+  registerSchema,
+} from "./validation.js"
 
 describe("registerSchema", () => {
   const base = {
@@ -88,5 +96,54 @@ describe("cartItemSchema", () => {
   it("rejects qty <= 0 or > 10", () => {
     expect(cartItemSchema.safeParse({ variantId: "00000000-0000-0000-0000-000000000000", qty: 0 }).success).toBe(false)
     expect(cartItemSchema.safeParse({ variantId: "00000000-0000-0000-0000-000000000000", qty: 11 }).success).toBe(false)
+  })
+})
+
+describe("blogArticleCreateSchema", () => {
+  const base = { slug: "histoire-du-luger-p08", title: "Histoire du Luger P08", content: "<p>Texte.</p>" }
+
+  it("accepts a minimal valid post and defaults published/featured to false", () => {
+    const r = blogArticleCreateSchema.safeParse(base)
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect(r.data.published).toBe(false)
+      expect(r.data.featured).toBe(false)
+    }
+  })
+
+  it("rejects an invalid slug, empty content and unknown keys", () => {
+    expect(blogArticleCreateSchema.safeParse({ ...base, slug: "Pas Valide" }).success).toBe(false)
+    expect(blogArticleCreateSchema.safeParse({ ...base, content: "" }).success).toBe(false)
+    expect(blogArticleCreateSchema.safeParse({ ...base, authorId: "x" }).success).toBe(false)
+  })
+
+  it("rejects a non-URL featured image", () => {
+    expect(blogArticleCreateSchema.safeParse({ ...base, featuredImageUrl: "not-a-url" }).success).toBe(false)
+  })
+})
+
+describe("blogArticleUpdateSchema", () => {
+  it("accepts a partial update", () => {
+    expect(blogArticleUpdateSchema.safeParse({ published: true }).success).toBe(true)
+  })
+
+  it("rejects an empty object", () => {
+    expect(blogArticleUpdateSchema.safeParse({}).success).toBe(false)
+  })
+})
+
+describe("blogQuerySchema", () => {
+  it("coerces the published string to a boolean and defaults pagination", () => {
+    const r = blogQuerySchema.safeParse({ published: "true" })
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect(r.data.published).toBe(true)
+      expect(r.data.page).toBe(1)
+      expect(r.data.limit).toBe(20)
+    }
+  })
+
+  it("rejects a non-boolean published filter", () => {
+    expect(blogQuerySchema.safeParse({ published: "maybe" }).success).toBe(false)
   })
 })
