@@ -208,8 +208,19 @@ describe("legal documents (/api/legal-documents)", () => {
   it("issues a download URL only once the scan is clean, and enforces ownership", async () => {
     const created = (await upload({ fields: { docType: "cni" }, file: validPdf })).json().data
 
-    // While the scan is unresolved (pending/infected) no bytes are served. Force
-    // the state deterministically — the async scan is fire-and-forget on upload.
+    // While the scan is unresolved (pending/infected) no bytes are served. The
+    // scan is fire-and-forget on upload, so wait for it to settle before forcing
+    // `pending` — otherwise that background write can land *after* our reset (a
+    // race that flakes on slower CI runners).
+    for (let i = 0; i < 100; i++) {
+      const [d] = await db
+        .select({ scanStatus: legalDocuments.scanStatus })
+        .from(legalDocuments)
+        .where(eq(legalDocuments.id, created.id))
+        .limit(1)
+      if (d?.scanStatus !== "pending") break
+      await new Promise((r) => setTimeout(r, 20))
+    }
     await db.update(legalDocuments).set({ scanStatus: "pending" }).where(eq(legalDocuments.id, created.id))
     const beforeScan = await app.inject({
       method: "GET",

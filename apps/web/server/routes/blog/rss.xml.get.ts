@@ -1,6 +1,8 @@
 // RSS 2.0 feed for the blog — discoverable by readers and crawlers (SEO).
 // Pulls published articles from the API and renders a cached XML document.
 
+import { escapeXml } from "../../utils/seo"
+
 interface BlogListItem {
   slug: string
   title: string
@@ -8,22 +10,6 @@ interface BlogListItem {
   publishedAt: string | null
   authorName: string | null
 }
-
-const escapeXml = (s: string): string =>
-  s.replace(/[<>&'"]/g, (c) => {
-    switch (c) {
-      case "<":
-        return "&lt;"
-      case ">":
-        return "&gt;"
-      case "&":
-        return "&amp;"
-      case "'":
-        return "&apos;"
-      default:
-        return "&quot;"
-    }
-  })
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
