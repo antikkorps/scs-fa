@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtworkListItem } from "~/types/artwork"
-import { artworkImage, availabilityLabel, formatEuros } from "~/utils/format"
+import { artworkGeometry, artworkImage, availabilityLabel, formatEuros } from "~/utils/format"
 
 const props = defineProps<{
   artwork: ArtworkListItem
@@ -9,18 +9,21 @@ const props = defineProps<{
 }>()
 
 const soldOut = computed(() => props.artwork.availableCount <= 0)
-const img = computed(() => artworkImage(props.artwork.featuredImageUrl, props.artwork.slug, 800, 1000))
+const geometry = computed(() => artworkGeometry(props.artwork.orientation))
+const img = computed(() =>
+  artworkImage(props.artwork.featuredImageUrl, props.artwork.slug, geometry.value.width, geometry.value.height),
+)
 </script>
 
 <template>
   <article class="card" :class="{ 'is-soldout': soldOut }">
     <NuxtLink :to="`/collection/${artwork.slug}`" class="card__link">
-      <div class="card__media">
+      <div class="card__media" :style="{ aspectRatio: geometry.ratio }">
         <img
           :src="img"
           :alt="`${artwork.title}${artwork.artistName ? ` — ${artwork.artistName}` : ''}`"
-          width="800"
-          height="1000"
+          :width="geometry.width"
+          :height="geometry.height"
           :loading="priority ? 'eager' : 'lazy'"
           :fetchpriority="priority ? 'high' : 'auto'"
           decoding="async"
@@ -56,7 +59,8 @@ const img = computed(() => artworkImage(props.artwork.featuredImageUrl, props.ar
 }
 .card__media {
   position: relative;
-  aspect-ratio: 4 / 5;
+  /* aspect-ratio is bound inline from the artwork orientation (portrait /
+     landscape / square) so the catalogue mixes ratios without cropping. */
   overflow: hidden;
   border-radius: var(--radius);
   background: var(--ink-soft);

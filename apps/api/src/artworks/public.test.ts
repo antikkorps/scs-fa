@@ -37,6 +37,7 @@ describe("public artwork routes (/api/artworks)", () => {
     editionLimit: number
     basePriceHt: number
     soldCount: number
+    orientation?: "portrait" | "landscape" | "square"
   }) {
     const gunArt = await categoryId("gun-art")
     const [product] = await db
@@ -65,6 +66,7 @@ describe("public artwork routes (/api/artworks)", () => {
         priceIncrementHt: "10.00",
         vatPct: "20",
         featuredImageUrl: null,
+        orientation: opts.orientation ?? "portrait",
         published: opts.published,
       })
       .returning({ id: artworks.id, slug: artworks.slug })
@@ -97,6 +99,7 @@ describe("public artwork routes (/api/artworks)", () => {
       editionLimit: 10,
       basePriceHt: 100,
       soldCount: 3,
+      orientation: "landscape",
     })
     await seedArtwork({ suffix: "hidden", published: false, editionLimit: 5, basePriceHt: 50, soldCount: 0 })
   })
@@ -111,6 +114,7 @@ describe("public artwork routes (/api/artworks)", () => {
     expect(res.statusCode).toBe(200)
     const items = res.json().data as Array<{
       slug: string
+      orientation: string
       availableCount: number
       soldCount: number
       priceFromHt: number
@@ -119,6 +123,7 @@ describe("public artwork routes (/api/artworks)", () => {
 
     const pub = items.find((a) => a.slug === publishedSlug)
     expect(pub).toBeDefined()
+    expect(pub?.orientation).toBe("landscape")
     expect(pub?.availableCount).toBe(7) // 10 - 3 sold
     expect(pub?.soldCount).toBe(3)
     // cheapest available = print 10 = base 100 HT -> 120 TTC
@@ -133,6 +138,7 @@ describe("public artwork routes (/api/artworks)", () => {
     expect(res.statusCode).toBe(200)
     const data = res.json().data
     expect(data.slug).toBe(publishedSlug)
+    expect(data.orientation).toBe("landscape")
     expect(data.prints).toHaveLength(10)
     expect(data.availableCount).toBe(7)
     expect(data.soldCount).toBe(3)

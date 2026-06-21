@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calculateArtworkPrice, calculateArtworkPriceBreakdown } from "./artwork.js"
+import { calculateArtworkPrice, calculateArtworkPriceBreakdown, normalizeOrientation } from "./artwork.js"
 
 const SMALL = { priceFactor: 1.0 }
 const MEDIUM = { priceFactor: 1.5 }
@@ -56,6 +56,22 @@ describe("calculateArtworkPrice", () => {
     expect(() => calculateArtworkPrice(50, 2, 25, 1, { priceFactor: 0 })).toThrow(RangeError)
     expect(() => calculateArtworkPrice(-1, 2, 25, 1, SMALL)).toThrow(RangeError)
     expect(() => calculateArtworkPrice(50, -2, 25, 1, SMALL)).toThrow(RangeError)
+  })
+})
+
+describe("normalizeOrientation", () => {
+  it("passes through known orientations", () => {
+    expect(normalizeOrientation("portrait")).toBe("portrait")
+    expect(normalizeOrientation("landscape")).toBe("landscape")
+    expect(normalizeOrientation("square")).toBe("square")
+  })
+
+  it("defaults unknown / empty / non-string values to portrait", () => {
+    expect(normalizeOrientation("paysage")).toBe("portrait")
+    expect(normalizeOrientation("")).toBe("portrait")
+    expect(normalizeOrientation(null)).toBe("portrait")
+    expect(normalizeOrientation(undefined)).toBe("portrait")
+    expect(normalizeOrientation(42)).toBe("portrait")
   })
 })
 

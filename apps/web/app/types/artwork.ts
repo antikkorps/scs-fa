@@ -1,3 +1,5 @@
+import type { ArtworkOrientation } from "@armurier/shared"
+
 export interface ArtworkListItem {
   id: string
   slug: string
@@ -5,6 +7,7 @@ export interface ArtworkListItem {
   artistName: string | null
   description: string | null
   featuredImageUrl: string | null
+  orientation: ArtworkOrientation
   editionLimit: number
   editionYear: number | null
   availableCount: number
@@ -64,6 +67,7 @@ export interface ArtworkDetail {
   artistName: string | null
   artistBio: string | null
   featuredImageUrl: string | null
+  orientation: ArtworkOrientation
   editionLimit: number
   editionYear: number | null
   availableFormats: ArtworkFormat[] | null
