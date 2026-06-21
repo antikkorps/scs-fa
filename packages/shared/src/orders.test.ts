@@ -113,24 +113,24 @@ describe("parseBankStatementCsv", () => {
       amount: 1200,
       counterpartyIban: "FR7612345678901234567890123",
     })
-    expect(txns[0].label).toContain("SCS-0123-4567")
-    expect(txns[1].amount).toBeCloseTo(-45.9, 2)
+    expect(txns[0]?.label).toContain("SCS-0123-4567")
+    expect(txns[1]?.amount).toBeCloseTo(-45.9, 2)
   })
 
   it("parses a comma-delimited English export and honours quoted fields", () => {
     const csv = ["date,description,amount", '2026-06-10,"VIR SCS-0123-4567, JEAN",1200.00'].join("\n")
     const txns = parseBankStatementCsv(csv)
     expect(txns).toHaveLength(1)
-    expect(txns[0].label).toBe("VIR SCS-0123-4567, JEAN")
-    expect(txns[0].amount).toBe(1200)
-    expect(txns[0].counterpartyIban).toBeNull()
+    expect(txns[0]?.label).toBe("VIR SCS-0123-4567, JEAN")
+    expect(txns[0]?.amount).toBe(1200)
+    expect(txns[0]?.counterpartyIban).toBeNull()
   })
 
   it("skips rows with an unparseable amount and returns [] for header-only input", () => {
     const csv = ["Libelle;Montant", "VIR SCS-0123-4567;n/a", "VIR SCS-AB12-CD34;500,00"].join("\n")
     const txns = parseBankStatementCsv(csv)
     expect(txns).toHaveLength(1)
-    expect(txns[0].amount).toBe(500)
+    expect(txns[0]?.amount).toBe(500)
     expect(parseBankStatementCsv("Libelle;Montant")).toEqual([])
   })
 

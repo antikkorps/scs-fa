@@ -77,7 +77,9 @@ export function virementReferenceFromBytes(bytes: Uint8Array): string {
   }
   let out = ""
   for (let i = 0; i < 8; i++) {
-    out += VIREMENT_REF_ALPHABET[bytes[i] % 32]
+    // `bytes[i] % 32` is always 0–31 and the alphabet has 32 symbols, so the
+    // lookup never misses; the `?? ""` satisfies noUncheckedIndexedAccess.
+    out += VIREMENT_REF_ALPHABET[(bytes[i] ?? 0) % 32] ?? ""
   }
   return `SCS-${out.slice(0, 4)}-${out.slice(4)}`
 }
@@ -192,8 +194,11 @@ export function parseBankStatementCsv(csv: string): BankTransaction[] {
     .filter((l) => l.length > 0)
   if (lines.length < 2) return []
 
-  const delimiter = (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ";" : ","
-  const headers = splitCsvLine(lines[0], delimiter).map(normaliseHeader)
+  // Guarded by the length check above; bind to a non-optional local so the
+  // header parsing stays clean under noUncheckedIndexedAccess.
+  const headerLine = lines[0] ?? ""
+  const delimiter = (headerLine.match(/;/g)?.length ?? 0) >= (headerLine.match(/,/g)?.length ?? 0) ? ";" : ","
+  const headers = splitCsvLine(headerLine, delimiter).map(normaliseHeader)
 
   const indexFor = (key: keyof BankTransaction): number => {
     const aliases = CSV_HEADER_ALIASES[key]
@@ -209,7 +214,7 @@ export function parseBankStatementCsv(csv: string): BankTransaction[] {
 
   const transactions: BankTransaction[] = []
   for (let i = 1; i < lines.length; i++) {
-    const cols = splitCsvLine(lines[i], delimiter)
+    const cols = splitCsvLine(lines[i] ?? "", delimiter)
     const amount = parseBankAmount(cols[amountIdx] ?? "")
     if (Number.isNaN(amount)) continue
     transactions.push({

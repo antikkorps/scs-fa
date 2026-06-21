@@ -5,6 +5,9 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "strict": true,
+    // Match the consumers' strictness (the Nuxt app enables this): shared source
+    // is type-checked under web's config, so catch unsafe indexed access here too.
+    "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
