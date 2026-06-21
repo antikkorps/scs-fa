@@ -408,6 +408,7 @@
 - [x] **RSS** : route Nitro `/blog/rss.xml` (RSS 2.0, cache 10 min) ; `<link rel=alternate>` sur l'index. (`sitemap.xml` global → story 9.5)
 - [x] **Seed** : 3 articles de démo (Histoire / Atelier / Collection) avec images picsum
 - [x] **Vérifié** : `pnpm -r typecheck` clean, **279 API** (13 blog) / 65 shared / 13 web au vert (suite API stable ×3), Biome clean ; smoke SSR `/blog`, `/blog/:slug`, 404, RSS OK
+- [x] **9.4b — Éditeur WYSIWYG** (décision validée avec Franck : rich text plutôt que HTML brut) : `RichTextEditor` (TipTap 3.20.4 — gras/italique/souligné/barré, H2/H3, listes, citation, **liens**, **images**) dans `AdminBlogForm`. Upload d'images `POST /api/admin/blog/images` (admin) → conversion **WebP** (sharp 0.34.5, qualité 80, max 1600px) → service public durable `GET /api/blog/images/:filename` (cache long). URL relative + devProxy Nitro en dev (origine unique via Caddy en prod). **Sanitization serveur** au save (`sanitize-html` 2.17.2, liste blanche alignée sur la sortie TipTap). Vérifié : **284 API** (5 nouveaux : upload→WebP→serve e2e via storage mémoire, rejets non-image, 403/401, 404 path-traversal, sanitization au save) / 65 shared / 21 web au vert, Biome clean, devProxy OK
 
 **Story 9.5** — Agent-ready / découvrabilité IA ✅
 
