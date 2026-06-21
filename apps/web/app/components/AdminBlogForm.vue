@@ -36,12 +36,26 @@ function onTitleInput() {
     <div class="grid">
       <label class="field field--wide">
         <span class="field__label">Titre *</span>
-        <input v-model="model.title" class="ctl" type="text" maxlength="255" required @input="onTitleInput" />
+        <input
+          v-model="model.title"
+          class="ctl"
+          type="text"
+          maxlength="255"
+          required
+          @input="onTitleInput"
+        />
       </label>
 
       <label class="field">
         <span class="field__label">Slug *</span>
-        <input v-model="model.slug" class="ctl" type="text" maxlength="255" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" />
+        <input
+          v-model="model.slug"
+          class="ctl"
+          type="text"
+          maxlength="255"
+          required
+          pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+        />
       </label>
 
       <label class="field">
@@ -93,10 +107,22 @@ function onTitleInput() {
 
     <div class="actions">
       <button type="submit" class="btn btn-primary" :disabled="submitting">
-        {{ submitting ? "Enregistrement…" : mode === "create" ? "Créer l'article" : "Enregistrer" }}
+        {{
+          submitting
+            ? "Enregistrement…"
+            : mode === "create"
+              ? "Créer l'article"
+              : "Enregistrer"
+        }}
       </button>
       <NuxtLink to="/admin/blog" class="btn btn-ghost">Annuler</NuxtLink>
-      <button v-if="mode === 'edit'" type="button" class="btn btn-ghost danger" :disabled="submitting" @click="emit('remove')">
+      <button
+        v-if="mode === 'edit'"
+        type="button"
+        class="btn btn-ghost danger"
+        :disabled="submitting"
+        @click="emit('remove')"
+      >
         Supprimer
       </button>
     </div>

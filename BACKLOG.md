@@ -409,10 +409,15 @@
 - [x] **Seed** : 3 articles de démo (Histoire / Atelier / Collection) avec images picsum
 - [x] **Vérifié** : `pnpm -r typecheck` clean, **279 API** (13 blog) / 65 shared / 13 web au vert (suite API stable ×3), Biome clean ; smoke SSR `/blog`, `/blog/:slug`, 404, RSS OK
 
-**Story 9.5** — Agent-ready / découvrabilité IA
+**Story 9.5** — Agent-ready / découvrabilité IA ✅
 
-- Être visible dans les recherches d'**agents LLM** : `llms.txt` (+ `llms-full.txt`), `sitemap.xml`, structured data complète et valide (Product/VisualArtwork/Offer/Breadcrumb/Organization déjà amorcés), contenu sémantique propre, métadonnées riches
-- Étudier un format/endpoints pensés pour agents (réponses structurées, éventuellement exposition MCP en lecture)
+- [x] **`sitemap.xml`** : route Nitro dynamique (`server/routes/sitemap.xml.get.ts`) — accueil + collection + journal + chaque œuvre + chaque article (lastmod sur les articles), tirée de l'API ; `/recherche` exclue (noindex)
+- [x] **`robots.txt`** : passé en route Nitro dynamique (statique supprimé) avec directive `Sitemap:` absolue + `Disallow: /recherche` et `/admin`
+- [x] **`llms.txt` + `llms-full.txt`** (convention llmstxt.org) : `/llms.txt` concis (résumé + sections + liens + endpoints API JSON) ; `/llms-full.txt` enrichi (catalogue des œuvres + articles avec descriptions), tiré de l'API
+- [x] **Structured data** : ajout sitewide `WebSite` + `SearchAction` (sitelinks search box → `/recherche?q=`) et enrichissement `Organization` (description, slogan) dans `app.vue` ; JSON-LD existant conservé (VisualArtwork/Offer/ItemList/BreadcrumbList/BlogPosting/Blog)
+- [x] **Builders purs** `server/utils/seo.ts` (`buildSitemap`/`buildRobots`/`buildLlmsTxt`/`buildLlmsFull`/`escapeXml`, réutilisé par le flux RSS) — testés (`server/**` ajouté à l'include vitest web)
+- Périmètre : exposition MCP en lecture **étudiée mais non implémentée** (l'API JSON publique est déjà documentée dans `llms.txt` comme surface agent ; MCP = amélioration future)
+- [x] **Vérifié** : smoke `/sitemap.xml` (12 URLs), `/robots.txt`, `/llms.txt`, `/llms-full.txt`, WebSite/SearchAction en home ; `pnpm -r typecheck` clean, **279 API / 65 shared / 21 web** (8 nouveaux `seo.test.ts`) au vert, Biome clean
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
