@@ -162,4 +162,23 @@ describe("GET /api/products/:id", () => {
     expect(res.statusCode).toBe(400)
     expect(res.json().error).toBe("ValidationError")
   })
+
+  it("resolves a published product by slug", async () => {
+    const res = await app.inject({ method: "GET", url: `/api/products/slug/${SKU_PREFIX}alpha` })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.id).toBe(publishedId)
+    expect(body.slug).toBe(`${SKU_PREFIX}alpha`)
+    expect(body.legalCategory).toMatchObject({ category: "B" })
+  })
+
+  it("returns 404 for an unpublished product by slug", async () => {
+    const res = await app.inject({ method: "GET", url: `/api/products/slug/${SKU_PREFIX}delta` })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it("returns 404 for an unknown slug", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/products/slug/nope-does-not-exist" })
+    expect(res.statusCode).toBe(404)
+  })
 })

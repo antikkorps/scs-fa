@@ -37,8 +37,11 @@ const { data, error, pending } = await useAsyncData<SearchResponse | null>(
 )
 
 const artworks = computed(() => data.value?.artworks ?? [])
+const products = computed(() => data.value?.products ?? [])
 const hasQuery = computed(() => debounced.value.length > 0)
-const isEmpty = computed(() => hasQuery.value && !pending.value && !error.value && artworks.value.length === 0)
+const isEmpty = computed(
+  () => hasQuery.value && !pending.value && !error.value && artworks.value.length === 0 && products.value.length === 0,
+)
 
 // Search result pages carry no standalone SEO value — keep them out of the index.
 useSeoMeta({
@@ -81,15 +84,28 @@ useSeoMeta({
         Aucun résultat pour « {{ debounced }} ». Essayez un autre terme.
       </p>
 
-      <template v-else-if="artworks.length > 0">
-        <h2 class="results__heading">
-          Œuvres <span class="results__count">{{ artworks.length }}</span>
-        </h2>
-        <ul class="grid" role="list">
-          <li v-for="(art, i) in artworks" :key="art.id">
-            <ArtworkCard :artwork="art" :priority="i < 2" />
-          </li>
-        </ul>
+      <template v-else>
+        <template v-if="products.length > 0">
+          <h2 class="results__heading">
+            Armurerie <span class="results__count">{{ products.length }}</span>
+          </h2>
+          <ul class="grid" role="list">
+            <li v-for="(p, i) in products" :key="p.id">
+              <ProductCard :product="p" :priority="i < 2" />
+            </li>
+          </ul>
+        </template>
+
+        <template v-if="artworks.length > 0">
+          <h2 class="results__heading">
+            Œuvres <span class="results__count">{{ artworks.length }}</span>
+          </h2>
+          <ul class="grid" role="list">
+            <li v-for="(art, i) in artworks" :key="art.id">
+              <ArtworkCard :artwork="art" :priority="i < 2" />
+            </li>
+          </ul>
+        </template>
       </template>
     </section>
   </div>

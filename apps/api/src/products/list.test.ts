@@ -40,6 +40,7 @@ describe("GET /api/products", () => {
     const armeLongue = await categoryId("arme-longue")
     const munition = await categoryId("munition")
     const accessoire = await categoryId("accessoire-tireur")
+    const gunArt = await categoryId("gun-art")
     const legalB = await legalCategoryId("B")
     const legalC = await legalCategoryId("C")
     const legalNone = await legalCategoryId("none")
@@ -89,6 +90,17 @@ describe("GET /api/products", () => {
         requiresLegalVerification: false,
         published: false,
       },
+      {
+        sku: `${SKU_PREFIX}epsilon`,
+        slug: `${SKU_PREFIX}epsilon`,
+        name: "Tirage Gun Art Test Epsilon",
+        description: "Produit support d'une œuvre Gun Art — ne doit pas apparaître en armurerie",
+        categoryId: gunArt,
+        legalCategoryId: legalNone,
+        priceHt: "180.00",
+        requiresLegalVerification: false,
+        published: true,
+      },
     ])
   })
 
@@ -113,6 +125,14 @@ describe("GET /api/products", () => {
     expect(skus).toContain(`${SKU_PREFIX}gamma`)
     // unpublished product is hidden
     expect(skus).not.toContain(`${SKU_PREFIX}delta`)
+    // Gun Art is its own universe (/api/artworks) — excluded from the armurerie list
+    expect(skus).not.toContain(`${SKU_PREFIX}epsilon`)
+  })
+
+  it("excludes gun_art products even when no category filter is given", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/products?search=epsilon&limit=100" })
+    expect(res.statusCode).toBe(200)
+    expect(testSkus(res.json())).not.toContain(`${SKU_PREFIX}epsilon`)
   })
 
   it("computes priceTtc from priceHt and vat", async () => {
