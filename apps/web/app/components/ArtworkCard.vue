@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtworkListItem } from "~/types/artwork"
-import { artworkGeometry, artworkImage, availabilityLabel, formatEuros } from "~/utils/format"
+import { artworkImage, availabilityLabel, CARD_GEOMETRY, formatEuros } from "~/utils/format"
 
 const props = defineProps<{
   artwork: ArtworkListItem
@@ -9,21 +9,22 @@ const props = defineProps<{
 }>()
 
 const soldOut = computed(() => props.artwork.availableCount <= 0)
-const geometry = computed(() => artworkGeometry(props.artwork.orientation))
+// Cards use a single uniform ratio (see CARD_GEOMETRY) for an even grid; the
+// detail page keeps each piece's true orientation.
 const img = computed(() =>
-  artworkImage(props.artwork.featuredImageUrl, props.artwork.slug, geometry.value.width, geometry.value.height),
+  artworkImage(props.artwork.featuredImageUrl, props.artwork.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height),
 )
 </script>
 
 <template>
   <article class="card" :class="{ 'is-soldout': soldOut }">
     <NuxtLink :to="`/collection/${artwork.slug}`" class="card__link">
-      <div class="card__media" :style="{ aspectRatio: geometry.ratio }">
+      <div class="card__media">
         <img
           :src="img"
           :alt="`${artwork.title}${artwork.artistName ? ` — ${artwork.artistName}` : ''}`"
-          :width="geometry.width"
-          :height="geometry.height"
+          :width="CARD_GEOMETRY.width"
+          :height="CARD_GEOMETRY.height"
           :loading="priority ? 'eager' : 'lazy'"
           :fetchpriority="priority ? 'high' : 'auto'"
           decoding="async"
@@ -59,8 +60,9 @@ const img = computed(() =>
 }
 .card__media {
   position: relative;
-  /* aspect-ratio is bound inline from the artwork orientation (portrait /
-     landscape / square) so the catalogue mixes ratios without cropping. */
+  /* Uniform card ratio (see CARD_GEOMETRY): every card is the same height so the
+     grid reads as an even gallery hang; the image fills it via object-fit:cover. */
+  aspect-ratio: 4 / 5;
   overflow: hidden;
   border-radius: var(--radius);
   background: var(--ink-soft);

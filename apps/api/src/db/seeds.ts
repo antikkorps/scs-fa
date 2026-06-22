@@ -188,20 +188,9 @@ export async function seedDatabase() {
 // GUN ART — œuvres en tirage limité (≤25) pour la page collection
 // ==========================================================================
 
-// Image placeholders: Lorem Picsum (real photos, deterministic per slug) so the
-// collection is visual out of the box. Replace `featuredImageUrl` from the admin
-// backend with the real artwork photography when available.
-// Demo image whose dimensions match the artwork's orientation, so landscape
-// pieces don't render as cropped portraits in the gallery.
-const PICSUM_DIMS: Record<string, [number, number]> = {
-  portrait: [1200, 1500],
-  landscape: [1500, 1000],
-  square: [1200, 1200],
-}
-const picsum = (seed: string, orientation = "portrait") => {
-  const [w, h] = PICSUM_DIMS[orientation] ?? PICSUM_DIMS.portrait
-  return `https://picsum.photos/seed/${seed}/${w}/${h}`
-}
+// Seeded artworks ship without a demo photo (`featuredImageUrl: null`): the
+// storefront renders its own deterministic on-brand placeholder, and real
+// photography is uploaded later from the admin backend.
 
 // A4 print format (priceFactor 1.0) used to price every seeded numbered print;
 // rarity drives the increment (print 1 dearest, print N = base).
@@ -376,7 +365,10 @@ async function seedGunArt() {
         basePriceHt: piece.basePriceHt.toFixed(2),
         priceIncrementHt: piece.priceIncrementHt.toFixed(2),
         vatPct: "20",
-        featuredImageUrl: picsum(piece.slug, piece.orientation),
+        // No demo photo: the storefront renders its own on-brand placeholder
+        // (see web artworkImage/fallbackImage). Real photography is uploaded
+        // from the admin backend.
+        featuredImageUrl: null,
         orientation: piece.orientation,
         featured: piece.featured,
         published: true,
@@ -479,7 +471,8 @@ async function seedBlog() {
       content: post.content,
       category: post.category,
       tags: post.tags,
-      featuredImageUrl: picsum(`blog-${post.slug}`, post.orientation),
+      // Same as artworks: let the storefront render its own placeholder.
+      featuredImageUrl: null,
       metaDescription: post.excerpt,
       authorId: admin?.id ?? null,
       published: true,

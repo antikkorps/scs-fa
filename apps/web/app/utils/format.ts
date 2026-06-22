@@ -27,9 +27,40 @@ export function formatDate(iso: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? "—" : DATE.format(d)
 }
 
-/** Deterministic real-photo placeholder when an artwork has no image yet. */
-export function fallbackImage(seed: string, w = 1200, h = 1500): string {
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`
+/** Small deterministic string hash (FNV-ish) used to vary the placeholder accent. */
+function seedHash(seed: string): number {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (Math.imul(h, 31) + seed.charCodeAt(i)) >>> 0
+  return h
+}
+
+/**
+ * Deterministic, self-contained placeholder for an artwork without an image yet.
+ * Returns an inline SVG data URI (no network) on the dark "gallery" palette with
+ * a brass aperture/target motif — on-brand and reliable offline, unlike a remote
+ * photo service. The accent shade varies per seed for subtle variety.
+ */
+export function fallbackImage(seed: string, w = 800, h = 1000): string {
+  const hash = seedHash(seed)
+  const lightness = 40 + (hash % 12) // brass-ish, 40–51%
+  const accent = `hsl(40 46% ${lightness}%)`
+  const cx = Math.round(w / 2)
+  const cy = Math.round(h / 2)
+  const r = Math.round(Math.min(w, h) * 0.2)
+  const arm = Math.round(r * 1.5)
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<defs><radialGradient id="g" cx="50%" cy="42%" r="78%">` +
+    `<stop offset="0%" stop-color="#1c1c21"/><stop offset="100%" stop-color="#0e0e10"/>` +
+    `</radialGradient></defs>` +
+    `<rect width="${w}" height="${h}" fill="url(#g)"/>` +
+    `<g fill="none" stroke="${accent}" stroke-opacity="0.5">` +
+    `<circle cx="${cx}" cy="${cy}" r="${r}" stroke-width="2"/>` +
+    `<circle cx="${cx}" cy="${cy}" r="${Math.round(r * 0.58)}" stroke-width="1.5"/>` +
+    `<line x1="${cx}" y1="${cy - arm}" x2="${cx}" y2="${cy + arm}" stroke-width="1"/>` +
+    `<line x1="${cx - arm}" y1="${cy}" x2="${cx + arm}" y2="${cy}" stroke-width="1"/>` +
+    `</g></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
 /** Artwork image: the backend-provided URL when set, else a deterministic placeholder. */
@@ -57,6 +88,14 @@ export function artworkGeometry(orientation: ArtworkOrientation): {
       return { ratio: "4 / 5", width: 800, height: 1000 }
   }
 }
+
+/**
+ * Uniform geometry for catalogue cards. Every card shares one ratio so the grid
+ * reads as an even gallery hang; the image fills it with `object-fit: cover`
+ * (mixed orientations are cropped to the card box). The detail page keeps each
+ * piece's true orientation via {@link artworkGeometry}.
+ */
+export const CARD_GEOMETRY = { ratio: "4 / 5", width: 800, height: 1000 } as const
 
 /** Human availability label for a limited edition. */
 export function availabilityLabel(availableCount: number, editionLimit: number): string {

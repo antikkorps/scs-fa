@@ -9,6 +9,16 @@ on:
     branches: [main]
   pull_request:
 
+# Serialize ALL CI runs repo-wide. The Forgejo runner shares one Docker network
+# (`forgejo-config_internal`) across jobs, so two concurrent runs would each spin
+# up a Postgres service under the same `testdb` alias and step on each other
+# (manifested as "port already allocated", then "relation \"users\" does not
+# exist" when a run's schema push/seed hit the wrong database). A constant group
+# with cancel-in-progress: false queues runs so they never overlap.
+concurrency:
+  group: ci-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
   verify:
     runs-on: ubuntu-latest
