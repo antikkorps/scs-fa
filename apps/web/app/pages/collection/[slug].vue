@@ -22,6 +22,8 @@ const heroGeometry = computed(() => artworkGeometry(art.value.orientation))
 const hero = computed(() =>
   artworkImage(art.value.featuredImageUrl, art.value.slug, heroGeometry.value.width, heroGeometry.value.height),
 )
+const lightboxOpen = ref(false)
+const heroAlt = computed(() => `${art.value.title}${art.value.artistName ? ` — ${art.value.artistName}` : ""}`)
 const formatName = (id: string) => art.value.availableFormats?.find((f) => f.id === id)?.name ?? id
 const availablePrints = computed(() => art.value.prints.filter((p) => p.status === "available"))
 const soldOut = computed(() => availablePrints.value.length === 0)
@@ -95,15 +97,19 @@ useHead({
 
       <div class="detail__grid">
         <figure class="detail__media" :style="{ aspectRatio: heroGeometry.ratio }">
-          <img
-            :src="hero"
-            :alt="`${art.title}${art.artistName ? ` — ${art.artistName}` : ''}`"
-            :width="heroGeometry.width"
-            :height="heroGeometry.height"
-            fetchpriority="high"
-            decoding="async"
-          />
+          <button type="button" class="detail__zoom" :aria-label="`Agrandir l'image : ${art.title}`" @click="lightboxOpen = true">
+            <img
+              :src="hero"
+              :alt="heroAlt"
+              :width="heroGeometry.width"
+              :height="heroGeometry.height"
+              fetchpriority="high"
+              decoding="async"
+            />
+            <span class="detail__zoomhint" aria-hidden="true">⤢</span>
+          </button>
         </figure>
+        <ImageLightbox v-model="lightboxOpen" :src="hero" :alt="heroAlt" />
 
         <div class="detail__info">
           <p v-if="art.artistName" class="eyebrow">{{ art.artistName }}</p>
@@ -193,12 +199,42 @@ useHead({
   background: var(--ink-soft);
   box-shadow: var(--shadow);
 }
+.detail__zoom {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+}
 .detail__media img {
   /* The figure carries the orientation aspect-ratio (bound inline); the image
      fills it so portrait and landscape pieces both display uncropped at scale. */
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.detail__zoomhint {
+  position: absolute;
+  bottom: 0.85rem;
+  right: 0.85rem;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  color: var(--paper);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--ink-line);
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+.detail__media:hover .detail__zoomhint,
+.detail__zoom:focus-visible .detail__zoomhint {
+  opacity: 1;
 }
 .detail__title {
   font-size: clamp(2.4rem, 7vw, 3.6rem);

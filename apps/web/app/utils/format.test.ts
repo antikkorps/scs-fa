@@ -23,14 +23,22 @@ describe("formatEuros", () => {
 })
 
 describe("artwork images", () => {
-  it("builds a deterministic placeholder from a seed", () => {
-    expect(fallbackImage("acier-nocturne", 800, 1000)).toBe("https://picsum.photos/seed/acier-nocturne/800/1000")
+  it("builds a self-contained inline-SVG placeholder (no network)", () => {
+    const out = fallbackImage("acier-nocturne", 800, 1000)
+    expect(out.startsWith("data:image/svg+xml,")).toBe(true)
+    const svg = decodeURIComponent(out.replace("data:image/svg+xml,", ""))
+    expect(svg).toContain('width="800"')
+    expect(svg).toContain('height="1000"')
+  })
+
+  it("is deterministic for a given seed and size", () => {
+    expect(fallbackImage("acier-nocturne", 800, 1000)).toBe(fallbackImage("acier-nocturne", 800, 1000))
   })
 
   it("prefers the backend image when present, falls back otherwise", () => {
     expect(artworkImage("https://cdn.example/x.jpg", "slug")).toBe("https://cdn.example/x.jpg")
-    expect(artworkImage(null, "slug", 400, 500)).toBe("https://picsum.photos/seed/slug/400/500")
-    expect(artworkImage("", "slug", 400, 500)).toBe("https://picsum.photos/seed/slug/400/500")
+    expect(artworkImage(null, "slug", 400, 500)).toBe(fallbackImage("slug", 400, 500))
+    expect(artworkImage("", "slug", 400, 500)).toBe(fallbackImage("slug", 400, 500))
   })
 })
 
