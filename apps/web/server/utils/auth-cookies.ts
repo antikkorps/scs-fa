@@ -30,11 +30,7 @@ export function clearRefreshCookie(event: H3Event): void {
 
 // Forwards a call to the upstream auth API and re-throws upstream errors with
 // their original status + payload, so client pages can react to 401/409/423/etc.
-export async function callAuthApi<T>(
-  event: H3Event,
-  path: string,
-  body: Record<string, unknown>,
-): Promise<T> {
+export async function callAuthApi<T>(event: H3Event, path: string, body: Record<string, unknown>): Promise<T> {
   const apiBase = useRuntimeConfig(event).public.apiBase as string
   try {
     return (await $fetch(`${apiBase}${path}`, { method: "POST", body })) as T
