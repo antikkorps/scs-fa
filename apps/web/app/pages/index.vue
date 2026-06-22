@@ -73,6 +73,23 @@ useHead({ link: [{ rel: "canonical", href: siteUrl }] })
         <NuxtLink to="/collection" class="btn btn-ghost">Voir toute la collection</NuxtLink>
       </div>
     </section>
+
+    <!-- À propos -->
+    <section id="about" class="container about">
+      <p class="eyebrow">À propos</p>
+      <h2 class="about__title">La maison SCS Firearm</h2>
+      <p class="about__text">
+        SCS Firearm réunit deux exigences&nbsp;: une <strong>armurerie de précision</strong>, où chaque arme, munition
+        et accessoire est sélectionné et encadré par les obligations légales françaises, et une galerie
+        <strong>Gun Art</strong>, qui élève l'objet au rang d'œuvre à travers des tirages signés en édition limitée.
+      </p>
+      <p class="about__text">
+        Même maison, même soin du détail&nbsp;: conseil rigoureux, traçabilité, et un accompagnement de la commande
+        jusqu'à la conformité réglementaire. Découvrez la
+        <NuxtLink to="/boutique" class="about__link">boutique</NuxtLink> ou la
+        <NuxtLink to="/collection" class="about__link">collection Gun Art</NuxtLink>.
+      </p>
+    </section>
   </div>
 </template>
 
@@ -140,6 +157,30 @@ useHead({ link: [{ rel: "canonical", href: siteUrl }] })
   display: flex;
   justify-content: center;
   margin-top: clamp(2rem, 5vw, 3rem);
+}
+
+.about {
+  padding-top: clamp(3rem, 8vw, 5.5rem);
+  padding-bottom: clamp(3rem, 8vw, 5.5rem);
+  max-width: 760px;
+}
+.about__title {
+  font-size: clamp(2rem, 6vw, 3rem);
+  margin: 0.5rem 0 1.25rem;
+}
+.about__text {
+  font-size: clamp(1rem, 2.4vw, 1.12rem);
+  color: var(--paper-dim);
+  line-height: 1.7;
+  margin: 0 0 1rem;
+}
+.about__text strong {
+  color: var(--paper);
+  font-weight: 600;
+}
+.about__link {
+  color: var(--brass);
+  text-decoration: underline;
 }
 
 @media (min-width: 560px) {

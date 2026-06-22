@@ -62,7 +62,7 @@ const NAV = [
 
       <nav class="nav" aria-label="Navigation principale">
         <NuxtLink v-for="item in NAV" :key="item.to" :to="item.to" class="nav__link">{{ item.label }}</NuxtLink>
-        <a href="/#about" class="nav__link">La maison</a>
+        <a href="/#about" class="nav__link">À propos</a>
       </nav>
 
       <div class="actions">
@@ -150,37 +150,83 @@ const NAV = [
       </div>
     </div>
 
-    <!-- Desktop search panel -->
-    <Transition name="slide">
-      <div v-if="searchOpen" id="search-panel" class="search-panel">
-        <div class="container">
-          <SearchBar large @submit="closeAll" />
+    <!-- Overlays are teleported to <body>: .hdr's backdrop-filter would otherwise
+         trap their position:fixed inside the 68px-tall header. -->
+
+    <!-- Account dropdown click-outside scrim -->
+    <Teleport to="body">
+      <button
+        v-if="accountOpen"
+        class="hdr-scrim hdr-scrim--clear"
+        aria-label="Fermer le menu"
+        @click="accountOpen = false"
+      />
+    </Teleport>
+
+    <!-- Search overlay -->
+    <Teleport to="body">
+      <Transition name="searchov">
+        <div
+          v-if="searchOpen"
+          class="searchov"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Recherche"
+          @click.self="searchOpen = false"
+        >
+          <div class="searchov__panel">
+            <SearchBar large @submit="closeAll" />
+            <button type="button" class="searchov__close" aria-label="Fermer" @click="searchOpen = false">✕</button>
+          </div>
         </div>
-      </div>
-    </Transition>
-    <button v-if="searchOpen" class="scrim" aria-label="Fermer la recherche" @click="searchOpen = false" />
-    <button v-if="accountOpen" class="scrim scrim--clear" aria-label="Fermer le menu" @click="accountOpen = false" />
+      </Transition>
+    </Teleport>
 
     <!-- Mobile full-screen overlay -->
-    <Transition name="overlay">
-      <nav v-if="open" id="mobile-nav" class="mobile" aria-label="Navigation mobile">
-        <SearchBar class="mobile__search" @submit="closeAll" />
-        <NuxtLink v-for="item in NAV" :key="item.to" :to="item.to" class="mobile__link">{{ item.label }}</NuxtLink>
-        <a href="/#about" class="mobile__link" @click="closeAll">La maison</a>
-        <NuxtLink to="/panier" class="mobile__link">Panier<span v-if="cartCount > 0"> ({{ cartCount }})</span></NuxtLink>
+    <Teleport to="body">
+      <Transition name="overlay">
+        <nav v-if="open" id="mobile-nav" class="mobile" aria-label="Navigation mobile">
+          <div class="mobile__top">
+            <span class="brand">
+              <span class="brand__mark">SCS</span><span class="brand__word">Firearm</span>
+            </span>
+            <button type="button" class="mobile__close" aria-label="Fermer le menu" @click="open = false">✕</button>
+          </div>
 
-        <div class="mobile__account">
-          <template v-if="isAuthenticated">
-            <NuxtLink v-if="isAdmin" to="/admin" class="mobile__link">Administration</NuxtLink>
-            <button type="button" class="mobile__link mobile__signout" @click="signOut">Déconnexion</button>
-          </template>
-          <template v-else>
-            <NuxtLink to="/connexion" class="mobile__link">Connexion</NuxtLink>
-            <NuxtLink to="/inscription" class="mobile__link mobile__cta">Créer un compte</NuxtLink>
-          </template>
-        </div>
-      </nav>
-    </Transition>
+          <div class="mobile__body">
+            <SearchBar class="mobile__search" @submit="closeAll" />
+
+            <ul class="mobile__nav" role="list">
+              <li v-for="(item, i) in NAV" :key="item.to" :style="{ '--i': i }">
+                <NuxtLink :to="item.to" class="mlink">
+                  <span>{{ item.label }}</span><span class="mlink__chev" aria-hidden="true">›</span>
+                </NuxtLink>
+              </li>
+              <li :style="{ '--i': NAV.length }">
+                <a href="/#about" class="mlink" @click="closeAll">
+                  <span>À propos</span><span class="mlink__chev" aria-hidden="true">›</span>
+                </a>
+              </li>
+            </ul>
+
+            <div class="mobile__foot">
+              <NuxtLink to="/panier" class="mfoot">
+                <span>Panier</span>
+                <span v-if="cartCount > 0" class="mfoot__badge">{{ cartCount }}</span>
+              </NuxtLink>
+              <template v-if="isAuthenticated">
+                <NuxtLink v-if="isAdmin" to="/admin" class="mfoot">Administration</NuxtLink>
+                <button type="button" class="mfoot mfoot--btn" @click="signOut">Déconnexion</button>
+              </template>
+              <template v-else>
+                <NuxtLink to="/connexion" class="mfoot">Connexion</NuxtLink>
+                <NuxtLink to="/inscription" class="mfoot mfoot--accent">Créer un compte</NuxtLink>
+              </template>
+            </div>
+          </div>
+        </nav>
+      </Transition>
+    </Teleport>
   </header>
 </template>
 
@@ -326,27 +372,49 @@ const NAV = [
   color: var(--brass);
 }
 
-/* Scrims for click-outside */
-.scrim {
+/* Transparent click-outside scrim for the account dropdown */
+.hdr-scrim {
   position: fixed;
   inset: 0;
-  z-index: 40;
-  background: rgba(8, 8, 10, 0.5);
+  z-index: 55;
+  background: transparent;
   border: none;
   cursor: default;
 }
-.scrim--clear {
-  background: transparent;
-  z-index: 55;
-}
 
-/* Search panel (desktop) */
-.search-panel {
+/* Search overlay (dims the page, panel near the top) */
+.searchov {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  padding: clamp(4rem, 14vh, 9rem) var(--gutter) 2rem;
+  background: rgba(8, 8, 10, 0.7);
+  backdrop-filter: blur(6px);
+}
+.searchov__panel {
   position: relative;
-  z-index: 45;
-  padding: 1rem 0 1.25rem;
-  background: rgba(14, 14, 16, 0.95);
-  border-bottom: 1px solid var(--ink-line);
+  width: 100%;
+  max-width: 640px;
+  height: max-content;
+}
+.searchov__close {
+  position: absolute;
+  top: -2.6rem;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
+  color: var(--paper);
+  background: transparent;
+  border: 1px solid var(--ink-line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.searchov__close:hover {
+  color: var(--brass);
+  border-color: var(--brass);
 }
 
 /* Burger */
@@ -391,57 +459,165 @@ const NAV = [
   transform: translateY(-6px) rotate(-45deg);
 }
 
-/* Mobile full-screen overlay */
+/* Mobile full-screen overlay (teleported to body → full viewport) */
 .mobile {
   position: fixed;
-  inset: 68px 0 0;
-  z-index: 48;
+  inset: 0;
+  z-index: 80;
   display: flex;
   flex-direction: column;
-  padding: clamp(1.25rem, 6vw, 2.5rem) var(--gutter) 2.5rem;
+  padding: 0 var(--gutter) 2.5rem;
   background: var(--ink);
   overflow-y: auto;
 }
-.mobile__search {
-  margin-bottom: 1.25rem;
+.mobile__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 68px;
+  margin-bottom: 1rem;
 }
-.mobile__link {
-  padding: 1rem 0;
+.mobile__top .brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
   font-family: var(--font-display);
-  font-size: 1.6rem;
-  color: var(--paper);
-  border-bottom: 1px solid var(--ink-line);
-  text-align: left;
-  background: transparent;
-  width: 100%;
+  font-size: 1.5rem;
 }
-.mobile__account {
-  margin-top: auto;
-  padding-top: 1.5rem;
+.mobile__close {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  color: var(--paper);
+  background: transparent;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.mobile__close:hover {
+  color: var(--brass);
+  border-color: var(--brass);
+}
+.mobile__body {
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
-.mobile__signout {
-  border: none;
-  cursor: pointer;
-  color: var(--paper-dim);
-  font-family: var(--font-display);
+.mobile__search {
+  margin-bottom: 1.5rem;
 }
-.mobile__cta {
+.mobile__nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mlink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1.15rem 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--paper);
+  border-bottom: 1px solid var(--ink-line);
+  transition: color 0.25s var(--ease);
+}
+.mlink:hover,
+.mlink:active,
+.mlink.router-link-active {
   color: var(--brass);
+}
+.mlink__chev {
+  color: var(--brass);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+.mobile__foot {
+  margin-top: auto;
+  padding-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.mfoot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 0.25rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.25s var(--ease);
+}
+.mfoot:hover {
+  color: var(--paper);
+}
+.mfoot--accent {
+  color: var(--brass);
+}
+.mfoot__badge {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.68rem;
+  color: #1a1407;
+  background: var(--brass);
+  border-radius: 999px;
+}
+
+/* Staggered reveal of the mobile menu content */
+.mobile__search,
+.mobile__nav li,
+.mobile__foot > * {
+  animation: riseIn 0.4s var(--ease) both;
+}
+.mobile__search {
+  animation-delay: 0.04s;
+}
+.mobile__nav li {
+  animation-delay: calc(var(--i) * 55ms + 0.1s);
+}
+.mobile__foot > * {
+  animation-delay: 0.34s;
+}
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Transitions */
-.slide-enter-active,
-.slide-leave-active {
-  transition:
-    opacity 0.25s var(--ease),
-    transform 0.25s var(--ease);
+.searchov-enter-active,
+.searchov-leave-active {
+  transition: opacity 0.2s var(--ease);
 }
-.slide-enter-from,
-.slide-leave-to {
+.searchov-enter-active .searchov__panel,
+.searchov-leave-active .searchov__panel {
+  transition: transform 0.25s var(--ease);
+}
+.searchov-enter-from,
+.searchov-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
+}
+.searchov-enter-from .searchov__panel,
+.searchov-leave-to .searchov__panel {
+  transform: translateY(-12px);
 }
 .drop-enter-active,
 .drop-leave-active {
@@ -454,16 +630,21 @@ const NAV = [
   opacity: 0;
   transform: translateY(-6px);
 }
-.overlay-enter-active,
+.overlay-enter-active {
+  transition: opacity 0.28s var(--ease);
+}
+/* Softer, slightly longer exit: fade + gentle slide-down instead of a hard cut. */
 .overlay-leave-active {
   transition:
-    opacity 0.3s var(--ease),
-    transform 0.3s var(--ease);
+    opacity 0.38s var(--ease),
+    transform 0.38s var(--ease);
 }
-.overlay-enter-from,
+.overlay-enter-from {
+  opacity: 0;
+}
 .overlay-leave-to {
   opacity: 0;
-  transform: translateY(-1.5%);
+  transform: translateY(16px);
 }
 
 @media (min-width: 980px) {

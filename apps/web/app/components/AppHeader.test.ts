@@ -53,17 +53,19 @@ describe("AppHeader", () => {
     expect(menu).toContain("Déconnexion")
   })
 
-  it("toggles the search panel", async () => {
+  it("toggles the search overlay (teleported to body)", async () => {
     const wrapper = await mountSuspended(AppHeader)
-    expect(wrapper.find("#search-panel").exists()).toBe(false)
+    expect(document.querySelector(".searchov")).toBeNull()
     await wrapper.find('button[aria-label="Rechercher"]').trigger("click")
-    expect(wrapper.find("#search-panel").exists()).toBe(true)
+    expect(document.querySelector(".searchov")).not.toBeNull()
+    wrapper.unmount()
   })
 
-  it("opens the mobile overlay from the burger", async () => {
+  it("opens the mobile overlay from the burger (teleported to body)", async () => {
     const wrapper = await mountSuspended(AppHeader)
-    expect(wrapper.find("#mobile-nav").exists()).toBe(false)
+    expect(document.querySelector("#mobile-nav")).toBeNull()
     await wrapper.find('button[aria-label="Ouvrir le menu"]').trigger("click")
-    expect(wrapper.find("#mobile-nav").exists()).toBe(true)
+    expect(document.querySelector("#mobile-nav")).not.toBeNull()
+    wrapper.unmount()
   })
 })
