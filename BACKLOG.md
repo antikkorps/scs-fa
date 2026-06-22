@@ -456,6 +456,11 @@
 
 - Page d'accueil présentant **armurerie + Gun Art** (aujourd'hui hero centré Gun Art), navigation header vers les deux univers
 - Cohérence de marque entre la boutique réglementée et la galerie d'art
+- **Refonte de la navbar (priorité — desktop + mobile)** : le header actuel empile les éléments à plat (liens + recherche + auth + panier + CTA), peu aéré. Objectifs :
+  - **Deux univers lisibles** : Armurerie (`/boutique`) vs Gun Art (`/collection`) — point d'entrée clair (split ou méga-menu par univers).
+  - **Desktop** : réorganiser/aérer, **icônes** (panier avec compteur, compte/admin selon connecté + `isAdmin`, accueil), envisager un mega-menu.
+  - **Mobile** : **burger plein écran** (overlay pleine page) + **animation** d'ouverture/fermeture.
+  - Le lien « Panier » + badge (ajouté en 10.4a) est temporaire en attendant cette refonte.
 
 ---
 

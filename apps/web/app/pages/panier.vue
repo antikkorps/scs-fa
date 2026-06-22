@@ -130,10 +130,10 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
             </div>
           </dl>
 
-          <button type="button" class="btn btn-primary summary__cta" @click="$router.push('/boutique')">
-            Continuer mes achats
+          <button type="button" class="btn btn-primary summary__cta" @click="$router.push('/commande')">
+            Passer commande
           </button>
-          <p class="summary__next">Le tunnel de commande arrive à la prochaine étape.</p>
+          <NuxtLink to="/boutique" class="summary__continue">Continuer mes achats</NuxtLink>
         </aside>
       </div>
     </section>
@@ -268,11 +268,13 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
   width: 100%;
   justify-content: center;
 }
-.summary__next {
+.summary__continue {
+  display: block;
   margin: 0.85rem 0 0;
-  font-size: 0.82rem;
-  color: var(--paper-faint);
+  font-size: 0.85rem;
+  color: var(--paper-dim);
   text-align: center;
+  text-decoration: underline;
 }
 
 @media (min-width: 860px) {
