@@ -56,6 +56,18 @@ export interface OrderDetail {
   items: unknown
   shippingAddress: unknown
   billingAddress: unknown
+  payment: {
+    carte: { status: string; amountTtc: number } | null
+    virement: {
+      status: string
+      amountTtc: number
+      reference: string
+      iban: string
+      bic: string | null
+      bankName: string | null
+      accountHolder: string | null
+    } | null
+  }
 }
 
 export interface VirementInstructions {

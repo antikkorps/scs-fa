@@ -36,7 +36,13 @@ describe("useOrders", () => {
     expect(await orders.getVirement("ord-3")).toBeNull()
   })
 
-  it("rethrows non-404 errors from getVirement", async () => {
+  it("returns null when a card-only order has no virement bucket (400 NoBankTransfer)", async () => {
+    apiMock.mockRejectedValue({ response: { status: 400 }, data: { error: "NoBankTransfer" } })
+    const orders = useOrders()
+    expect(await orders.getVirement("ord-cb")).toBeNull()
+  })
+
+  it("rethrows other errors from getVirement", async () => {
     apiMock.mockRejectedValue({ response: { status: 500 } })
     const orders = useOrders()
     await expect(orders.getVirement("ord-4")).rejects.toBeTruthy()

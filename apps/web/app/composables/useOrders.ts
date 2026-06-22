@@ -17,13 +17,16 @@ export function useOrders() {
   }
 
   // Bank-transfer (RIB) instructions for the order's virement bucket, or null
-  // when the order has no virement portion (404 from the API).
+  // when the order has no virement portion: the API answers 404 (unknown order)
+  // or 400 "NoBankTransfer" for a card-only order.
   async function getVirement(orderId: string): Promise<VirementInstructions | null> {
     try {
       const res = await api<{ data: VirementInstructions }>(`/payments/virement/${orderId}`)
       return res.data
     } catch (err) {
-      if (authErrorStatus(err) === 404) return null
+      const status = authErrorStatus(err)
+      const code = (err as { data?: { error?: string } })?.data?.error
+      if (status === 404 || (status === 400 && code === "NoBankTransfer")) return null
       throw err
     }
   }
@@ -35,5 +38,16 @@ export function useOrders() {
     }).then((r) => r.data)
   }
 
-  return { create, get, getVirement, claimVirement }
+  // Creates/reuses the order's card PaymentIntent and returns its client secret
+  // for Stripe Elements.
+  function createStripeIntent(
+    orderId: string,
+  ): Promise<{ clientSecret: string; paymentIntentId: string; amountTtc: string }> {
+    return api<{ data: { clientSecret: string; paymentIntentId: string; amountTtc: string } }>(
+      "/payments/stripe/intent",
+      { method: "POST", body: { orderId } },
+    ).then((r) => r.data)
+  }
+
+  return { create, get, getVirement, claimVirement, createStripeIntent }
 }

@@ -404,6 +404,11 @@ describe("orders (POST /api/orders)", () => {
     expect(data.items[0]).toMatchObject({ sku: `${PREFIX}reg`, qty: 1, requiresPaymentVirement: true })
     expect(data.shippingAddress).toMatchObject({ line1: "1 rue du Tir", city: "Paris" })
     expect(data.billingAddress).toMatchObject({ line1: "1 rue du Tir" })
+    // Payment buckets: a regulated firearm is virement-only.
+    expect(data.payment.carte).toBeNull()
+    expect(data.payment.virement).toMatchObject({ amountTtc: 1200 })
+    expect(typeof data.payment.virement.reference).toBe("string")
+    expect(typeof data.payment.virement.iban).toBe("string")
   })
 
   it("returns 404 for an unknown order id", async () => {

@@ -6,7 +6,7 @@ import { formatEuros } from "~/utils/format"
 definePageMeta({ middleware: "auth" })
 useHead({ title: "Commande — SCS Firearm" })
 
-const { fetchCart } = useCart()
+const { fetchCart, count: cartCount } = useCart()
 const { list: listAddresses, create: createAddress } = useAddresses()
 const { create: createOrder } = useOrders()
 const router = useRouter()
@@ -86,6 +86,8 @@ async function placeOrder() {
   try {
     const billing = billingDifferent.value && billingId.value ? billingId.value : undefined
     const order = await createOrder(shippingId.value, billing)
+    // The order consumes the cart server-side — clear the header badge.
+    cartCount.value = 0
     await router.push(`/commande/${order.id}`)
   } catch (err) {
     placeError.value =
