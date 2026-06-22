@@ -248,5 +248,32 @@ describe("forgot-password + reset-password", () => {
       expect(res.statusCode).toBe(400)
       expect(res.json().error).toBe("ValidationError")
     })
+
+    it("rejects reusing the current password and keeps the token usable", async () => {
+      const email = `same-${Date.now()}${TEST_EMAIL_SUFFIX}`
+      const userId = await seedUser(email)
+      const token = await seedResetToken(userId)
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/auth/reset-password",
+        payload: { token, password: PLAINTEXT_PASSWORD },
+      })
+
+      expect(res.statusCode).toBe(422)
+      expect(res.json().error).toBe("SamePassword")
+
+      // The token must NOT be consumed, so the user can retry with a new password.
+      const [tok] = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.userId, userId))
+      expect(tok.usedAt).toBeNull()
+
+      // The original password still works (nothing changed).
+      const login = await app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { email, password: PLAINTEXT_PASSWORD },
+      })
+      expect(login.statusCode).toBe(200)
+    })
   })
 })

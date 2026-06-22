@@ -1,6 +1,9 @@
-import { defineConfig } from "vitest/config"
+import { defineVitestConfig } from "@nuxt/test-utils/config"
 
-export default defineConfig({
+// `defineVitestConfig` registers the "nuxt" Vitest environment. Pure-logic and
+// server tests default to "node" (fast); component/composable tests opt into the
+// Nuxt runtime per file with a `// @vitest-environment nuxt` docblock.
+export default defineVitestConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.{test,spec}.ts", "app/**/*.{test,spec}.ts", "server/**/*.{test,spec}.ts"],

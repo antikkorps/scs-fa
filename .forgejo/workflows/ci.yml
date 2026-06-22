@@ -18,14 +18,17 @@ jobs:
       # `postgres` host on the runner network. Trust auth + no password in the URL
       # means a connection by the armurier role is accepted no matter what — the
       # CI database is ephemeral and isolated.
+      #
+      # No host `ports:` mapping on purpose: the job container reaches Postgres on
+      # the runner network by service name (`testdb:5432`, see DATABASE_URL), so
+      # publishing 5432 to the host is unnecessary — and it made concurrent PR
+      # runs collide ("Bind for :::5432 failed: port is already allocated").
       testdb:
         image: postgres:17-alpine
         env:
           POSTGRES_USER: armurier
           POSTGRES_DB: armurier_test
           POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U armurier -d armurier_test"
           --health-interval 5s
