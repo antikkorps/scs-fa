@@ -2,6 +2,7 @@
 const open = ref(false)
 const route = useRoute()
 const { isAuthenticated, user, logout } = useAuth()
+const { count: cartCount } = useCart()
 
 // Close the mobile menu on navigation
 watch(
@@ -37,6 +38,9 @@ async function signOut() {
           <button type="button" class="nav__link nav__signout" @click="signOut">Déconnexion</button>
         </template>
         <NuxtLink v-else to="/connexion" class="nav__link">Connexion</NuxtLink>
+        <NuxtLink to="/panier" class="nav__link">
+          Panier<span v-if="cartCount > 0" class="nav__cartcount">{{ cartCount }}</span>
+        </NuxtLink>
         <NuxtLink to="/collection" class="nav__cta btn btn-primary">Acquérir</NuxtLink>
       </nav>
 
@@ -62,6 +66,9 @@ async function signOut() {
         <button type="button" class="mnav__link mnav__signout" @click="signOut">Déconnexion</button>
       </template>
       <NuxtLink v-else to="/connexion" class="mnav__link">Connexion</NuxtLink>
+      <NuxtLink to="/panier" class="mnav__link">
+        Panier<span v-if="cartCount > 0"> ({{ cartCount }})</span>
+      </NuxtLink>
       <NuxtLink to="/collection" class="mnav__link mnav__cta">Acquérir une œuvre</NuxtLink>
     </nav>
   </header>
@@ -120,6 +127,18 @@ async function signOut() {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--brass);
+}
+.nav__cartcount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 0.35rem;
+  padding: 0 5px;
+  font-size: 0.68rem;
+  color: #1a1407;
+  background: var(--brass);
+  border-radius: 999px;
 }
 .nav__signout {
   background: transparent;

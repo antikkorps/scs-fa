@@ -49,6 +49,18 @@ export interface LegalCategoryRef {
   requiredDocTypes: string[]
 }
 
+export interface ProductVariant {
+  id: string
+  skuVariant: string
+  finition: string | null
+  munition: string | null
+  couleur: string | null
+  stockQty: number | null
+  priceDeltaHt: number
+  priceHt: number
+  priceTtc: number
+}
+
 export interface ProductDetail {
   id: string
   sku: string
@@ -60,6 +72,7 @@ export interface ProductDetail {
   vatPct: number
   priceTtc: number
   stockQty: number | null
+  variants: ProductVariant[]
   featured: boolean | null
   requiresLegalVerification: boolean | null
   ageMinRequired: number | null
