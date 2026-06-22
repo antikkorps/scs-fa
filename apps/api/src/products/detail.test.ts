@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { legalCategories, productCategories, products } from "../db/schema.js"
+import { legalCategories, productCategories, products, productVariants } from "../db/schema.js"
 
 const SKU_PREFIX = "TEST22-"
 
@@ -94,6 +94,24 @@ describe("GET /api/products/:id", () => {
     publishedId = idOf(`${SKU_PREFIX}alpha`)
     accessoryId = idOf(`${SKU_PREFIX}gamma`)
     unpublishedId = idOf(`${SKU_PREFIX}delta`)
+
+    // Two buyable variants on the published product (priced base HT + delta).
+    await db.insert(productVariants).values([
+      {
+        productId: publishedId,
+        skuVariant: `${SKU_PREFIX}alpha-noir`,
+        finition: "Noir",
+        stockQty: 4,
+        priceDeltaHt: "0",
+      },
+      {
+        productId: publishedId,
+        skuVariant: `${SKU_PREFIX}alpha-inox`,
+        finition: "Inox",
+        stockQty: 2,
+        priceDeltaHt: "50",
+      },
+    ])
   })
 
   afterAll(async () => {
@@ -116,6 +134,20 @@ describe("GET /api/products/:id", () => {
     })
     expect(body.category).toMatchObject({ slug: "arme-poing", name: "Armes de poing" })
     expect(body.seo).toBeDefined()
+  })
+
+  it("returns buyable variants with per-variant TTC pricing", async () => {
+    const res = await app.inject({ method: "GET", url: `/api/products/${publishedId}` })
+    const body = res.json()
+    expect(Array.isArray(body.variants)).toBe(true)
+    expect(body.variants).toHaveLength(2)
+    const inox = body.variants.find((v: { finition: string }) => v.finition === "Inox")
+    expect(inox).toBeDefined()
+    // base 800 HT + 50 delta = 850 HT → 1020 TTC at 20% VAT
+    expect(inox.priceHt).toBe(850)
+    expect(inox.priceTtc).toBe(1020)
+    expect(inox.stockQty).toBe(2)
+    expect(typeof inox.id).toBe("string")
   })
 
   it("computes priceTtc from priceHt and vat", async () => {

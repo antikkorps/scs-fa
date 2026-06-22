@@ -1,8 +1,8 @@
 import { computePriceTtc, productIdParamSchema } from "@armurier/shared"
-import { and, eq, type SQL } from "drizzle-orm"
+import { and, asc, eq, type SQL } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
-import { legalCategories, productCategories, products } from "../db/schema.js"
+import { legalCategories, productCategories, products, productVariants } from "../db/schema.js"
 
 // Shared lookup for a single published product (by id or by slug). Returns the
 // public detail shape, or null when not found / unpublished.
@@ -51,6 +51,37 @@ async function fetchPublishedProduct(match: SQL) {
   const priceHt = Number(row.priceHt)
   const vatPct = Number(row.vatPct ?? 0)
 
+  // Buyable variants (the cart adds by variantId). Each variant's price is the
+  // base HT plus its delta, then TTC.
+  const variantRows = await db
+    .select({
+      id: productVariants.id,
+      skuVariant: productVariants.skuVariant,
+      finition: productVariants.finition,
+      munition: productVariants.munition,
+      couleur: productVariants.couleur,
+      stockQty: productVariants.stockQty,
+      priceDeltaHt: productVariants.priceDeltaHt,
+    })
+    .from(productVariants)
+    .where(eq(productVariants.productId, row.id))
+    .orderBy(asc(productVariants.skuVariant))
+
+  const variants = variantRows.map((v) => {
+    const variantHt = priceHt + Number(v.priceDeltaHt ?? 0)
+    return {
+      id: v.id,
+      skuVariant: v.skuVariant,
+      finition: v.finition,
+      munition: v.munition,
+      couleur: v.couleur,
+      stockQty: v.stockQty,
+      priceDeltaHt: Number(v.priceDeltaHt ?? 0),
+      priceHt: variantHt,
+      priceTtc: computePriceTtc(variantHt, vatPct),
+    }
+  })
+
   return {
     id: row.id,
     sku: row.sku,
@@ -62,6 +93,7 @@ async function fetchPublishedProduct(match: SQL) {
     vatPct,
     priceTtc: computePriceTtc(priceHt, vatPct),
     stockQty: row.stockQty,
+    variants,
     featured: row.featured,
     requiresLegalVerification: row.requiresLegalVerification,
     ageMinRequired: row.ageMinRequired,

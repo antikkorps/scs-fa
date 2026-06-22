@@ -12,6 +12,7 @@ import {
   legalCategories,
   productCategories,
   products,
+  productVariants,
   users,
 } from "./schema.js"
 
@@ -574,16 +575,46 @@ const ARMURERIE_PRODUCTS: SeedProduct[] = [
   },
 ]
 
+// Variants per product SKU. Products absent from this map get a single
+// "Standard" finition variant (chk_variant_attrs requires at least one of
+// finition/munition/couleur). Multi-variant products drive the detail selector.
+type SeedVariant = {
+  skuVariant: string
+  finition?: string
+  munition?: string
+  couleur?: string
+  stockQty: number
+  priceDeltaHt: number
+}
+
+const VARIANTS_BY_SKU: Record<string, SeedVariant[]> = {
+  "ARM-GLOCK17": [
+    { skuVariant: "ARM-GLOCK17-NOIR", finition: "Noir", stockQty: 6, priceDeltaHt: 0 },
+    { skuVariant: "ARM-GLOCK17-FDE", finition: "FDE (tan)", stockQty: 3, priceDeltaHt: 40 },
+  ],
+  "ARM-VC-IMPACT": [
+    { skuVariant: "ARM-VC-IMPACT-3006", munition: ".30-06 Sprg", stockQty: 4, priceDeltaHt: 0 },
+    { skuVariant: "ARM-VC-IMPACT-300WM", munition: ".300 Win Mag", stockQty: 2, priceDeltaHt: 120 },
+  ],
+  "ARM-CASQUE-ELEC": [
+    { skuVariant: "ARM-CASQUE-NOIR", couleur: "Noir", stockQty: 15, priceDeltaHt: 0 },
+    { skuVariant: "ARM-CASQUE-OD", couleur: "Vert OD", stockQty: 10, priceDeltaHt: 0 },
+  ],
+}
+
+function variantsFor(p: SeedProduct): SeedVariant[] {
+  return VARIANTS_BY_SKU[p.sku] ?? [{ skuVariant: `${p.sku}-STD`, finition: "Standard", stockQty: p.stockQty, priceDeltaHt: 0 }]
+}
+
 async function seedArmurerie() {
-  const cats = await db
-    .select({ id: productCategories.id, slug: productCategories.slug })
-    .from(productCategories)
+  const cats = await db.select({ id: productCategories.id, slug: productCategories.slug }).from(productCategories)
   const catBySlug = new Map(cats.map((c) => [c.slug, c.id]))
 
   const legals = await db.select({ id: legalCategories.id, category: legalCategories.category }).from(legalCategories)
   const legalByCode = new Map(legals.map((l) => [l.category, l.id]))
 
-  let inserted = 0
+  let newProducts = 0
+  let newVariants = 0
   for (const p of ARMURERIE_PRODUCTS) {
     const categoryId = catBySlug.get(p.categorySlug)
     const legalCategoryId = legalByCode.get(p.legal)
@@ -592,29 +623,62 @@ async function seedArmurerie() {
       continue
     }
 
-    const [existing] = await db.select({ id: products.id }).from(products).where(eq(products.sku, p.sku)).limit(1)
-    if (existing) continue
+    const variants = variantsFor(p)
+    const totalStock = variants.reduce((sum, v) => sum + v.stockQty, 0)
 
-    await db.insert(products).values({
-      sku: p.sku,
-      slug: p.slug,
-      name: p.name,
-      description: p.description,
-      categoryId,
-      legalCategoryId,
-      priceHt: p.priceHt.toFixed(2),
-      stockQty: p.stockQty,
-      requiresLegalVerification: p.requiresLegalVerification,
-      ageMinRequired: p.ageMinRequired,
-      featured: p.featured ?? false,
-      // No demo photo: the storefront renders its own placeholder.
-      featuredImageUrl: null,
-      published: true,
-    })
-    inserted++
+    // Get-or-create the product (idempotent on SKU).
+    let product = (await db.select({ id: products.id }).from(products).where(eq(products.sku, p.sku)).limit(1))[0]
+    if (!product) {
+      product = (
+        await db
+          .insert(products)
+          .values({
+            sku: p.sku,
+            slug: p.slug,
+            name: p.name,
+            description: p.description,
+            categoryId,
+            legalCategoryId,
+            priceHt: p.priceHt.toFixed(2),
+            stockQty: totalStock,
+            requiresLegalVerification: p.requiresLegalVerification,
+            ageMinRequired: p.ageMinRequired,
+            featured: p.featured ?? false,
+            // No demo photo: the storefront renders its own placeholder.
+            featuredImageUrl: null,
+            published: true,
+          })
+          .returning({ id: products.id })
+      )[0]
+      newProducts++
+    } else {
+      // Existing product (seeded in 10.2 without variants): sync its stock to the variant total.
+      await db.update(products).set({ stockQty: totalStock }).where(eq(products.id, product.id))
+    }
+    if (!product) continue
+
+    // Ensure each variant exists (idempotent on skuVariant).
+    for (const v of variants) {
+      const [existingV] = await db
+        .select({ id: productVariants.id })
+        .from(productVariants)
+        .where(eq(productVariants.skuVariant, v.skuVariant))
+        .limit(1)
+      if (existingV) continue
+      await db.insert(productVariants).values({
+        productId: product.id,
+        skuVariant: v.skuVariant,
+        finition: v.finition ?? null,
+        munition: v.munition ?? null,
+        couleur: v.couleur ?? null,
+        stockQty: v.stockQty,
+        priceDeltaHt: v.priceDeltaHt.toFixed(2),
+      })
+      newVariants++
+    }
   }
 
-  console.log(`✅ Armurerie seeded (${inserted} new / ${ARMURERIE_PRODUCTS.length} products)`)
+  console.log(`✅ Armurerie seeded (${newProducts} new products, ${newVariants} new variants)`)
 }
 
 // ==========================================================================

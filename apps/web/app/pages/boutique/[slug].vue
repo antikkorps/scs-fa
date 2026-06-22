@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProductDetail } from "~/types/product"
+import type { ProductDetail, ProductVariant } from "~/types/product"
 import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
 import { inStock, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
 
@@ -21,10 +21,44 @@ const product = computed(() => data.value as ProductDetail)
 const image = computed(() =>
   artworkImage(product.value.featuredImageUrl, product.value.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height),
 )
-const available = computed(() => inStock(product.value.stockQty))
 const legal = computed(() => product.value.legalCategory)
 const lightboxOpen = ref(false)
+
+// Variants drive price/stock and the cart (the cart adds by variantId).
+const variants = computed(() => product.value.variants ?? [])
+const selectedVariantId = ref<string | null>(variants.value[0]?.id ?? null)
+const selectedVariant = computed(
+  () => variants.value.find((v) => v.id === selectedVariantId.value) ?? variants.value[0] ?? null,
+)
+const variantLabel = (v: ProductVariant) => v.finition ?? v.munition ?? v.couleur ?? v.skuVariant
+const hasChoice = computed(() => variants.value.length > 1)
+const displayPriceTtc = computed(() => selectedVariant.value?.priceTtc ?? product.value.priceTtc)
+const available = computed(() => inStock(selectedVariant.value?.stockQty ?? product.value.stockQty))
+
+const { isAuthenticated } = useAuth()
+const cart = useCart()
+const adding = ref(false)
 const added = ref(false)
+const addError = ref("")
+
+async function addToCart() {
+  if (!selectedVariant.value) return
+  if (!isAuthenticated.value) {
+    await navigateTo(`/connexion?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
+  adding.value = true
+  addError.value = ""
+  try {
+    await cart.addVariant(selectedVariant.value.id, 1)
+    added.value = true
+  } catch (err) {
+    addError.value =
+      authErrorStatus(err) === 400 ? "Stock insuffisant pour cette quantité." : "Impossible d'ajouter au panier."
+  } finally {
+    adding.value = false
+  }
+}
 
 const pageUrl = `${siteUrl}/boutique/${slug}`
 const description = computed(
@@ -116,7 +150,24 @@ useHead({
             </span>
           </div>
 
-          <p class="detail__price">{{ formatEuros(product.priceTtc) }} <span>TTC</span></p>
+          <p class="detail__price">{{ formatEuros(displayPriceTtc) }} <span>TTC</span></p>
+
+          <fieldset v-if="hasChoice" class="variants">
+            <legend class="variants__legend">Variante</legend>
+            <div class="variants__opts">
+              <button
+                v-for="v in variants"
+                :key="v.id"
+                type="button"
+                class="variants__opt"
+                :class="{ 'is-selected': v.id === selectedVariantId, 'is-out': !inStock(v.stockQty) }"
+                :aria-pressed="v.id === selectedVariantId"
+                @click="selectedVariantId = v.id"
+              >
+                {{ variantLabel(v) }}
+              </button>
+            </div>
+          </fieldset>
 
           <p v-if="product.description" class="detail__desc">{{ product.description }}</p>
           <p v-if="product.longDescription" class="detail__long">{{ product.longDescription }}</p>
@@ -151,12 +202,13 @@ useHead({
           </section>
 
           <div class="detail__cta">
-            <button type="button" class="btn btn-primary buy" :disabled="!available" @click="added = true">
-              {{ available ? "Ajouter au panier" : "Indisponible" }}
+            <button type="button" class="btn btn-primary buy" :disabled="!available || adding" @click="addToCart">
+              {{ available ? (adding ? "Ajout…" : "Ajouter au panier") : "Indisponible" }}
             </button>
             <p v-if="added" class="detail__added" role="status">
-              Le panier et le tunnel d'achat arrivent à la prochaine étape.
+              Ajouté au panier. <NuxtLink to="/panier">Voir le panier</NuxtLink>
             </p>
+            <p v-if="addError" class="detail__error" role="alert">{{ addError }}</p>
           </div>
         </div>
       </div>
@@ -327,6 +379,55 @@ useHead({
   margin: 0.85rem 0 0;
   font-size: 0.88rem;
   color: var(--brass);
+}
+.detail__added a {
+  color: var(--brass);
+  text-decoration: underline;
+}
+.detail__error {
+  margin: 0.85rem 0 0;
+  font-size: 0.88rem;
+  color: var(--danger);
+}
+.variants {
+  border: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+}
+.variants__legend {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 0.6rem;
+  padding: 0;
+}
+.variants__opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.variants__opt {
+  padding: 0.55rem 1rem;
+  font-size: 0.9rem;
+  color: var(--paper);
+  background: var(--ink-soft);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    border-color 0.3s var(--ease),
+    color 0.3s var(--ease);
+}
+.variants__opt:hover {
+  border-color: var(--brass);
+}
+.variants__opt.is-selected {
+  border-color: var(--brass);
+  color: var(--brass);
+}
+.variants__opt.is-out {
+  opacity: 0.5;
 }
 
 @media (min-width: 880px) {
