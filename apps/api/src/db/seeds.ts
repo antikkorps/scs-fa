@@ -179,6 +179,7 @@ export async function seedDatabase() {
   console.log("✅ Product categories seeded")
 
   await seedGunArt()
+  await seedArmurerie()
   await seedBlog()
 
   console.log("🌱 Seeding complete!")
@@ -399,6 +400,221 @@ async function seedGunArt() {
   }
 
   console.log(`✅ Gun Art seeded (${GUN_ART_PIECES.length} artworks)`)
+}
+
+// ==========================================================================
+// ARMURERIE — produits de démo pour le catalogue (Story 10.2)
+// ==========================================================================
+
+// Demo armurerie catalogue: a handful of products per category, spanning the
+// legal categories B/C/D/none and varied stock (incl. a rupture) so the
+// storefront filters, legal badges and stock states all have something to show.
+// `featuredImageUrl: null` → the storefront renders its own SVG placeholder.
+type SeedProduct = {
+  sku: string
+  slug: string
+  name: string
+  description: string
+  categorySlug: string
+  legal: "A" | "B" | "C" | "D" | "none"
+  priceHt: number
+  stockQty: number
+  requiresLegalVerification: boolean
+  ageMinRequired: number | null
+  featured?: boolean
+}
+
+const ARMURERIE_PRODUCTS: SeedProduct[] = [
+  {
+    sku: "ARM-GLOCK17",
+    slug: "pistolet-glock-17-gen5",
+    name: "Pistolet GLOCK 17 Gen5 — 9mm",
+    description: "Pistolet semi-automatique 9x19, chargeur 17 coups, détente Gen5. Référence du tir sportif.",
+    categorySlug: "arme-poing",
+    legal: "B",
+    priceHt: 600,
+    stockQty: 6,
+    requiresLegalVerification: true,
+    ageMinRequired: 18,
+    featured: true,
+  },
+  {
+    sku: "ARM-SW686",
+    slug: "revolver-smith-wesson-686",
+    name: "Revolver Smith & Wesson 686 — .357 Mag",
+    description: "Revolver 6 coups canon 4 pouces, acier inoxydable. Polyvalent cible et défense.",
+    categorySlug: "arme-poing",
+    legal: "B",
+    priceHt: 820,
+    stockQty: 0,
+    requiresLegalVerification: true,
+    ageMinRequired: 18,
+  },
+  {
+    sku: "ARM-VC-IMPACT",
+    slug: "carabine-verney-carron-impact",
+    name: "Carabine Verney-Carron Impact — .30-06",
+    description: "Carabine à canon basculant, fabrication française, idéale battue et approche.",
+    categorySlug: "arme-longue",
+    legal: "C",
+    priceHt: 1090,
+    stockQty: 4,
+    requiresLegalVerification: true,
+    ageMinRequired: 18,
+    featured: true,
+  },
+  {
+    sku: "ARM-BERETTA686",
+    slug: "fusil-beretta-686-silver-pigeon",
+    name: "Fusil superposé Beretta 686 Silver Pigeon — cal. 12",
+    description: "Superposé de chasse et ball-trap, bascule gravée, éjecteurs automatiques.",
+    categorySlug: "arme-longue",
+    legal: "C",
+    priceHt: 1980,
+    stockQty: 2,
+    requiresLegalVerification: true,
+    ageMinRequired: 18,
+  },
+  {
+    sku: "ARM-RUGER1022",
+    slug: "carabine-ruger-10-22",
+    name: "Carabine Ruger 10/22 — .22 LR",
+    description: "Carabine semi-automatique .22 Long Rifle, légère et fiable pour l'entraînement.",
+    categorySlug: "arme-longue",
+    legal: "C",
+    priceHt: 360,
+    stockQty: 9,
+    requiresLegalVerification: true,
+    ageMinRequired: 18,
+  },
+  {
+    sku: "ARM-9MM-50",
+    slug: "munitions-9mm-luger-x50",
+    name: "Munitions 9x19 Luger FMJ — boîte de 50",
+    description: "Cartouches 9mm Parabellum blindées 124 gr pour le tir sur cible.",
+    categorySlug: "munition",
+    legal: "B",
+    priceHt: 21,
+    stockQty: 140,
+    requiresLegalVerification: true,
+    ageMinRequired: 18,
+  },
+  {
+    sku: "ARM-CAL12-25",
+    slug: "cartouches-calibre-12-x25",
+    name: "Cartouches calibre 12 — boîte de 25",
+    description: "Cartouches de chasse plombs n°6, bourre grasse, pour fusil calibre 12.",
+    categorySlug: "munition",
+    legal: "C",
+    priceHt: 10.5,
+    stockQty: 200,
+    requiresLegalVerification: true,
+    ageMinRequired: 18,
+  },
+  {
+    sku: "ARM-VORTEX-416",
+    slug: "lunette-vortex-diamondback-4-16x44",
+    name: "Lunette de tir Vortex Diamondback 4-16x44",
+    description: "Optique grossissement variable, réticule éclairé, tubes étanches purgés azote.",
+    categorySlug: "aide-visee",
+    legal: "none",
+    priceHt: 325,
+    stockQty: 7,
+    requiresLegalVerification: false,
+    ageMinRequired: null,
+  },
+  {
+    sku: "ARM-AIMPOINT-ACRO",
+    slug: "point-rouge-aimpoint-acro-p2",
+    name: "Point rouge Aimpoint Acro P-2",
+    description: "Viseur point rouge fermé, autonomie 5 ans, conçu pour armes de poing et longues.",
+    categorySlug: "aide-visee",
+    legal: "none",
+    priceHt: 540,
+    stockQty: 3,
+    requiresLegalVerification: false,
+    ageMinRequired: null,
+  },
+  {
+    sku: "ARM-CASQUE-ELEC",
+    slug: "casque-anti-bruit-electronique",
+    name: "Casque anti-bruit électronique",
+    description: "Protection auditive active : amplifie les sons faibles, coupe les détonations.",
+    categorySlug: "accessoire-tireur",
+    legal: "none",
+    priceHt: 75,
+    stockQty: 25,
+    requiresLegalVerification: false,
+    ageMinRequired: null,
+    featured: true,
+  },
+  {
+    sku: "ARM-MALLETTE",
+    slug: "mallette-de-transport-rigide",
+    name: "Mallette de transport rigide",
+    description: "Valise de transport mousse alvéolée, fermeture à clé, conforme au transport réglementé.",
+    categorySlug: "accessoire-tireur",
+    legal: "none",
+    priceHt: 120,
+    stockQty: 15,
+    requiresLegalVerification: false,
+    ageMinRequired: null,
+  },
+  {
+    sku: "ARM-SPRAY-GAZ",
+    slug: "spray-de-defense-gel-poivre",
+    name: "Spray de défense gel poivre 50 ml",
+    description: "Aérosol de défense au gel OC, portée 4 m, catégorie D soumise à conditions.",
+    categorySlug: "arme-defense",
+    legal: "D",
+    priceHt: 16.5,
+    stockQty: 40,
+    requiresLegalVerification: true,
+    ageMinRequired: 18,
+  },
+]
+
+async function seedArmurerie() {
+  const cats = await db
+    .select({ id: productCategories.id, slug: productCategories.slug })
+    .from(productCategories)
+  const catBySlug = new Map(cats.map((c) => [c.slug, c.id]))
+
+  const legals = await db.select({ id: legalCategories.id, category: legalCategories.category }).from(legalCategories)
+  const legalByCode = new Map(legals.map((l) => [l.category, l.id]))
+
+  let inserted = 0
+  for (const p of ARMURERIE_PRODUCTS) {
+    const categoryId = catBySlug.get(p.categorySlug)
+    const legalCategoryId = legalByCode.get(p.legal)
+    if (!categoryId || !legalCategoryId) {
+      console.warn(`⚠️  Armurerie seed: skipping ${p.sku} (missing category ${p.categorySlug} or legal ${p.legal})`)
+      continue
+    }
+
+    const [existing] = await db.select({ id: products.id }).from(products).where(eq(products.sku, p.sku)).limit(1)
+    if (existing) continue
+
+    await db.insert(products).values({
+      sku: p.sku,
+      slug: p.slug,
+      name: p.name,
+      description: p.description,
+      categoryId,
+      legalCategoryId,
+      priceHt: p.priceHt.toFixed(2),
+      stockQty: p.stockQty,
+      requiresLegalVerification: p.requiresLegalVerification,
+      ageMinRequired: p.ageMinRequired,
+      featured: p.featured ?? false,
+      // No demo photo: the storefront renders its own placeholder.
+      featuredImageUrl: null,
+      published: true,
+    })
+    inserted++
+  }
+
+  console.log(`✅ Armurerie seeded (${inserted} new / ${ARMURERIE_PRODUCTS.length} products)`)
 }
 
 // ==========================================================================

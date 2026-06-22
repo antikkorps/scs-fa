@@ -23,6 +23,7 @@ import { adminOrderRoutes } from "./orders/admin.js"
 import { orderRoutes } from "./orders/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
+import { productCategoryRoutes } from "./product-categories/index.js"
 import { productRoutes } from "./products/index.js"
 import { searchRoutes } from "./search/index.js"
 
@@ -71,6 +72,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await fastify.register(authRoutes, { prefix: "/api/auth" })
   await fastify.register(productRoutes, { prefix: "/api/products" })
+  await fastify.register(productCategoryRoutes, { prefix: "/api/product-categories" })
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
   await fastify.register(blogRoutes, { prefix: "/api/blog" })
   await fastify.register(blogImageRoutes, { prefix: "/api/blog/images" })

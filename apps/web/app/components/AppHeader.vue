@@ -27,6 +27,7 @@ async function signOut() {
       </NuxtLink>
 
       <nav class="nav" aria-label="Navigation principale">
+        <NuxtLink to="/boutique" class="nav__link">Boutique</NuxtLink>
         <NuxtLink to="/collection" class="nav__link">Collection</NuxtLink>
         <NuxtLink to="/blog" class="nav__link">Journal</NuxtLink>
         <a href="#about" class="nav__link">La maison</a>
@@ -52,6 +53,7 @@ async function signOut() {
 
     <nav v-show="open" id="mobile-nav" class="mnav" aria-label="Navigation mobile">
       <SearchBar class="mnav__search" @submit="open = false" />
+      <NuxtLink to="/boutique" class="mnav__link">Boutique</NuxtLink>
       <NuxtLink to="/collection" class="mnav__link">Collection</NuxtLink>
       <NuxtLink to="/blog" class="mnav__link">Journal</NuxtLink>
       <a href="#about" class="mnav__link">La maison</a>

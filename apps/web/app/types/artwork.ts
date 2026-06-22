@@ -31,7 +31,7 @@ export interface SearchProductItem {
   requiresLegalVerification: boolean | null
   featuredImageUrl: string | null
   category: { slug: string | null; name: string | null }
-  legalCategory: string | null
+  legalCategory: import("./product").LegalCategoryCode | null
 }
 
 export interface SearchResponse {

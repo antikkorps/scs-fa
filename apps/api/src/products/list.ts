@@ -1,5 +1,5 @@
 import { computePriceTtc, productFiltersSchema } from "@armurier/shared"
-import { and, asc, desc, eq, gte, lte, type SQL, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gte, lte, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { legalCategories, productCategories, products } from "../db/schema.js"
@@ -19,8 +19,10 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
 
     const { category, legalCategory, search, minPrice, maxPrice, page, limit } = parsed.data
 
-    // Only published products are publicly listable
-    const conditions: SQL[] = [eq(products.published, true)]
+    // Only published products are publicly listable. Gun Art is its own universe
+    // served by /api/artworks, so its backing products are excluded here — this
+    // endpoint is the armurerie catalogue (firearms, ammo, accessories…).
+    const conditions: SQL[] = [eq(products.published, true), ne(productCategories.category, "gun_art")]
     if (category) conditions.push(eq(productCategories.slug, category))
     if (legalCategory) conditions.push(eq(legalCategories.category, legalCategory))
     if (minPrice !== undefined) conditions.push(gte(products.priceHt, minPrice.toString()))
