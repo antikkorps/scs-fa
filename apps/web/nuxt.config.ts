@@ -24,6 +24,9 @@ export default defineNuxtConfig({
       // Dev API runs on 8081 (see apps/api/.env); override via API_BASE_URL in prod.
       apiBase: process.env.API_BASE_URL ?? "http://localhost:8081/api",
       siteUrl: process.env.SITE_URL ?? "http://localhost:3000",
+      // Stripe publishable key (public by design). Set via
+      // NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in apps/web/.env.
+      stripePublishableKey: "",
     },
   },
 

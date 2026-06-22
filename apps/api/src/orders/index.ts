@@ -370,6 +370,27 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: "NotFound", message: "Order not found" })
     }
 
+    // Payment buckets, so the storefront knows what to show (card form / RIB)
+    // and each bucket's status without probing the payment endpoints.
+    const [carte] = await db
+      .select({ paymentStatus: paymentCarte.paymentStatus, amountTtc: paymentCarte.amountTtc })
+      .from(paymentCarte)
+      .where(eq(paymentCarte.orderId, order.id))
+      .limit(1)
+    const [virement] = await db
+      .select({
+        paymentStatus: paymentVirement.paymentStatus,
+        amountExpectedTtc: paymentVirement.amountExpectedTtc,
+        reference: paymentVirement.paymentReference,
+        iban: paymentVirement.ibanRecipient,
+        bic: paymentVirement.bicRecipient,
+        bankName: paymentVirement.bankName,
+        accountHolder: paymentVirement.accountHolderName,
+      })
+      .from(paymentVirement)
+      .where(eq(paymentVirement.orderId, order.id))
+      .limit(1)
+
     return reply.code(200).send({
       data: {
         ...order,
@@ -378,6 +399,20 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         totalTtc: Number(order.totalTtc),
         vipDiscountAmount: Number(order.vipDiscountAmount),
         vipDiscountAppliedPct: Number(order.vipDiscountAppliedPct),
+        payment: {
+          carte: carte ? { status: carte.paymentStatus, amountTtc: Number(carte.amountTtc) } : null,
+          virement: virement
+            ? {
+                status: virement.paymentStatus,
+                amountTtc: Number(virement.amountExpectedTtc),
+                reference: virement.reference ?? "",
+                iban: virement.iban,
+                bic: virement.bic,
+                bankName: virement.bankName,
+                accountHolder: virement.accountHolder,
+              }
+            : null,
+        },
       },
     })
   })

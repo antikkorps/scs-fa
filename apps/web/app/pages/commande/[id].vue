@@ -1,26 +1,25 @@
 <script setup lang="ts">
-import type { OrderDetail, VirementInstructions } from "~/types/checkout"
+import type { OrderDetail } from "~/types/checkout"
 import { formatEuros } from "~/utils/format"
+import { legalStatusLabel, paymentStatusLabel, statusTone } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
 useHead({ title: "Votre commande — SCS Firearm" })
 
 const route = useRoute()
 const orderId = route.params.id as string
-const { get: getOrder, getVirement, claimVirement } = useOrders()
+const { get: getOrder, claimVirement } = useOrders()
 
 const order = ref<OrderDetail | null>(null)
-const virement = ref<VirementInstructions | null>(null)
 const pending = ref(true)
 const notFound = ref(false)
 const claiming = ref(false)
+const cardPaidLocal = ref(false)
 
 async function load() {
   pending.value = true
   try {
-    const [o, v] = await Promise.all([getOrder(orderId), getVirement(orderId)])
-    order.value = o
-    virement.value = v
+    order.value = await getOrder(orderId)
   } catch (err) {
     if (authErrorStatus(err) === 404) notFound.value = true
   } finally {
@@ -29,19 +28,42 @@ async function load() {
 }
 onMounted(load)
 
-// Card-payable amount = total minus the virement bucket (if any). CB itself is
-// deferred (Stripe Elements lands when the test key is provided).
-const carteAmount = computed(() => {
-  if (!order.value) return 0
-  const v = virement.value ? Number(virement.value.amountTtc) : 0
-  return Math.round((order.value.totalTtc - v) * 100) / 100
-})
-const virementPending = computed(() => virement.value?.paymentStatus === "awaiting_transfer")
+// Payment buckets come straight from the order — no blind probing of the
+// payment endpoints (avoids spurious 400/409 on card-only or already-paid orders).
+const virement = computed(() => order.value?.payment.virement ?? null)
+const carte = computed(() => order.value?.payment.carte ?? null)
+const carteAmount = computed(() => carte.value?.amountTtc ?? 0)
+const cardSettled = computed(() => cardPaidLocal.value || carte.value?.status === "received")
+const virementPending = computed(() => virement.value?.status === "awaiting_transfer")
+
+// The legal-verification status is only worth surfacing once the document
+// workflow is actually under way. Before that (e.g. "payment_pending"), it would
+// just contradict the payment status, so we lean on the next-step note instead.
+const legalShown = computed(() =>
+  ["docs_verifying", "docs_verified", "docs_rejected"].includes(order.value?.legalVerificationStatus ?? ""),
+)
+
+async function onCardPaid() {
+  cardPaidLocal.value = true
+  // The webhook settles the card bucket asynchronously; poll a few times so the
+  // order's status reflects it without a manual reload.
+  for (let i = 0; i < 6; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      const fresh = await getOrder(orderId)
+      order.value = fresh
+      if (fresh.payment.carte?.status === "received") break
+    } catch {
+      // Keep the success message; try again on the next tick.
+    }
+  }
+}
 
 async function declareTransfer() {
   claiming.value = true
   try {
-    virement.value = await claimVirement(orderId)
+    await claimVirement(orderId)
+    order.value = await getOrder(orderId)
   } finally {
     claiming.value = false
   }
@@ -63,7 +85,7 @@ async function declareTransfer() {
 
         <!-- Virement bucket -->
         <section v-if="virement" class="pay" aria-labelledby="vir-h">
-          <h2 id="vir-h" class="pay__h">Paiement par virement — {{ formatEuros(Number(virement.amountTtc)) }}</h2>
+          <h2 id="vir-h" class="pay__h">Paiement par virement — {{ formatEuros(virement.amountTtc) }}</h2>
           <p class="pay__lede">
             Les armes réglementées se règlent par virement bancaire. Indiquez impérativement la référence ci-dessous.
           </p>
@@ -85,20 +107,25 @@ async function declareTransfer() {
           </p>
         </section>
 
-        <!-- Carte bucket (deferred) -->
-        <section v-if="carteAmount > 0.005" class="pay" aria-labelledby="cb-h">
+        <!-- Carte bucket -->
+        <section v-if="carte" class="pay" aria-labelledby="cb-h">
           <h2 id="cb-h" class="pay__h">Paiement par carte — {{ formatEuros(carteAmount) }}</h2>
-          <p class="pay__soon">Le paiement par carte sera disponible très prochainement sur cette page.</p>
+          <p v-if="cardSettled" class="pay__done" role="status">Paiement par carte reçu. Merci&nbsp;!</p>
+          <StripeCardPayment v-else :order-id="orderId" :amount="carteAmount" @paid="onCardPaid" />
         </section>
 
         <section class="status">
           <div>
             <p class="status__label">Statut paiement</p>
-            <p class="status__value">{{ order.paymentStatus }}</p>
+            <p class="status__value" :class="`tone-${statusTone(order.paymentStatus)}`">
+              {{ paymentStatusLabel(order.paymentStatus) }}
+            </p>
           </div>
-          <div>
+          <div v-if="legalShown">
             <p class="status__label">Vérification légale</p>
-            <p class="status__value">{{ order.legalVerificationStatus }}</p>
+            <p class="status__value" :class="`tone-${statusTone(order.legalVerificationStatus)}`">
+              {{ legalStatusLabel(order.legalVerificationStatus) }}
+            </p>
           </div>
         </section>
 
@@ -184,11 +211,6 @@ async function declareTransfer() {
   font-size: 0.9rem;
   margin: 0;
 }
-.pay__soon {
-  color: var(--paper-faint);
-  font-size: 0.9rem;
-  margin: 0;
-}
 .status {
   display: flex;
   gap: 2rem;
@@ -207,6 +229,15 @@ async function declareTransfer() {
 .status__value {
   margin: 0;
   color: var(--paper);
+}
+.tone-positive {
+  color: var(--brass);
+}
+.tone-negative {
+  color: var(--danger);
+}
+.tone-neutral {
+  color: var(--paper-dim);
 }
 .order__next {
   color: var(--paper-dim);

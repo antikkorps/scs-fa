@@ -3,28 +3,31 @@ const year = new Date().getFullYear()
 </script>
 
 <template>
-  <footer id="about" class="ft">
+  <footer class="ft">
     <div class="container ft__grid">
       <div class="ft__brand">
         <p class="brand">
           <span class="brand__mark">SCS</span> <span class="brand__word">Firearm</span>
         </p>
         <p class="ft__tag">
-          Gun Art — tirages d'art photographiques en édition strictement limitée, signés et numérotés.
+          Armurerie de précision &amp; galerie Gun Art — du fonctionnel à l'œuvre d'art, avec exigence et conformité
+          réglementaire.
         </p>
       </div>
 
       <nav class="ft__col" aria-label="Explorer">
         <h2 class="ft__h">Explorer</h2>
-        <NuxtLink to="/collection">La collection</NuxtLink>
-        <NuxtLink to="/blog">Le Journal</NuxtLink>
-        <NuxtLink to="/">Accueil</NuxtLink>
+        <NuxtLink to="/boutique">Armurerie</NuxtLink>
+        <NuxtLink to="/collection">Gun Art</NuxtLink>
+        <NuxtLink to="/blog">Journal</NuxtLink>
       </nav>
 
-      <div class="ft__col">
+      <nav class="ft__col" aria-label="La maison">
         <h2 class="ft__h">La maison</h2>
-        <p>Chaque œuvre est livrée avec son certificat d'authenticité.</p>
-      </div>
+        <a href="/#about">À propos</a>
+        <NuxtLink to="/connexion">Mon compte</NuxtLink>
+        <NuxtLink to="/panier">Panier</NuxtLink>
+      </nav>
     </div>
 
     <div class="container ft__base">

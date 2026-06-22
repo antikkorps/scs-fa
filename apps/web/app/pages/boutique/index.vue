@@ -318,7 +318,9 @@ select.input {
   padding: 0 0 1rem;
   display: grid;
   gap: clamp(1.5rem, 4vw, 2.75rem);
-  grid-template-columns: repeat(2, 1fr);
+  /* One column on mobile, like the rest of the site (collection / home /
+     search); 2 from 560px, 3 from 960px. */
+  grid-template-columns: 1fr;
 }
 .pager {
   display: flex;
@@ -357,6 +359,11 @@ select.input {
   white-space: nowrap;
 }
 
+@media (min-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 @media (min-width: 720px) {
   .filters {
     grid-template-columns: 2fr 1fr 1fr;
