@@ -178,3 +178,106 @@ button {
   color: var(--danger);
   border-color: rgba(217, 138, 106, 0.35);
 }
+
+/* ----- Auth forms (connexion / inscription / mot de passe) --------------- */
+
+.auth-wrap {
+  min-height: 70vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(2rem, 6vw, 4rem) var(--gutter);
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--ink-soft);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  padding: clamp(1.6rem, 5vw, 2.5rem);
+  box-shadow: var(--shadow);
+}
+.auth-card__title {
+  font-size: clamp(1.8rem, 5vw, 2.2rem);
+  margin: 0.4rem 0 0.2rem;
+}
+.auth-card__lede {
+  color: var(--paper-dim);
+  margin: 0 0 1.6rem;
+  font-size: 0.95rem;
+}
+.auth-field {
+  display: block;
+  margin-bottom: 1.1rem;
+}
+.auth-field > span {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin-bottom: 0.45rem;
+}
+.auth-input {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  background: var(--ink);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  color: var(--paper);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.auth-input:focus {
+  outline: none;
+  border-color: var(--brass);
+}
+.auth-row {
+  display: grid;
+  gap: 0 1rem;
+  grid-template-columns: 1fr 1fr;
+}
+.auth-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 1.2rem;
+  font-size: 0.85rem;
+  color: var(--paper-dim);
+}
+.auth-consent input {
+  margin-top: 0.2rem;
+  accent-color: var(--brass);
+}
+.auth-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+.auth-field__error {
+  color: var(--danger);
+  font-size: 0.78rem;
+  margin: 0.35rem 0 0;
+}
+.auth-notice {
+  color: var(--brass);
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+.auth-submit {
+  width: 100%;
+  justify-content: center;
+}
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.auth-alt {
+  margin: 1.4rem 0 0;
+  font-size: 0.88rem;
+  color: var(--paper-dim);
+  text-align: center;
+}
+.auth-alt a {
+  color: var(--brass);
+}

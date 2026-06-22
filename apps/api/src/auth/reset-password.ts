@@ -1,5 +1,5 @@
 import { resetPasswordSchema } from "@armurier/shared"
-import { hash } from "@node-rs/argon2"
+import { hash, verify } from "@node-rs/argon2"
 import { and, eq, gt, isNull } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
@@ -51,6 +51,21 @@ export const resetPasswordRoute: FastifyPluginAsync = async (fastify) => {
         return reply.code(400).send({
           error: "InvalidOrExpiredToken",
           message: "This reset link is invalid or has expired.",
+        })
+      }
+
+      const [existing] = await db
+        .select({ passwordHash: users.passwordHash })
+        .from(users)
+        .where(eq(users.id, resetToken.userId))
+        .limit(1)
+
+      // Refuse a no-op reset (new password identical to the current one). The
+      // token is intentionally left usable so the user can retry with a new one.
+      if (existing && (await verify(existing.passwordHash, password))) {
+        return reply.code(422).send({
+          error: "SamePassword",
+          message: "The new password must be different from the current one.",
         })
       }
 

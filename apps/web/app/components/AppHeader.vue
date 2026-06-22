@@ -1,6 +1,8 @@
 <script setup lang="ts">
 const open = ref(false)
 const route = useRoute()
+const { isAuthenticated, user, logout } = useAuth()
+
 // Close the mobile menu on navigation
 watch(
   () => route.fullPath,
@@ -8,6 +10,12 @@ watch(
     open.value = false
   },
 )
+
+async function signOut() {
+  await logout()
+  open.value = false
+  await navigateTo("/")
+}
 </script>
 
 <template>
@@ -23,6 +31,11 @@ watch(
         <NuxtLink to="/blog" class="nav__link">Journal</NuxtLink>
         <a href="#about" class="nav__link">La maison</a>
         <SearchBar class="nav__search" />
+        <template v-if="isAuthenticated">
+          <span class="nav__user">{{ user?.firstName || "Mon compte" }}</span>
+          <button type="button" class="nav__link nav__signout" @click="signOut">Déconnexion</button>
+        </template>
+        <NuxtLink v-else to="/connexion" class="nav__link">Connexion</NuxtLink>
         <NuxtLink to="/collection" class="nav__cta btn btn-primary">Acquérir</NuxtLink>
       </nav>
 
@@ -42,6 +55,11 @@ watch(
       <NuxtLink to="/collection" class="mnav__link">Collection</NuxtLink>
       <NuxtLink to="/blog" class="mnav__link">Journal</NuxtLink>
       <a href="#about" class="mnav__link">La maison</a>
+      <template v-if="isAuthenticated">
+        <span class="mnav__link mnav__user">{{ user?.firstName || "Mon compte" }}</span>
+        <button type="button" class="mnav__link mnav__signout" @click="signOut">Déconnexion</button>
+      </template>
+      <NuxtLink v-else to="/connexion" class="mnav__link">Connexion</NuxtLink>
       <NuxtLink to="/collection" class="mnav__link mnav__cta">Acquérir une œuvre</NuxtLink>
     </nav>
   </header>
@@ -93,6 +111,32 @@ watch(
 }
 .nav__link:hover {
   color: var(--paper);
+}
+.nav__user {
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.nav__signout {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.mnav__user {
+  color: var(--brass);
+}
+.mnav__signout {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink-line);
+  padding: 0.9rem 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
 }
 .nav__search {
   width: 230px;
