@@ -130,8 +130,9 @@ async function declareTransfer() {
         </section>
 
         <p class="order__next">
-          Pour les articles réglementés, l'envoi de vos documents légaux sera demandé depuis votre espace compte
-          (prochaine étape). <NuxtLink to="/boutique" class="link">Retour à la boutique</NuxtLink>
+          Pour les articles réglementés, envoyez vos documents légaux depuis
+          <NuxtLink :to="`/compte/commandes/${order.id}`" class="link">le détail de votre commande</NuxtLink>.
+          <NuxtLink to="/boutique" class="link">Retour à la boutique</NuxtLink>
         </p>
       </template>
     </section>

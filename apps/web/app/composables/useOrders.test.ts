@@ -55,4 +55,20 @@ describe("useOrders", () => {
     expect(apiMock).toHaveBeenCalledWith("/payments/virement/ord-5/claim", { method: "POST", body: {} })
     expect(res.paymentStatus).toBe("transfer_claimed")
   })
+
+  it("lists orders with pagination query, returning the paginated envelope", async () => {
+    apiMock.mockResolvedValue({ data: [{ id: "ord-1" }], pagination: { page: 2, limit: 20, total: 25 } })
+    const orders = useOrders()
+    const res = await orders.list(2)
+    expect(apiMock).toHaveBeenCalledWith("/orders", { query: { page: 2, limit: 20 } })
+    expect(res.data).toHaveLength(1)
+    expect(res.pagination.page).toBe(2)
+  })
+
+  it("defaults to page 1 when no page is given", async () => {
+    apiMock.mockResolvedValue({ data: [], pagination: { page: 1, limit: 20, total: 0 } })
+    const orders = useOrders()
+    await orders.list()
+    expect(apiMock).toHaveBeenCalledWith("/orders", { query: { page: 1, limit: 20 } })
+  })
 })

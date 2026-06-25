@@ -9,6 +9,7 @@ import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, legalDocuments, orders, users } from "../db/schema.js"
 import { scanDocument } from "../legal-documents/scan.js"
+import { recomputeOrderLegalStatus } from "./legal-status.js"
 
 vi.mock("../email.js", () => ({
   sendLegalDocApprovedEmail: vi.fn().mockResolvedValue(undefined),
@@ -351,5 +352,67 @@ describe("order legal status (/api/orders/:id/legal)", () => {
 
     expect((await orderStatusInDb(mine)).status).toBe("docs_verified")
     expect((await orderStatusInDb(theirs)).status).toBe("pending")
+  })
+
+  // ── Payment dimension (legalVerificationStatus is the combined lifecycle) ──
+
+  /** Force the order's payment status, as the payment webhook would. */
+  async function markPaid(orderId: string, status = "received") {
+    await db
+      .update(orders)
+      .set({ paymentStatus: status as never })
+      .where(eq(orders.id, orderId))
+  }
+
+  it("completes a no-docs order once payment is received", async () => {
+    const orderId = await seedOrder(customerId, [null, "none"])
+    expect((await orderStatusInDb(orderId)).status).toBe("payment_pending")
+
+    await markPaid(orderId)
+    await recomputeOrderLegalStatus(customerId)
+    expect((await orderStatusInDb(orderId)).status).toBe("completed")
+  })
+
+  it("keeps a no-docs order payment_pending while payment is outstanding", async () => {
+    const orderId = await seedOrder(customerId, [null, "none"])
+    await recomputeOrderLegalStatus(customerId)
+    expect((await orderStatusInDb(orderId)).status).toBe("payment_pending")
+  })
+
+  it("completes a docs order once docs are verified and payment received", async () => {
+    const orderId = await seedOrder(customerId, ["D"])
+    const docId = await uploadDoc("cni")
+    await decide(docId, "approve")
+    expect((await orderStatusInDb(orderId)).status).toBe("docs_verified")
+
+    await markPaid(orderId)
+    await recomputeOrderLegalStatus(customerId)
+    expect((await orderStatusInDb(orderId)).status).toBe("completed")
+  })
+
+  it("keeps a paid docs order in the legal flow until docs are verified", async () => {
+    const orderId = await seedOrder(customerId, ["D"])
+    await markPaid(orderId)
+    await recomputeOrderLegalStatus(customerId)
+    // Paid, but documents still missing → not completed
+    expect((await orderStatusInDb(orderId)).status).toBe("pending")
+
+    const docId = await uploadDoc("cni")
+    await decide(docId, "approve")
+    // Docs now verified and already paid → straight to completed
+    const row = await orderStatusInDb(orderId)
+    expect(row.status).toBe("completed")
+    expect(row.verifiedAt).not.toBeNull()
+  })
+
+  it("does not advance a completed order", async () => {
+    const orderId = await seedOrder(customerId, [null, "none"])
+    await markPaid(orderId)
+    await recomputeOrderLegalStatus(customerId)
+    expect((await orderStatusInDb(orderId)).status).toBe("completed")
+
+    // A later recompute (e.g. refund bookkeeping) must not undo completion
+    await recomputeOrderLegalStatus(customerId)
+    expect((await orderStatusInDb(orderId)).status).toBe("completed")
   })
 })
