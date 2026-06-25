@@ -111,6 +111,8 @@ const NAV = [
             <div v-if="accountOpen" class="menu" role="menu">
               <template v-if="isAuthenticated">
                 <p class="menu__hello">Bonjour {{ user?.firstName || "" }}</p>
+                <NuxtLink to="/compte" class="menu__item" role="menuitem">Mon compte</NuxtLink>
+                <NuxtLink to="/compte/commandes" class="menu__item" role="menuitem">Mes commandes</NuxtLink>
                 <NuxtLink v-if="isAdmin" to="/admin" class="menu__item" role="menuitem">Administration</NuxtLink>
                 <button type="button" class="menu__item" role="menuitem" @click="signOut">Déconnexion</button>
               </template>
@@ -215,6 +217,8 @@ const NAV = [
                 <span v-if="cartCount > 0" class="mfoot__badge">{{ cartCount }}</span>
               </NuxtLink>
               <template v-if="isAuthenticated">
+                <NuxtLink to="/compte" class="mfoot">Mon compte</NuxtLink>
+                <NuxtLink to="/compte/commandes" class="mfoot">Mes commandes</NuxtLink>
                 <NuxtLink v-if="isAdmin" to="/admin" class="mfoot">Administration</NuxtLink>
                 <button type="button" class="mfoot mfoot--btn" @click="signOut">Déconnexion</button>
               </template>

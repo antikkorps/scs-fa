@@ -1,7 +1,8 @@
 import type { ClaimVirementInput } from "@armurier/shared"
+import type { OrderSummary, Paginated } from "~/types/account"
 import type { CreatedOrder, OrderDetail, VirementInstructions } from "~/types/checkout"
 
-// Authenticated order + payment operations for the checkout tunnel.
+// Authenticated order + payment operations for the checkout tunnel and account area.
 export function useOrders() {
   const api = useApi()
 
@@ -10,6 +11,11 @@ export function useOrders() {
       method: "POST",
       body: { shippingAddressId, ...(billingAddressId ? { billingAddressId } : {}) },
     }).then((r) => r.data)
+  }
+
+  // The authenticated user's orders, newest first (account area).
+  function list(page = 1, limit = 20): Promise<Paginated<OrderSummary>> {
+    return api<Paginated<OrderSummary>>("/orders", { query: { page, limit } })
   }
 
   function get(id: string): Promise<OrderDetail> {
@@ -49,5 +55,5 @@ export function useOrders() {
     ).then((r) => r.data)
   }
 
-  return { create, get, getVirement, claimVirement, createStripeIntent }
+  return { create, list, get, getVirement, claimVirement, createStripeIntent }
 }
