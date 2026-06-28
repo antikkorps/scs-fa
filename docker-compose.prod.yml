@@ -81,7 +81,7 @@ services:
   # The API streams each upload here over TCP (INSTREAM) and gates the document's
   # usability on the verdict. Ships freshclam, which keeps the virus DB current.
   clamav:
-    image: clamav/clamav:1.4
+    image: clamav/clamav:1.5.2-33
     restart: unless-stopped
     volumes:
       - clamav_data:/var/lib/clamav # virus DB — persist so restarts don't re-download
