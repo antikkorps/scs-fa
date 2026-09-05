@@ -1,44 +1,23 @@
 import type { RegisterInput } from "@armurier/shared"
 import type { AuthUser } from "~/types/admin"
 
-// Unified auth for the whole site (storefront customers + admins). The session
-// lives in two non-httpOnly cookies so it survives reloads and is readable
-// during SSR: the access token (bearer, attached by useApi) and a copy of the
-// signed-in user. The refresh token is httpOnly and handled exclusively by the
-// BFF routes under /bff/auth/* — it never touches client JS.
-//
-// `secure` keeps these off plain HTTP in prod (dev is http://localhost, so it's
-// disabled there or the cookie is dropped). Making the access token itself
-// httpOnly requires proxying all API calls through the BFF — tracked as a
-// follow-up (see BACKLOG security hardening).
-const COOKIE_OPTS = { sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7, secure: !import.meta.dev } as const
-
-interface SessionResponse {
-  accessToken: string
-  expiresIn: number
-  user: AuthUser
-}
+// Unified auth for the whole site (storefront customers + admins). Both session
+// tokens live in httpOnly cookies managed exclusively by the BFF — client JS
+// never sees them. The browser keeps only a non-secret `scs_user` cookie for UI
+// state (display name, role); the server enforces all authorization.
+const USER_COOKIE_OPTS = { sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7, secure: !import.meta.dev } as const
 
 export function useAuth() {
-  const token = useCookie<string | null>("scs_token", COOKIE_OPTS)
-  const user = useCookie<AuthUser | null>("scs_user", COOKIE_OPTS)
+  const user = useCookie<AuthUser | null>("scs_user", USER_COOKIE_OPTS)
 
   async function login(email: string, password: string): Promise<AuthUser> {
-    const res = await $fetch<SessionResponse>("/bff/auth/login", {
-      method: "POST",
-      body: { email, password },
-    })
-    token.value = res.accessToken
+    const res = await $fetch<{ user: AuthUser }>("/bff/auth/login", { method: "POST", body: { email, password } })
     user.value = res.user
     return res.user
   }
 
   async function register(input: RegisterInput): Promise<AuthUser> {
-    const res = await $fetch<SessionResponse>("/bff/auth/register", {
-      method: "POST",
-      body: input,
-    })
-    token.value = res.accessToken
+    const res = await $fetch<{ user: AuthUser }>("/bff/auth/register", { method: "POST", body: input })
     user.value = res.user
     return res.user
   }
@@ -47,24 +26,19 @@ export function useAuth() {
     try {
       await $fetch("/bff/auth/logout", { method: "POST" })
     } finally {
-      token.value = null
       user.value = null
     }
   }
 
-  // Exchanges the httpOnly refresh cookie for a fresh access token. Returns the
-  // new token, or null if the session is gone (caller should redirect to login).
-  async function refresh(): Promise<string | null> {
+  // Rotates the httpOnly session cookies server-side (the tokens stay out of JS).
+  // Returns whether the session is still alive; clears the user copy when it's not.
+  async function refresh(): Promise<boolean> {
     try {
-      const res = await $fetch<{ accessToken: string; expiresIn: number }>("/bff/auth/refresh", {
-        method: "POST",
-      })
-      token.value = res.accessToken
-      return res.accessToken
+      await $fetch("/bff/auth/refresh", { method: "POST" })
+      return true
     } catch {
-      token.value = null
       user.value = null
-      return null
+      return false
     }
   }
 
@@ -76,11 +50,10 @@ export function useAuth() {
     return $fetch("/bff/auth/reset-password", { method: "POST", body: { token: resetToken, password } })
   }
 
-  const isAuthenticated = computed(() => Boolean(token.value))
+  const isAuthenticated = computed(() => Boolean(user.value))
   const isAdmin = computed(() => user.value?.role === "admin")
 
   return {
-    token,
     user,
     login,
     register,

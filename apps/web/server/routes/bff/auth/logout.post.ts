@@ -10,5 +10,6 @@ export default defineEventHandler(async (event) => {
     }
   }
   clearRefreshCookie(event)
+  clearAccessCookie(event)
   return sendNoContent(event, 204)
 })

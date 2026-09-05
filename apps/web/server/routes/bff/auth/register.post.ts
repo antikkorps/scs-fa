@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
   })
 
   setRefreshCookie(event, res.refreshToken)
+  setAccessCookie(event, res.accessToken)
 
-  return { accessToken: res.accessToken, expiresIn: res.expiresIn, user: res.user }
+  return { user: res.user }
 })
