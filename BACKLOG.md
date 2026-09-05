@@ -373,10 +373,11 @@
 
 **Audit sécurité 2026-09-05 (post-Phase 10)** — 3 audits parallèles (auth/BFF, paiement/checkout, compte/légal/admin/storage). Paiement + compte/légal/admin/storage = **RAS** (autorité prix serveur, aucun IDOR, RBAC complet, présignés gated+scoped+attachment, upload durci sans traversal, webhook signé+idempotent). Corrigé : [x] validation `?redirect=` (open-redirect) `utils/navigation.ts` ; [x] middleware CSRF Origin sur `/bff/**` `server/middleware/csrf-origin.ts` ; [x] `secure` flag sur `scs_token`/`scs_user` ; [x] 404 neutre 2 univers.
 
-**Story 8.8** — Session **httpOnly** (token d'accès hors JS) — 🔜 **À FAIRE (story dédiée)**
+**Story 8.8** — Session **httpOnly** (token d'accès hors JS) + **reuse detection** refresh (RTR) — 🔜 **À FAIRE (story dédiée)**
 
 - Finding HIGH de l'audit : `scs_token` (JWT d'accès) + `scs_user` sont dans des cookies **lisibles en JS** → tout XSS = vol de session (mitigé partiellement par le `secure` flag + la CSP nonce, mais pas résolu).
 - Fix propre = **proxy BFF `/bff/api/**`** qui lit le token dans un cookie **httpOnly** et attache le Bearer côté serveur ; l'API reste inchangée (pure Bearer). Implique : **streaming multipart** (upload docs légaux + images blog), **retry+refresh sur 401** côté proxy, **forwarding cookie SSR** (`useRequestFetch`), réécriture de `useApi`/`useAuth`. Touche **tous les appels authentifiés** → **re-test e2e exhaustif** (login, compte, commandes, upload, checkout, admin) obligatoire avant merge.
+- **+ Reuse detection (RTR)** — le refresh existant est déjà solide (httpOnly, rotation, sha256, 7 j, révoqué au reset) mais **ne détecte pas la réutilisation** : rejouer un refresh token déjà tourné échoue juste en local (401) sans réaction. À ajouter : au lieu de **supprimer** le token consommé, le marquer `used_at` avec un **`family_id`** ; présenter un token déjà consommé = signal de vol → **révoquer toute la famille** (déconnexion partout) + audit log. Schéma `refresh_tokens` += `family_id`/`used_at`. Se teste avec le refacto httpOnly (même couche session, mêmes tests e2e).
 
 **Story 8.7** — `justfile` d'orchestration ops (go-live) ✅
 
