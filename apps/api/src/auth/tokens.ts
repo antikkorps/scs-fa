@@ -1,6 +1,6 @@
-import { createHash, randomBytes } from "node:crypto"
+import { createHash, randomBytes, randomUUID } from "node:crypto"
 import type { AuthTokens } from "@armurier/shared"
-import { and, eq, gt } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { db } from "../db/client.js"
 import { refreshTokens } from "../db/schema.js"
@@ -40,6 +40,9 @@ export async function issueTokens(
   fastify: FastifyInstance,
   user: { id: string; role: string },
   deviceLabel: string | null,
+  // Rotations of one session reuse the parent's family; a fresh login omits it
+  // and starts a new family.
+  familyId?: string,
 ): Promise<AuthTokens> {
   const accessToken = await signAccessToken(fastify, { sub: user.id, role: user.role })
   const refreshToken = generateRefreshToken()
@@ -49,6 +52,7 @@ export async function issueTokens(
     tokenHash: hashRefreshToken(refreshToken),
     expiresAt: computeRefreshExpiry(),
     deviceLabel,
+    familyId: familyId ?? randomUUID(),
   })
 
   return {
@@ -58,14 +62,31 @@ export async function issueTokens(
   }
 }
 
-export async function findValidRefreshToken(token: string) {
-  const tokenHash = hashRefreshToken(token)
+// Look up a refresh token by hash regardless of state — the refresh route needs
+// to see revoked/expired rows to detect reuse (a replayed, already-rotated token
+// is a theft signal).
+export async function findRefreshTokenByHash(token: string) {
   const [row] = await db
     .select()
     .from(refreshTokens)
-    .where(and(eq(refreshTokens.tokenHash, tokenHash), gt(refreshTokens.expiresAt, new Date())))
+    .where(eq(refreshTokens.tokenHash, hashRefreshToken(token)))
     .limit(1)
   return row ?? null
+}
+
+export async function markRefreshTokenRevoked(id: string): Promise<void> {
+  await db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, id))
+}
+
+// Revoke every still-active token in a family — used when a consumed token is
+// replayed (breach): the whole session tree is invalidated at once.
+export async function revokeRefreshFamily(familyId: string): Promise<number> {
+  const rows = await db
+    .update(refreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(refreshTokens.familyId, familyId), isNull(refreshTokens.revokedAt)))
+    .returning({ id: refreshTokens.id })
+  return rows.length
 }
 
 export async function revokeRefreshTokenByValue(token: string): Promise<boolean> {

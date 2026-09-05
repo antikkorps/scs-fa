@@ -1,6 +1,6 @@
 import { logoutSchema } from "@armurier/shared"
 import type { FastifyPluginAsync } from "fastify"
-import { revokeRefreshTokenByValue } from "./tokens.js"
+import { findRefreshTokenByHash, revokeRefreshFamily } from "./tokens.js"
 
 export const logoutRoute: FastifyPluginAsync = async (fastify) => {
   fastify.post("/logout", async (request, reply) => {
@@ -15,7 +15,10 @@ export const logoutRoute: FastifyPluginAsync = async (fastify) => {
       })
     }
 
-    await revokeRefreshTokenByValue(parsed.data.refreshToken)
+    // Revoke the whole session family, not just this token, so no rotated
+    // sibling survives a logout.
+    const stored = await findRefreshTokenByHash(parsed.data.refreshToken)
+    if (stored) await revokeRefreshFamily(stored.familyId)
     return reply.code(204).send()
   })
 }
