@@ -12,7 +12,7 @@ const loading = ref(false)
 
 // Already signed in as admin? Skip straight through.
 if (isAdmin.value) {
-  await navigateTo((route.query.redirect as string) || "/admin")
+  await navigateTo(safeInternalPath(route.query.redirect, "/admin"))
 }
 
 async function submit() {
@@ -24,7 +24,7 @@ async function submit() {
       error.value = "Ce compte n'a pas accès à l'administration."
       return
     }
-    await navigateTo((route.query.redirect as string) || "/admin")
+    await navigateTo(safeInternalPath(route.query.redirect, "/admin"))
   } catch (err) {
     const status = (err as { response?: { status?: number } })?.response?.status
     error.value = status === 401 ? "Identifiants invalides." : "Connexion impossible. Réessayez."

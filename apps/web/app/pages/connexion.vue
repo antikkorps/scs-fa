@@ -12,7 +12,7 @@ const fieldErrors = ref<Record<string, string>>({})
 const error = ref("")
 const loading = ref(false)
 
-const redirectTo = computed(() => (route.query.redirect as string) || "/")
+const redirectTo = computed(() => safeInternalPath(route.query.redirect))
 
 // Already signed in? Skip the form.
 if (isAuthenticated.value) {
