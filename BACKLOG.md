@@ -424,29 +424,29 @@
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
 
-**Story 10.1** — UI Auth (inscription, connexion, reset)
+**Story 10.1** — UI Auth (inscription, connexion, reset) ✅
 
 - Pages Nuxt inscription / connexion / mot de passe oublié / reset (API Phase 1)
 - Gestion de session côté client (stockage token + refresh), middleware de route protégée, état connecté dans le header
 - Mobile-first, validations alignées sur `shared`, états erreur/lockout/anti-énumération respectés
 
-**Story 10.2** — Catalogue armurerie (listing + filtres + recherche)
+**Story 10.2** — Catalogue armurerie (listing + filtres + recherche) ✅
 
 - Page boutique : grille produits, filtres catégorie / catégorie légale / prix, recherche full-text (API 2.1, `{ data, pagination }`)
 - Mobile-first, SSR + SEO, états vide/erreur ; recoupe la recherche globale 9.1 (à coordonner)
 
-**Story 10.3** — Fiche produit armurerie
+**Story 10.3** — Fiche produit armurerie ✅
 
 - Page détail (API 2.2) : variants, prix TTC, **mentions légales** (catégorie, âge mini, docs requis), restrictions ; ajout au panier
 - SEO `Product` JSON-LD ; gère un produit sans variant seedé (cf. note 2.2)
 
-**Story 10.4** — Panier & tunnel d'achat (commun aux 2 univers)
+**Story 10.4** — Panier & tunnel d'achat (commun aux 2 univers) ✅
 
 - Page panier (produits + tirages), récap totaux, **remise VIP affichée**, retrait de lignes (libération tirage)
 - Choix/saisie adresses depuis le carnet (API 3.x), récap du **split paiement** virement/CB, création commande (API 3.2)
 - Débouche sur le paiement (Phase 6) → ensemble = « achetable de bout en bout »
 
-**Story 10.5** — Espace compte (commandes + documents légaux)
+**Story 10.5** — Espace compte (commandes + documents légaux) ✅
 
 - Profil (API 1.3), liste + détail commandes avec statut légal/paiement (API 3.3)
 - **Upload & suivi des documents légaux** (API 4.1) + checklist légale par commande (API 4.3) : statut par doc, motif de rejet, réupload
