@@ -435,6 +435,20 @@
 - Périmètre : exposition MCP en lecture **étudiée mais non implémentée** (l'API JSON publique est déjà documentée dans `llms.txt` comme surface agent ; MCP = amélioration future)
 - [x] **Vérifié** : smoke `/sitemap.xml` (12 URLs), `/robots.txt`, `/llms.txt`, `/llms-full.txt`, WebSite/SearchAction en home ; `pnpm -r typecheck` clean, **279 API / 65 shared / 21 web** (8 nouveaux `seo.test.ts`) au vert, Biome clean
 
+**Story 9.6** — SEO avancé « aux petits oignons » — 🔜 **À FAIRE (après)**
+
+> Objectif : passer d'un SEO déjà solide (9.1–9.5) à un niveau **irréprochable** — audit Lighthouse SEO 100 + Rich Results Test / validateur Schema.org verts comme critères de *done*.
+
+- **⚠️ Combler le retard Phase 10 (prioritaire)** : la Phase 9 SEO a été construite **avant** que la boutique armurerie existe → aujourd'hui **le sitemap ne liste que Gun Art** (collection/œuvres/blog, **aucun `/boutique` ni produit**), et `llms.txt`/`llms-full.txt` décrivent l'armurerie comme « à terme ». À corriger : sitemap += `/boutique` + chaque produit (+ catégories), llms.txt/full réécrits pour les **2 univers**, `Organization`/`WebSite` cohérents.
+- **Données structurées produit** : `Product` + `Offer` complets sur les fiches armurerie (prix TTC, disponibilité, marque, SKU, catégorie légale), `BreadcrumbList` sur boutique/produit/collection, `ItemList` sur les listings ; valider chaque type au Rich Results Test.
+- **Social cards** : OG + **Twitter `summary_large_image`** complets partout (title/description/image/url), images OG dédiées par produit/œuvre (featured ou générées), `og:type` correct par page.
+- **Perf / Core Web Vitals** : images responsives (`srcset` + AVIF/WebP — évaluer `@nuxt/image`, **décision dépendance à trancher**), preload LCP, `font-display` + preconnect (déjà partiel), budget Lighthouse ; viser LCP < 2,5 s / CLS ~0 / INP bas.
+- **Sitemap avancé** : `lastmod` partout, `changefreq`/`priority` cohérents, **image sitemap**, split si volumineux ; ping/déclaration.
+- **Rich results métier** : `FAQPage` / `HowTo` sur pages réglementation (« comment acheter une arme légalement », catégories B/C/D) ; `Store`/`LocalBusiness` (adresse, horaires) si point de vente physique.
+- **Hygiène technique** : canonicals sur vues filtrées/paginées, cohérence trailing-slash + redirections 301, **audit des meta descriptions/titres uniques**, `hreflang` fr, `theme-color`, `manifest`.
+- **Mesure** : Search Console (vérification + soumission sitemap) et **analytics** (GA4 / Plausible — **décision en attente**, cf. `docs/CLARIFICATIONS_A_TRANCHER.md` §I/G2).
+- **Agent-ready** : maintenir `llms.txt` à jour avec les 2 univers ; envisager l'exposition MCP en lecture (étudiée en 9.5, non implémentée).
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
