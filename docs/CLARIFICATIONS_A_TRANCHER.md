@@ -1,5 +1,21 @@
 # CLARIFICATIONS À TRANCHER - Armurier E-commerce
 
+> **Mise à jour 2026-09-05.** La majorité des questions produit / paiement /
+> légal ci-dessous (§A–§I) a été **tranchée et implémentée** au fil des Phases
+> 1–10 (auth, catalogue, panier, tunnel d'achat, workflow légal, paiement
+> Stripe CB + virement, espace compte, VIP, blog, SEO). Ce document reste la
+> trace des arbitrages ; il faut le lire comme un **historique + les points
+> encore ouverts**, pas comme une todo bloquante.
+>
+> **Encore ouvert à ce stade :**
+> - **§J — Infra & go-live (Cloudflare / Hetzner)** : nouvelle section ci-dessous,
+>   pilote la checklist de `docs/DEPLOY.md §7`.
+> - **Variantes produit** (différées, non seedées — cf. BACKLOG §Phase 2).
+> - **Story 8.5 — monitoring uptime** : approche à trancher (Uptime Kuma
+>   auto-hébergé vs service externe vs Prometheus/Grafana/Loki).
+> - Durcissement sécurité go-live (nonce CSP, clé S3 backup least-privilege,
+>   baseline migration) — cf. `docs/DEPLOY.md §7` + BACKLOG Phase 8.6.
+
 ## A. GUN ART - PRICING & TRACKING
 
 ### A1. Pricing dynamique
@@ -224,6 +240,52 @@
 - [ ] Faut-il un **dashboard analytics** (ventes, top produits, tendances)?
 - [ ] **Export commandes** par plage de dates?
 - [ ] **Bulk actions** (changer prix de 10 produits en 1 clic)?
+
+---
+
+## J. INFRA & GO-LIVE (migration OVH → Hetzner + Cloudflare)
+
+> Contexte : l'ancien site est chez **OVH**, la cible est un VM **Hetzner** +
+> **Cloudflare** devant. Runbook & checklist complète : `docs/DEPLOY.md §7`.
+
+### J1. Registrar & DNS
+
+- [ ] Le domaine est-il **enregistré chez OVH** (registrar) ou ailleurs ? →
+      conditionne le changement de **nameservers** vers Cloudflare.
+- [ ] **MX / SPF / DKIM / DMARC** actuels : on les récupère tels quels sur
+      Cloudflare (sinon l'email transactionnel casse au cutover).
+- [ ] Fenêtre de bascule (heure creuse) + durée de rétention de l'ancien OVH
+      pour rollback ?
+
+### J2. Cloudflare — proxy & TLS
+
+- [ ] **Proxifié (orange, CDN/WAF/anti-DDoS)** ou **DNS-only (gris)** ? (reco :
+      proxifié).
+- [ ] TLS origine : **Cloudflare Origin Certificate** sur Caddy (reco, simple)
+      **ou** garder Let's Encrypt via challenge **DNS-01** ? Mode CF = **Full
+      (strict)** dans tous les cas.
+- [ ] Verrouiller le firewall Hetzner sur les **plages IP Cloudflare** (empêche
+      le bypass du WAF) — OK ?
+
+### J3. IP client réelle (sécurité)
+
+- [ ] Confirmer la config **`trusted_proxies` (Caddy) + `trustProxy` (Fastify)**
+      sur les IP Cloudflare : sinon le **rate-limiter** et les **audit logs**
+      voient les IP de Cloudflare, pas celles des clients.
+
+### J4. Stockage objet
+
+- [ ] Rester sur le provider **S3 actuel** (`S3_ENDPOINT`) ou migrer vers
+      **Cloudflare R2** (S3-compatible, sans frais d'egress) pour uploads +
+      backups ? (impact : endpoint + credentials, pas le code).
+- [ ] Chiffrement au repos + object-lock/versioning sur le bucket de **backups**
+      (contient de la PII) — à activer ?
+
+### J5. Emails transactionnels
+
+- [ ] Quel **relais SMTP** en prod (le VM Hetzner enverra-t-il en direct, ou via
+      un service — SES, Postmark, OVH mail… ) ? Délivrabilité sur domaine
+      réglementé = point sensible.
 
 ---
 

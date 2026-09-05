@@ -137,6 +137,66 @@ backup you've never restored is a hypothesis, not a backup.
 > credentials; consider enabling object-lock/versioning and, for extra
 > defence-in-depth, at-rest encryption (e.g. SSE) on the backup bucket.
 
+## 7. Migration OVH → Hetzner + Cloudflare (go-live)
+
+The current site is hosted at **OVH**; go-live moves it to a **Hetzner** VM
+(sections 1–6) with **Cloudflare** in front (CDN + WAF + DDoS). A few decisions
+are still open — see `docs/CLARIFICATIONS_A_TRANCHER.md` §J — but the target
+below is the recommended path.
+
+### Pre-flight checklist (before touching DNS)
+
+- [ ] VM provisioned + hardened (§1), Docker firewall = SSH/80/443 only.
+- [ ] `.env` filled: every secret, `DOMAIN`, `ACME_EMAIL`, `S3_*`, Stripe **live**
+      keys, SMTP creds. No placeholder left.
+- [ ] Stack builds & boots on the VM; `migrate` ran; seed ran; `ps` all healthy.
+- [ ] **Stripe live webhook** registered at `https://www.<DOMAIN>/api/...` →
+      `STRIPE_WEBHOOK_SECRET` set. Test one live-mode payment.
+- [ ] Backups verified: on-demand `backup.sh` produces a dump **and** a
+      `restore.sh` round-trip works (a backup you've never restored is a hypothesis).
+- [ ] Content parity check with the old OVH site (products, artworks, legal pages).
+- [ ] `smtp` deliverability from the VM IP (or relay) confirmed — regulated-domain
+      mail is easily flagged as spam.
+
+### DNS cutover (OVH → Cloudflare)
+
+1. **Lower the TTL** on the current OVH records to 300s a few days ahead, so the
+   switch propagates fast.
+2. Add the domain to **Cloudflare**, let it import existing records. **Verify MX +
+   SPF + DKIM + DMARC are carried over** — moving nameservers without them breaks
+   email (the API sends transactional mail via nodemailer). Where is the domain
+   registered? If at OVH, change the **nameservers** to Cloudflare's at the registrar.
+3. Point `A @`, `A www` (+ `AAAA` if IPv6) at the **Hetzner IP**, **proxied**
+   (orange cloud).
+4. Cut over during low traffic; watch `caddy` + `api` logs. Keep the OVH box up
+   read-only for a rollback window, then decommission.
+
+### Cloudflare configuration
+
+- **TLS mode = Full (strict).** Origin needs a real cert. Recommended:
+  a **Cloudflare Origin Certificate** on Caddy (15-year, CF-trusted) instead of
+  Let's Encrypt — simpler than ACME behind a proxy. This swaps Caddy's automatic
+  HTTPS for an explicit `tls <cert> <key>` (Caddyfile change). *Decision: Origin
+  Cert vs keep LE via DNS-01 challenge — see §J.*
+- **Restore the real client IP.** Behind the proxy, Caddy/Fastify otherwise see
+  Cloudflare IPs — which would poison the **rate-limiter** and **audit logs**:
+  - Caddy: global `servers { trusted_proxies static <cloudflare-ranges> }`.
+  - Fastify: enable `trustProxy` so `req.ip` reads the forwarded client IP.
+- **Lock the origin to Cloudflare.** Set the Hetzner Cloud Firewall to accept
+  80/443 **only from Cloudflare IP ranges** (`https://www.cloudflare.com/ips`),
+  so no one can bypass the WAF by hitting the IP directly.
+- Optional: WAF managed rules, a rate-limit rule on `/api/auth/*`, cache rules for
+  static assets. *Decision: move object storage to Cloudflare **R2** (S3-compatible,
+  no egress) or keep the current S3 provider — see §J.*
+
+### Security hardening at go-live (currently deferred — see BACKLOG Phase 8.6)
+
+- [ ] **Least-privilege S3 key** scoped to the backup bucket (not the app's key).
+- [ ] **Migration baseline** (Drizzle) instead of `push --force` before prod churn.
+- [ ] **CSP nonces** to drop `'unsafe-inline'` on script/style (Caddyfile CSP).
+- [ ] **Secret rotation** post-launch (initial secrets were shared during setup).
+- [ ] Container hardening (`cap_drop`, `read_only`) validated in staging.
+
 ## Notes / gotchas
 
 - `.env` is the single source of truth: docker-compose reads it for `${VAR}`
