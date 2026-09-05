@@ -1,23 +1,12 @@
-// A `$fetch`-like helper for the upstream API: it points at apiBase and attaches
-// the bearer token on every request. On a 401 (access token expired) it makes a
-// single silent refresh attempt via the BFF, then replays the request once. If
-// the session is truly gone, it clears state and bounces to the right login
-// screen (/admin/login for the admin area, /connexion for the storefront).
+// A `$fetch`-like helper for authenticated API calls. It routes through the
+// same-origin BFF proxy (/bff/api/*), which attaches the bearer from the
+// httpOnly access cookie and transparently refreshes the session server-side.
+// The access token never touches client JS. On a 401 (session truly gone) it
+// bounces to the right login screen (/admin/login for admin, /connexion else).
 export function useApi() {
-  const config = useRuntimeConfig()
-  const apiBase = config.public.apiBase as string
-  const { token, refresh } = useAuth()
-
-  const base = $fetch.create({
-    baseURL: apiBase,
-    onRequest({ options }) {
-      if (token.value) {
-        const headers = new Headers(options.headers as HeadersInit)
-        headers.set("Authorization", `Bearer ${token.value}`)
-        options.headers = headers
-      }
-    },
-  })
+  // useRequestFetch forwards the incoming request's cookies during SSR, so the
+  // httpOnly session cookie reaches the proxy on server-rendered calls too.
+  const request = useRequestFetch()
 
   function loginRedirect(): string {
     const path = useRoute().fullPath
@@ -25,18 +14,13 @@ export function useApi() {
     return `${target}?redirect=${encodeURIComponent(path)}`
   }
 
-  return async function api<T = unknown>(url: string, options?: Parameters<typeof base>[1]): Promise<T> {
+  return async function api<T = unknown>(url: string, options?: Parameters<typeof request>[1]): Promise<T> {
+    const path = url.startsWith("/") ? url : `/${url}`
     try {
-      return (await base(url, options)) as T
+      return (await request(`/bff/api${path}`, options)) as T
     } catch (err) {
       const status = (err as { response?: { status?: number } }).response?.status
-      if (status !== 401) throw err
-
-      const newToken = await refresh()
-      if (newToken) {
-        return (await base(url, options)) as T
-      }
-      if (import.meta.client) {
+      if (status === 401 && import.meta.client) {
         await navigateTo(loginRedirect())
       }
       throw err

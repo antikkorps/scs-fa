@@ -276,10 +276,16 @@ export const refreshTokens = pgTable(
     deviceLabel: varchar("device_label", { length: 255 }),
     lastUsedAt: timestamp("last_used_at").defaultNow(),
     createdAt: timestamp("created_at").defaultNow(),
+    // Refresh-token rotation with reuse detection (RTR): all rotations of one
+    // session share a family_id; a consumed token is kept with revoked_at set so
+    // that replaying it is detectable as theft → the whole family is revoked.
+    familyId: uuid("family_id").notNull().defaultRandom(),
+    revokedAt: timestamp("revoked_at"),
   },
   (t) => [
     index("idx_refresh_tokens_user").on(t.userId),
     index("idx_refresh_tokens_expires").on(t.expiresAt),
+    index("idx_refresh_tokens_family").on(t.familyId),
     foreignKey({
       columns: [t.userId],
       foreignColumns: [users.id],

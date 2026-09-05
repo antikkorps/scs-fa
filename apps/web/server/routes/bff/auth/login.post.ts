@@ -7,13 +7,15 @@ interface ApiLoginResponse {
   user: AuthUser
 }
 
-// BFF login: proxies to the API, stashes the refresh token in an httpOnly
-// cookie, and returns only the access token + user to the browser.
+// BFF login: proxies to the API and stashes BOTH tokens in httpOnly cookies.
+// Only the (non-secret) user is returned for UI state — the access token never
+// reaches client JS (it's attached server-side by the /bff/api/* proxy).
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const res = await callAuthApi<ApiLoginResponse>(event, "/auth/login", body)
 
   setRefreshCookie(event, res.refreshToken)
+  setAccessCookie(event, res.accessToken)
 
-  return { accessToken: res.accessToken, expiresIn: res.expiresIn, user: res.user }
+  return { user: res.user }
 })
