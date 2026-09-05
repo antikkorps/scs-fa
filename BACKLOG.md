@@ -370,6 +370,12 @@
 - [x] **Vérifié** : typecheck clean (shared/api/web), **262 API / 56 shared / 10 web** au vert (nouvelle couverture : magic-bytes, Content-Type usurpé, download gated, JSON-LD, montant Stripe), compose prod valide
 - Différé (documenté) : baseline de migration (vs `push --force`), rotation des secrets, clé S3 dédiée least-privilege pour les backups, nonce CSP (drop `unsafe-inline`), 3 moderates `pnpm audit` dev/build-time uniquement, durcissement conteneur avancé (cap_drop/read_only) à valider en staging
 
+**Story 8.7** — `justfile` d'orchestration ops (go-live) — 🔜 **À FAIRE au go-live**
+
+- Runner `just` (binaire statique, `set dotenv-load`) **en complément** des scripts pnpm — scope **ops/déploiement uniquement** : rend exécutables les blocs copier-coller de `docs/DEPLOY.md §3-§7` pour réduire l'erreur humaine à la mise en ligne.
+- Recettes cibles : `deploy` (compose build + up -d), `migrate` (profile migrate run), `seed`, `backup` / `restore [dump]` (destructif → confirmation), `logs <svc>`, `ps` / `down` / `psql`, `staging-tls` (bascule ACME staging).
+- **Décision tranchée (2026-09-05)** : `just` **plutôt que Make** — pas de pièges tabs/`.PHONY`, paramètres, `--list` auto-documenté, chargement `.env` natif, binaire unique facile à déposer sur le VM Hetzner (Ubuntu minimal). Ne **remplace pas** les scripts pnpm dev/build/test. Voir [[project_delivery_strategy]] pour le bar qualité.
+
 ## PHASE 9 — Front, SEO & Découvrabilité (transverse)
 
 > Remarques Franck (2026-06-10, après démo front 5.3). Palette laiton + charbon **validée** — à conserver.
