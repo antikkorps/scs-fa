@@ -1,7 +1,7 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { ref } from "vue"
+import { nextTick, ref } from "vue"
 import AppHeader from "./AppHeader.vue"
 
 // Real refs so Vue auto-unwraps them in the template (plain objects would read
@@ -14,6 +14,9 @@ const logout = vi.fn()
 
 mockNuxtImport("useAuth", () => () => ({ isAuthenticated, isAdmin, user, logout }))
 mockNuxtImport("useCart", () => () => ({ count: cartCount }))
+mockNuxtImport("useProductCategories", () => () => ({
+  categories: ref([{ slug: "carabines", name: "Carabines", category: "arme", displayOrder: 1 }]),
+}))
 
 beforeEach(() => {
   isAuthenticated.value = false
@@ -53,6 +56,25 @@ describe("AppHeader", () => {
     expect(menu).toContain("Déconnexion")
   })
 
+  it("opens the Armurerie mega-menu with category and legal links", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    expect(wrapper.find("#mega-armurerie").exists()).toBe(false)
+    await wrapper.find('button[aria-controls="mega-armurerie"]').trigger("click")
+    const mega = wrapper.find("#mega-armurerie")
+    expect(mega.exists()).toBe(true)
+    expect(mega.text()).toContain("Carabines") // category from the mocked list
+    expect(mega.text()).toContain("Vente libre") // legal category label
+    expect(mega.find('a[href="/boutique?category=carabines"]').exists()).toBe(true)
+  })
+
+  it("opens the Gun Art mega-menu with a link to the collection", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    await wrapper.find('button[aria-controls="mega-gunart"]').trigger("click")
+    const mega = wrapper.find("#mega-gunart")
+    expect(mega.exists()).toBe(true)
+    expect(mega.find('a[href="/collection"]').exists()).toBe(true)
+  })
+
   it("toggles the search overlay (teleported to body)", async () => {
     const wrapper = await mountSuspended(AppHeader)
     expect(document.querySelector(".searchov")).toBeNull()
@@ -66,6 +88,20 @@ describe("AppHeader", () => {
     expect(document.querySelector("#mobile-nav")).toBeNull()
     await wrapper.find('button[aria-label="Ouvrir le menu"]').trigger("click")
     expect(document.querySelector("#mobile-nav")).not.toBeNull()
+    wrapper.unmount()
+  })
+
+  it("expands the Armurerie accordion in the mobile menu", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    await wrapper.find('button[aria-label="Ouvrir le menu"]').trigger("click")
+    const toggle = document.querySelector('button[aria-controls="msub-armurerie"]') as HTMLElement | null
+    expect(toggle).not.toBeNull()
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false")
+    toggle?.click()
+    await nextTick()
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true")
+    // The category sub-links come from the mocked useProductCategories.
+    expect(document.querySelector("#msub-armurerie")?.textContent).toContain("Carabines")
     wrapper.unmount()
   })
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LegalCategoryCode, ProductCategoryRef, ProductListResponse } from "~/types/product"
+import type { LegalCategoryCode, ProductListResponse } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/product"
 
 const PAGE_SIZE = 24
@@ -30,10 +30,8 @@ const page = computed(() => {
   return Number.isFinite(n) && n > 0 ? n : 1
 })
 
-// Reference data for the filters.
-const { data: categories } = await useFetch<{ data: ProductCategoryRef[] }>(`${apiBase}/product-categories`, {
-  key: "product-categories",
-})
+// Reference data for the filters (shared with the header mega-menu, one request).
+const { categories } = useProductCategories()
 
 // Reactive query object → useFetch refetches whenever a filter changes.
 const apiQuery = computed(() => {
@@ -170,7 +168,7 @@ useHead({
             @change="setFilter('category', ($event.target as HTMLSelectElement).value)"
           >
             <option value="">Toutes les catégories</option>
-            <option v-for="c in categories?.data ?? []" :key="c.slug" :value="c.slug">{{ c.name }}</option>
+            <option v-for="c in categories" :key="c.slug" :value="c.slug">{{ c.name }}</option>
           </select>
         </div>
 
