@@ -97,7 +97,7 @@ useHead({
           Armes de chasse et de tir, munitions, optiques et accessoires. Catégorie légale, prix TTC et contrôles requis
           affichés sur chaque article.
         </p>
-        <span class="universe__cta">Explorer la boutique <span aria-hidden="true">→</span></span>
+        <span class="btn btn-primary universe__cta">Explorer la boutique <span aria-hidden="true">→</span></span>
       </NuxtLink>
 
       <NuxtLink to="/collection" class="universe universe--art">
@@ -107,7 +107,7 @@ useHead({
           Des tirages photographiques d'exception, signés et numérotés, tirés à un nombre strictement limité
           d'exemplaires, avec certificat d'authenticité.
         </p>
-        <span class="universe__cta">Voir la collection <span aria-hidden="true">→</span></span>
+        <span class="btn btn-primary universe__cta">Voir la collection <span aria-hidden="true">→</span></span>
       </NuxtLink>
     </section>
 
@@ -239,11 +239,7 @@ useHead({
 }
 .universe__cta {
   margin-top: auto;
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--brass);
+  align-self: flex-start;
 }
 
 .selection {

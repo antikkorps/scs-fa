@@ -138,9 +138,8 @@ async function signOut() {
                 </NuxtLink>
               </div>
               <NuxtLink to="/boutique" class="mega__cta">
-                <span class="mega__cta-title">Toute la boutique</span>
+                <span class="mega__cta-title">Toute la boutique <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
                 <span class="mega__cta-sub">Armes, munitions, optiques &amp; accessoires</span>
-                <span class="mega__cta-arrow" aria-hidden="true">→</span>
               </NuxtLink>
             </div>
           </Transition>
@@ -178,9 +177,8 @@ async function signOut() {
                 </ul>
               </div>
               <NuxtLink to="/collection" class="mega__cta">
-                <span class="mega__cta-title">Découvrir la collection</span>
+                <span class="mega__cta-title">Découvrir la collection <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
                 <span class="mega__cta-sub">La galerie Gun Art</span>
-                <span class="mega__cta-arrow" aria-hidden="true">→</span>
               </NuxtLink>
             </div>
           </Transition>
@@ -581,12 +579,12 @@ async function signOut() {
 }
 .mega__cta {
   position: relative;
+  align-self: center;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 0.3rem;
   min-width: 190px;
-  padding: 1.1rem 1.25rem;
+  padding: 1.25rem;
   background: var(--ink);
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
@@ -598,6 +596,9 @@ async function signOut() {
   border-color: var(--brass);
 }
 .mega__cta-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-family: var(--font-display);
   font-size: 1.1rem;
   color: var(--paper);
@@ -607,9 +608,6 @@ async function signOut() {
   color: var(--paper-faint);
 }
 .mega__cta-arrow {
-  position: absolute;
-  top: 1.1rem;
-  right: 1.25rem;
   color: var(--brass);
   transition: transform 0.25s var(--ease);
 }
