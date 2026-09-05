@@ -12,6 +12,14 @@ internet ──443──▶ caddy ──/api/*, /health──▶ api:8080
                                                 api ──▶ postgres:5432
 ```
 
+> **Ops shortcuts (`just`).** The Compose operations in this guide are wrapped as
+> [`just`](https://github.com/casey/just) recipes in the repo-root `justfile`, so
+> go-live steps are runnable, not copy-pasted. Install with `brew install just`
+> (or your distro package), then run `just` from the repo root to list them:
+> `just deploy` · `just migrate` · `just seed` · `just update` · `just logs api` ·
+> `just ps` · `just psql` · `just backup` · `just restore [dump]`. They complement
+> the pnpm scripts (dev/build/test stay in `package.json`).
+
 ## 1. Provision the server
 
 - **Hetzner Cloud** VM, e.g. `CPX21` (3 vCPU / 4 GB) in `nbg1`/`fsn1`, Ubuntu 24.04.
