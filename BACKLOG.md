@@ -371,6 +371,13 @@
 - [x] **Nonce CSP (drop `unsafe-inline` sur script-src)** — CSP désormais posée **par Nitro** par requête avec un nonce frais (`apps/web/server/plugins/csp.ts` + util pur testé `server/utils/csp.ts`) ; le hook `render:html` tague tous les `<script>` inline (payload d'hydratation, JSON-LD). Caddy ne pose plus la CSP. **Bonus** : ajout des origines **Stripe** (js/api/hooks/m.stripe.network) que l'ancienne CSP oubliait → le paiement CB aurait été cassé en prod. `style-src` garde `unsafe-inline` (PrimeVue injecte des `<style>` au runtime côté client — à durcir via `csp.nonce` de PrimeVue). Vérifié : build prod + preview, 0 violation CSP en navigateur (accueil/boutique/collection), +8 tests unitaires.
 - Différé (documenté) : baseline de migration (vs `push --force`), rotation des secrets, clé S3 dédiée least-privilege pour les backups, `style-src` nonce (PrimeVue `csp.nonce`), 3 moderates `pnpm audit` dev/build-time uniquement, durcissement conteneur avancé (cap_drop/read_only) à valider en staging
 
+**Audit sécurité 2026-09-05 (post-Phase 10)** — 3 audits parallèles (auth/BFF, paiement/checkout, compte/légal/admin/storage). Paiement + compte/légal/admin/storage = **RAS** (autorité prix serveur, aucun IDOR, RBAC complet, présignés gated+scoped+attachment, upload durci sans traversal, webhook signé+idempotent). Corrigé : [x] validation `?redirect=` (open-redirect) `utils/navigation.ts` ; [x] middleware CSRF Origin sur `/bff/**` `server/middleware/csrf-origin.ts` ; [x] `secure` flag sur `scs_token`/`scs_user` ; [x] 404 neutre 2 univers.
+
+**Story 8.8** — Session **httpOnly** (token d'accès hors JS) — 🔜 **À FAIRE (story dédiée)**
+
+- Finding HIGH de l'audit : `scs_token` (JWT d'accès) + `scs_user` sont dans des cookies **lisibles en JS** → tout XSS = vol de session (mitigé partiellement par le `secure` flag + la CSP nonce, mais pas résolu).
+- Fix propre = **proxy BFF `/bff/api/**`** qui lit le token dans un cookie **httpOnly** et attache le Bearer côté serveur ; l'API reste inchangée (pure Bearer). Implique : **streaming multipart** (upload docs légaux + images blog), **retry+refresh sur 401** côté proxy, **forwarding cookie SSR** (`useRequestFetch`), réécriture de `useApi`/`useAuth`. Touche **tous les appels authentifiés** → **re-test e2e exhaustif** (login, compte, commandes, upload, checkout, admin) obligatoire avant merge.
+
 **Story 8.7** — `justfile` d'orchestration ops (go-live) ✅
 
 - Runner `just` (binaire statique, `set dotenv-load`) **en complément** des scripts pnpm — scope **ops/déploiement uniquement** : rend exécutables les blocs copier-coller de `docs/DEPLOY.md §3-§7` pour réduire l'erreur humaine à la mise en ligne.
