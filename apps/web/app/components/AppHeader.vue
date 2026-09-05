@@ -1,16 +1,52 @@
 <script setup lang="ts">
+import type { LegalCategoryCode } from "~/types/product"
+import { legalCategoryLabel } from "~/utils/product"
+
 const route = useRoute()
 const { isAuthenticated, user, isAdmin, logout } = useAuth()
 const { count: cartCount } = useCart()
+const { categories } = useProductCategories()
 
 const open = ref(false) // mobile full-screen menu
 const searchOpen = ref(false) // desktop search panel
 const accountOpen = ref(false) // desktop account dropdown
+const megaOpen = ref<null | "armurerie" | "gunart">(null) // desktop universe mega-menu
+const mobileUniverse = ref<null | "armurerie" | "gunart">(null) // mobile accordion section
+
+// Legal categories shown in the Armurerie mega-menu (static codes, same as the
+// boutique filters — no extra request).
+const LEGAL = (["B", "C", "D", "none"] as const).map((code) => ({
+  code: code as LegalCategoryCode,
+  label: legalCategoryLabel(code),
+}))
 
 function closeAll() {
   open.value = false
   searchOpen.value = false
   accountOpen.value = false
+  megaOpen.value = null
+  mobileUniverse.value = null
+}
+
+function toggleMobileUniverse(key: "armurerie" | "gunart") {
+  mobileUniverse.value = mobileUniverse.value === key ? null : key
+}
+
+function openMega(key: "armurerie" | "gunart") {
+  searchOpen.value = false
+  accountOpen.value = false
+  megaOpen.value = key
+}
+function closeMega() {
+  megaOpen.value = null
+}
+function toggleMega(key: "armurerie" | "gunart") {
+  megaOpen.value = megaOpen.value === key ? null : key
+}
+// Keyboard: close the panel when focus leaves the whole universe item.
+function onItemBlur(e: FocusEvent, key: "armurerie" | "gunart") {
+  const item = e.currentTarget as HTMLElement | null
+  if (megaOpen.value === key && item && !item.contains(e.relatedTarget as Node | null)) closeMega()
 }
 
 // Close everything on navigation.
@@ -22,9 +58,10 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => window.addEventListener("keydown", onKeydown))
 onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
 
-// Body scroll lock while the mobile overlay is open.
+// Body scroll lock while the mobile overlay is open; collapse accordions on close.
 watch(open, (v) => {
   if (import.meta.client) document.body.style.overflow = v ? "hidden" : ""
+  if (!v) mobileUniverse.value = null
 })
 onBeforeUnmount(() => {
   if (import.meta.client) document.body.style.overflow = ""
@@ -32,10 +69,12 @@ onBeforeUnmount(() => {
 
 function toggleSearch() {
   accountOpen.value = false
+  megaOpen.value = null
   searchOpen.value = !searchOpen.value
 }
 function toggleAccount() {
   searchOpen.value = false
+  megaOpen.value = null
   accountOpen.value = !accountOpen.value
 }
 
@@ -44,12 +83,6 @@ async function signOut() {
   closeAll()
   await navigateTo("/")
 }
-
-const NAV = [
-  { to: "/boutique", label: "Armurerie" },
-  { to: "/collection", label: "Gun Art" },
-  { to: "/blog", label: "Journal" },
-]
 </script>
 
 <template>
@@ -61,7 +94,97 @@ const NAV = [
       </NuxtLink>
 
       <nav class="nav" aria-label="Navigation principale">
-        <NuxtLink v-for="item in NAV" :key="item.to" :to="item.to" class="nav__link">{{ item.label }}</NuxtLink>
+        <!-- Armurerie universe → mega-menu -->
+        <div
+          class="nav__item"
+          @pointerenter="openMega('armurerie')"
+          @pointerleave="closeMega"
+          @focusout="onItemBlur($event, 'armurerie')"
+        >
+          <button
+            type="button"
+            class="nav__link nav__trigger"
+            :class="{ 'is-open': megaOpen === 'armurerie' }"
+            :aria-expanded="megaOpen === 'armurerie'"
+            aria-controls="mega-armurerie"
+            aria-haspopup="true"
+            @click="toggleMega('armurerie')"
+          >
+            Armurerie
+          </button>
+          <Transition name="mega">
+            <div v-if="megaOpen === 'armurerie'" id="mega-armurerie" class="mega mega--shop">
+              <div class="mega__col">
+                <p class="mega__label">Catégories</p>
+                <NuxtLink
+                  v-for="c in categories"
+                  :key="c.slug"
+                  :to="`/boutique?category=${c.slug}`"
+                  class="mega__link"
+                >
+                  {{ c.name }}
+                </NuxtLink>
+                <NuxtLink v-if="!categories.length" to="/boutique" class="mega__link">Voir la boutique</NuxtLink>
+              </div>
+              <div class="mega__col">
+                <p class="mega__label">Par catégorie légale</p>
+                <NuxtLink
+                  v-for="l in LEGAL"
+                  :key="l.code"
+                  :to="`/boutique?legalCategory=${l.code}`"
+                  class="mega__link"
+                >
+                  {{ l.label }}
+                </NuxtLink>
+              </div>
+              <NuxtLink to="/boutique" class="mega__cta">
+                <span class="mega__cta-title">Toute la boutique <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
+                <span class="mega__cta-sub">Armes, munitions, optiques &amp; accessoires</span>
+              </NuxtLink>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Gun Art universe → mega-menu -->
+        <div
+          class="nav__item"
+          @pointerenter="openMega('gunart')"
+          @pointerleave="closeMega"
+          @focusout="onItemBlur($event, 'gunart')"
+        >
+          <button
+            type="button"
+            class="nav__link nav__trigger"
+            :class="{ 'is-open': megaOpen === 'gunart' }"
+            :aria-expanded="megaOpen === 'gunart'"
+            aria-controls="mega-gunart"
+            aria-haspopup="true"
+            @click="toggleMega('gunart')"
+          >
+            Gun Art
+          </button>
+          <Transition name="mega">
+            <div v-if="megaOpen === 'gunart'" id="mega-gunart" class="mega mega--art">
+              <div class="mega__pitch">
+                <p class="mega__label">Gun Art</p>
+                <p class="mega__lede">
+                  Des tirages photographiques d'exception, signés et numérotés, en édition strictement limitée.
+                </p>
+                <ul class="mega__points" role="list">
+                  <li>Éditions limitées ≤ 25 exemplaires</li>
+                  <li>Signées &amp; numérotées</li>
+                  <li>Certificat d'authenticité</li>
+                </ul>
+              </div>
+              <NuxtLink to="/collection" class="mega__cta">
+                <span class="mega__cta-title">Découvrir la collection <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
+                <span class="mega__cta-sub">La galerie Gun Art</span>
+              </NuxtLink>
+            </div>
+          </Transition>
+        </div>
+
+        <NuxtLink to="/blog" class="nav__link">Journal</NuxtLink>
         <a href="/#about" class="nav__link">À propos</a>
       </nav>
 
@@ -199,12 +322,58 @@ const NAV = [
             <SearchBar class="mobile__search" @submit="closeAll" />
 
             <ul class="mobile__nav" role="list">
-              <li v-for="(item, i) in NAV" :key="item.to" :style="{ '--i': i }">
-                <NuxtLink :to="item.to" class="mlink">
-                  <span>{{ item.label }}</span><span class="mlink__chev" aria-hidden="true">›</span>
+              <!-- Armurerie accordion -->
+              <li class="mnav__item" :style="{ '--i': 0 }">
+                <button
+                  type="button"
+                  class="mlink mlink--toggle"
+                  :class="{ 'is-open': mobileUniverse === 'armurerie' }"
+                  :aria-expanded="mobileUniverse === 'armurerie'"
+                  aria-controls="msub-armurerie"
+                  @click="toggleMobileUniverse('armurerie')"
+                >
+                  <span>Armurerie</span><span class="mlink__chev" aria-hidden="true">›</span>
+                </button>
+                <div class="msub-wrap" :class="{ 'is-open': mobileUniverse === 'armurerie' }">
+                  <div class="msub-inner">
+                    <ul id="msub-armurerie" class="msub" role="list">
+                      <li><NuxtLink to="/boutique" class="msub__link">Toute la boutique</NuxtLink></li>
+                      <li v-for="c in categories" :key="c.slug">
+                        <NuxtLink :to="`/boutique?category=${c.slug}`" class="msub__link">{{ c.name }}</NuxtLink>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </li>
+
+              <!-- Gun Art accordion -->
+              <li class="mnav__item" :style="{ '--i': 1 }">
+                <button
+                  type="button"
+                  class="mlink mlink--toggle"
+                  :class="{ 'is-open': mobileUniverse === 'gunart' }"
+                  :aria-expanded="mobileUniverse === 'gunart'"
+                  aria-controls="msub-gunart"
+                  @click="toggleMobileUniverse('gunart')"
+                >
+                  <span>Gun Art</span><span class="mlink__chev" aria-hidden="true">›</span>
+                </button>
+                <div class="msub-wrap" :class="{ 'is-open': mobileUniverse === 'gunart' }">
+                  <div class="msub-inner">
+                    <ul id="msub-gunart" class="msub" role="list">
+                      <li><NuxtLink to="/collection" class="msub__link">Voir la collection</NuxtLink></li>
+                      <li class="msub__note">Éditions limitées ≤ 25, signées, numérotées &amp; certifiées</li>
+                    </ul>
+                  </div>
+                </div>
+              </li>
+
+              <li class="mnav__item" :style="{ '--i': 2 }">
+                <NuxtLink to="/blog" class="mlink">
+                  <span>Journal</span><span class="mlink__chev" aria-hidden="true">›</span>
                 </NuxtLink>
               </li>
-              <li :style="{ '--i': NAV.length }">
+              <li class="mnav__item" :style="{ '--i': 3 }">
                 <a href="/#about" class="mlink" @click="closeAll">
                   <span>À propos</span><span class="mlink__chev" aria-hidden="true">›</span>
                 </a>
@@ -286,6 +455,175 @@ const NAV = [
 .nav__link:hover,
 .nav__link.router-link-active {
   color: var(--paper);
+}
+
+/* Universe items with a mega-menu */
+.nav__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.nav__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.nav__trigger::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.25s var(--ease);
+}
+.nav__trigger.is-open,
+.nav__trigger:hover {
+  color: var(--paper);
+}
+.nav__trigger.is-open::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+
+/* Mega-menu panel */
+.mega {
+  position: absolute;
+  top: calc(100% + 18px);
+  left: 0;
+  z-index: 70;
+  display: flex;
+  gap: 2.5rem;
+  padding: 1.5rem 1.75rem;
+  background: var(--ink-soft);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+/* Invisible bridge so the pointer can cross the gap without closing the panel. */
+.mega::before {
+  content: "";
+  position: absolute;
+  top: -18px;
+  left: 0;
+  right: 0;
+  height: 18px;
+}
+.mega--shop {
+  min-width: 520px;
+}
+.mega--art {
+  min-width: 460px;
+}
+.mega__col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 170px;
+}
+.mega__label {
+  margin: 0 0 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.mega__link {
+  padding: 0.4rem 0.5rem;
+  margin: 0 -0.5rem;
+  font-size: 0.92rem;
+  color: var(--paper-dim);
+  border-radius: var(--radius);
+  transition:
+    color 0.2s var(--ease),
+    background 0.2s var(--ease);
+}
+.mega__link:hover,
+.mega__link.router-link-active {
+  color: var(--paper);
+  background: var(--ink);
+}
+.mega__pitch {
+  max-width: 260px;
+}
+.mega__lede {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--paper-dim);
+}
+.mega__points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.mega__points li {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--paper-faint);
+}
+.mega__points li::before {
+  content: "›";
+  position: absolute;
+  left: 0;
+  color: var(--brass);
+}
+.mega__cta {
+  position: relative;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 190px;
+  padding: 1.25rem;
+  background: var(--ink);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  transition:
+    border-color 0.25s var(--ease),
+    transform 0.25s var(--ease);
+}
+.mega__cta:hover {
+  border-color: var(--brass);
+}
+.mega__cta-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--paper);
+}
+.mega__cta-sub {
+  font-size: 0.8rem;
+  color: var(--paper-faint);
+}
+.mega__cta-arrow {
+  color: var(--brass);
+  transition: transform 0.25s var(--ease);
+}
+.mega__cta:hover .mega__cta-arrow {
+  transform: translateX(4px);
+}
+.mega-enter-active,
+.mega-leave-active {
+  transition:
+    opacity 0.2s var(--ease),
+    transform 0.2s var(--ease);
+}
+.mega-enter-from,
+.mega-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 /* Right cluster */
@@ -539,6 +877,55 @@ const NAV = [
   color: var(--brass);
   font-size: 1.4rem;
   line-height: 1;
+  transition: transform 0.25s var(--ease);
+}
+/* Accordion toggle rows reuse .mlink but are <button>s → reset UA styles. */
+.mlink--toggle {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink-line);
+  font-family: inherit;
+  cursor: pointer;
+}
+.mlink--toggle.is-open {
+  color: var(--brass);
+}
+.mlink--toggle.is-open .mlink__chev {
+  transform: rotate(90deg);
+}
+/* Collapsible sub-panel: grid-rows 0fr→1fr gives a smooth height transition. */
+.msub-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s var(--ease);
+}
+.msub-wrap.is-open {
+  grid-template-rows: 1fr;
+}
+.msub-inner {
+  overflow: hidden;
+}
+.msub {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0 0.6rem;
+}
+.msub__link {
+  display: block;
+  padding: 0.6rem 0.25rem 0.6rem 1rem;
+  font-size: 1rem;
+  color: var(--paper-dim);
+  transition: color 0.2s var(--ease);
+}
+.msub__link:hover,
+.msub__link:active,
+.msub__link.router-link-active {
+  color: var(--paper);
+}
+.msub__note {
+  padding: 0.5rem 0.25rem 0.5rem 1rem;
+  font-size: 0.82rem;
+  color: var(--paper-faint);
 }
 .mobile__foot {
   margin-top: auto;

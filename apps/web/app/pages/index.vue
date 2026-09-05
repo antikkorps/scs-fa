@@ -1,36 +1,66 @@
 <script setup lang="ts">
 import type { ArtworkListItem } from "~/types/artwork"
+import type { ProductListResponse } from "~/types/product"
 import { artworkImage } from "~/utils/format"
 
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
-const { data } = await useFetch<{ data: ArtworkListItem[] }>(`${apiBase}/artworks`, { key: "artworks-collection" })
-const artworks = computed(() => data.value?.data ?? [])
+// Both universes feed the unified home: artworks (Gun Art gallery) and the
+// featured-first armurerie catalogue.
+const { data: artworkData } = await useFetch<{ data: ArtworkListItem[] }>(`${apiBase}/artworks`, {
+  key: "home-artworks",
+})
+const { data: productData } = await useFetch<ProductListResponse>(`${apiBase}/products`, {
+  key: "home-products",
+  query: { limit: 3 },
+})
+
+const artworks = computed(() => artworkData.value?.data ?? [])
+const products = computed(() => productData.value?.data ?? [])
+const artSelection = computed(() => artworks.value.slice(0, 3))
 const featured = computed(() => artworks.value[0] ?? null)
-const selection = computed(() => artworks.value.slice(0, 3))
 const heroImg = computed(() =>
   featured.value ? artworkImage(featured.value.featuredImageUrl, featured.value.slug, 1600, 1100) : null,
 )
 
 const description =
-  "SCS Firearm — Gun Art : tirages d'art photographiques en édition limitée, signés, numérotés et certifiés. Une collection à la croisée de l'armurerie de précision et de l'art contemporain."
+  "SCS Firearm réunit une armurerie de précision — armes, munitions, optiques et accessoires encadrés par la réglementation française — et Gun Art, des tirages d'art en édition limitée, signés, numérotés et certifiés."
 
 useSeoMeta({
   title: "",
   description,
-  ogTitle: "SCS Firearm — Gun Art en édition limitée",
+  ogTitle: "SCS Firearm — Armurerie de précision & Gun Art",
   ogDescription: description,
   ogUrl: siteUrl,
   ogImage: heroImg,
 })
-useHead({ link: [{ rel: "canonical", href: siteUrl }] })
+
+useHead({
+  link: [{ rel: "canonical", href: siteUrl }],
+  script: [
+    {
+      type: "application/ld+json",
+      innerHTML: serializeJsonLd({
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: "SCS Firearm",
+        url: siteUrl,
+        description,
+        department: [
+          { "@type": "Store", name: "Armurerie SCS Firearm", url: `${siteUrl}/boutique` },
+          { "@type": "Store", name: "Gun Art", url: `${siteUrl}/collection` },
+        ],
+      }),
+    },
+  ],
+})
 </script>
 
 <template>
   <div class="home">
-    <!-- Hero -->
+    <!-- Brand hero -->
     <section class="hero">
       <img
         v-if="heroImg"
@@ -45,28 +75,67 @@ useHead({ link: [{ rel: "canonical", href: siteUrl }] })
       />
       <div class="hero__veil" />
       <div class="container hero__inner">
-        <p class="eyebrow">L'arme comme objet d'art</p>
-        <h1 class="hero__title">Gun Art,<br />en édition limitée.</h1>
+        <p class="eyebrow">La maison SCS Firearm</p>
+        <h1 class="hero__title">Armurerie de précision<br />& Gun Art.</h1>
         <p class="hero__lede">
-          Des tirages photographiques d'exception, signés et numérotés, tirés à un nombre strictement limité
-          d'exemplaires. La précision de l'armurerie rencontre l'art contemporain.
+          Deux univers, une même exigence : une armurerie encadrée par la réglementation française, et une galerie de
+          tirages d'art en édition limitée. Le geste de l'armurier rencontre l'œil du collectionneur.
         </p>
         <div class="hero__actions">
-          <NuxtLink to="/collection" class="btn btn-primary">Découvrir la collection</NuxtLink>
-          <a href="#selection" class="btn btn-ghost">La sélection</a>
+          <NuxtLink to="/boutique" class="btn btn-primary">Entrer dans la boutique</NuxtLink>
+          <NuxtLink to="/collection" class="btn btn-ghost">Découvrir Gun Art</NuxtLink>
         </div>
       </div>
     </section>
 
-    <!-- Selection -->
-    <section v-if="selection.length" id="selection" class="container selection">
+    <!-- Two universes -->
+    <section class="container universes" aria-label="Nos deux univers">
+      <NuxtLink to="/boutique" class="universe universe--shop">
+        <p class="eyebrow">Armurerie</p>
+        <h2 class="universe__title">La boutique</h2>
+        <p class="universe__text">
+          Armes de chasse et de tir, munitions, optiques et accessoires. Catégorie légale, prix TTC et contrôles requis
+          affichés sur chaque article.
+        </p>
+        <span class="btn btn-primary universe__cta">Explorer la boutique <span aria-hidden="true">→</span></span>
+      </NuxtLink>
+
+      <NuxtLink to="/collection" class="universe universe--art">
+        <p class="eyebrow">Gun Art</p>
+        <h2 class="universe__title">La collection</h2>
+        <p class="universe__text">
+          Des tirages photographiques d'exception, signés et numérotés, tirés à un nombre strictement limité
+          d'exemplaires, avec certificat d'authenticité.
+        </p>
+        <span class="btn btn-primary universe__cta">Voir la collection <span aria-hidden="true">→</span></span>
+      </NuxtLink>
+    </section>
+
+    <!-- Armurerie selection -->
+    <section v-if="products.length" class="container selection">
       <header class="selection__head">
-        <p class="eyebrow">La sélection</p>
+        <p class="eyebrow">Armurerie</p>
+        <h2 class="selection__title">Sélection de la boutique</h2>
+      </header>
+      <ul class="grid" role="list">
+        <li v-for="(p, i) in products" :key="p.id">
+          <ProductCard :product="p" :priority="i === 0" />
+        </li>
+      </ul>
+      <div class="selection__more">
+        <NuxtLink to="/boutique" class="btn btn-ghost">Voir toute la boutique</NuxtLink>
+      </div>
+    </section>
+
+    <!-- Gun Art selection -->
+    <section v-if="artSelection.length" class="container selection">
+      <header class="selection__head">
+        <p class="eyebrow">Gun Art</p>
         <h2 class="selection__title">Pièces du moment</h2>
       </header>
       <ul class="grid" role="list">
-        <li v-for="(art, i) in selection" :key="art.id">
-          <ArtworkCard :artwork="art" :priority="i === 0" />
+        <li v-for="art in artSelection" :key="art.id">
+          <ArtworkCard :artwork="art" />
         </li>
       </ul>
       <div class="selection__more">
@@ -77,9 +146,9 @@ useHead({ link: [{ rel: "canonical", href: siteUrl }] })
     <!-- À propos -->
     <section id="about" class="container about">
       <p class="eyebrow">À propos</p>
-      <h2 class="about__title">La maison SCS Firearm</h2>
+      <h2 class="about__title">Une maison, deux exigences</h2>
       <p class="about__text">
-        SCS Firearm réunit deux exigences&nbsp;: une <strong>armurerie de précision</strong>, où chaque arme, munition
+        SCS Firearm réunit deux savoir-faire&nbsp;: une <strong>armurerie de précision</strong>, où chaque arme, munition
         et accessoire est sélectionné et encadré par les obligations légales françaises, et une galerie
         <strong>Gun Art</strong>, qui élève l'objet au rang d'œuvre à travers des tirages signés en édition limitée.
       </p>
@@ -117,22 +186,60 @@ useHead({ link: [{ rel: "canonical", href: siteUrl }] })
 .hero__inner {
   position: relative;
   padding-block: clamp(3rem, 9vw, 6rem);
-  max-width: 720px;
+  max-width: 760px;
 }
 .hero__title {
-  font-size: clamp(3rem, 11vw, 6rem);
+  font-size: clamp(2.6rem, 9vw, 5.5rem);
   margin: 0.75rem 0 1.25rem;
 }
 .hero__lede {
   font-size: clamp(1.05rem, 2.6vw, 1.3rem);
   color: var(--paper-dim);
-  max-width: 52ch;
+  max-width: 54ch;
   margin: 0 0 2rem;
 }
 .hero__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
+}
+
+/* Two universes */
+.universes {
+  padding-top: clamp(3rem, 8vw, 5.5rem);
+  display: grid;
+  gap: clamp(1.25rem, 3vw, 2rem);
+  grid-template-columns: 1fr;
+}
+.universe {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.75rem, 4vw, 2.75rem);
+  background: var(--ink-soft);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  transition:
+    border-color 0.3s var(--ease),
+    transform 0.3s var(--ease);
+}
+.universe:hover {
+  border-color: var(--brass);
+  transform: translateY(-3px);
+}
+.universe__title {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  margin: 0.4rem 0 0.9rem;
+}
+.universe__text {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--paper-dim);
+  margin: 0 0 1.5rem;
+  max-width: 46ch;
+}
+.universe__cta {
+  margin-top: auto;
+  align-self: flex-start;
 }
 
 .selection {
@@ -183,6 +290,11 @@ useHead({ link: [{ rel: "canonical", href: siteUrl }] })
   text-decoration: underline;
 }
 
+@media (min-width: 720px) {
+  .universes {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 @media (min-width: 560px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);
