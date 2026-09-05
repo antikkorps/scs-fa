@@ -6,10 +6,10 @@ const props = defineProps<{ error: NuxtError }>()
 const isNotFound = computed(() => props.error?.statusCode === 404)
 const code = computed(() => props.error?.statusCode ?? 500)
 
-const heading = computed(() => (isNotFound.value ? "Œuvre introuvable" : "Une erreur est survenue"))
+const heading = computed(() => (isNotFound.value ? "Page introuvable" : "Une erreur est survenue"))
 const lead = computed(() =>
   isNotFound.value
-    ? "La page que vous cherchez a été déplacée, vendue ou n'a jamais existé. Le reste de la collection vous attend."
+    ? "La page que vous cherchez a été déplacée, vendue ou n'a jamais existé. Nos deux univers — l'armurerie et la galerie Gun Art — vous attendent."
     : "Quelque chose s'est interrompu de notre côté. Reprenez votre exploration dans un instant.",
 )
 
@@ -17,6 +17,9 @@ const lead = computed(() =>
 // leave the error boundary mounted.
 function goHome() {
   return clearError({ redirect: "/" })
+}
+function goBoutique() {
+  return clearError({ redirect: "/boutique" })
 }
 function goCollection() {
   return clearError({ redirect: "/collection" })
@@ -38,8 +41,9 @@ useSeoMeta({
         <h1 class="err__title">{{ heading }}</h1>
         <p class="err__lead">{{ lead }}</p>
         <div class="err__actions">
-          <button type="button" class="btn btn-primary" @click="goCollection">Voir la collection</button>
-          <button type="button" class="btn btn-ghost" @click="goHome">Retour à l'accueil</button>
+          <button type="button" class="btn btn-primary" @click="goHome">Retour à l'accueil</button>
+          <button type="button" class="btn btn-ghost" @click="goBoutique">La boutique</button>
+          <button type="button" class="btn btn-ghost" @click="goCollection">La collection</button>
         </div>
       </div>
     </section>

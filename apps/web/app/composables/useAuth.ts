@@ -6,7 +6,12 @@ import type { AuthUser } from "~/types/admin"
 // during SSR: the access token (bearer, attached by useApi) and a copy of the
 // signed-in user. The refresh token is httpOnly and handled exclusively by the
 // BFF routes under /bff/auth/* — it never touches client JS.
-const COOKIE_OPTS = { sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7 } as const
+//
+// `secure` keeps these off plain HTTP in prod (dev is http://localhost, so it's
+// disabled there or the cookie is dropped). Making the access token itself
+// httpOnly requires proxying all API calls through the BFF — tracked as a
+// follow-up (see BACKLOG security hardening).
+const COOKIE_OPTS = { sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7, secure: !import.meta.dev } as const
 
 interface SessionResponse {
   accessToken: string
