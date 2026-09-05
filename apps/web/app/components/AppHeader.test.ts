@@ -1,7 +1,7 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { ref } from "vue"
+import { nextTick, ref } from "vue"
 import AppHeader from "./AppHeader.vue"
 
 // Real refs so Vue auto-unwraps them in the template (plain objects would read
@@ -88,6 +88,20 @@ describe("AppHeader", () => {
     expect(document.querySelector("#mobile-nav")).toBeNull()
     await wrapper.find('button[aria-label="Ouvrir le menu"]').trigger("click")
     expect(document.querySelector("#mobile-nav")).not.toBeNull()
+    wrapper.unmount()
+  })
+
+  it("expands the Armurerie accordion in the mobile menu", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    await wrapper.find('button[aria-label="Ouvrir le menu"]').trigger("click")
+    const toggle = document.querySelector('button[aria-controls="msub-armurerie"]') as HTMLElement | null
+    expect(toggle).not.toBeNull()
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false")
+    toggle?.click()
+    await nextTick()
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true")
+    // The category sub-links come from the mocked useProductCategories.
+    expect(document.querySelector("#msub-armurerie")?.textContent).toContain("Carabines")
     wrapper.unmount()
   })
 })

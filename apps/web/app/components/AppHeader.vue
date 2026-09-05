@@ -11,6 +11,7 @@ const open = ref(false) // mobile full-screen menu
 const searchOpen = ref(false) // desktop search panel
 const accountOpen = ref(false) // desktop account dropdown
 const megaOpen = ref<null | "armurerie" | "gunart">(null) // desktop universe mega-menu
+const mobileUniverse = ref<null | "armurerie" | "gunart">(null) // mobile accordion section
 
 // Legal categories shown in the Armurerie mega-menu (static codes, same as the
 // boutique filters — no extra request).
@@ -24,6 +25,11 @@ function closeAll() {
   searchOpen.value = false
   accountOpen.value = false
   megaOpen.value = null
+  mobileUniverse.value = null
+}
+
+function toggleMobileUniverse(key: "armurerie" | "gunart") {
+  mobileUniverse.value = mobileUniverse.value === key ? null : key
 }
 
 function openMega(key: "armurerie" | "gunart") {
@@ -52,9 +58,10 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => window.addEventListener("keydown", onKeydown))
 onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
 
-// Body scroll lock while the mobile overlay is open.
+// Body scroll lock while the mobile overlay is open; collapse accordions on close.
 watch(open, (v) => {
   if (import.meta.client) document.body.style.overflow = v ? "hidden" : ""
+  if (!v) mobileUniverse.value = null
 })
 onBeforeUnmount(() => {
   if (import.meta.client) document.body.style.overflow = ""
@@ -76,12 +83,6 @@ async function signOut() {
   closeAll()
   await navigateTo("/")
 }
-
-const NAV = [
-  { to: "/boutique", label: "Armurerie" },
-  { to: "/collection", label: "Gun Art" },
-  { to: "/blog", label: "Journal" },
-]
 </script>
 
 <template>
@@ -323,12 +324,58 @@ const NAV = [
             <SearchBar class="mobile__search" @submit="closeAll" />
 
             <ul class="mobile__nav" role="list">
-              <li v-for="(item, i) in NAV" :key="item.to" :style="{ '--i': i }">
-                <NuxtLink :to="item.to" class="mlink">
-                  <span>{{ item.label }}</span><span class="mlink__chev" aria-hidden="true">›</span>
+              <!-- Armurerie accordion -->
+              <li class="mnav__item" :style="{ '--i': 0 }">
+                <button
+                  type="button"
+                  class="mlink mlink--toggle"
+                  :class="{ 'is-open': mobileUniverse === 'armurerie' }"
+                  :aria-expanded="mobileUniverse === 'armurerie'"
+                  aria-controls="msub-armurerie"
+                  @click="toggleMobileUniverse('armurerie')"
+                >
+                  <span>Armurerie</span><span class="mlink__chev" aria-hidden="true">›</span>
+                </button>
+                <div class="msub-wrap" :class="{ 'is-open': mobileUniverse === 'armurerie' }">
+                  <div class="msub-inner">
+                    <ul id="msub-armurerie" class="msub" role="list">
+                      <li><NuxtLink to="/boutique" class="msub__link">Toute la boutique</NuxtLink></li>
+                      <li v-for="c in categories" :key="c.slug">
+                        <NuxtLink :to="`/boutique?category=${c.slug}`" class="msub__link">{{ c.name }}</NuxtLink>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </li>
+
+              <!-- Gun Art accordion -->
+              <li class="mnav__item" :style="{ '--i': 1 }">
+                <button
+                  type="button"
+                  class="mlink mlink--toggle"
+                  :class="{ 'is-open': mobileUniverse === 'gunart' }"
+                  :aria-expanded="mobileUniverse === 'gunart'"
+                  aria-controls="msub-gunart"
+                  @click="toggleMobileUniverse('gunart')"
+                >
+                  <span>Gun Art</span><span class="mlink__chev" aria-hidden="true">›</span>
+                </button>
+                <div class="msub-wrap" :class="{ 'is-open': mobileUniverse === 'gunart' }">
+                  <div class="msub-inner">
+                    <ul id="msub-gunart" class="msub" role="list">
+                      <li><NuxtLink to="/collection" class="msub__link">Voir la collection</NuxtLink></li>
+                      <li class="msub__note">Éditions limitées ≤ 25, signées, numérotées &amp; certifiées</li>
+                    </ul>
+                  </div>
+                </div>
+              </li>
+
+              <li class="mnav__item" :style="{ '--i': 2 }">
+                <NuxtLink to="/blog" class="mlink">
+                  <span>Journal</span><span class="mlink__chev" aria-hidden="true">›</span>
                 </NuxtLink>
               </li>
-              <li :style="{ '--i': NAV.length }">
+              <li class="mnav__item" :style="{ '--i': 3 }">
                 <a href="/#about" class="mlink" @click="closeAll">
                   <span>À propos</span><span class="mlink__chev" aria-hidden="true">›</span>
                 </a>
@@ -832,6 +879,55 @@ const NAV = [
   color: var(--brass);
   font-size: 1.4rem;
   line-height: 1;
+  transition: transform 0.25s var(--ease);
+}
+/* Accordion toggle rows reuse .mlink but are <button>s → reset UA styles. */
+.mlink--toggle {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink-line);
+  font-family: inherit;
+  cursor: pointer;
+}
+.mlink--toggle.is-open {
+  color: var(--brass);
+}
+.mlink--toggle.is-open .mlink__chev {
+  transform: rotate(90deg);
+}
+/* Collapsible sub-panel: grid-rows 0fr→1fr gives a smooth height transition. */
+.msub-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s var(--ease);
+}
+.msub-wrap.is-open {
+  grid-template-rows: 1fr;
+}
+.msub-inner {
+  overflow: hidden;
+}
+.msub {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0 0.6rem;
+}
+.msub__link {
+  display: block;
+  padding: 0.6rem 0.25rem 0.6rem 1rem;
+  font-size: 1rem;
+  color: var(--paper-dim);
+  transition: color 0.2s var(--ease);
+}
+.msub__link:hover,
+.msub__link:active,
+.msub__link.router-link-active {
+  color: var(--paper);
+}
+.msub__note {
+  padding: 0.5rem 0.25rem 0.5rem 1rem;
+  font-size: 0.82rem;
+  color: var(--paper-faint);
 }
 .mobile__foot {
   margin-top: auto;
