@@ -14,6 +14,9 @@ const logout = vi.fn()
 
 mockNuxtImport("useAuth", () => () => ({ isAuthenticated, isAdmin, user, logout }))
 mockNuxtImport("useCart", () => () => ({ count: cartCount }))
+mockNuxtImport("useProductCategories", () => () => ({
+  categories: ref([{ slug: "carabines", name: "Carabines", category: "arme", displayOrder: 1 }]),
+}))
 
 beforeEach(() => {
   isAuthenticated.value = false
@@ -51,6 +54,25 @@ describe("AppHeader", () => {
     const menu = wrapper.find(".menu").text()
     expect(menu).toContain("Administration")
     expect(menu).toContain("Déconnexion")
+  })
+
+  it("opens the Armurerie mega-menu with category and legal links", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    expect(wrapper.find("#mega-armurerie").exists()).toBe(false)
+    await wrapper.find('button[aria-controls="mega-armurerie"]').trigger("click")
+    const mega = wrapper.find("#mega-armurerie")
+    expect(mega.exists()).toBe(true)
+    expect(mega.text()).toContain("Carabines") // category from the mocked list
+    expect(mega.text()).toContain("Vente libre") // legal category label
+    expect(mega.find('a[href="/boutique?category=carabines"]').exists()).toBe(true)
+  })
+
+  it("opens the Gun Art mega-menu with a link to the collection", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    await wrapper.find('button[aria-controls="mega-gunart"]').trigger("click")
+    const mega = wrapper.find("#mega-gunart")
+    expect(mega.exists()).toBe(true)
+    expect(mega.find('a[href="/collection"]').exists()).toBe(true)
   })
 
   it("toggles the search overlay (teleported to body)", async () => {

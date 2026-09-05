@@ -452,7 +452,7 @@
 - **Upload & suivi des documents légaux** (API 4.1) + checklist légale par commande (API 4.3) : statut par doc, motif de rejet, réupload
 - Cœur de l'expérience réglementée côté client
 
-**Story 10.6** — Accueil unifié & navigation 2 univers
+**Story 10.6** — Accueil unifié & navigation 2 univers ✅
 
 - Page d'accueil présentant **armurerie + Gun Art** (aujourd'hui hero centré Gun Art), navigation header vers les deux univers
 - Cohérence de marque entre la boutique réglementée et la galerie d'art
