@@ -30,7 +30,7 @@ cp apps/api/.env.example apps/api/.env
 pnpm docker:up
 
 # 4. Apply the schema + seeds (legal categories + products)
-pnpm db:push
+pnpm db:migrate
 pnpm db:seed
 
 # 5. Start the API (port 8081)
@@ -52,8 +52,9 @@ pnpm dev:web
 | `pnpm format`         | Biome format (auto-fix)                                    |
 | `pnpm check`          | Biome lint + format combined                               |
 | `pnpm verify`         | `biome ci` + typecheck + tests (must pass before commit)   |
-| `pnpm db:push`        | Push the schema to Postgres (dev only, unversioned)        |
-| `pnpm db:generate`    | Generate a SQL migration (prod)                            |
+| `pnpm db:generate`    | Generate a SQL migration from `schema.ts` (commit the file) |
+| `pnpm db:migrate`     | Apply pending migrations (dev, CI and prod)                |
+| `pnpm db:push`        | Diff the schema straight into a DB — **prototyping only**, never on a shared or deployed database |
 | `pnpm db:seed`        | Run the seeds                                              |
 | `pnpm db:studio`      | Drizzle Studio web UI                                      |
 | `pnpm docker:up/down` | Dev Postgres lifecycle                                     |
@@ -62,14 +63,34 @@ pnpm dev:web
 
 `.forgejo/workflows/ci.yml` runs Biome, typecheck and the full test suite on every
 pull request and on pushes to `main` (Forgejo Actions — requires a registered
-`forgejo-runner` with the Docker backend). It spins up a Postgres service, creates the schema with
-`drizzle-kit push --force` (schema.ts is the source of truth — no migration
-baseline), then runs the tests against it with `TEST_DB_SKIP_PROVISION=true` so
-the vitest global setup seeds the CI database instead of cloning a local dev one.
+`forgejo-runner` with the Docker backend). It spins up a Postgres service and runs
+the tests against it with `TEST_DB_SKIP_PROVISION=true`, which tells the vitest
+global setup to skip the docker drop/create and migrate + seed the existing
+service database.
 
-Locally, tests auto-provision a throwaway `armurier_test` database (cloned from
-`armurier_dev`) — see `apps/api/src/test/global-setup.ts` — so they never touch
-dev data. Run the same gate locally with `pnpm verify`.
+Locally, tests auto-provision a throwaway `armurier_test` database — see
+`apps/api/src/test/global-setup.ts` — so they never touch dev data. Both paths
+build the schema by **applying the migrations**, so CI, dev and prod are created
+the same way and cannot drift. Run the same gate locally with `pnpm verify`.
+
+## Database schema
+
+`apps/api/src/db/schema.ts` is what you edit; `apps/api/drizzle/` holds the
+generated SQL and is the deployment source of truth. The flow:
+
+```bash
+# 1. edit schema.ts, then generate the migration
+pnpm db:generate        # writes apps/api/drizzle/NNNN_*.sql
+
+# 2. review the SQL, commit it with the schema change
+
+# 3. apply it
+pnpm db:migrate         # dev; CI and prod run the same command
+```
+
+Never hand-write ALTERs against a database: a migration that isn't in `drizzle/`
+doesn't exist as far as CI and prod are concerned. `db:push` stays available for
+throwaway prototyping only.
 
 ## Structure
 

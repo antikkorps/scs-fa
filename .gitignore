@@ -16,8 +16,9 @@ coverage/
 .vite/
 *.tsbuildinfo
 
-# Drizzle
-apps/api/drizzle/
+# Drizzle migrations are the deployment source of truth — they MUST be
+# committed (CI and prod apply them). Only the local studio cache is ignored.
+apps/api/drizzle/.drizzle/
 
 # IDE
 .vscode/

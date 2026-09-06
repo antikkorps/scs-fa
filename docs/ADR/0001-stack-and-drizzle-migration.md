@@ -73,5 +73,5 @@ D'autres projets sur la machine occupent 5432–5434 (Postgres) et 8080 (API). O
 
 ## À revoir
 
-- Migration vers `drizzle-kit migrate` (versionné) au lieu de `db:push` quand le schéma se stabilise.
+- ~~Migration vers `drizzle-kit migrate` (versionné) au lieu de `db:push` quand le schéma se stabilise.~~ **Fait le 2026-09-06** (story 11.1) : baseline `drizzle/0000_*.sql` générée depuis `schema.ts`, `armurier_dev` reconstruite uniquement depuis les migrations, tests et prod basculés sur `drizzle-kit migrate`. `db:push` ne sert plus qu'au prototypage jetable.
 - Réviser le bug Biome `pnpm exec` lors de la prochaine version éligible (>90j) — peut-être résolu en 2.4.5+.

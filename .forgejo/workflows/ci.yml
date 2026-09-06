@@ -46,9 +46,11 @@ jobs:
           --health-retries 15
 
     env:
-      # The suite runs against the CI Postgres directly: the schema is created by
-      # `drizzle-kit push` (below) and TEST_DB_SKIP_PROVISION makes the vitest
-      # global setup seed it without trying to clone a local dev DB via docker.
+      # The suite runs against the CI Postgres directly. TEST_DB_SKIP_PROVISION
+      # skips the docker drop/create (the service container already provides the
+      # database); the vitest global setup then applies the Drizzle migrations
+      # and seeds it — the same code path as a local run, so CI and dev build the
+      # schema identically.
       DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
       TEST_DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
       TEST_DB_SKIP_PROVISION: "true"
@@ -91,9 +93,6 @@ jobs:
 
       - name: Typecheck
         run: pnpm -r typecheck
-
-      - name: Apply database schema
-        run: pnpm --filter @armurier/api exec drizzle-kit push --force
 
       - name: Test
         run: pnpm -r test

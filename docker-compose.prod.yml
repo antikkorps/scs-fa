@@ -31,10 +31,12 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
-  # One-off schema push (drizzle-kit lives in dev deps → use the build stage,
-  # which has the full workspace). Gated behind the `migrate` profile so it never
-  # runs on a normal `up`. `schema.ts` is the source of truth (no migration
-  # baseline yet — see BACKLOG); --force applies without interactive prompts.
+  # One-off schema migration (drizzle-kit lives in dev deps → use the build
+  # stage, which has the full workspace and the `drizzle/` migration files).
+  # Gated behind the `migrate` profile so it never runs on a normal `up`.
+  # Applies the committed migrations in order and records them, so re-running is
+  # a no-op and the deployed schema is always a known revision — no destructive
+  # diffing against a live database.
   migrate:
     build:
       context: .
@@ -46,7 +48,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["pnpm", "--filter", "@armurier/api", "exec", "drizzle-kit", "push", "--force"]
+    command: ["pnpm", "--filter", "@armurier/api", "exec", "drizzle-kit", "migrate"]
     networks: [internal]
 
   api:
