@@ -514,7 +514,7 @@
 >
 > Constat : `productCategoryEnum` est **mono-valué** et mélange nature et état (`arme_ancienne`, `occasion`, `arme_longue`, `arme_poing`…). Or une arme historique est **nécessairement d'occasion** → une catégorie unique ne peut plus porter l'information.
 
-- **⚠️ Décision à trancher** : table `tags` + pivot `product_tags` (n-n) **vs** colonne tableau sur `products`. Reco : **table + pivot** — permet une page par tag indexable, des libellés éditables sans migration, et des index propres.
+- ✅ **Décision tranchée (Franck, 2026-09-06)** : **table `tags` + pivot `product_tags`** (n-n), retenue pour sa souplesse. Un tag devient une entité éditable (libellé, slug, description) sans migration, une page de tag indexable, et le pivot autorise autant de tags que voulu par produit. La colonne tableau est écartée : pas de libellé éditable, pas d'index propre, pas de page dédiée.
 - Notion de **facette** sur le tag (nature / état / époque / calibre…) pour grouper les filtres dans l'UI.
 - API : filtre `?tags=` sur `GET /api/products` (sémantique **ET/OU à définir**), facettes avec compteurs, cumul avec les filtres existants (catégorie légale, prix, recherche).
 - Les vues du site deviennent des **présélections de tags** : boutique = tout, `/armes-de-collection` = tag historique, occasion = tag occasion.
@@ -546,7 +546,10 @@
 - **Double opt-in** et lien de désabonnement — obligatoire, et exigé par le fournisseur d'envoi.
 - Intégration **Brevo** (contacts + listes), derrière une **interface `NewsletterService`** sur le modèle de `StorageService` : agnostique du fournisseur, zéro spécificité hors env, driver mémoire en test.
 - RGPD : consentement **horodaté et traçable**, mention explicite, purge sur désabonnement.
-- **⚠️ Décision** : une liste unique ou une **segmentation par univers** (armurerie / collection / Gun Art) ? La segmentation est plus pertinente commercialement mais complexifie l'inscription.
+- ✅ **Décision tranchée (Franck, 2026-09-06)** : **segmentation par univers** (armurerie / collection / Gun Art).
+  - ⚠️ Nuance explicite : la segmentation porte sur **l'abonnement, pas sur le contenu**. Une newsletter d'un univers pourra parler des autres. Donc **ne pas cloisonner l'éditorial** par segment — le segment détermine qui reçoit quoi, pas ce qu'on a le droit d'écrire dedans.
+  - Conséquence sur le modèle : un contact **unique** porteur de N abonnements (et non un contact par liste), **consentement horodaté par segment**, désabonnement **par segment ET global**. Les segments se mappent sur des listes Brevo.
+  - Inscription : cases à cocher multiples, avec un défaut sensé selon la page d'où vient l'inscription (une fiche œuvre pré-coche Gun Art) — sans jamais pré-cocher l'ensemble.
 
 **Story 11.5** — Protection des visuels Gun Art — 🔜 **À FAIRE**
 
