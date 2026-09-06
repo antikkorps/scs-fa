@@ -512,6 +512,119 @@
 
 ---
 
+## PHASE 11 — Armes de collection, tags & Gun Art éditorial
+
+> **Source : réunion client du 2026-09-06** (notes Franck). Ces stories traduisent les besoins exprimés, confrontés au code existant. Plusieurs s'appuient sur du schéma **déjà écrit mais jamais exposé** (`ancient_weapons`), d'autres imposent de nouvelles tables.
+>
+> **Direction artistique transverse** : registre « classe / luxe » (référence donnée en réunion : l'armurerie de John Wick). À intégrer à la refonte navbar (10.6) et aux nouvelles pages ci-dessous, dans la continuité de l'identité galerie validée (cf. [[project_front_direction]]).
+>
+> **Points tranchés en réunion, à ne pas re-questionner** :
+> - Une arme historique est une **pièce unique** (1 exemplaire), comme une arme d'occasion mais avec le prestige — pas de matrice de variantes, un prix unique.
+> - **Catégorie C : aucun document alternatif** — le seed actuel (`["cni", "permis_chasse", "sia"]`) est correct.
+> - Prix Gun Art **décroissant** quand le numéro de tirage monte (le n°1 est le plus cher) = comportement voulu, la formule actuelle est conforme.
+> - **Râtelier numérique** (quota 6 puis 15 armes) : **hors périmètre** — obligation légale du détenteur, pas du site.
+> - **Blog** : déjà livré (9.4 / 9.4b). L'extension aux 2 univers est tracée en 9.6, rien à créer.
+
+**Story 11.1** — Tags transverses & catalogue global — 🔜 **À FAIRE**
+
+> Besoin : **un catalogue global unique** (hors Gun Art) où tout apparaît, filtré ensuite selon l'endroit du site où l'on se trouve.
+>
+> Constat : `productCategoryEnum` est **mono-valué** et mélange nature et état (`arme_ancienne`, `occasion`, `arme_longue`, `arme_poing`…). Or une arme historique est **nécessairement d'occasion** → une catégorie unique ne peut plus porter l'information.
+
+- ✅ **Décision tranchée (Franck, 2026-09-06)** : **table `tags` + pivot `product_tags`** (n-n), retenue pour sa souplesse. Un tag devient une entité éditable (libellé, slug, description) sans migration, une page de tag indexable, et le pivot autorise autant de tags que voulu par produit. La colonne tableau est écartée : pas de libellé éditable, pas d'index propre, pas de page dédiée.
+- Notion de **facette** sur le tag (nature / état / époque / calibre…) pour grouper les filtres dans l'UI.
+- API : filtre `?tags=` sur `GET /api/products` (sémantique **ET/OU à définir**), facettes avec compteurs, cumul avec les filtres existants (catégorie légale, prix, recherche).
+- Les vues du site deviennent des **présélections de tags** : boutique = tout, `/armes-de-collection` = tag historique, occasion = tag occasion.
+- **Migration** des catégories existantes vers des tags, sans casser `productFiltersSchema` ni les URLs indexées.
+- SEO : pages de tag indexables + canonicals sur les vues filtrées (à coordonner avec 9.6).
+
+**Story 11.2** — Univers « Armes de collection & historiques » — 🔜 **À FAIRE**
+
+> ⚠️ La table **`ancient_weapons` existe déjà et n'est utilisée nulle part** (aucune API, aucune page, aucun seed — cf. `db/schema.ts:590`). Le modèle est complet : période, provenance, fabricant, état + description, restauration, authenticité, expert + certificat, `historicalInfo` (batailles / propriétaires / événements), `isUnique`. Cette story l'expose enfin.
+
+- **Onglet dédié** dans la navigation du site principal (à caler avec la refonte navbar 10.6).
+- **Pièce unique** : `stockQty = 1`, `isUnique`, aucune variante, **un prix unique par arme**.
+- **Listing** : miniature par arme, titre, une ou deux lignes de résumé ; sous-catégories **arme ancienne (avant 1900)** et **arme historique de guerre**, catégories légales **B et C**.
+- **Fiche détail** : description longue (~30 lignes) racontant l'histoire de l'arme, provenance, fabricant, état, expertise ; **mentions légales avec la classification** (réutilise l'affichage de la 10.3).
+- **Parcours d'achat identique aux armes neuves** : prix, vente, réception des documents légaux — aucun tunnel spécifique, on réutilise les Phases 3, 4 et 6.
+- **Accessoires historiques** : même traitement, même modèle.
+- API publique (listing + détail) et **CRUD admin** joignant `products` ↔ `ancient_weapons`.
+
+**Story 11.3** — Marquage « vendu » persistant — 🔜 **À FAIRE**
+
+- Une pièce vendue **reste visible** dans la galerie avec un marquage **« Vendu — indisponible »** : elle conserve sa valeur éditoriale et SEO, et démontre l'activité de la maison. Pas de 404, pas de dépublication.
+- Retirée de l'achat (pas d'ajout au panier), `availability: schema.org/SoldOut` dans le JSON-LD.
+- **CTA « Se tenir informé des arrivées »** sur la fiche vendue → alimente la story 11.4.
+- Existe **déjà côté Gun Art** (badge épuisé + `SoldOut` dans `collection/[slug].vue:118`) : généraliser le composant aux armes plutôt que le dupliquer.
+
+**Story 11.4** — Newsletter & alertes d'arrivée — 🔜 **À FAIRE**
+
+- Capture d'email : CTA « se tenir informé des arrivées » (fiches vendues, listings) + inscription depuis le footer.
+- **Double opt-in** et lien de désabonnement — obligatoire, et exigé par le fournisseur d'envoi.
+- Intégration **Brevo** (contacts + listes), derrière une **interface `NewsletterService`** sur le modèle de `StorageService` : agnostique du fournisseur, zéro spécificité hors env, driver mémoire en test.
+- RGPD : consentement **horodaté et traçable**, mention explicite, purge sur désabonnement.
+- ✅ **Décision tranchée (Franck, 2026-09-06)** : **segmentation par univers** (armurerie / collection / Gun Art).
+  - ⚠️ Nuance explicite : la segmentation porte sur **l'abonnement, pas sur le contenu**. Une newsletter d'un univers pourra parler des autres. Donc **ne pas cloisonner l'éditorial** par segment — le segment détermine qui reçoit quoi, pas ce qu'on a le droit d'écrire dedans.
+  - Conséquence sur le modèle : un contact **unique** porteur de N abonnements (et non un contact par liste), **consentement horodaté par segment**, désabonnement **par segment ET global**. Les segments se mappent sur des listes Brevo.
+  - Inscription : cases à cocher multiples, avec un défaut sensé selon la page d'où vient l'inscription (une fiche œuvre pré-coche Gun Art) — sans jamais pré-cocher l'ensemble.
+
+**Story 11.5** — Protection des visuels Gun Art — 🔜 **À FAIRE**
+
+> Demande explicite du client : empêcher le téléchargement des photos. **À cadrer honnêtement — c'est dissuasif, jamais infaillible** : toute image affichée est dans le cache du navigateur et une capture d'écran contourne toute protection JS/CSS. Aucune mesure ci-dessous ne doit être présentée comme une garantie.
+
+- **Filigrane incrusté côté serveur** dans le pipeline `sharp` (position, opacité, échelle paramétrables) — **la seule mesure qui survit à une capture d'écran**, donc la seule qui protège réellement la valeur d'un tirage limité.
+- **Résolution d'affichage plafonnée** : l'original haute définition n'est jamais servi publiquement (il reste dans le bucket privé, accessible seulement au traitement de commande).
+- Dissuasion côté client : `contextmenu`, `dragstart`, appui long mobile, `user-select`, superposition transparente.
+- **⚠️ Décision esthétique avec Sylvain** : filigrane discret ou assumé ? Sur une galerie d'art c'est un arbitrage artistique autant que technique.
+- Ne s'applique **pas** aux visuels produit de l'armurerie (aucun enjeu de reproduction).
+
+**Story 11.6** — Gun Art éditorial : séries, thèmes & page artiste — 🔜 **À FAIRE**
+
+- **Notion de série** (nouvelle table `artwork_series` + FK sur `artworks`) : titre, **texte de présentation**, thème, film ou univers de référence, ordre d'affichage.
+- **Présentation en galeries par série**, navigation par thème — la série devient l'unité éditoriale, pas seulement l'œuvre isolée.
+- Photos **noir et blanc**, dimension historique, séries complètes avec leurs textes.
+- **Page de présentation de Sylvain** : bio, portrait, parcours (les champs `artistName` / `artistBio` / `artistImageUrl` existent déjà sur `artworks` mais aucune page ne les expose) + **lien Amazon vers son livre** (`rel="sponsored noopener"`, ouverture nouvel onglet).
+- SEO : `Person` + `CreativeWorkSeries` en JSON-LD, à coordonner avec 9.6.
+
+**Story 11.7** — Cohérence des prix Gun Art entre formats — 🔜 **À FAIRE**
+
+> ⚠️ **Règle client non respectée par la formule actuelle.** `calculateArtworkPrice` (`packages/shared/src/artwork.ts:60`) applique `base × facteurFormat + increment × (editionLimit − numéro)`. Avec des valeurs plausibles (base 50 €, increment 2 €, 25 tirages, facteurs 1 / 1,5 / 2), le **petit format n°1 (98 €) dépasse le moyen format n°25 (75 €)** — exactement ce que le client refuse.
+
+- **Garde-fou de validation** à la saisie admin : refuser une grille où le prix **maximum** d'un format dépasse le prix **minimum** du format supérieur. Condition : `base × (facteur[n+1] − facteur[n]) ≥ increment × (editionLimit − 1)`.
+- **Simulateur visuel** dans l'admin : grille complète des 25 tirages × formats, chevauchements surlignés — le client fixe ses pourcentages en voyant le résultat.
+- Formats cibles : **3 à 4 formats, de 40×50 cm à 1 m × 1 m** (`availableFormats` en JSONB le permet déjà).
+- **25 exemplaires tous formats confondus** : déjà le comportement actuel (compteur global sur `artworks.editionLimit`) — à confirmer par un test explicite.
+- ⚠️ Effet de bord à documenter : les numéros étant **partagés entre formats**, « la dernière d'un format » dépend de l'ordre des achats et n'est pas prévisible à l'avance. Le garde-fou doit donc porter sur les **bornes théoriques** de chaque format, pas sur l'état des ventes.
+- La décroissance du prix avec le numéro est **confirmée comme voulue** — ne pas « corriger » la formule sur ce point.
+
+**Story 11.8** — Cross-sell « Fréquemment achetés ensemble » — 🔜 **À FAIRE (activable à la demande)**
+
+- Bloc de suggestions d'accessoires sur la **fiche détail** d'une arme.
+- **Désactivé par défaut** (feature flag) : le client a explicitement dit « activé à la demande, pas forcément au début ».
+- **⚠️ Décision** : associations **saisies manuellement** en admin **vs** calculées sur les co-achats réels. Reco : **manuel d'abord** — au lancement il n'y a aucun historique de commandes à exploiter.
+- Respecter les **restrictions d'accessoires** déjà modélisées (`hasAccessoryRestrictions`, `accessoryRestrictionNotes`) : ne jamais suggérer un accessoire interdit pour la catégorie légale de l'arme.
+
+**Story 11.9** — Expédition multi-colis — 🔜 **À FAIRE**
+
+> Une arme de **catégorie B se livre en 2 colis** (arme et éléments séparés). Constat : **aucun modèle d'expédition n'existe** — `orders` ne porte qu'un `shippingMethod`, un `shippingCost` et une adresse (`db/schema.ts:961`).
+
+- Nouvelle table `shipments` (plusieurs par commande) : transporteur, **numéro de suivi**, contenu (lignes de commande rattachées), statut, date d'expédition.
+- Admin : création et suivi des colis depuis le détail commande.
+- Client : suivi **par colis** dans l'espace compte, pas un statut global unique.
+- À prévoir de façon générique (tout produit peut être multi-colis), la catégorie B n'étant que le cas déclencheur.
+
+**Story 11.10** — Rentabilité par article : marge & charges — 🔜 **À FAIRE**
+
+> Existant : `products.costPrice` et `products.marginPct` sont **déjà en base** (`db/schema.ts:456`) mais **aucune interface ne les expose** et il n'y a pas de notion de charges.
+
+- Ajouter les **charges**, saisissables en **pourcentage ou en montant**, avec un **défaut global paramétrable** en configuration, surchargeable article par article.
+- Admin : formulaire affichant prix d'achat, charges, prix de vente **HT et TTC**, et **marge calculée en direct** (en € et en %) à la saisie.
+- Étendre aux œuvres Gun Art (coût matériel / impression / encadrement).
+- Complète la story 7.3 (métriques CA + commission globales) par une vue **par article**.
+- Ne jamais exposer prix d'achat, charges ni marge sur une route publique — données strictement admin.
+
+---
+
 ## Backlog non priorisé / Idées
 
 - Programme fidélité au-delà du VIP ?
