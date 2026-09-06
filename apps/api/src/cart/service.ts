@@ -1,5 +1,5 @@
 import { calculateVipDiscount, computePriceTtc, round2 } from "@armurier/shared"
-import { asc, eq } from "drizzle-orm"
+import { asc, eq, sql } from "drizzle-orm"
 import { db } from "../db/client.js"
 import {
   artworkCartItems,
@@ -9,9 +9,20 @@ import {
   legalCategories,
   productCategories,
   products,
+  productTags,
   productVariants,
+  tags,
   users,
 } from "../db/schema.js"
+
+// A product's tag slugs, as a correlated aggregate. Built with the query builder
+// rather than a raw string so the `products.id` reference stays qualified — a
+// bare "id" would be ambiguous against the joined tables inside the subquery.
+const productTagSlugs = sql<string[]>`coalesce((${db
+  .select({ slugs: sql`array_agg(${tags.slug})` })
+  .from(productTags)
+  .innerJoin(tags, eq(tags.id, productTags.tagId))
+  .where(eq(productTags.productId, products.id))}), '{}')`
 
 export interface CartProductLine {
   id: string
@@ -32,6 +43,7 @@ export interface CartProductLine {
   discountAmount: number
   lineTtc: number
   categorySlug: string
+  tagSlugs: string[]
   legalCategory: string | null
   requiresLegalVerification: boolean
 }
@@ -88,6 +100,9 @@ export async function loadCart(userId: string): Promise<CartView> {
       marginPct: products.marginPct,
       requiresLegalVerification: products.requiresLegalVerification,
       categorySlug: productCategories.slug,
+      // Snapshotted onto the order so the VIP rule can tell a new firearm from a
+      // second-hand one after the fact (state is a tag since story 11.1).
+      tagSlugs: productTagSlugs,
       legalCategory: legalCategories.category,
     })
     .from(cartItems)
@@ -146,6 +161,7 @@ export async function loadCart(userId: string): Promise<CartView> {
       discountAmount,
       lineTtc: computePriceTtc(round2(lineHt - discountAmount), vatPct),
       categorySlug: r.categorySlug,
+      tagSlugs: r.tagSlugs,
       legalCategory: r.legalCategory,
       requiresLegalVerification: r.requiresLegalVerification,
     }

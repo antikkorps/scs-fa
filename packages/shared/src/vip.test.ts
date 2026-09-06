@@ -8,7 +8,24 @@ describe("isNewFirearmQualifying", () => {
     expect(isNewFirearmQualifying("D", "arme-defense")).toBe(true)
   })
 
-  it("does not qualify second-hand or antique firearms", () => {
+  it("does not qualify a firearm tagged second-hand or historical", () => {
+    expect(isNewFirearmQualifying("C", "arme-poing", ["occasion"])).toBe(false)
+    expect(isNewFirearmQualifying("B", "arme-longue", ["arme-ancienne"])).toBe(false)
+    expect(isNewFirearmQualifying("B", "arme-longue", ["arme-historique"])).toBe(false)
+  })
+
+  it("still qualifies when the tags carry nothing about state", () => {
+    expect(isNewFirearmQualifying("B", "arme-longue", ["calibre-12"])).toBe(true)
+    expect(isNewFirearmQualifying("B", "arme-longue", [])).toBe(true)
+  })
+
+  it("disqualifies as soon as one tag marks the piece as not new", () => {
+    expect(isNewFirearmQualifying("B", "arme-longue", ["calibre-12", "occasion"])).toBe(false)
+  })
+
+  it("still reads the legacy category on orders placed before story 11.1", () => {
+    // Those snapshots carry no tags at all: without the category fallback an old
+    // second-hand purchase would retroactively become VIP-qualifying.
     expect(isNewFirearmQualifying("C", "occasion")).toBe(false)
     expect(isNewFirearmQualifying("B", "arme-ancienne")).toBe(false)
   })

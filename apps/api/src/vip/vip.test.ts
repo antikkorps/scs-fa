@@ -13,7 +13,9 @@ import {
   orders,
   productCategories,
   products,
+  productTags,
   productVariants,
+  tags,
   users,
 } from "../db/schema.js"
 import { recomputeVipStatus } from "./service.js"
@@ -50,6 +52,14 @@ describe("VIP (story 3.4)", () => {
   let newFirearmVariantId: string
   let occasionVariantId: string
   let munitionVariantId: string
+
+  // Attach a seeded tag to a product by SKU.
+  async function tagProduct(sku: string, tagSlug: string) {
+    const [p] = await db.select({ id: products.id }).from(products).where(eq(products.sku, sku)).limit(1)
+    const [t] = await db.select({ id: tags.id }).from(tags).where(eq(tags.slug, tagSlug)).limit(1)
+    if (!p || !t) throw new Error(`Cannot tag ${sku} with ${tagSlug} (run db:seed)`)
+    await db.insert(productTags).values({ productId: p.id, tagId: t.id }).onConflictDoNothing()
+  }
 
   async function cleanup() {
     const variantIds = db
@@ -99,7 +109,9 @@ describe("VIP (story 3.4)", () => {
     shippingAddressId = addr.id
 
     const armeLongue = await categoryId("arme-longue")
-    const occasion = await categoryId("occasion")
+    // "occasion" is a tag since story 11.1, no longer a category. This fixture
+    // only needs a second category-C firearm, so its category is incidental.
+    const armePoing = await categoryId("arme-poing")
     const munition = await categoryId("munition")
     const legalB = await legalCategoryId("B")
     const legalC = await legalCategoryId("C")
@@ -128,7 +140,10 @@ describe("VIP (story 3.4)", () => {
     }
 
     newFirearmVariantId = await mkProduct("newgun", armeLongue, legalB, "1000.00", "30")
-    occasionVariantId = await mkProduct("occ", occasion, legalC, "500.00", "30")
+    occasionVariantId = await mkProduct("occ", armePoing, legalC, "500.00", "30")
+    // What makes this one second-hand is now the tag, not the category — this is
+    // exactly what the VIP rule has to read (story 11.1).
+    await tagProduct(`${PREFIX}occ`, "occasion")
     munitionVariantId = await mkProduct("munit", munition, legalNone, "20.00", "30")
 
     token = (

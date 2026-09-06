@@ -71,3 +71,15 @@ export const MAX_LEGAL_DOC_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 
 // Gun Art - tirage limité
 export const GUN_ART_MAX_PRINTS = 25
+
+// Tag facets (matches the `tag_facet` DB enum). A facet groups tags for
+// filtering: within a facet the selection is a union (OR), across facets an
+// intersection (AND). Facets are structural — adding one is a migration —
+// whereas the tags inside them are editable from the backoffice.
+export const TAG_FACETS = ["etat", "epoque", "caracteristique"] as const
+export type TagFacet = (typeof TAG_FACETS)[number]
+
+// Cap on how many tags a single query may filter on. Each distinct facet in the
+// selection adds an EXISTS sub-query, so this bounds the work a crafted URL can
+// ask the database to do.
+export const MAX_TAG_FILTERS = 20

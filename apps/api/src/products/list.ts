@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, lte, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { legalCategories, productCategories, products } from "../db/schema.js"
+import { buildTagFilterConditions, productTagsJson } from "./tag-filter.js"
 
 export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (request, reply) => {
@@ -17,7 +18,7 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
       })
     }
 
-    const { category, legalCategory, search, minPrice, maxPrice, page, limit } = parsed.data
+    const { category, tags: tagSlugs, legalCategory, search, minPrice, maxPrice, page, limit } = parsed.data
 
     // Only published products are publicly listable. Gun Art is its own universe
     // served by /api/artworks, so its backing products are excluded here — this
@@ -30,6 +31,7 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
     if (search) {
       conditions.push(sql`${products.searchVector} @@ websearch_to_tsquery('french', ${search})`)
     }
+    if (tagSlugs) conditions.push(...(await buildTagFilterConditions(tagSlugs)))
 
     const where = and(...conditions)
 
@@ -64,6 +66,7 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
         categorySlug: productCategories.slug,
         categoryName: productCategories.name,
         legalCategory: legalCategories.category,
+        tags: productTagsJson,
         createdAt: products.createdAt,
       })
       .from(products)
@@ -91,6 +94,7 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
         requiresLegalVerification: r.requiresLegalVerification,
         featuredImageUrl: r.featuredImageUrl,
         category: { slug: r.categorySlug, name: r.categoryName },
+        tags: r.tags,
         legalCategory: r.legalCategory,
         createdAt: r.createdAt,
       }

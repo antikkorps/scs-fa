@@ -142,6 +142,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         name: l.name,
         sku: l.sku,
         category: l.categorySlug,
+        tags: l.tagSlugs,
         legalCategory: l.legalCategory,
         requiresPaymentVirement: requiresVirement(l.legalCategory),
       })),

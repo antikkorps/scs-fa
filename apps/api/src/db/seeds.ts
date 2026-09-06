@@ -12,7 +12,9 @@ import {
   legalCategories,
   productCategories,
   products,
+  productTags,
   productVariants,
+  tags,
   users,
 } from "./schema.js"
 
@@ -91,20 +93,10 @@ export async function seedDatabase() {
 
   const productCatsData = [
     // Armurerie
-    {
-      slug: "arme-ancienne",
-      name: "Armes anciennes & historiques",
-      category: "arme_ancienne" as const,
-      displayOrder: 1,
-      description: "Collection et armes historiques (avant 1900)",
-    },
-    {
-      slug: "occasion",
-      name: "Armes d'occasion",
-      category: "occasion" as const,
-      displayOrder: 2,
-      description: "Armes d'occasion testées et certifiées",
-    },
+    // « Arme ancienne » et « occasion » ne sont plus des catégories : ce sont
+    // des états, qui se cumulent avec la nature de l'arme (une arme historique
+    // est nécessairement d'occasion). Ils vivent désormais dans les tags —
+    // voir seedTags() plus bas (story 11.1).
     {
       slug: "arme-longue",
       name: "Armes longues",
@@ -179,11 +171,51 @@ export async function seedDatabase() {
 
   console.log("✅ Product categories seeded")
 
+  await seedTags()
   await seedGunArt()
   await seedArmurerie()
   await seedBlog()
 
   console.log("🌱 Seeding complete!")
+}
+
+// ==========================================================================
+// TAGS TRANSVERSES (story 11.1)
+// ==========================================================================
+// Données de référence : les tags qui portent l'état et l'époque d'une arme,
+// que la catégorie (sa nature) ne peut pas exprimer puisqu'elle est unique.
+// Idempotent sur le slug — un renommage fait en backoffice n'est pas écrasé.
+
+async function seedTags() {
+  const tagsData = [
+    {
+      slug: "occasion",
+      name: "Occasion",
+      facet: "etat" as const,
+      displayOrder: 1,
+      description: "Arme d'occasion, testée et certifiée par l'armurier",
+    },
+    {
+      slug: "arme-ancienne",
+      name: "Arme ancienne (avant 1900)",
+      facet: "epoque" as const,
+      displayOrder: 1,
+      description: "Pièce de collection antérieure à 1900",
+    },
+    {
+      slug: "arme-historique",
+      name: "Arme historique de guerre",
+      facet: "epoque" as const,
+      displayOrder: 2,
+      description: "Arme de guerre à valeur historique, pièce unique",
+    },
+  ]
+
+  for (const tag of tagsData) {
+    await db.insert(tags).values(tag).onConflictDoNothing()
+  }
+
+  console.log(`✅ Tags seeded (${tagsData.length})`)
 }
 
 // ==========================================================================
@@ -679,6 +711,32 @@ async function seedArmurerie() {
   }
 
   console.log(`✅ Armurerie seeded (${newProducts} new products, ${newVariants} new variants)`)
+
+  await seedProductTags()
+}
+
+// Pose quelques tags de démonstration pour que le filtre à facettes ait de quoi
+// travailler. Idempotent : la PK composite du pivot rend le rejeu sans effet.
+async function seedProductTags() {
+  const assignments = [
+    { productSlug: "revolver-smith-wesson-686", tagSlugs: ["occasion"] },
+    { productSlug: "carabine-verney-carron-impact", tagSlugs: ["occasion"] },
+  ]
+
+  let linked = 0
+  for (const { productSlug, tagSlugs } of assignments) {
+    const [product] = await db.select({ id: products.id }).from(products).where(eq(products.slug, productSlug)).limit(1)
+    if (!product) continue
+
+    for (const tagSlug of tagSlugs) {
+      const [tag] = await db.select({ id: tags.id }).from(tags).where(eq(tags.slug, tagSlug)).limit(1)
+      if (!tag) continue
+      await db.insert(productTags).values({ productId: product.id, tagId: tag.id }).onConflictDoNothing()
+      linked++
+    }
+  }
+
+  console.log(`✅ Product tags seeded (${linked} links)`)
 }
 
 // ==========================================================================

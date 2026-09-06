@@ -15,6 +15,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -98,9 +99,12 @@ export const printStatusEnum = pgEnum("print_status", [
   "reserved",
   "cancelled",
 ])
+// Nature d'un produit — UNE seule par produit, structurelle (pilote la nav, le
+// méga-menu et les URLs `?category=` déjà indexées). Les états et époques
+// (occasion, arme ancienne, historique de guerre) sont des TAGS, pas des
+// catégories : ils se cumulent, une arme historique étant nécessairement
+// d'occasion (story 11.1).
 export const productCategoryEnum = pgEnum("product_category", [
-  "arme_ancienne",
-  "occasion",
   "arme_longue",
   "arme_poing",
   "arme_defense",
@@ -393,6 +397,71 @@ export const productCategoriesRelations = relations(productCategories, ({ many }
 }))
 
 // ============================================================================
+// TAGS TRANSVERSES (story 11.1)
+// ============================================================================
+// Un produit porte UNE catégorie (sa nature) et AUTANT DE TAGS que nécessaire.
+// C'est ce qui permet à une arme d'être à la fois « historique » et
+// « d'occasion » — ce qu'une catégorie unique ne pouvait pas exprimer.
+//
+// La FACETTE regroupe les tags pour le filtrage : **OU à l'intérieur d'une
+// facette, ET entre facettes**. Cocher un second état élargit donc le résultat,
+// tandis qu'ajouter une époque le restreint — le comportement attendu d'un
+// filtre à facettes. Les facettes sont structurelles (peu nombreuses, stables,
+// elles pilotent la requête) et vivent donc dans un enum ; les tags sont
+// éditoriaux (nombreux, renommables depuis le backoffice sans migration).
+export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique"])
+
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 100 }).unique().notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    facet: tagFacetEnum("facet").notNull(),
+    description: text("description"),
+    displayOrder: integer("display_order").default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [index("idx_tags_facet").on(t.facet, t.displayOrder)],
+)
+
+// Pivot n-n. Clé primaire composite = un tag ne peut être posé deux fois sur le
+// même produit ; les deux FK cascadent, donc supprimer un tag le retire partout
+// sans laisser de ligne orpheline.
+export const productTags = pgTable(
+  "product_tags",
+  {
+    productId: uuid("product_id").notNull(),
+    tagId: uuid("tag_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.productId, t.tagId] }),
+    foreignKey({ columns: [t.productId], foreignColumns: [products.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.tagId], foreignColumns: [tags.id] }).onDelete("cascade"),
+    // L'index sur product_id est déjà fourni par la PK composite (colonne de
+    // tête) ; celui-ci sert le sens inverse : « tous les produits de ce tag ».
+    index("idx_product_tags_tag").on(t.tagId),
+  ],
+)
+
+export const tagsRelations = relations(tags, ({ many }) => ({
+  products: many(productTags),
+}))
+
+export const productTagsRelations = relations(productTags, ({ one }) => ({
+  product: one(products, {
+    fields: [productTags.productId],
+    references: [products.id],
+  }),
+  tag: one(tags, {
+    fields: [productTags.tagId],
+    references: [tags.id],
+  }),
+}))
+
+// ============================================================================
 export const legalCategories = pgTable("legal_categories", {
   id: uuid("id").primaryKey().defaultRandom(),
   category: legalCategoryEnum("category").notNull().unique(), // A, B, C, D, none
@@ -531,6 +600,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     references: [suppliers.id],
   }),
   variants: many(productVariants),
+  tags: many(productTags),
   ancientWeapon: one(ancientWeapons),
   artwork: one(artworks),
   orderItems: many(orderItems),
@@ -930,6 +1000,9 @@ export const orders = pgTable(
           name: string
           sku: string
           category: string
+          // Tag slugs at purchase time (story 11.1). Absent on pre-11.1 orders,
+          // whose state was carried by `category` — see isNewFirearmQualifying.
+          tags?: string[]
           legalCategory?: string | null
           requiresPaymentVirement: boolean
         }>

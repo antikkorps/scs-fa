@@ -32,11 +32,29 @@ const page = computed(() => {
 
 // Reference data for the filters (shared with the header mega-menu, one request).
 const { categories } = useProductCategories()
+const { facets } = useTags()
+
+// `?tags=` carries a comma-separated selection, matching what the API accepts,
+// so a filtered view stays copy-pasteable and survives a page reload.
+const selectedTags = computed(() =>
+  q("tags")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+)
+
+function toggleTag(slug: string) {
+  const next = selectedTags.value.includes(slug)
+    ? selectedTags.value.filter((s) => s !== slug)
+    : [...selectedTags.value, slug]
+  navigate({ tags: next.join(",") || undefined })
+}
 
 // Reactive query object → useFetch refetches whenever a filter changes.
 const apiQuery = computed(() => {
   const query: Record<string, string | number> = { limit: PAGE_SIZE, page: page.value }
   if (category.value) query.category = category.value
+  if (selectedTags.value.length > 0) query.tags = selectedTags.value.join(",")
   if (legalCategory.value) query.legalCategory = legalCategory.value
   if (term.value.trim()) query.search = term.value.trim()
   if (minPrice.value) query.minPrice = minPrice.value
@@ -59,6 +77,7 @@ function navigate(overrides: Record<string, string | undefined>, resetPage = tru
   const base = {
     search: term.value.trim(),
     category: category.value,
+    tags: selectedTags.value.join(","),
     legalCategory: legalCategory.value,
     minPrice: minPrice.value,
     maxPrice: maxPrice.value,
@@ -93,7 +112,14 @@ function resetFilters() {
 }
 
 const hasFilters = computed(() =>
-  Boolean(category.value || legalCategory.value || minPrice.value || maxPrice.value || term.value.trim()),
+  Boolean(
+    category.value ||
+      legalCategory.value ||
+      minPrice.value ||
+      maxPrice.value ||
+      term.value.trim() ||
+      selectedTags.value.length > 0,
+  ),
 )
 
 const pageUrl = `${siteUrl}/boutique`
@@ -213,6 +239,13 @@ useHead({
 
         <button v-if="hasFilters" type="button" class="filters__reset" @click="resetFilters">Réinitialiser</button>
       </form>
+
+      <ProductTagFilters
+        :facets="facets"
+        :selected="selectedTags"
+        @toggle="toggleTag"
+        @clear="navigate({ tags: undefined })"
+      />
 
       <p v-if="error" class="state">La boutique est indisponible pour le moment. Revenez bientôt.</p>
       <p v-else-if="isEmpty" class="state">Aucun article ne correspond à votre recherche.</p>
