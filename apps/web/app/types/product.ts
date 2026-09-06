@@ -17,6 +17,7 @@ export interface ProductListItem {
   featuredImageUrl: string | null
   category: { slug: string | null; name: string | null }
   tags: ProductTag[]
+  isUnique: boolean
   legalCategory: LegalCategoryCode | null
   createdAt: string
 }
@@ -28,6 +29,8 @@ export interface ProductCardItem {
   name: string
   priceTtc: number
   stockQty: number | null
+  /** True for a collection piece: once sold it never comes back (story 11.3). */
+  isUnique?: boolean
   requiresLegalVerification: boolean | null
   featuredImageUrl: string | null
   category: { name: string | null }

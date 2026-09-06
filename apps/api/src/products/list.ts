@@ -2,7 +2,7 @@ import { computePriceTtc, productFiltersSchema } from "@armurier/shared"
 import { and, asc, desc, eq, gte, lte, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
-import { legalCategories, productCategories, products } from "../db/schema.js"
+import { ancientWeapons, legalCategories, productCategories, products } from "../db/schema.js"
 import { buildTagFilterConditions, productTagsJson } from "./tag-filter.js"
 
 export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
@@ -67,11 +67,16 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
         categoryName: productCategories.name,
         legalCategory: legalCategories.category,
         tags: productTagsJson,
+        // Distinguishes a piece that is gone for good from an ordinary product
+        // that is merely out of stock — they must not be worded, or marked up
+        // for search engines, the same way (story 11.3).
+        isUnique: ancientWeapons.isUnique,
         createdAt: products.createdAt,
       })
       .from(products)
       .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
       .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
+      .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
       .where(where)
       .orderBy(...orderBy, asc(products.id))
       .limit(limit)
@@ -95,6 +100,7 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
         featuredImageUrl: r.featuredImageUrl,
         category: { slug: r.categorySlug, name: r.categoryName },
         tags: r.tags,
+        isUnique: r.isUnique === true,
         legalCategory: r.legalCategory,
         createdAt: r.createdAt,
       }

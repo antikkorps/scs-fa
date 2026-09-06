@@ -332,6 +332,47 @@ describe("Collection weapons (story 11.2)", () => {
     })
   })
 
+  describe("catalogue listing (story 11.3)", () => {
+    async function listed(slug: string) {
+      const res = await app.inject({ method: "GET", url: "/api/products?limit=100" })
+      return (res.json().data as Array<{ slug: string; isUnique: boolean }>).find((p) => p.slug === slug)
+    }
+
+    it("flags a collection piece as unique and an ordinary product as not", async () => {
+      expect((await listed(`${SLUG}unique`))?.isUnique).toBe(true)
+      expect((await listed(`${SLUG}plain`))?.isUnique).toBe(false)
+    })
+
+    it("keeps a sold piece in the catalogue instead of hiding it", async () => {
+      await db
+        .update(products)
+        .set({ stockQty: 0 })
+        .where(eq(products.sku, `${PREFIX}unique`))
+      // Still listed: it keeps its editorial and SEO value, and the front is
+      // what turns `isUnique` + zero stock into "Vendu" rather than "Rupture".
+      const item = await listed(`${SLUG}unique`)
+      expect(item).toBeDefined()
+      expect(item?.isUnique).toBe(true)
+      await db
+        .update(products)
+        .set({ stockQty: 1 })
+        .where(eq(products.sku, `${PREFIX}unique`))
+    })
+
+    it("still serves the detail page of a sold piece (no 404)", async () => {
+      await db
+        .update(products)
+        .set({ stockQty: 0 })
+        .where(eq(products.sku, `${PREFIX}unique`))
+      const res = await app.inject({ method: "GET", url: `/api/products/slug/${SLUG}unique` })
+      expect(res.statusCode).toBe(200)
+      await db
+        .update(products)
+        .set({ stockQty: 1 })
+        .where(eq(products.sku, `${PREFIX}unique`))
+    })
+  })
+
   describe("admin CRUD", () => {
     const created: string[] = []
 

@@ -170,7 +170,7 @@ useHead({
                   :loading="i < 3 ? 'eager' : 'lazy'"
                   :fetchpriority="i < 3 ? 'high' : 'auto'"
                 />
-                <span v-if="!w.available" class="card__sold">Vendue</span>
+                <AvailabilityBadge v-if="!w.available" state="sold" size="sm" class="card__sold" />
               </div>
               <div class="card__body">
                 <p class="card__period">
@@ -320,14 +320,8 @@ useHead({
 }
 .card__sold {
   background: var(--ink, #111);
-  border: 1px solid var(--brass);
-  color: var(--brass);
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  padding: 0.3rem 0.7rem;
   position: absolute;
   right: 0.75rem;
-  text-transform: uppercase;
   top: 0.75rem;
 }
 .card__body {

@@ -29,9 +29,12 @@ const img = computed(() =>
           :fetchpriority="priority ? 'high' : 'auto'"
           decoding="async"
         />
-        <span class="card__badge badge" :class="soldOut ? 'badge-soldout' : 'badge-available'">
-          {{ availabilityLabel(artwork.availableCount, artwork.editionLimit) }}
-        </span>
+        <AvailabilityBadge
+          :state="soldOut ? 'sold' : 'available'"
+          :label="availabilityLabel(artwork.availableCount, artwork.editionLimit)"
+          size="sm"
+          class="card__badge"
+        />
       </div>
 
       <div class="card__body">

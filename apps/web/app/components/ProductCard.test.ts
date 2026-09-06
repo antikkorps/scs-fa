@@ -38,3 +38,36 @@ describe("ProductCard", () => {
     expect(wrapper.text()).toContain("Rupture")
   })
 })
+
+describe("ProductCard availability (story 11.3)", () => {
+  it("says « Rupture » for an ordinary product with no stock", async () => {
+    const wrapper = await mountSuspended(ProductCard, {
+      props: { product: { ...base, stockQty: 0 } },
+    })
+    expect(wrapper.text()).toContain("Rupture")
+    expect(wrapper.text()).not.toContain("Vendu")
+  })
+
+  it("says « Vendu » for a unique piece, never promising a restock", async () => {
+    const wrapper = await mountSuspended(ProductCard, {
+      props: { product: { ...base, stockQty: 0, isUnique: true } },
+    })
+    expect(wrapper.text()).toContain("Vendu")
+    expect(wrapper.text()).not.toContain("Rupture")
+  })
+
+  it("shows no availability badge while the item is in stock", async () => {
+    const wrapper = await mountSuspended(ProductCard, {
+      props: { product: { ...base, stockQty: 3, isUnique: true } },
+    })
+    expect(wrapper.find(".card__badge--stock").exists()).toBe(false)
+  })
+
+  it("keeps a sold piece linked rather than hiding it", async () => {
+    // It stays online for its editorial and SEO value — no 404, no removal.
+    const wrapper = await mountSuspended(ProductCard, {
+      props: { product: { ...base, stockQty: 0, isUnique: true } },
+    })
+    expect(wrapper.find("a").attributes("href")).toBe("/boutique/pistolet-test")
+  })
+})

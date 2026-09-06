@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ProductDetail, ProductVariant } from "~/types/product"
+import { availabilityLongLabel, availabilitySchemaUrl, availabilityState, isPurchasable } from "~/utils/availability"
 import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
-import { conditionLabel, inStock, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
+import { conditionLabel, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -50,9 +51,18 @@ const displayPriceTtc = computed(() => selectedVariant.value?.priceTtc ?? produc
 // else's cart is momentarily unbuyable, and saying so up front is the whole
 // point of the hold (story 11.2).
 const heldByOther = computed(() => selectedVariant.value?.heldByOther === true)
-const available = computed(
-  () => inStock(selectedVariant.value?.stockQty ?? product.value.stockQty) && !heldByOther.value,
+
+// Sold vs out of stock (story 11.3). A sold one-off stays online — it keeps its
+// editorial and SEO value and shows the house is active — but it is no longer
+// purchasable and is marked SoldOut rather than OutOfStock.
+const state = computed(() =>
+  availabilityState({
+    stockQty: selectedVariant.value?.stockQty ?? product.value.stockQty,
+    isUnique: product.value.ancientWeapon?.isUnique ?? false,
+  }),
 )
+const isSold = computed(() => state.value === "sold")
+const available = computed(() => isPurchasable(state.value) && !heldByOther.value)
 
 const { isAuthenticated } = useAuth()
 const cart = useCart()
@@ -112,7 +122,7 @@ useHead({
             "@type": "Offer",
             priceCurrency: "EUR",
             price: product.value.priceTtc,
-            availability: available.value ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+            availability: availabilitySchemaUrl(state.value),
             url: pageUrl,
           },
         }),
@@ -164,12 +174,14 @@ useHead({
             <span class="badge" :class="legal && legal.category !== 'none' ? 'badge-legal' : 'badge-free'">
               {{ legalCategoryLabel(legal?.category ?? null) }}
             </span>
-            <span class="badge" :class="available ? 'badge-available' : 'badge-soldout'">
-              {{ stockLabel(product.stockQty) }}
-            </span>
+            <AvailabilityBadge :state="state" :label="state === 'available' ? stockLabel(product.stockQty) : undefined" />
           </div>
 
           <p class="detail__price">{{ formatEuros(displayPriceTtc) }} <span>TTC</span></p>
+
+          <p v-if="isSold" class="detail__avail-note">
+            Cette pièce a trouvé preneur. Elle reste présentée ici pour mémoire.
+          </p>
 
           <fieldset v-if="hasChoice" class="variants">
             <legend class="variants__legend">Variante</legend>
@@ -273,7 +285,15 @@ useHead({
 
           <div class="detail__cta">
             <button type="button" class="btn btn-primary buy" :disabled="!available || adding" @click="addToCart">
-              {{ available ? (adding ? "Ajout…" : "Ajouter au panier") : heldByOther ? "Momentanément réservée" : "Indisponible" }}
+              {{
+                available
+                  ? adding
+                    ? "Ajout…"
+                    : "Ajouter au panier"
+                  : heldByOther
+                    ? "Momentanément réservée"
+                    : availabilityLongLabel(state)
+              }}
             </button>
             <p v-if="heldByOther" class="detail__held">
               Un autre client a cette pièce dans son panier. Elle redeviendra disponible s'il ne finalise pas.
@@ -405,6 +425,11 @@ useHead({
 }
 .detail__long :deep(p:last-child) {
   margin-bottom: 0;
+}
+.detail__avail-note {
+  color: var(--paper-dim);
+  font-size: 0.85rem;
+  margin: 0 0 1.25rem;
 }
 .detail__held {
   color: var(--paper-dim);
