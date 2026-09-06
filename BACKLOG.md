@@ -306,6 +306,23 @@
 
 **PHASE 7 — COMPLÈTE** (7.1 dashboard admin, 7.2 logs+alerting, 7.3 métriques+commission, 7.4 actions paiement UI)
 
+**Story 7.5** — Médias produit : upload & galerie admin — 🔜 **À FAIRE** _(ajoutée après clôture de la phase, 2026-09-06)_
+
+> Constat : il n'existe **aucun pipeline d'upload pour les visuels produit/œuvre**. Seuls le blog (9.4b) et les documents légaux (4.1) en ont un. Côté catalogue, le schéma stocke une **URL saisie à la main** (`products.featuredImageUrl` / `artworks.featuredImageUrl`, `varchar(512)`, cf. `db/schema.ts:475`, `703`) et un `imagesCount` sans table d'images associée. Le client annonce un volume de photos important → il faut une **interface admin** de gestion des médias. **Contrainte : rester agnostique du fournisseur** — tout passe par l'abstraction `StorageService` (`apps/api/src/storage/types.ts`), zéro spécificité provider hors env (cible prod = Scaleway `fr-par`, cf. `.env.prod.example`).
+
+- **⚠️ Décisions à trancher avec Franck avant de coder** :
+  - **Modèle de données** : table `product_images` + table `artwork_images` (2 tables explicites) **vs** table `media` polymorphe (`ownerType`/`ownerId`) partagée par les 2 univers. Impacte les FK, les index et le cascade delete.
+  - **Variantes responsives** : **pré-générer N largeurs au upload** (stockage ×N, indépendant du CDN) **vs** stocker un seul original et **redimensionner au edge** (Cloudflare Image Resizing — moins de stockage, couplage CDN). Choix lié à la ligne « images responsives » de la story 9.6.
+  - Sort de l'existant `featuredImageUrl` : conservé en fallback/dénormalisation, ou dérivé de l'image en position 0.
+- **API** : `POST /api/admin/products/:id/images` (multipart, `requireRole("admin")`), `DELETE /:imageId`, `PATCH` (réordonnancement + texte alternatif). Réutiliser le pipeline durci de 9.4b : décodage **sharp** comme contrôle de contenu réel (rejet des fichiers mislabellisés/polyglots), `.rotate()` EXIF puis **strip des métadonnées** (EXIF GPS = fuite de données), re-encodage, plafond de largeur, limite de taille, **pas de SVG**. Validation magic-bytes `shared/file-signature.ts`.
+- **Service** : route publique durable façon `GET /api/blog/images/:filename` — URL stable, `cache-control: public, max-age=31536000, immutable`, clé opaque (UUID), regex de nom stricte anti-traversal. ⚠️ Ne **pas** réutiliser `getUrl()` présigné (TTL 5 min + `Content-Disposition: attachment`) : inadapté à un visuel public, non cacheable au edge et non indexable.
+- **Admin UI** : galerie par produit/œuvre — upload multiple (drag & drop), miniatures, **réordonnancement**, image principale, **suppression**, barre de progression, états d'erreur. Réutiliser les conventions PrimeVue du backoffice existant.
+- **Texte alternatif obligatoire** à l'upload (a11y + SEO) ; réutiliser le champ `orientation` déjà présent sur les œuvres (`db/schema.ts:705`) et l'étendre aux produits si le front en a besoin pour les ratios de cartes.
+- **Formats** : WebP systématique, **AVIF** à évaluer (gain LCP, coût CPU d'encodage) — cohérent avec l'objectif Core Web Vitals de la 9.6.
+- **Hors périmètre — vidéo** : décidé en externe (embed **Vimeo**, cf. comptes à ouvrir). L'API sert les octets en mémoire (`getBytes` → `reply.send`) sans *range requests* : self-héberger de la vidéo casserait le seek et la lecture progressive. Prévoir au plus un champ `videoEmbedUrl` + façade *click-to-load* (RGPD cookies tiers + LCP).
+- **Débloque** : l'**image sitemap** et les OG images par produit de la story 9.6.
+- **Done** : tests-first (upload e2e via driver mémoire, rejets non-image, 403/401, path-traversal, suppression idempotente, réordonnancement), `pnpm -r typecheck` + Biome clean, smoke réel sur serveur live.
+
 ## PHASE 8 — Mise en prod
 
 **Story 8.0** — Base de test dédiée (isolation tests / dev) ✅
