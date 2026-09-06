@@ -5,6 +5,7 @@ import {
   LEGAL_DOC_REJECTION_REASONS,
   LEGAL_DOC_TYPES,
   LEGAL_DOC_VERIFICATION_STATUS,
+  MAX_TAG_FILTERS,
 } from "./constants.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
 
@@ -180,9 +181,30 @@ export const categorySlugSchema = z
   .max(100)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid category slug")
 
+// Tag slug (references tags.slug, e.g. "occasion", "avant-1900")
+export const tagSlugSchema = z
+  .string()
+  .max(100)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid tag slug")
+
+// `?tags=` accepts both a comma-separated list (`?tags=occasion,avant-1900`) and
+// repeated params (`?tags=occasion&tags=avant-1900`), because Fastify hands us a
+// string for one occurrence and an array for several. Duplicates are collapsed,
+// and an empty selection normalises to `undefined` so `?tags=` behaves like no
+// filter at all rather than "match nothing".
+const tagsFilterSchema = z.preprocess((value) => {
+  if (value === undefined || value === null) return undefined
+  const entries = (Array.isArray(value) ? value : [value])
+    .flatMap((entry) => String(entry).split(","))
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+  return entries.length > 0 ? [...new Set(entries)] : undefined
+}, z.array(tagSlugSchema).max(MAX_TAG_FILTERS).optional())
+
 export const productFiltersSchema = z
   .object({
     category: categorySlugSchema.optional(),
+    tags: tagsFilterSchema,
     legalCategory: z.enum(LEGAL_CATEGORIES).optional(),
     search: z.string().trim().min(1).max(200).optional(),
     minPrice: z.coerce.number().nonnegative().optional(),

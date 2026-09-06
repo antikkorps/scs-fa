@@ -16,6 +16,7 @@ export interface ProductListItem {
   requiresLegalVerification: boolean | null
   featuredImageUrl: string | null
   category: { slug: string | null; name: string | null }
+  tags: ProductTag[]
   legalCategory: LegalCategoryCode | null
   createdAt: string
 }
@@ -31,6 +32,25 @@ export interface ProductCardItem {
   featuredImageUrl: string | null
   category: { name: string | null }
   legalCategory: LegalCategoryCode | null
+}
+
+// Facets group tags in the filter panel. Mirrors TAG_FACETS in @armurier/shared.
+export type TagFacet = "etat" | "epoque" | "caracteristique"
+
+export interface ProductTag {
+  slug: string
+  name: string
+  facet: TagFacet
+}
+
+export interface TagRef extends ProductTag {
+  description: string | null
+  productCount: number
+}
+
+export interface TagFacetGroup {
+  facet: TagFacet
+  tags: TagRef[]
 }
 
 export interface ProductCategoryRef {

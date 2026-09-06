@@ -200,7 +200,7 @@ below is the recommended path.
 ### Security hardening at go-live (currently deferred — see BACKLOG Phase 8.6)
 
 - [ ] **Least-privilege S3 key** scoped to the backup bucket (not the app's key).
-- [ ] **Migration baseline** (Drizzle) instead of `push --force` before prod churn.
+- [x] **Migration baseline** (Drizzle) instead of `push --force` — done 2026-09-06. `just migrate` now runs `drizzle-kit migrate`, applying the committed `apps/api/drizzle/*.sql` in order and recording them, so re-running is a no-op and the deployed schema is always a known revision.
 - [ ] **CSP nonces** to drop `'unsafe-inline'` on script/style (Caddyfile CSP).
 - [ ] **Secret rotation** post-launch (initial secrets were shared during setup).
 - [ ] Container hardening (`cap_drop`, `read_only`) validated in staging.

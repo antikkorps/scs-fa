@@ -34,7 +34,7 @@ export async function recomputeVipStatus(userId: string): Promise<boolean> {
   let eligibleSince: Date | null = null
   for (const order of userOrders) {
     if (!PAID_PAYMENT_STATUSES.includes(order.paymentStatus)) continue
-    const qualifies = order.itemsJson.some((i) => isNewFirearmQualifying(i.legalCategory, i.category))
+    const qualifies = order.itemsJson.some((i) => isNewFirearmQualifying(i.legalCategory, i.category, i.tags ?? []))
     if (qualifies) {
       eligibleSince = order.createdAt
       break

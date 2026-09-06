@@ -525,18 +525,19 @@
 > - **Râtelier numérique** (quota 6 puis 15 armes) : **hors périmètre** — obligation légale du détenteur, pas du site.
 > - **Blog** : déjà livré (9.4 / 9.4b). L'extension aux 2 univers est tracée en 9.6, rien à créer.
 
-**Story 11.1** — Tags transverses & catalogue global — 🔜 **À FAIRE**
+**Story 11.1** — Tags transverses & catalogue global ✅
 
-> Besoin : **un catalogue global unique** (hors Gun Art) où tout apparaît, filtré ensuite selon l'endroit du site où l'on se trouve.
->
-> Constat : `productCategoryEnum` est **mono-valué** et mélange nature et état (`arme_ancienne`, `occasion`, `arme_longue`, `arme_poing`…). Or une arme historique est **nécessairement d'occasion** → une catégorie unique ne peut plus porter l'information.
+> Besoin : **un catalogue global unique** (hors Gun Art) où tout apparaît, filtré ensuite selon l'endroit du site où l'on se trouve. Constat de départ : `productCategoryEnum` était **mono-valué** et mélangeait nature et état (`arme_ancienne`, `occasion`, `arme_longue`…), alors qu'une arme historique est **nécessairement d'occasion**.
 
-- ✅ **Décision tranchée (Franck, 2026-09-06)** : **table `tags` + pivot `product_tags`** (n-n), retenue pour sa souplesse. Un tag devient une entité éditable (libellé, slug, description) sans migration, une page de tag indexable, et le pivot autorise autant de tags que voulu par produit. La colonne tableau est écartée : pas de libellé éditable, pas d'index propre, pas de page dédiée.
-- Notion de **facette** sur le tag (nature / état / époque / calibre…) pour grouper les filtres dans l'UI.
-- API : filtre `?tags=` sur `GET /api/products` (sémantique **ET/OU à définir**), facettes avec compteurs, cumul avec les filtres existants (catégorie légale, prix, recherche).
-- Les vues du site deviennent des **présélections de tags** : boutique = tout, `/armes-de-collection` = tag historique, occasion = tag occasion.
-- **Migration** des catégories existantes vers des tags, sans casser `productFiltersSchema` ni les URLs indexées.
-- SEO : pages de tag indexables + canonicals sur les vues filtrées (à coordonner avec 9.6).
+- [x] **Baseline de migration Drizzle** (prérequis, faite dans la même PR — retire la dette « quelle base est à jour ? ») : `drizzle/0000` généré depuis `schema.ts` (capture les colonnes générées `tsvector` + index GIN, les CHECK, l'unicité `payment_reference`, le `family_id` de la RTR — qui n'existaient jusque-là que sous forme d'ALTER psql joués à la main) ; `armurier_dev` **reconstruite uniquement depuis les migrations** (24 tables) ; tests et CI passent par `drizzle-kit migrate` (le global-setup ne clone plus la base dev via `pg_dump -s`) ; compose prod `push --force` → `migrate`. ⚠️ **`apps/api/drizzle/` était gitignoré** depuis le scaffold — sans ce correctif les migrations n'atteignaient ni la CI ni la prod. Docs : README (flux de schéma), DEPLOY, ADR 0001, `.env.example`
+- [x] **Modèle** (décision Franck) : table `tags` (slug unique, name, facet, description, displayOrder) + pivot **`product_tags`** à PK composite et FK cascadées. Enum `tag_facet` (`etat`/`epoque`/`caracteristique`) : les **facettes** sont structurelles (elles pilotent la requête), les **tags** éditoriaux (renommables en backoffice sans migration)
+- [x] **Sémantique de filtrage** (décision Franck) : **OU dans une facette, ET entre facettes** — cocher un second état élargit, ajouter une époque restreint. Une sous-requête `EXISTS` par facette, servie par la PK composite et `idx_product_tags_tag`
+- [x] **Reprise des 2 intruses** : `arme_ancienne` et `occasion` **sortis de l'enum** et devenus des tags. Aucun produit ne les utilisait (0/0), donc bascule sans migration de données ; la migration `0001` porte une **étape de données ajoutée à la main** (`DELETE` des 2 lignes avant la recréation de l'enum, sans quoi le cast échoue sur toute base existante — la FK `products.category_id` sert de garde-fou). Les URLs `?category=` et `productFiltersSchema` sont intactes
+- [x] **API** : `?tags=` sur `GET /api/products` (liste séparée par virgules **ou** paramètres répétés), cumulable avec catégorie/légale/prix/recherche ; les tags de chaque produit sont renvoyés dans le payload (agrégat JSON corrélé, pas de N+1) ; nouveau **`GET /api/tags`** = facettes + tags + **compteurs** calculés avec exactement la même lentille que le listing (publié, hors Gun Art). Slugs inconnus **ignorés** (un tag renommé dans une URL indexée ne doit ni 400 ni vider le catalogue) ; plafond de 20 tags par requête
+- [x] **Front** : composable `useTags` (SSR-cachée) + composant `ProductTagFilters` (pastilles à cocher groupées par facette, compteurs, « tout effacer », cases réellement présentes dans l'arbre d'accessibilité) ; branché sur `/boutique` avec l'URL comme source de vérité (`?tags=` partageable, retour arrière fonctionnel)
+- [x] ⚠️ **Effet de bord rattrapé — règle VIP.** `isNewFirearmQualifying` s'appuyait sur la **catégorie** `occasion`/`arme-ancienne` : la bascule en tags aurait silencieusement rendu une arme d'occasion **éligible au VIP**. La règle lit désormais les tags, et les commandes conservent leurs tags dans l'instantané `items_json`. L'ancienne clé catégorie est **conservée** pour les commandes antérieures à 11.1, dont l'instantané ne porte aucun tag
+- [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 316 / shared 68 / web 117 = 501** au vert ; smoke réel sur serveur live (`/api/tags` avec compteurs, `?tags=occasion` → 2 articles, slug inconnu ignoré, slug malformé 400) et **SSR `/boutique`** (panneau rendu, pastille active, décompte correct)
+- Reste ouvert, hors périmètre de cette story : **pages de tag indexables** + canonicals sur les vues filtrées (à traiter avec la 9.6), badges de tag sur les cartes produit (la 11.3 touche déjà les cartes), et l'**écran d'administration des tags** (pose/dépose sur un produit) — à cadrer avec la 7.5
 
 **Story 11.2** — Univers « Armes de collection & historiques » — 🔜 **À FAIRE**
 
