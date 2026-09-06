@@ -8,7 +8,7 @@ import {
   uuidParamSchema,
   virementReferenceFromBytes,
 } from "@armurier/shared"
-import { and, desc, eq, gte, sql } from "drizzle-orm"
+import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { reservePrintForOrder } from "../artworks/reservation.js"
 import { authenticate } from "../auth/authenticate.js"
@@ -183,15 +183,30 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
           })
           .returning({ id: orders.id })
 
-        // Decrement variant stock atomically (guard prevents overselling)
+        // Decrement variant stock atomically (guard prevents overselling).
+        // The guard also honours a unique-piece hold (story 11.2): a lapsed hold
+        // that someone else has re-claimed must block this checkout, otherwise
+        // the hold would mean nothing at the one moment it matters.
         for (const line of cart.items) {
           const updated = await tx
             .update(productVariants)
             .set({
               stockQty: sql`${productVariants.stockQty} - ${line.qty}`,
+              reservedBy: null,
+              reservedUntil: null,
               updatedAt: new Date(),
             })
-            .where(and(eq(productVariants.id, line.variantId), gte(productVariants.stockQty, line.qty)))
+            .where(
+              and(
+                eq(productVariants.id, line.variantId),
+                gte(productVariants.stockQty, line.qty),
+                or(
+                  isNull(productVariants.reservedBy),
+                  eq(productVariants.reservedBy, userId),
+                  lt(productVariants.reservedUntil, sql`now()`),
+                ),
+              ),
+            )
             .returning({ id: productVariants.id })
           if (updated.length === 0) {
             throw new OrderError(409, "InsufficientStock", `Insufficient stock for ${line.sku}`)

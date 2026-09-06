@@ -43,3 +43,16 @@ const DOC_LABELS: Record<string, string> = {
 export function legalDocLabel(code: string): string {
   return DOC_LABELS[code] ?? code
 }
+
+// Condition grades of a collection weapon (mirror the ancient_weapons values).
+const CONDITION_LABELS: Record<string, string> = {
+  excellent: "Excellent",
+  bon: "Bon",
+  moyen: "Moyen",
+  restaure: "Restauré",
+}
+
+export function conditionLabel(condition: string | null | undefined): string {
+  if (!condition) return "—"
+  return CONDITION_LABELS[condition] ?? condition
+}

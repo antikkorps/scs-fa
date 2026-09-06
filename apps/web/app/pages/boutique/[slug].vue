@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductDetail, ProductVariant } from "~/types/product"
 import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
-import { inStock, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
+import { conditionLabel, inStock, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -22,6 +22,19 @@ const image = computed(() =>
   artworkImage(product.value.featuredImageUrl, product.value.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height),
 )
 const legal = computed(() => product.value.legalCategory)
+
+// Collection weapons carry a historical dossier; ordinary products don't.
+const ancient = computed(() => product.value.ancientWeapon)
+const periodRange = computed(() => {
+  const from = ancient.value?.periodStartYear
+  const to = ancient.value?.periodEndYear
+  if (!from) return null
+  return to && to !== from ? `${from}–${to}` : String(from)
+})
+const historicalEvents = computed(() => [
+  ...(ancient.value?.historicalInfo?.battles ?? []),
+  ...(ancient.value?.historicalInfo?.events ?? []),
+])
 const lightboxOpen = ref(false)
 
 // Variants drive price/stock and the cart (the cart adds by variantId).
@@ -33,7 +46,13 @@ const selectedVariant = computed(
 const variantLabel = (v: ProductVariant) => v.finition ?? v.munition ?? v.couleur ?? v.skuVariant
 const hasChoice = computed(() => variants.value.length > 1)
 const displayPriceTtc = computed(() => selectedVariant.value?.priceTtc ?? product.value.priceTtc)
-const available = computed(() => inStock(selectedVariant.value?.stockQty ?? product.value.stockQty))
+// In stock AND not held by another shopper: a unique piece sitting in someone
+// else's cart is momentarily unbuyable, and saying so up front is the whole
+// point of the hold (story 11.2).
+const heldByOther = computed(() => selectedVariant.value?.heldByOther === true)
+const available = computed(
+  () => inStock(selectedVariant.value?.stockQty ?? product.value.stockQty) && !heldByOther.value,
+)
 
 const { isAuthenticated } = useAuth()
 const cart = useCart()
@@ -170,7 +189,58 @@ useHead({
           </fieldset>
 
           <p v-if="product.description" class="detail__desc">{{ product.description }}</p>
-          <p v-if="product.longDescription" class="detail__long">{{ product.longDescription }}</p>
+          <!-- Rich text. Safe to inject because every write path sanitises it
+               server-side (apps/api/src/sanitize.ts) — do not render any field
+               here that hasn't gone through that. -->
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div v-if="product.longDescription" class="detail__long" v-html="product.longDescription" />
+
+          <!-- Historical dossier: only collection weapons carry one (story 11.2) -->
+          <section v-if="ancient" class="hist" aria-labelledby="hist-h">
+            <h2 id="hist-h" class="hist__h">L'histoire de cette pièce</h2>
+            <dl class="hist__list">
+              <div v-if="ancient.period">
+                <dt>Époque</dt>
+                <dd>{{ ancient.period }}<span v-if="periodRange"> ({{ periodRange }})</span></dd>
+              </div>
+              <div v-if="ancient.makerName">
+                <dt>Fabricant</dt>
+                <dd>{{ ancient.makerName }}<span v-if="ancient.makerLocation"> — {{ ancient.makerLocation }}</span></dd>
+              </div>
+              <div v-if="ancient.provenance">
+                <dt>Provenance</dt>
+                <dd>{{ ancient.provenance }}</dd>
+              </div>
+              <div>
+                <dt>État</dt>
+                <dd>
+                  {{ conditionLabel(ancient.condition) }}
+                  <span v-if="ancient.conditionDescription"> — {{ ancient.conditionDescription }}</span>
+                </dd>
+              </div>
+              <div v-if="ancient.restorationInfo">
+                <dt>Restauration</dt>
+                <dd>{{ ancient.restorationInfo }}</dd>
+              </div>
+              <div v-if="ancient.isAuthentic && ancient.expertName">
+                <dt>Expertise</dt>
+                <dd>Authentifiée par {{ ancient.expertName }}</dd>
+              </div>
+              <div v-if="historicalEvents.length > 0">
+                <dt>Faits marquants</dt>
+                <dd>
+                  <ul class="hist__events">
+                    <li v-for="e in historicalEvents" :key="e">{{ e }}</li>
+                  </ul>
+                </dd>
+              </div>
+              <div v-if="ancient.historicalInfo?.notes">
+                <dt>Note</dt>
+                <dd>{{ ancient.historicalInfo.notes }}</dd>
+              </div>
+            </dl>
+            <p v-if="ancient.isUnique" class="hist__unique">Pièce unique — un seul exemplaire disponible.</p>
+          </section>
 
           <!-- Legal mentions: the regulated-commerce differentiator -->
           <section v-if="legal" class="legal" aria-labelledby="legal-h">
@@ -203,8 +273,11 @@ useHead({
 
           <div class="detail__cta">
             <button type="button" class="btn btn-primary buy" :disabled="!available || adding" @click="addToCart">
-              {{ available ? (adding ? "Ajout…" : "Ajouter au panier") : "Indisponible" }}
+              {{ available ? (adding ? "Ajout…" : "Ajouter au panier") : heldByOther ? "Momentanément réservée" : "Indisponible" }}
             </button>
+            <p v-if="heldByOther" class="detail__held">
+              Un autre client a cette pièce dans son panier. Elle redeviendra disponible s'il ne finalise pas.
+            </p>
             <p v-if="added" class="detail__added" role="status">
               Ajouté au panier. <NuxtLink to="/panier">Voir le panier</NuxtLink>
             </p>
@@ -326,6 +399,57 @@ useHead({
 .detail__long {
   color: var(--paper-dim);
   margin: 0 0 1.5rem;
+}
+.detail__long :deep(p) {
+  margin: 0 0 0.9rem;
+}
+.detail__long :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.detail__held {
+  color: var(--paper-dim);
+  font-size: 0.85rem;
+  margin: 0.6rem 0 0;
+}
+.hist {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 1.75rem 0;
+  padding: 1.5rem;
+}
+.hist__h {
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+}
+.hist__list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+.hist__list > div {
+  display: grid;
+  gap: 0.15rem;
+}
+.hist__list dt {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+.hist__list dd {
+  margin: 0;
+}
+.hist__unique {
+  color: var(--brass);
+  font-size: 0.85rem;
+  margin: 1rem 0 0;
+}
+.hist__events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 .legal {
   margin: 1.75rem 0;

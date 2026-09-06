@@ -217,6 +217,79 @@ export const productFiltersSchema = z
     path: ["maxPrice"],
   })
 
+// Collection-weapon listing filters. Narrower than the catalogue's: a visitor
+// browsing the collection universe filters by period/state tag, legal category
+// and availability — price and free-text search belong to the main catalogue.
+export const ancientWeaponFiltersSchema = z.object({
+  tags: tagsFilterSchema,
+  legalCategory: z.enum(LEGAL_CATEGORIES).optional(),
+  // Tri-state: omitted shows everything, including sold pieces — a sold
+  // historical weapon stays on display (story 11.3).
+  available: z
+    .union([z.literal("true"), z.literal("false"), z.boolean()])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === true || v === "true")),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+})
+
+export type AncientWeaponFilters = z.infer<typeof ancientWeaponFiltersSchema>
+
+// --- Admin: collection weapons (story 11.2) -------------------------------
+// A collection weapon is one product row plus one ancient_weapons row; the API
+// takes them as a single payload because they are never useful apart.
+
+const ANCIENT_CONDITIONS = ["excellent", "bon", "moyen", "restaure"] as const
+export const ANCIENT_WEAPON_CONDITIONS: readonly string[] = ANCIENT_CONDITIONS
+
+const historicalInfoSchema = z.object({
+  battles: z.array(z.string().max(200)).max(20).optional(),
+  owners: z.array(z.string().max(200)).max(20).optional(),
+  events: z.array(z.string().max(200)).max(20).optional(),
+  notes: z.string().max(5000).optional(),
+})
+
+export const createAncientWeaponSchema = z.object({
+  sku: z.string().trim().min(1).max(100),
+  slug: categorySlugSchema,
+  name: z.string().trim().min(1).max(255),
+  description: z.string().trim().max(1000).optional(),
+  // The client asked for roughly thirty lines telling the weapon's story, so
+  // this is the field that actually carries the piece's value.
+  longDescription: z.string().trim().max(20000).optional(),
+  categorySlug: categorySlugSchema,
+  legalCategory: z.enum(LEGAL_CATEGORIES),
+  priceHt: z.coerce.number().positive(),
+  featuredImageUrl: z.string().url().max(512).optional(),
+  published: z.boolean().default(false),
+  tagSlugs: z.array(tagSlugSchema).max(MAX_TAG_FILTERS).default([]),
+
+  period: z.string().trim().max(100).optional(),
+  periodStartYear: z.coerce.number().int().min(1000).max(2100).optional(),
+  periodEndYear: z.coerce.number().int().min(1000).max(2100).optional(),
+  provenance: z.string().trim().max(500).optional(),
+  makerName: z.string().trim().max(255).optional(),
+  makerLocation: z.string().trim().max(255).optional(),
+  condition: z.enum(ANCIENT_CONDITIONS),
+  conditionDescription: z.string().trim().max(5000).optional(),
+  restorationInfo: z.string().trim().max(5000).optional(),
+  isAuthentic: z.boolean().default(false),
+  expertName: z.string().trim().max(255).optional(),
+  expertDate: z.string().date().optional(),
+  historicalInfo: historicalInfoSchema.optional(),
+})
+
+export type CreateAncientWeaponInput = z.infer<typeof createAncientWeaponSchema>
+
+// Every field optional, but `sku`/`slug`/`categorySlug` are deliberately absent:
+// changing them would break indexed URLs and the variant SKU derived from them.
+export const updateAncientWeaponSchema = createAncientWeaponSchema
+  .omit({ sku: true, slug: true, categorySlug: true })
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+export type UpdateAncientWeaponInput = z.infer<typeof updateAncientWeaponSchema>
+
 // Generic pagination query (page/limit, max 100)
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),

@@ -6,6 +6,7 @@ import { hash } from "@node-rs/argon2"
 import { eq } from "drizzle-orm"
 import { db } from "./client.js"
 import {
+  ancientWeapons,
   artworkPrints,
   artworks,
   blogPosts,
@@ -713,6 +714,7 @@ async function seedArmurerie() {
   console.log(`✅ Armurerie seeded (${newProducts} new products, ${newVariants} new variants)`)
 
   await seedProductTags()
+  await seedAncientWeapons()
 }
 
 // Pose quelques tags de démonstration pour que le filtre à facettes ait de quoi
@@ -737,6 +739,197 @@ async function seedProductTags() {
   }
 
   console.log(`✅ Product tags seeded (${linked} links)`)
+}
+
+// ==========================================================================
+// ARMES DE COLLECTION & HISTORIQUES (Story 11.2)
+// ==========================================================================
+// Chaque pièce est un exemplaire unique : un produit (stock 1), sa fiche
+// historique dans `ancient_weapons`, une variante « Pièce unique » (le panier
+// est clé sur variantId, donc sans variante la pièce serait inachetable) et ses
+// tags d'état/époque. Idempotent sur le SKU.
+
+const ANCIENT_WEAPONS = [
+  {
+    sku: "COL-LEFAUCHEUX-1854",
+    slug: "revolver-lefaucheux-modele-1854",
+    name: "Revolver Lefaucheux modèle 1854",
+    categorySlug: "arme-poing",
+    legalCategory: "D" as const,
+    priceHt: 2400,
+    tagSlugs: ["occasion", "arme-ancienne"],
+    description: "Revolver à broche de Casimir Lefaucheux, poinçons de Liège, crosse en noyer d'origine.",
+    longDescription:
+      "<p>Le modèle 1854 de Casimir Lefaucheux est le premier revolver à cartouche métallique adopté par une marine militaire — celle de la France. Il marque le basculement de l'ère de la poudre noire chargée par la bouche vers celle de la munition autonome.</p>" +
+      "<p>Cet exemplaire porte les poinçons liégeois d'épreuve et une numérotation cohérente sur la carcasse, le barillet et le canon, ce qui exclut un assemblage tardif de pièces dépareillées — le défaut le plus courant sur ce modèle.</p>" +
+      "<p>La crosse en noyer a conservé son quadrillage d'origine, simplement adouci par l'usage. Le bronzage subsiste à environ soixante pour cent, avec la patine grise régulière que l'on attend d'une arme conservée sans être astiquée.</p>" +
+      "<p>La mécanique est saine : l'armé est franc, l'indexation du barillet nette, sans jeu latéral perceptible en position de tir. Aucune pièce n'a été remplacée.</p>",
+    period: "Second Empire",
+    periodStartYear: 1854,
+    periodEndYear: 1870,
+    provenance: "Collection privée bourguignonne, acquise en vente publique à Dijon en 1987",
+    makerName: "Casimir Lefaucheux",
+    makerLocation: "Paris / Liège",
+    condition: "bon",
+    conditionDescription: "Bronzage à environ 60 %, patine homogène, mécanique saine, numérotation cohérente.",
+    isAuthentic: true,
+    expertName: "Cabinet Vernier — expert près la Cour d'appel",
+    historicalInfo: {
+      events: ["Adoption par la Marine française", "Guerre de 1870"],
+      notes: "Modèle emblématique du passage à la cartouche métallique.",
+    },
+  },
+  {
+    sku: "COL-LUGER-P08-1917",
+    slug: "luger-p08-daté-1917",
+    name: "Luger P08 daté 1917",
+    categorySlug: "arme-poing",
+    legalCategory: "B" as const,
+    priceHt: 3800,
+    tagSlugs: ["occasion", "arme-historique"],
+    description: "Pistolet Luger P08 de fabrication DWM, daté 1917, numérotation d'origine complète.",
+    longDescription:
+      "<p>Produit par la Deutsche Waffen- und Munitionsfabriken en 1917, ce P08 appartient à la période de production de guerre, la plus recherchée par les collectionneurs pour la qualité d'ajustage encore intacte à cette date.</p>" +
+      "<p>La numérotation est complète et concordante : carcasse, culasse, canon, levier de démontage et plaquettes portent le même suffixe. C'est le critère qui sépare une pièce de collection d'un assemblage d'après-guerre, et il est ici pleinement satisfait.</p>" +
+      "<p>Le système à genouillère fonctionne avec la douceur caractéristique des productions DWM. La hausse et le guidon sont d'origine, sans trace de remplacement ni de repositionnement.</p>" +
+      "<p>L'arme est vendue avec son étui daté et le chargeur numéroté correspondant. En catégorie B, sa détention est soumise à autorisation préfectorale et à l'enregistrement au SIA.</p>",
+    period: "Première Guerre mondiale",
+    periodStartYear: 1917,
+    periodEndYear: 1918,
+    provenance: "Succession d'un officier français, rapportée du front en 1918",
+    makerName: "Deutsche Waffen- und Munitionsfabriken (DWM)",
+    makerLocation: "Berlin",
+    condition: "excellent",
+    conditionDescription: "Numérotation entièrement concordante, bronzage à plus de 90 %, mécanique irréprochable.",
+    isAuthentic: true,
+    expertName: "Cabinet Vernier — expert près la Cour d'appel",
+    historicalInfo: {
+      battles: ["Front de l'Ouest"],
+      notes: "Étui et chargeur numérotés d'origine fournis avec la pièce.",
+    },
+  },
+  {
+    sku: "COL-GRAS-1874",
+    slug: "fusil-gras-modele-1874",
+    name: "Fusil Gras modèle 1874",
+    categorySlug: "arme-longue",
+    legalCategory: "C" as const,
+    priceHt: 1150,
+    tagSlugs: ["occasion", "arme-ancienne"],
+    description: "Fusil Gras de la manufacture de Saint-Étienne, millésime lisible, bois sain.",
+    longDescription:
+      "<p>Le fusil Gras modèle 1874 est la première arme réglementaire française à cartouche métallique. Il équipe l'armée au lendemain de la défaite de 1870 et reste en service, sous diverses transformations, jusqu'à la Première Guerre mondiale.</p>" +
+      "<p>Cet exemplaire sort de la Manufacture d'armes de Saint-Étienne. Le marquage de tonnerre est parfaitement lisible, millésime compris, ce qui est loin d'être acquis sur des armes ayant beaucoup servi.</p>" +
+      "<p>Le bois est sain, sans fente ni réparation, et porte ses cachets d'inspection. La mécanique fonctionne normalement et l'âme du canon conserve des rayures franches.</p>",
+    period: "Troisième République",
+    periodStartYear: 1874,
+    periodEndYear: 1890,
+    provenance: "Collection régionale stéphanoise",
+    makerName: "Manufacture d'armes de Saint-Étienne",
+    makerLocation: "Saint-Étienne",
+    condition: "bon",
+    conditionDescription: "Marquages lisibles, bois sain sans réparation, rayures franches.",
+    isAuthentic: true,
+    historicalInfo: { notes: "Première arme réglementaire française à cartouche métallique." },
+  },
+  {
+    // Accessoire historique : même modèle, même traitement (story 11.2).
+    sku: "COL-ETUI-P08-1941",
+    slug: "etui-de-luger-p08-date-1941",
+    name: "Étui de Luger P08 daté 1941",
+    categorySlug: "accessoire-autre",
+    legalCategory: "none" as const,
+    priceHt: 320,
+    tagSlugs: ["occasion", "arme-historique"],
+    description: "Étui en cuir noir pour Luger P08, marquages et date lisibles, cuir souple.",
+    longDescription:
+      "<p>Étui réglementaire en cuir noir pour pistolet P08, daté 1941 et portant ses marquages de fabricant au revers du rabat.</p>" +
+      "<p>Le cuir est resté souple, les coutures sont saines et le compartiment à chargeur de rechange est intact. Une pièce d'accompagnement recherchée pour compléter un P08 de la même période.</p>",
+    period: "Seconde Guerre mondiale",
+    periodStartYear: 1941,
+    periodEndYear: 1941,
+    makerName: "Fabricant militaire allemand (marquage au revers)",
+    condition: "bon",
+    conditionDescription: "Cuir souple, coutures saines, marquages lisibles.",
+    isAuthentic: true,
+    historicalInfo: {},
+  },
+]
+
+async function seedAncientWeapons() {
+  let created = 0
+
+  for (const w of ANCIENT_WEAPONS) {
+    const [existing] = await db.select({ id: products.id }).from(products).where(eq(products.sku, w.sku)).limit(1)
+    if (existing) continue
+
+    const [category] = await db
+      .select({ id: productCategories.id })
+      .from(productCategories)
+      .where(eq(productCategories.slug, w.categorySlug))
+      .limit(1)
+    const [legal] = await db
+      .select({ id: legalCategories.id })
+      .from(legalCategories)
+      .where(eq(legalCategories.category, w.legalCategory))
+      .limit(1)
+    if (!category || !legal) continue
+
+    const [product] = await db
+      .insert(products)
+      .values({
+        sku: w.sku,
+        slug: w.slug,
+        name: w.name,
+        description: w.description,
+        longDescription: w.longDescription,
+        categoryId: category.id,
+        legalCategoryId: legal.id,
+        priceHt: w.priceHt.toFixed(2),
+        stockQty: 1,
+        requiresLegalVerification: w.legalCategory !== "none",
+        featuredImageUrl: null,
+        published: true,
+      })
+      .returning({ id: products.id })
+    if (!product) continue
+
+    await db.insert(ancientWeapons).values({
+      productId: product.id,
+      period: w.period,
+      periodStartYear: w.periodStartYear,
+      periodEndYear: w.periodEndYear,
+      provenance: w.provenance,
+      makerName: w.makerName,
+      makerLocation: w.makerLocation,
+      condition: w.condition,
+      conditionDescription: w.conditionDescription,
+      isAuthentic: w.isAuthentic,
+      expertName: w.expertName,
+      historicalInfo: w.historicalInfo,
+      isUnique: true,
+    })
+
+    // Sans variante, la pièce ne peut pas entrer dans le panier (clé variantId).
+    await db.insert(productVariants).values({
+      productId: product.id,
+      skuVariant: `${w.sku}-PU`,
+      finition: "Pièce unique",
+      stockQty: 1,
+      priceDeltaHt: "0",
+    })
+
+    for (const slug of w.tagSlugs) {
+      const [tag] = await db.select({ id: tags.id }).from(tags).where(eq(tags.slug, slug)).limit(1)
+      if (tag) {
+        await db.insert(productTags).values({ productId: product.id, tagId: tag.id }).onConflictDoNothing()
+      }
+    }
+
+    created++
+  }
+
+  console.log(`✅ Ancient weapons seeded (${created} new)`)
 }
 
 // ==========================================================================

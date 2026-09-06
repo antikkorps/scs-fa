@@ -6,6 +6,8 @@ import fastifyMultipart from "@fastify/multipart"
 import fastifyRateLimit from "@fastify/rate-limit"
 import Fastify, { type FastifyInstance } from "fastify"
 import { addressRoutes } from "./addresses/index.js"
+import { adminAncientWeaponRoutes } from "./ancient-weapons/admin.js"
+import { ancientWeaponRoutes } from "./ancient-weapons/index.js"
 import { artworkRoutes } from "./artworks/index.js"
 import { authRoutes } from "./auth/index.js"
 import { adminBlogRoutes } from "./blog/admin.js"
@@ -75,6 +77,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(productRoutes, { prefix: "/api/products" })
   await fastify.register(productCategoryRoutes, { prefix: "/api/product-categories" })
   await fastify.register(tagRoutes, { prefix: "/api/tags" })
+  await fastify.register(ancientWeaponRoutes, { prefix: "/api/ancient-weapons" })
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
   await fastify.register(blogRoutes, { prefix: "/api/blog" })
   await fastify.register(blogImageRoutes, { prefix: "/api/blog/images" })
@@ -92,6 +95,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminBlogRoutes, { prefix: "/api/admin/blog" })
   await fastify.register(adminBlogImageRoutes, { prefix: "/api/admin/blog/images" })
   await fastify.register(adminMetricsRoutes, { prefix: "/api/admin/metrics" })
+  await fastify.register(adminAncientWeaponRoutes, { prefix: "/api/admin/ancient-weapons" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)
