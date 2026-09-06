@@ -127,7 +127,10 @@ async function signOut() {
                 <NuxtLink v-if="!categories.length" to="/boutique" class="mega__link">Voir la boutique</NuxtLink>
               </div>
               <div class="mega__col">
-                <p class="mega__label">Par catégorie légale</p>
+                <p class="mega__label">Collection</p>
+                <NuxtLink to="/armes-de-collection" class="mega__link">Armes de collection &amp; historiques</NuxtLink>
+                <NuxtLink to="/boutique?tags=occasion" class="mega__link">Armes d'occasion</NuxtLink>
+                <p class="mega__label mega__label--spaced">Par catégorie légale</p>
                 <NuxtLink
                   v-for="l in LEGAL"
                   :key="l.code"
@@ -338,6 +341,11 @@ async function signOut() {
                   <div class="msub-inner">
                     <ul id="msub-armurerie" class="msub" role="list">
                       <li><NuxtLink to="/boutique" class="msub__link">Toute la boutique</NuxtLink></li>
+                      <li>
+                        <NuxtLink to="/armes-de-collection" class="msub__link">
+                          Armes de collection &amp; historiques
+                        </NuxtLink>
+                      </li>
                       <li v-for="c in categories" :key="c.slug">
                         <NuxtLink :to="`/boutique?category=${c.slug}`" class="msub__link">{{ c.name }}</NuxtLink>
                       </li>
@@ -524,6 +532,9 @@ async function signOut() {
   flex-direction: column;
   gap: 0.25rem;
   min-width: 170px;
+}
+.mega__label--spaced {
+  margin-top: 1.1rem;
 }
 .mega__label {
   margin: 0 0 0.6rem;

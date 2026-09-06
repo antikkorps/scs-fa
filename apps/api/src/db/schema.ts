@@ -625,6 +625,18 @@ export const productVariants = pgTable(
     stockQty: integer("stock_qty").default(0),
     priceDeltaHt: decimal("price_delta_ht", { precision: 8, scale: 2 }).default("0"),
 
+    // Réservation panier des PIÈCES UNIQUES (story 11.2). Une arme de collection
+    // n'existe qu'en un exemplaire : sans blocage à l'ajout au panier, deux
+    // clients peuvent la préparer en parallèle et le second n'apprend qu'à la
+    // validation qu'elle est partie. Même intention que la réservation des
+    // tirages Gun Art (story 5.2), transposée au stock d'une variante.
+    //
+    // Une réservation **expirée n'est jamais balayée** : elle est ignorée à la
+    // lecture (`reserved_until < now()`). Pas de tâche planifiée à maintenir, et
+    // aucune fenêtre pendant laquelle une pièce libre paraîtrait encore prise.
+    reservedBy: uuid("reserved_by"),
+    reservedUntil: timestamp("reserved_until"),
+
     // Métadonnées
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -636,6 +648,11 @@ export const productVariants = pgTable(
       columns: [t.productId],
       foreignColumns: [products.id],
     }).onDelete("cascade"),
+     foreignKey({
+      columns: [t.reservedBy],
+      foreignColumns: [users.id],
+      // A deleted account must not keep a piece hostage.
+    }).onDelete("set null"),
      check(
       "chk_variant_attrs",
       sql`finition IS NOT NULL OR munition IS NOT NULL OR couleur IS NOT NULL`,

@@ -4,8 +4,9 @@ import type { FastifyPluginAsync } from "fastify"
 import { releasePrintFromCart, reservePrintForCart } from "../artworks/reservation.js"
 import { authenticate } from "../auth/authenticate.js"
 import { db } from "../db/client.js"
-import { artworkCartItems, artworkPrints, cartItems, products, productVariants } from "../db/schema.js"
+import { ancientWeapons, artworkCartItems, artworkPrints, cartItems, products, productVariants } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { releaseAllUniquePieces, releaseUniquePiece, reserveUniquePiece } from "../products/reservation.js"
 import { loadCart } from "./service.js"
 
 export const cartRoutes: FastifyPluginAsync = async (fastify) => {
@@ -34,9 +35,13 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
           priceDeltaHt: productVariants.priceDeltaHt,
           productPriceHt: products.priceHt,
           published: products.published,
+          // A collection weapon exists in a single copy, so it is held for the
+          // shopper as soon as it enters their cart (story 11.2).
+          isUniquePiece: ancientWeapons.isUnique,
         })
         .from(productVariants)
         .innerJoin(products, eq(productVariants.productId, products.id))
+        .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
         .where(eq(productVariants.id, variantId))
         .limit(1)
 
@@ -58,6 +63,16 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
           error: "InsufficientStock",
           message: `Only ${variant.stockQty} unit(s) available`,
         })
+      }
+
+      if (variant.isUniquePiece) {
+        const held = await reserveUniquePiece(variantId, userId)
+        if (!held) {
+          return reply.code(409).send({
+            error: "Conflict",
+            message: "This piece is currently held by another customer",
+          })
+        }
       }
 
       if (existing) {
@@ -156,12 +171,20 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(400).send(validationError(params.error.issues))
     }
     const userId = request.user.sub
-    const deleted = await db
-      .delete(cartItems)
-      .where(and(eq(cartItems.id, params.data.id), eq(cartItems.userId, userId)))
-      .returning({ id: cartItems.id })
+    // Remove the line and release any hold it carried, atomically.
+    const removed = await db.transaction(async (tx) => {
+      const [deleted] = await tx
+        .delete(cartItems)
+        .where(and(eq(cartItems.id, params.data.id), eq(cartItems.userId, userId)))
+        .returning({ variantId: cartItems.variantId })
+      if (!deleted) return false
+      // No-op unless this shopper actually held the variant, so a regular
+      // multi-stock product costs nothing here.
+      await releaseUniquePiece(deleted.variantId, userId, tx)
+      return true
+    })
 
-    if (deleted.length === 0) {
+    if (!removed) {
       return reply.code(404).send({ error: "NotFound", message: "Cart item not found" })
     }
     return reply.code(204).send()
@@ -196,6 +219,7 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = request.user.sub
     await db.transaction(async (tx) => {
       await tx.delete(cartItems).where(eq(cartItems.userId, userId))
+      await releaseAllUniquePieces(userId, tx)
       const removed = await tx
         .delete(artworkCartItems)
         .where(eq(artworkCartItems.userId, userId))

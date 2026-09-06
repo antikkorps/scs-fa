@@ -1,8 +1,9 @@
 import { computePriceTtc, productIdParamSchema } from "@armurier/shared"
-import { and, asc, eq, type SQL } from "drizzle-orm"
+import { and, asc, eq, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
-import { legalCategories, productCategories, products, productVariants } from "../db/schema.js"
+import { ancientWeapons, legalCategories, productCategories, products, productVariants } from "../db/schema.js"
+import { productTagsJson } from "./tag-filter.js"
 
 // Shared lookup for a single published product (by id or by slug). Returns the
 // public detail shape, or null when not found / unpublished.
@@ -36,12 +37,29 @@ async function fetchPublishedProduct(match: SQL) {
       legalCategoryRequiresVerification: legalCategories.requiresVerification,
       legalCategoryMinAge: legalCategories.minAge,
       legalCategoryRequiredDocTypes: legalCategories.requiredDocTypes,
+      tags: productTagsJson,
+      // Historical block — present only on collection weapons (story 11.2).
+      ancientPeriod: ancientWeapons.period,
+      ancientPeriodStartYear: ancientWeapons.periodStartYear,
+      ancientPeriodEndYear: ancientWeapons.periodEndYear,
+      ancientProvenance: ancientWeapons.provenance,
+      ancientMakerName: ancientWeapons.makerName,
+      ancientMakerLocation: ancientWeapons.makerLocation,
+      ancientCondition: ancientWeapons.condition,
+      ancientConditionDescription: ancientWeapons.conditionDescription,
+      ancientRestorationInfo: ancientWeapons.restorationInfo,
+      ancientIsAuthentic: ancientWeapons.isAuthentic,
+      ancientExpertName: ancientWeapons.expertName,
+      ancientExpertDate: ancientWeapons.expertDate,
+      ancientHistoricalInfo: ancientWeapons.historicalInfo,
+      ancientIsUnique: ancientWeapons.isUnique,
       createdAt: products.createdAt,
       updatedAt: products.updatedAt,
     })
     .from(products)
     .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
+    .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
     // Only published products are publicly accessible
     .where(and(match, eq(products.published, true)))
     .limit(1)
@@ -62,6 +80,13 @@ async function fetchPublishedProduct(match: SQL) {
       couleur: productVariants.couleur,
       stockQty: productVariants.stockQty,
       priceDeltaHt: productVariants.priceDeltaHt,
+      // A unique piece held by another shopper is momentarily unbuyable. The
+      // expiry is compared here rather than swept, so a lapsed hold frees the
+      // piece the instant it runs out.
+      heldByOther: sql<boolean>`(
+        ${productVariants.reservedBy} is not null
+        and ${productVariants.reservedUntil} >= now()
+      )`,
     })
     .from(productVariants)
     .where(eq(productVariants.productId, row.id))
@@ -76,6 +101,7 @@ async function fetchPublishedProduct(match: SQL) {
       munition: v.munition,
       couleur: v.couleur,
       stockQty: v.stockQty,
+      heldByOther: v.heldByOther,
       priceDeltaHt: Number(v.priceDeltaHt ?? 0),
       priceHt: variantHt,
       priceTtc: computePriceTtc(variantHt, vatPct),
@@ -107,6 +133,27 @@ async function fetchPublishedProduct(match: SQL) {
       keywords: row.keywords,
     },
     category: { slug: row.categorySlug, name: row.categoryName },
+    tags: row.tags,
+    // Null for an ordinary product; the whole historical dossier for a
+    // collection weapon, which the front renders as its story section.
+    ancientWeapon: row.ancientCondition
+      ? {
+          period: row.ancientPeriod,
+          periodStartYear: row.ancientPeriodStartYear,
+          periodEndYear: row.ancientPeriodEndYear,
+          provenance: row.ancientProvenance,
+          makerName: row.ancientMakerName,
+          makerLocation: row.ancientMakerLocation,
+          condition: row.ancientCondition,
+          conditionDescription: row.ancientConditionDescription,
+          restorationInfo: row.ancientRestorationInfo,
+          isAuthentic: row.ancientIsAuthentic,
+          expertName: row.ancientExpertName,
+          expertDate: row.ancientExpertDate,
+          historicalInfo: row.ancientHistoricalInfo,
+          isUnique: row.ancientIsUnique,
+        }
+      : null,
     legalCategory: row.legalCategoryCode
       ? {
           category: row.legalCategoryCode,

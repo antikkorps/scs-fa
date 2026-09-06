@@ -539,17 +539,21 @@
 - [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 316 / shared 68 / web 117 = 501** au vert ; smoke réel sur serveur live (`/api/tags` avec compteurs, `?tags=occasion` → 2 articles, slug inconnu ignoré, slug malformé 400) et **SSR `/boutique`** (panneau rendu, pastille active, décompte correct)
 - Reste ouvert, hors périmètre de cette story : **pages de tag indexables** + canonicals sur les vues filtrées (à traiter avec la 9.6), badges de tag sur les cartes produit (la 11.3 touche déjà les cartes), et l'**écran d'administration des tags** (pose/dépose sur un produit) — à cadrer avec la 7.5
 
-**Story 11.2** — Univers « Armes de collection & historiques » — 🔜 **À FAIRE**
+**Story 11.2** — Univers « Armes de collection & historiques » ✅
 
-> ⚠️ La table **`ancient_weapons` existe déjà et n'est utilisée nulle part** (aucune API, aucune page, aucun seed — cf. `db/schema.ts:590`). Le modèle est complet : période, provenance, fabricant, état + description, restauration, authenticité, expert + certificat, `historicalInfo` (batailles / propriétaires / événements), `isUnique`. Cette story l'expose enfin.
+> La table **`ancient_weapons` existait déjà et n'était utilisée nulle part** (aucune API, aucune page, aucun seed). Cette story l'expose enfin, en réutilisant intégralement le tunnel d'achat des phases 3, 4 et 6.
 
-- **Onglet dédié** dans la navigation du site principal (à caler avec la refonte navbar 10.6).
-- **Pièce unique** : `stockQty = 1`, `isUnique`, aucune variante, **un prix unique par arme**.
-- **Listing** : miniature par arme, titre, une ou deux lignes de résumé ; sous-catégories **arme ancienne (avant 1900)** et **arme historique de guerre**, catégories légales **B et C**.
-- **Fiche détail** : description longue (~30 lignes) racontant l'histoire de l'arme, provenance, fabricant, état, expertise ; **mentions légales avec la classification** (réutilise l'affichage de la 10.3).
-- **Parcours d'achat identique aux armes neuves** : prix, vente, réception des documents légaux — aucun tunnel spécifique, on réutilise les Phases 3, 4 et 6.
-- **Accessoires historiques** : même traitement, même modèle.
-- API publique (listing + détail) et **CRUD admin** joignant `products` ↔ `ancient_weapons`.
+- [x] **Réservation au panier des pièces uniques** (décision Franck) : colonnes `reserved_by`/`reserved_until` sur `product_variants` (migration `0002`, FK `on delete set null` pour qu'un compte supprimé ne garde pas une pièce en otage). Compare-and-set, comme la réservation des tirages Gun Art (5.2). **Aucune tâche planifiée** : une réservation expirée n'est jamais balayée, elle est ignorée à la lecture (`reserved_until < now()`) — pas de cron à maintenir et aucune fenêtre où une pièce libérée paraîtrait encore prise
+- [x] **Cycle complet** : blocage à l'ajout au panier (409 pour un second client), libération au retrait de ligne et au vidage du panier, ré-ajout par le détenteur sans qu'il se bloque lui-même. La validation de commande **honore aussi la réservation** (clause ajoutée au garde-fou de stock atomique) — sans quoi le blocage n'aurait rien valu au seul moment qui compte
+- [x] **Pièce unique = 1 variante implicite** : le panier est clé sur `variantId`, donc un produit sans variante est inachetable. Le CRUD admin crée automatiquement une variante « Pièce unique » (stock 1) → parcours d'achat **identique aux armes neuves**, zéro modification du tunnel
+- [x] **API publique** : `GET /api/ancient-weapons` (listing avec époque/fabricant/état/authenticité, filtres tag + catégorie légale + disponibilité, pagination). Les **pièces vendues restent listées** et marquées `available: false` — elles gardent leur valeur éditoriale et SEO (prépare la 11.3). Fiche produit enrichie d'un bloc `ancientWeapon` (null sur un produit ordinaire) et d'un `heldByOther` par variante
+- [x] **CRUD admin** (`/api/admin/ancient-weapons`) : création transactionnelle produit + fiche historique + variante + tags (tout ou rien), édition partielle, suppression **refusée** si la pièce est vendue ou retenue par un client (on dépublie au lieu d'effacer une piste d'achat)
+- [x] **Texte riche assaini** (décision Franck : garder la mise en forme plutôt que du texte brut) : le module de sanitisation du blog remonte en `apps/api/src/sanitize.ts` et sert désormais les deux usages (DRY). `longDescription` est assainie **à l'écriture** et rendue en `v-html` — invariant documenté dans le module : un champ rendu en `v-html` DOIT être passé par là
+- [x] **Front** : page `/armes-de-collection` (identité éditoriale, filtre par époque, bascule « afficher les pièces vendues », badge « Vendue » en niveaux de gris, `ItemList` JSON-LD) ; **fiche unique** `/boutique/:slug` enrichie du dossier historique (époque, fabricant, provenance, état, restauration, expertise, faits marquants) — une seule URL canonique par arme, conforme au catalogue global. Bouton d'achat désactivé et message explicite quand la pièce est momentanément retenue. Entrées de nav ajoutées au méga-menu Armurerie et à l'accordéon mobile
+- [x] **Seed** : 3 armes (Lefaucheux 1854, Luger P08 1917, Gras 1874) + 1 **accessoire historique** (étui de P08 daté 1941), avec récits, provenance et tags
+- [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 337 / shared 68 / web 117 = 522** au vert ; smoke réel (listing, dossier historique, tags, variante unique, **assainissement d'une charge XSS réelle** — `<script>`, `onerror` et `javascript:` supprimés) et SSR des deux pages
+- ⚠️ **Bug trouvé par le smoke, pas par les tests** : la pose des tags utilisait `= any()`, que le driver sérialise en tuple et non en tableau → toute création admin avec tags renvoyait 500. Corrigé (`inArray`) **et couvert par un test** de création admin, qui manquait
+- Reste ouvert : écran d'administration Nuxt des armes de collection (l'API est là, l'UI viendra avec la refonte produit de la 7.5) ; les slugs de tags `arme-ancienne`/`arme-historique` sont formulés pour des armes et lisent mal sur un accessoire — à renommer si le vocabulaire gêne le client
 
 **Story 11.3** — Marquage « vendu » persistant — 🔜 **À FAIRE**
 
