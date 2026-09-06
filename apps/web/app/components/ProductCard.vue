@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ProductCardItem } from "~/types/product"
+import { availabilityState, isPurchasable } from "~/utils/availability"
 import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
-import { inStock, isRegulated, legalCategoryLabel } from "~/utils/product"
+import { isRegulated, legalCategoryLabel } from "~/utils/product"
 
 const props = defineProps<{
   product: ProductCardItem
@@ -12,7 +13,10 @@ const props = defineProps<{
 const img = computed(() =>
   artworkImage(props.product.featuredImageUrl, props.product.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height),
 )
-const available = computed(() => inStock(props.product.stockQty))
+// "Vendu" for a one-off that is gone, "Rupture" for a product that will
+// restock — the card must not promise a return that can never happen.
+const state = computed(() => availabilityState(props.product))
+const available = computed(() => isPurchasable(state.value))
 const regulated = computed(() => isRegulated(props.product.legalCategory))
 </script>
 
@@ -32,7 +36,7 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
         <span class="card__badge badge" :class="regulated ? 'badge-legal' : 'badge-free'">
           {{ legalCategoryLabel(product.legalCategory) }}
         </span>
-        <span v-if="!available" class="card__badge card__badge--stock badge badge-soldout">Rupture</span>
+        <AvailabilityBadge v-if="!available" :state="state" size="sm" class="card__badge card__badge--stock" />
       </div>
 
       <div class="card__body">

@@ -555,12 +555,17 @@
 - ⚠️ **Bug trouvé par le smoke, pas par les tests** : la pose des tags utilisait `= any()`, que le driver sérialise en tuple et non en tableau → toute création admin avec tags renvoyait 500. Corrigé (`inArray`) **et couvert par un test** de création admin, qui manquait
 - Reste ouvert : écran d'administration Nuxt des armes de collection (l'API est là, l'UI viendra avec la refonte produit de la 7.5) ; les slugs de tags `arme-ancienne`/`arme-historique` sont formulés pour des armes et lisent mal sur un accessoire — à renommer si le vocabulaire gêne le client
 
-**Story 11.3** — Marquage « vendu » persistant — 🔜 **À FAIRE**
+**Story 11.3** — Marquage « vendu » persistant ✅
 
-- Une pièce vendue **reste visible** dans la galerie avec un marquage **« Vendu — indisponible »** : elle conserve sa valeur éditoriale et SEO, et démontre l'activité de la maison. Pas de 404, pas de dépublication.
-- Retirée de l'achat (pas d'ajout au panier), `availability: schema.org/SoldOut` dans le JSON-LD.
-- **CTA « Se tenir informé des arrivées »** sur la fiche vendue → alimente la story 11.4.
-- Existe **déjà côté Gun Art** (badge épuisé + `SoldOut` dans `collection/[slug].vue:118`) : généraliser le composant aux armes plutôt que le dupliquer.
+- [x] **Distinction « vendu » / « rupture »** (le vrai sujet) : une pièce unique partie ne revient jamais, un produit ordinaire à zéro sera réapprovisionné. Afficher « Rupture » sur une arme historique vendue promettrait un retour impossible **et** dirait la mauvaise chose aux moteurs. `utils/availability.ts` calcule l'état à partir du stock et de `isUnique`, et porte les libellés **et** la valeur schema.org : `SoldOut` pour une pièce unique, `OutOfStock` sinon
+- [x] **API** : `isUnique` exposé dans le listing `/api/products` (jointure sur `ancient_weapons`) — sans lui le front ne peut pas faire la différence. La fiche portait déjà `ancientWeapon.isUnique`
+- [x] **Reste en ligne** : une pièce vendue **n'est ni dépubliée ni masquée** — elle sort dans le listing, sa fiche répond 200 (pas de 404), elle garde sa valeur éditoriale et SEO et montre l'activité de la maison. Couvert par des tests, pas seulement par l'intention
+- [x] **Retirée de l'achat** : bouton désactivé portant le motif exact (« Vendu — indisponible » vs « Rupture de stock »), et `availability` du JSON-LD `Offer` piloté par le même état
+- [x] **Composant partagé `AvailabilityBadge`** (la story demandait de généraliser, pas de dupliquer) : utilisé par la carte produit, la fiche, le listing collection **et les deux écrans Gun Art**, qui lui passent leur propre libellé d'édition (« 16 / 25 disponibles »). La couleur, la forme et la sémantique vivent en un seul endroit
+- [x] ⚠️ **Lisibilité (remarque d'un associé du client)** : le badge est **opaque et fortement contrasté**, pas une surimpression discrète — #f5f2ea sur #0e0e10, environ **17:1**, très au-dessus des 4,5:1 exigés. Aucune astuce d'opacité, aucun texte atténué ; il tient sur une photo claire, en niveaux de gris et pour un daltonien, car **le mot porte le sens, jamais la couleur seule**
+- [x] ⚠️ **Défaut vu à la capture d'écran, pas au code** : la fiche affichait **deux libellés contradictoires** — la puce héritée « Rupture de stock » juste à côté du nouveau badge « Vendu ». Unifié : une seule mention de disponibilité, plus une phrase d'explication
+- [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 340 / shared 68 / web 127 = 535** au vert (10 nouveaux : état, libellés, schema.org, carte produit, listing catalogue, fiche d'une pièce vendue) ; **captures Playwright** du badge sur carte et sur fiche pour juger la lisibilité plutôt que la supposer
+- Reporté à la 11.4 : le **CTA « se tenir informé des arrivées »**. Il n'existe aujourd'hui aucun endroit où envoyer l'adresse — l'expédier maintenant reviendrait à livrer un bouton mort. Il arrivera avec l'inscription Brevo
 
 **Story 11.4** — Newsletter & alertes d'arrivée — 🔜 **À FAIRE**
 

@@ -115,9 +115,10 @@ useHead({
           <p v-if="art.artistName" class="eyebrow">{{ art.artistName }}</p>
           <h1 class="detail__title">{{ art.title }}</h1>
 
-          <span class="badge" :class="soldOut ? 'badge-soldout' : 'badge-available'">
-            {{ availabilityLabel(availablePrints.length, art.editionLimit) }}
-          </span>
+          <AvailabilityBadge
+            :state="soldOut ? 'sold' : 'available'"
+            :label="availabilityLabel(availablePrints.length, art.editionLimit)"
+          />
 
           <p v-if="art.description" class="detail__desc">{{ art.description }}</p>
           <p v-if="art.longDescription" class="detail__long">{{ art.longDescription }}</p>
