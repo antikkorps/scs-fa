@@ -22,6 +22,15 @@ const year = new Date().getFullYear()
         <NuxtLink to="/blog">Journal</NuxtLink>
       </nav>
 
+      <div class="ft__col ft__news">
+        <NewsletterSignup
+          variant="bare"
+          source="/"
+          title="Rester informé"
+          description="Nouveautés de l'armurerie, pièces de collection et tirages Gun Art. Quelques envois par an, désabonnement en un clic."
+        />
+      </div>
+
       <nav class="ft__col" aria-label="La maison">
         <h2 class="ft__h">La maison</h2>
         <a href="/#about">À propos</a>
@@ -101,6 +110,10 @@ const year = new Date().getFullYear()
 @media (min-width: 720px) {
   .ft__grid {
     grid-template-columns: 2fr 1fr 1fr;
+  }
+  /* The signup form needs a full row of its own, under the three columns. */
+  .ft__news {
+    grid-column: 1 / -1;
   }
   .ft__base {
     flex-direction: row;

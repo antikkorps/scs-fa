@@ -1,4 +1,4 @@
-import type { LegalDocRejectionReason, LegalDocType } from "@armurier/shared"
+import { type LegalDocRejectionReason, type LegalDocType, NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS } from "@armurier/shared"
 import { createTransport } from "nodemailer"
 import { env } from "./env.js"
 
@@ -161,5 +161,48 @@ export async function sendLegalDocRejectedEmail(
       ${doc.notes ? `<p>Details: ${escapeHtml(doc.notes)}</p>` : ""}
       <p>Please upload a new document from your account.</p>
     `,
+  })
+}
+
+/**
+ * Double opt-in confirmation (Story 11.4). Sent to an address that has just been
+ * captured: nothing is mailed to it — and it never reaches the sending provider
+ * — until this link is followed, which is what makes the opt-in provable.
+ *
+ * The unsubscribe link travels in the same mail on purpose: withdrawing consent
+ * must be as easy as giving it, including for someone whose address was entered
+ * by a third party.
+ */
+export async function sendNewsletterConfirmationEmail(
+  to: string,
+  params: { confirmToken: string; unsubscribeToken: string; segmentLabels: string[] },
+): Promise<void> {
+  const confirmUrl = `${env.WEB_BASE_URL}/newsletter/confirmation?token=${params.confirmToken}`
+  const unsubscribeUrl = `${env.WEB_BASE_URL}/newsletter/desabonnement?token=${params.unsubscribeToken}`
+  const listText = params.segmentLabels.map((label) => `- ${label}`).join("\n")
+  const listHtml = params.segmentLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")
+
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: "Confirmez votre inscription à la newsletter SCS Firearm",
+    // One-click unsubscribe headers (RFC 8058): mail clients surface a native
+    // unsubscribe button, which keeps complaints off the spam button.
+    headers: {
+      "List-Unsubscribe": `<${unsubscribeUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+    text:
+      `Vous avez demandé à recevoir nos actualités :\n\n${listText}\n\n` +
+      `Confirmez votre inscription (lien valable ${NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS} heures) :\n${confirmUrl}\n\n` +
+      `Sans confirmation de votre part, aucune adresse n'est conservée et vous ne recevrez rien.\n\n` +
+      `Se désabonner à tout moment : ${unsubscribeUrl}`,
+    html:
+      `<p>Vous avez demandé à recevoir nos actualités :</p>` +
+      `<ul>${listHtml}</ul>` +
+      `<p><a href="${confirmUrl}">Confirmer mon inscription</a> ` +
+      `(lien valable ${NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS} heures)</p>` +
+      `<p>Sans confirmation de votre part, aucune adresse n'est conservée et vous ne recevrez rien.</p>` +
+      `<p><a href="${unsubscribeUrl}">Se désabonner</a> à tout moment.</p>`,
   })
 }

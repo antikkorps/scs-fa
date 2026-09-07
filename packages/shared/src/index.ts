@@ -1,6 +1,7 @@
 export * from "./artwork.js"
 export * from "./constants.js"
 export * from "./file-signature.js"
+export * from "./newsletter.js"
 export * from "./orders.js"
 export * from "./pricing.js"
 export * from "./types.js"

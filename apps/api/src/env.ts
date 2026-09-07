@@ -80,6 +80,18 @@ const envSchema = z.object({
   // dashboard as the partner's share of net revenue. Percent, default 5%.
   COMMISSION_RATE_PCT: z.coerce.number().min(0).max(100).default(5),
 
+  // Newsletter (Story 11.4). The provider is spoken to through NewsletterService;
+  // "memory" is an in-process driver for tests/CI/local (default outside
+  // production). Segments map onto Brevo lists purely through these ids, so a
+  // list can be repointed without a code deploy. The keys are optional at the
+  // schema level and validated by the Brevo driver at startup, so a laptop with
+  // no Brevo account still boots.
+  NEWSLETTER_DRIVER: z.enum(["brevo", "memory"]).optional(),
+  BREVO_API_KEY: z.string().optional(),
+  BREVO_LIST_ID_ARMURERIE: z.coerce.number().int().positive().optional(),
+  BREVO_LIST_ID_COLLECTION: z.coerce.number().int().positive().optional(),
+  BREVO_LIST_ID_GUN_ART: z.coerce.number().int().positive().optional(),
+
   // Canonical public front URL. Used for the CORS origin in production and for
   // the links embedded in transactional emails. Override per environment.
   WEB_BASE_URL: z.string().url().default("https://www.scs-firearms.com"),

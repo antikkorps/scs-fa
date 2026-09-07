@@ -302,6 +302,22 @@ useHead({
               Ajouté au panier. <NuxtLink to="/panier">Voir le panier</NuxtLink>
             </p>
             <p v-if="addError" class="detail__error" role="alert">{{ addError }}</p>
+
+            <!-- Story 11.4: an unavailable piece is the moment a visitor most
+                 wants to be told about the next one. Pre-ticks the universe this
+                 product belongs to, never the whole set. -->
+            <NewsletterSignup
+              v-if="!available"
+              class="detail__news"
+              :default-segments="[ancient ? 'collection' : 'armurerie']"
+              source="/boutique"
+              title="Se tenir informé des arrivées"
+              :description="
+                isSold
+                  ? 'Cette pièce est vendue. Prévenez-moi lorsqu\'une pièce comparable rejoint le catalogue.'
+                  : 'Prévenez-moi du retour de cet article et des prochaines arrivées.'
+              "
+            />
           </div>
         </div>
       </div>
@@ -430,6 +446,9 @@ useHead({
   color: var(--paper-dim);
   font-size: 0.85rem;
   margin: 0 0 1.25rem;
+}
+.detail__news {
+  margin-top: 1.75rem;
 }
 .detail__held {
   color: var(--paper-dim);

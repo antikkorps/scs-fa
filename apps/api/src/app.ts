@@ -21,6 +21,7 @@ import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
 import { adminMetricsRoutes } from "./metrics/admin.js"
+import { newsletterRoutes } from "./newsletter/index.js"
 import { adminOrderRoutes } from "./orders/admin.js"
 import { orderRoutes } from "./orders/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
@@ -81,6 +82,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
   await fastify.register(blogRoutes, { prefix: "/api/blog" })
   await fastify.register(blogImageRoutes, { prefix: "/api/blog/images" })
+  await fastify.register(newsletterRoutes, { prefix: "/api/newsletter" })
   await fastify.register(searchRoutes, { prefix: "/api/search" })
   await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
