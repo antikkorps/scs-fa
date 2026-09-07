@@ -1512,3 +1512,109 @@ export const blogPostsRelations = relations(blogPosts, ({ one }) => ({
     references: [users.id],
   }),
 }))
+
+// ============================================================================
+// 12. NEWSLETTER (story 11.4) — contact unique, N abonnements segmentés
+// ============================================================================
+//
+// Modèle : **un contact porte N abonnements** (un par univers), et non un
+// contact par liste. Le consentement est donc horodaté *par segment*, et un
+// désabonnement peut viser un seul univers sans toucher aux autres.
+//
+// RGPD : l'adresse n'est conservée que tant qu'un consentement est actif. Au
+// désabonnement total elle est **effacée** ; la ligne survit anonymisée (hash +
+// horodatages) pour pouvoir prouver qu'un consentement a existé puis a été
+// retiré, sans conserver de donnée personnelle exploitable.
+
+export const newsletterSegmentEnum = pgEnum("newsletter_segment", ["armurerie", "collection", "gun_art"])
+export const newsletterSubscriptionStatusEnum = pgEnum("newsletter_subscription_status", [
+  "pending",
+  "confirmed",
+  "unsubscribed",
+])
+export const newsletterTokenPurposeEnum = pgEnum("newsletter_token_purpose", ["confirm", "unsubscribe"])
+
+export const newsletterContacts = pgTable(
+  "newsletter_contacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Nullable **par conception** : purgée au désabonnement total. Postgres
+    // autorise plusieurs NULL sous un index unique, donc les traces anonymisées
+    // coexistent sans se marcher dessus.
+    email: varchar("email", { length: 255 }),
+    // SHA-256 de l'adresse normalisée. Clé d'identité stable : elle survit à la
+    // purge, ce qui permet à la fois de retrouver un contact qui se réabonne et
+    // de prouver l'historique de consentement sans stocker l'adresse.
+    emailHash: varchar("email_hash", { length: 64 }).notNull().unique(),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    // Renseigné quand plus aucun segment n'est actif (adresse purgée).
+    unsubscribedAt: timestamp("unsubscribed_at"),
+  },
+  (t) => [uniqueIndex("uq_newsletter_contacts_email").on(t.email)],
+)
+
+export const newsletterSubscriptions = pgTable(
+  "newsletter_subscriptions",
+  {
+    contactId: uuid("contact_id").notNull(),
+    segment: newsletterSegmentEnum("segment").notNull(),
+    status: newsletterSubscriptionStatusEnum("status").notNull().default("pending"),
+    // Preuve de consentement, exigible par la CNIL : quand il a été donné, quand
+    // il a été confirmé (double opt-in), d'où il vient et depuis quel navigateur.
+    requestedAt: timestamp("requested_at").notNull().defaultNow(),
+    confirmedAt: timestamp("confirmed_at"),
+    unsubscribedAt: timestamp("unsubscribed_at"),
+    consentSource: varchar("consent_source", { length: 255 }),
+    consentIp: varchar("consent_ip", { length: 45 }),
+    consentUserAgent: text("consent_user_agent"),
+    // Dernière synchronisation réussie vers le fournisseur d'envoi. Notre base
+    // reste la source de vérité : un échec Brevo ne bloque pas le consentement.
+    providerSyncedAt: timestamp("provider_synced_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.contactId, t.segment] }),
+    foreignKey({ columns: [t.contactId], foreignColumns: [newsletterContacts.id] }).onDelete("cascade"),
+    index("idx_newsletter_subscriptions_segment").on(t.segment, t.status),
+  ],
+)
+
+// Jetons de lien opaques, stockés **hachés** (comme les jetons de mot de passe) :
+// une fuite de la base ne permet pas de confirmer ni de désabonner à la place
+// d'un tiers. `expires_at` est nul pour un jeton de désabonnement, qui voyage
+// dans chaque envoi et doit rester valable tant que l'adresse existe.
+export const newsletterTokens = pgTable(
+  "newsletter_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    contactId: uuid("contact_id").notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    purpose: newsletterTokenPurposeEnum("purpose").notNull(),
+    expiresAt: timestamp("expires_at"),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_newsletter_tokens_contact").on(t.contactId, t.purpose),
+    foreignKey({ columns: [t.contactId], foreignColumns: [newsletterContacts.id] }).onDelete("cascade"),
+  ],
+)
+
+export const newsletterContactsRelations = relations(newsletterContacts, ({ many }) => ({
+  subscriptions: many(newsletterSubscriptions),
+  tokens: many(newsletterTokens),
+}))
+
+export const newsletterSubscriptionsRelations = relations(newsletterSubscriptions, ({ one }) => ({
+  contact: one(newsletterContacts, {
+    fields: [newsletterSubscriptions.contactId],
+    references: [newsletterContacts.id],
+  }),
+}))
+
+export const newsletterTokensRelations = relations(newsletterTokens, ({ one }) => ({
+  contact: one(newsletterContacts, {
+    fields: [newsletterTokens.contactId],
+    references: [newsletterContacts.id],
+  }),
+}))

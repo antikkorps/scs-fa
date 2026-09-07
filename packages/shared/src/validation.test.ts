@@ -5,6 +5,8 @@ import {
   blogQuerySchema,
   cartItemSchema,
   loginSchema,
+  newsletterSubscribeSchema,
+  newsletterUnsubscribeSchema,
   refreshSchema,
   registerSchema,
 } from "./validation.js"
@@ -145,5 +147,50 @@ describe("blogQuerySchema", () => {
 
   it("rejects a non-boolean published filter", () => {
     expect(blogQuerySchema.safeParse({ published: "maybe" }).success).toBe(false)
+  })
+})
+
+describe("newsletterSubscribeSchema", () => {
+  const base = { email: "client@example.test", segments: ["armurerie"], consent: true }
+
+  it("accepts an opt-in on one universe", () => {
+    expect(newsletterSubscribeSchema.safeParse(base).success).toBe(true)
+  })
+
+  it("refuses an unticked consent box — no coercion of a 'no' into a 'yes'", () => {
+    expect(newsletterSubscribeSchema.safeParse({ ...base, consent: false }).success).toBe(false)
+    expect(newsletterSubscribeSchema.safeParse({ ...base, consent: "true" }).success).toBe(false)
+  })
+
+  it("refuses an empty selection rather than subscribing to everything", () => {
+    expect(newsletterSubscribeSchema.safeParse({ ...base, segments: [] }).success).toBe(false)
+  })
+
+  it("collapses duplicate segments", () => {
+    const r = newsletterSubscribeSchema.safeParse({ ...base, segments: ["gun_art", "gun_art"] })
+    expect(r.success).toBe(true)
+    if (r.success) expect(r.data.segments).toEqual(["gun_art"])
+  })
+
+  it("keeps the consent source to a site path, never a full URL or a query string", () => {
+    expect(newsletterSubscribeSchema.safeParse({ ...base, source: "/boutique" }).success).toBe(true)
+    expect(newsletterSubscribeSchema.safeParse({ ...base, source: "https://evil.test/x" }).success).toBe(false)
+    expect(newsletterSubscribeSchema.safeParse({ ...base, source: "/boutique?email=a@b.c" }).success).toBe(false)
+  })
+})
+
+describe("newsletterUnsubscribeSchema", () => {
+  const token = "c".repeat(32)
+
+  it("treats an omitted segment list as a full withdrawal", () => {
+    const r = newsletterUnsubscribeSchema.safeParse({ token })
+    expect(r.success).toBe(true)
+    if (r.success) expect(r.data.segments).toBeUndefined()
+  })
+
+  it("rejects an unknown segment and a malformed token", () => {
+    expect(newsletterUnsubscribeSchema.safeParse({ token, segments: ["boutique"] }).success).toBe(false)
+    expect(newsletterUnsubscribeSchema.safeParse({ token: "short" }).success).toBe(false)
+    expect(newsletterUnsubscribeSchema.safeParse({ token: `${token}<script>` }).success).toBe(false)
   })
 })

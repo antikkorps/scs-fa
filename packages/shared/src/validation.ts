@@ -7,6 +7,7 @@ import {
   LEGAL_DOC_VERIFICATION_STATUS,
   MAX_TAG_FILTERS,
 } from "./constants.js"
+import { NEWSLETTER_SEGMENTS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
 
 export const emailSchema = z.string().email().max(255)
@@ -504,3 +505,55 @@ export const blogArticleUpdateSchema = z
 
 export type BlogArticleCreateInput = z.infer<typeof blogArticleCreateSchema>
 export type BlogArticleUpdateInput = z.infer<typeof blogArticleUpdateSchema>
+
+// ---------------------------------------------------------------------------
+// Newsletter (story 11.4)
+// ---------------------------------------------------------------------------
+
+// One opt-in covers one or more segments, never "all of them by default": the
+// form pre-checks at most the segment the visitor came from, and an empty
+// selection is a validation error rather than a silent subscribe-to-everything.
+const newsletterSegmentsSchema = z
+  .array(z.enum(NEWSLETTER_SEGMENTS))
+  .min(1, "Select at least one newsletter")
+  .max(NEWSLETTER_SEGMENTS.length)
+  .transform((segments) => [...new Set(segments)])
+
+// Opaque, single-use link token (base64url of 32 random bytes). Bounded so a
+// bogus value is rejected before it ever reaches a hash + DB lookup.
+export const newsletterTokenSchema = z
+  .string()
+  .min(20)
+  .max(256)
+  .regex(/^[A-Za-z0-9_-]+$/, "Invalid token")
+
+export const newsletterSubscribeSchema = z
+  .object({
+    email: emailSchema,
+    segments: newsletterSegmentsSchema,
+    // Explicit, affirmative consent — the checkbox that makes the opt-in lawful.
+    // `literal(true)` means an unticked box cannot be coerced into a yes.
+    consent: z.literal(true, { message: "Consent is required" }),
+    // Where the address was captured (a page path), stored with the consent so
+    // it stays provable months later. Never a full URL: no query string, no PII.
+    source: z
+      .string()
+      .max(255)
+      .regex(/^\/[A-Za-z0-9/_-]*$/, "Source must be a site path")
+      .optional(),
+  })
+  .strict()
+
+export const newsletterConfirmSchema = z.object({ token: newsletterTokenSchema }).strict()
+
+// Omitting `segments` withdraws consent entirely (the "unsubscribe from
+// everything" link); passing a subset unsubscribes only those.
+export const newsletterUnsubscribeSchema = z
+  .object({
+    token: newsletterTokenSchema,
+    segments: newsletterSegmentsSchema.optional(),
+  })
+  .strict()
+
+export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>
+export type NewsletterUnsubscribeInput = z.infer<typeof newsletterUnsubscribeSchema>

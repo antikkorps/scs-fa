@@ -137,6 +137,23 @@ throwaway prototyping only.
 
 Access tokens are JWTs (1 h TTL). Refresh tokens are opaque 32-byte values stored as SHA-256 hashes in the `refresh_tokens` table.
 
+## Newsletter (story 11.4)
+
+Segmented opt-in across the three universes (`armurerie`, `collection`, `gun_art`).
+One contact carries N subscriptions, each with its own timestamped consent.
+
+| Method | Path                             | Notes                                                          |
+| ------ | -------------------------------- | -------------------------------------------------------------- |
+| POST   | `/api/newsletter/subscribe`      | Capture only — nothing is mailed and no contact reaches the provider until confirmed |
+| POST   | `/api/newsletter/confirm`        | Double opt-in step 2; single-use link, 72 h TTL                 |
+| GET    | `/api/newsletter/subscription`   | Segments behind an unsubscribe link (the address is never echoed back) |
+| POST   | `/api/newsletter/unsubscribe`    | Per segment, or all; the last one purges the address            |
+
+- **Double opt-in is ours, not the provider's**: consent (when, from which page, which IP/user-agent) is recorded and timestamped in our own database, so it stays provable if the sending provider ever changes.
+- **`NewsletterService`** (`apps/api/src/newsletter/`) is the provider-agnostic seam, mirroring `StorageService`. `brevo` speaks the REST API v3 over plain `fetch`; `memory` is the in-process driver used by tests, CI and local dev. Set `NEWSLETTER_DRIVER` plus the `BREVO_*` list ids — nothing Brevo-specific exists outside that folder.
+- **GDPR**: a full unsubscribe **erases the address**; the row survives anonymised (email hash + consent/withdrawal timestamps) so a past consent stays provable without keeping personal data. Consent, confirmation and withdrawal are also written to `audit_logs`.
+- Our database is the source of truth: a provider outage never blocks a confirmation, it only leaves `provider_synced_at` null.
+
 ## Engineering principles
 
 1. **Tests-first** — Vitest on every feature; no merge without a test.

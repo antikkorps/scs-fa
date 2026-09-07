@@ -197,6 +197,16 @@ useHead({
           </button>
         </nav>
       </template>
+
+      <!-- Story 11.4: collection pieces are one-offs — the visitor who arrives
+           after a sale wants the next arrival, not a restock alert. -->
+      <NewsletterSignup
+        class="collection__news"
+        :default-segments="['collection']"
+        source="/armes-de-collection"
+        title="Être prévenu des prochaines pièces"
+        description="Chaque pièce est unique et part souvent vite. Nous vous signalons les nouvelles entrées en collection."
+      />
     </section>
   </div>
 </template>
@@ -359,6 +369,10 @@ useHead({
 .card__price span {
   font-size: 0.75rem;
   opacity: 0.6;
+}
+.collection__news {
+  margin: 2rem 0 4rem;
+  max-width: 44rem;
 }
 .pager {
   align-items: center;
