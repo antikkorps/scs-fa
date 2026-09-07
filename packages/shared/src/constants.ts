@@ -69,6 +69,14 @@ export type AllowedLegalDocMimeType = (typeof ALLOWED_LEGAL_DOC_MIME_TYPES)[numb
 
 export const MAX_LEGAL_DOC_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 
+// Gun Art originals are print-grade files, so they get their own (larger) cap:
+// raising the global multipart limit instead would have weakened the guard on
+// legal-document uploads, which have no reason to be that big.
+export const MAX_ARTWORK_IMAGE_SIZE_BYTES = 30 * 1024 * 1024 // 30 MB
+
+// Blog illustrations are web-sized; they have no reason to reach the artwork cap.
+export const MAX_BLOG_IMAGE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+
 // Gun Art - tirage limité
 export const GUN_ART_MAX_PRINTS = 25
 

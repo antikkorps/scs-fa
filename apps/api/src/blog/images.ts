@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { MAX_BLOG_IMAGE_SIZE_BYTES } from "@armurier/shared"
 import type { FastifyPluginAsync } from "fastify"
 import sharp from "sharp"
 import { authenticate } from "../auth/authenticate.js"
@@ -34,7 +35,8 @@ export const adminBlogImageRoutes: FastifyPluginAsync = async (fastify) => {
             continue
           }
           const buffer = await part.toBuffer()
-          if (part.file.truncated) {
+          // Per-feature cap: the plugin's ceiling is sized for Gun Art originals.
+          if (part.file.truncated || buffer.length > MAX_BLOG_IMAGE_SIZE_BYTES) {
             return reply.code(413).send({ error: "PayloadTooLarge", message: "Image exceeds the maximum allowed size" })
           }
           file = { buffer, mimetype: part.mimetype }

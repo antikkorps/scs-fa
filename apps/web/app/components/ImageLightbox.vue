@@ -4,7 +4,16 @@
 // Closes on Escape, on backdrop click, and on the close button; locks body
 // scroll and moves focus to the close button while open.
 const open = defineModel<boolean>({ default: false })
-defineProps<{ src: string; alt: string }>()
+defineProps<{
+  src: string
+  alt: string
+  /**
+   * Gun Art only (story 11.5): block the right-click and drag gestures. Opt-in
+   * because this same overlay serves the boutique, where the visuals carry no
+   * reproduction stake and a blocked context menu would just annoy.
+   */
+  protect?: boolean
+}>()
 
 const closeBtn = ref<HTMLButtonElement | null>(null)
 
@@ -43,7 +52,8 @@ onBeforeUnmount(() => {
         <button ref="closeBtn" type="button" class="lb__close" aria-label="Fermer" @click="close">
           <span aria-hidden="true">✕</span>
         </button>
-        <img class="lb__img" :src="src" :alt="alt" />
+        <ProtectedImage v-if="protect" class="lb__img" :src="src" :alt="alt" loading="eager" />
+        <img v-else class="lb__img" :src="src" :alt="alt" />
       </div>
     </Transition>
   </Teleport>

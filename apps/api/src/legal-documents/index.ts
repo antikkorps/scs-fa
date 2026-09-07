@@ -5,6 +5,7 @@ import {
   fileContentMatchesDeclaredMime,
   LEGAL_DOC_REVIEW_SLA_HOURS,
   legalDocumentMetaSchema,
+  MAX_LEGAL_DOC_SIZE_BYTES,
   uuidParamSchema,
 } from "@armurier/shared"
 import { and, desc, eq } from "drizzle-orm"
@@ -63,8 +64,10 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
             continue
           }
           const buffer = await part.toBuffer()
-          // Enforced by @fastify/multipart limits; flagged here when exceeded.
-          if (part.file.truncated) {
+          // The plugin's global ceiling bounds memory; this is the per-feature
+          // cap, because a legal document has no reason to be as large as the
+          // print-grade Gun Art originals that ceiling exists for (story 11.5).
+          if (part.file.truncated || buffer.length > MAX_LEGAL_DOC_SIZE_BYTES) {
             return reply.code(413).send({ error: "PayloadTooLarge", message: "File exceeds the maximum allowed size" })
           }
           file = { buffer, mimetype: part.mimetype }

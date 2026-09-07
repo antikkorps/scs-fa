@@ -17,6 +17,12 @@ FROM node:22-slim AS runtime
 ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=8080
+# The Gun Art watermark (story 11.5) is SVG text composited by sharp: a slim
+# image ships NO fonts, and a font-less runtime would silently burn an EMPTY
+# watermark into every published visual. DejaVu is what the pipeline names.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build --chown=node:node /app /app
 USER node

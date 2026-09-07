@@ -154,6 +154,22 @@ One contact carries N subscriptions, each with its own timestamped consent.
 - **GDPR**: a full unsubscribe **erases the address**; the row survives anonymised (email hash + consent/withdrawal timestamps) so a past consent stays provable without keeping personal data. Consent, confirmation and withdrawal are also written to `audit_logs`.
 - Our database is the source of truth: a provider outage never blocks a confirmation, it only leaves `provider_synced_at` null.
 
+## Gun Art image protection (story 11.5)
+
+⚠️ **Deterrence, not a guarantee — say so to the client.** Anything a browser displays is in its cache, and a screenshot defeats every client-side trick. Only the first measure below survives one.
+
+| Measure | Where | What it actually buys |
+| ------- | ----- | --------------------- |
+| Burnt-in watermark | `apps/api/src/artworks/watermark.ts` (sharp + SVG text) | Survives a screenshot and a re-encode — the only real protection for a limited edition |
+| Capped public resolution | `ARTWORK_PUBLIC_MAX_WIDTH` (1400 px) | The print-grade file never leaves the private bucket; a stolen visual is unprintable at size |
+| Right-click / drag blocking | `ProtectedImage.vue` (Gun Art views only) | Raises the effort of a casual save. Nothing more |
+
+- **Upload**: `POST /api/admin/artworks/:slug/image` (admin) stores the untouched original at `gun-art/originals/<uuid>` (**private**) and publishes only a capped, watermarked derivative at `gun-art/public/<uuid>.webp`. Both keys share one id, so nothing extra is stored on the artwork; replacing a visual deletes the previous pair.
+- **Original**: `GET /api/admin/artworks/:slug/image/original` — admin only, `no-store`, sent as an attachment. That is the file order processing prints, and the only route those bytes travel.
+- **Aesthetics are configuration**, because the call belongs to the artist: `ARTWORK_WATERMARK_TEXT`, `_POSITION` (`bottom-right` discreet · `center` · `tiled` assumed and crop-proof), `_OPACITY`, `_SCALE`.
+- ⚠️ The mark is **SVG text**, so the runtime needs a font: the API image installs `fonts-dejavu-core`. A font-less runtime would publish visuals with an **empty** watermark — a test asserts ink is actually laid down.
+- Deliberately **not** applied to armurerie product photos: no reproduction stake there.
+
 ## Engineering principles
 
 1. **Tests-first** — Vitest on every feature; no merge without a test.
