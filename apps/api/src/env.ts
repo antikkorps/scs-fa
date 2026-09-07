@@ -92,6 +92,19 @@ const envSchema = z.object({
   BREVO_LIST_ID_COLLECTION: z.coerce.number().int().positive().optional(),
   BREVO_LIST_ID_GUN_ART: z.coerce.number().int().positive().optional(),
 
+  // Gun Art image protection (Story 11.5). The watermark is burnt in server-side
+  // — the only measure that survives a screenshot — and the HD original is never
+  // served publicly. Position/opacity/scale are configuration because the
+  // aesthetic call belongs to the artist: "bottom-right" is a discreet
+  // signature, "tiled" an assumed, crop-proof mark across the whole piece.
+  ARTWORK_WATERMARK_TEXT: z.string().min(1).max(60).default("SCS FIREARM"),
+  ARTWORK_WATERMARK_POSITION: z.enum(["bottom-right", "center", "tiled"]).default("bottom-right"),
+  ARTWORK_WATERMARK_OPACITY: z.coerce.number().min(0).max(1).default(0.35),
+  ARTWORK_WATERMARK_SCALE: z.coerce.number().min(0.05).max(1).default(0.28),
+  // Longest edge of the public file. Print-grade pixels stay in the private
+  // bucket, reachable only by an admin processing an order.
+  ARTWORK_PUBLIC_MAX_WIDTH: z.coerce.number().int().min(400).max(4000).default(1400),
+
   // Canonical public front URL. Used for the CORS origin in production and for
   // the links embedded in transactional emails. Override per environment.
   WEB_BASE_URL: z.string().url().default("https://www.scs-firearms.com"),

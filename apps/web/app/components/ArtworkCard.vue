@@ -20,14 +20,13 @@ const img = computed(() =>
   <article class="card" :class="{ 'is-soldout': soldOut }">
     <NuxtLink :to="`/collection/${artwork.slug}`" class="card__link">
       <div class="card__media">
-        <img
+        <ProtectedImage
           :src="img"
           :alt="`${artwork.title}${artwork.artistName ? ` — ${artwork.artistName}` : ''}`"
           :width="CARD_GEOMETRY.width"
           :height="CARD_GEOMETRY.height"
           :loading="priority ? 'eager' : 'lazy'"
           :fetchpriority="priority ? 'high' : 'auto'"
-          decoding="async"
         />
         <AvailabilityBadge
           :state="soldOut ? 'sold' : 'available'"

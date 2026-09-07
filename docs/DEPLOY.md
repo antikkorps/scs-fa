@@ -205,6 +205,12 @@ below is the recommended path.
 - [ ] **Secret rotation** post-launch (initial secrets were shared during setup).
 - [ ] Container hardening (`cap_drop`, `read_only`) validated in staging.
 
+## Gun Art visuals (story 11.5)
+
+- Watermark and public resolution are set through `ARTWORK_WATERMARK_*` / `ARTWORK_PUBLIC_MAX_WIDTH` in `.env` — changing the look is a config change plus a restart, no deploy of code.
+- ⚠️ The watermark is SVG text rendered by sharp: the API image installs `fonts-dejavu-core` for it. If you ever rebuild the image from a different base, **check a published visual actually carries the mark** — a font-less runtime renders it empty, silently.
+- Print-grade originals live under `gun-art/originals/` in the bucket and are served by **no public route**. Keep them in the backup scope: they are the only copy the workshop can print from.
+
 ## Notes / gotchas
 
 - `.env` is the single source of truth: docker-compose reads it for `${VAR}`

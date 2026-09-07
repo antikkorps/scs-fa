@@ -1,4 +1,4 @@
-import { MAX_LEGAL_DOC_SIZE_BYTES } from "@armurier/shared"
+import { MAX_ARTWORK_IMAGE_SIZE_BYTES } from "@armurier/shared"
 import fastifyCors from "@fastify/cors"
 import fastifyHelmet from "@fastify/helmet"
 import fastifyJwt from "@fastify/jwt"
@@ -8,6 +8,7 @@ import Fastify, { type FastifyInstance } from "fastify"
 import { addressRoutes } from "./addresses/index.js"
 import { adminAncientWeaponRoutes } from "./ancient-weapons/admin.js"
 import { ancientWeaponRoutes } from "./ancient-weapons/index.js"
+import { adminArtworkImageRoutes, artworkImageRoutes } from "./artworks/images.js"
 import { artworkRoutes } from "./artworks/index.js"
 import { authRoutes } from "./auth/index.js"
 import { adminBlogRoutes } from "./blog/admin.js"
@@ -65,8 +66,12 @@ export async function buildApp(): Promise<FastifyInstance> {
     verify: { algorithms: ["HS256"] },
   })
 
+  // App-wide ceiling = the largest upload any route legitimately accepts (Gun Art
+  // originals are print-grade). It is a backstop, NOT the per-feature limit: each
+  // upload route passes its own, tighter `limits` to `request.parts()` — legal
+  // documents and blog images stay at 10 MB and have tests pinning that.
   await fastify.register(fastifyMultipart, {
-    limits: { fileSize: MAX_LEGAL_DOC_SIZE_BYTES, files: 1, fields: 10 },
+    limits: { fileSize: MAX_ARTWORK_IMAGE_SIZE_BYTES, files: 1, fields: 10 },
   })
 
   fastify.get("/health", async () => ({
@@ -80,6 +85,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(tagRoutes, { prefix: "/api/tags" })
   await fastify.register(ancientWeaponRoutes, { prefix: "/api/ancient-weapons" })
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
+  await fastify.register(artworkImageRoutes, { prefix: "/api/artworks/images" })
   await fastify.register(blogRoutes, { prefix: "/api/blog" })
   await fastify.register(blogImageRoutes, { prefix: "/api/blog/images" })
   await fastify.register(newsletterRoutes, { prefix: "/api/newsletter" })
@@ -98,6 +104,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminBlogImageRoutes, { prefix: "/api/admin/blog/images" })
   await fastify.register(adminMetricsRoutes, { prefix: "/api/admin/metrics" })
   await fastify.register(adminAncientWeaponRoutes, { prefix: "/api/admin/ancient-weapons" })
+  await fastify.register(adminArtworkImageRoutes, { prefix: "/api/admin/artworks" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)

@@ -98,18 +98,18 @@ useHead({
       <div class="detail__grid">
         <figure class="detail__media" :style="{ aspectRatio: heroGeometry.ratio }">
           <button type="button" class="detail__zoom" :aria-label="`Agrandir l'image : ${art.title}`" @click="lightboxOpen = true">
-            <img
+            <ProtectedImage
               :src="hero"
               :alt="heroAlt"
               :width="heroGeometry.width"
               :height="heroGeometry.height"
+              loading="eager"
               fetchpriority="high"
-              decoding="async"
             />
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="hero" :alt="heroAlt" />
+        <ImageLightbox v-model="lightboxOpen" :src="hero" :alt="heroAlt" protect />
 
         <div class="detail__info">
           <p v-if="art.artistName" class="eyebrow">{{ art.artistName }}</p>
