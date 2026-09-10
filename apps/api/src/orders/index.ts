@@ -27,6 +27,7 @@ import {
 } from "../db/schema.js"
 import { env } from "../env.js"
 import { validationError } from "../http.js"
+import { createPayoutsForOrder } from "../payouts/service.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 
 class OrderError extends Error {
@@ -182,6 +183,10 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
             shippingAddressCity: shippingSnapshot.city,
           })
           .returning({ id: orders.id })
+
+        // Freeze what each beneficiary will be owed, at the rates in force TODAY
+        // (story 11.10). Created `pending`: nothing is due until the money lands.
+        await createPayoutsForOrder(order.id, itemsJson, tx)
 
         // Decrement variant stock atomically (guard prevents overselling).
         // The guard also honours a unique-piece hold (story 11.2): a lapsed hold

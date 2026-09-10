@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { LEGAL_CATEGORIES } from "@armurier/shared"
 import type { AdminProductDetail, AdminProductVariant } from "~/types/admin-catalogue"
+import type { AdminProfitability } from "~/types/admin-finance"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 
@@ -28,6 +29,11 @@ const form = reactive({
   featured: false,
   tagSlugs: [] as string[],
   variants: [] as AdminProductVariant[],
+  costPriceHt: null as number | null,
+  chargesPct: null as number | null,
+  chargesAmountHt: null as number | null,
+  beneficiaryId: "",
+  beneficiarySharePct: null as number | null,
   metaTitle: "",
   metaDescription: "",
 })
@@ -35,6 +41,8 @@ const form = reactive({
 // Re-bound locally: the import is also used in a `typeof` position, and Vue
 // then drops it from the template scope.
 const legalCategoryOptions = LEGAL_CATEGORIES
+const profitability = ref<AdminProfitability | null>(null)
+const beneficiaryName = ref<string | null>(null)
 const loadError = ref(false)
 const saveError = ref<string | null>(null)
 const saving = ref(false)
@@ -45,6 +53,12 @@ const { data: categoriesData } = await useAsyncData("admin-product-categories", 
 const { data: tagsData } = await useAsyncData("admin-tags-opts", () =>
   api<{ data: Array<{ slug: string; name: string; facet: string }> }>("/admin/tags"),
 )
+const { data: beneficiariesData } = await useAsyncData("admin-beneficiary-opts", () =>
+  api<{ data: Array<{ id: string; name: string; kind: string; defaultSharePct: number }> }>(
+    "/admin/finance/beneficiary-options",
+  ),
+)
+const beneficiaryOptions = computed(() => beneficiariesData.value?.data ?? [])
 const categories = computed(() => (categoriesData.value?.data ?? []).filter((c) => c.slug !== "gun-art"))
 const allTags = computed(() => tagsData.value?.data ?? [])
 
@@ -69,9 +83,16 @@ async function load() {
       featured: d.featured,
       tagSlugs: d.tagSlugs,
       variants: d.variants,
+      costPriceHt: d.costPriceHt ?? null,
+      chargesPct: d.chargesPct ?? null,
+      chargesAmountHt: d.chargesAmountHt ?? null,
+      beneficiaryId: d.beneficiaryId ?? "",
+      beneficiarySharePct: d.beneficiarySharePct ?? null,
       metaTitle: d.metaTitle ?? "",
       metaDescription: d.metaDescription ?? "",
     })
+    profitability.value = d.profitability ?? null
+    beneficiaryName.value = d.beneficiaryName ?? null
   } catch {
     loadError.value = true
   }
@@ -114,6 +135,16 @@ function payload() {
     published: form.published,
     featured: form.featured,
     tagSlugs: form.tagSlugs,
+    // `null` clears an override and puts the article back on the default.
+    costPriceHt: form.costPriceHt === null || form.costPriceHt === ("" as unknown) ? null : Number(form.costPriceHt),
+    chargesPct: form.chargesPct === null || form.chargesPct === ("" as unknown) ? null : Number(form.chargesPct),
+    chargesAmountHt:
+      form.chargesAmountHt === null || form.chargesAmountHt === ("" as unknown) ? null : Number(form.chargesAmountHt),
+    beneficiaryId: form.beneficiaryId || null,
+    beneficiarySharePct:
+      form.beneficiarySharePct === null || form.beneficiarySharePct === ("" as unknown)
+        ? null
+        : Number(form.beneficiarySharePct),
     variants: form.variants.map((v) => ({
       ...(v.id ? { id: v.id } : {}),
       skuVariant: v.skuVariant,
@@ -155,6 +186,8 @@ async function save() {
       })
       form.variants = res.data.variants
       form.tagSlugs = res.data.tagSlugs
+      profitability.value = res.data.profitability ?? null
+      beneficiaryName.value = res.data.beneficiaryName ?? null
     }
   } catch (err) {
     saveError.value = messageFrom(err)
@@ -304,6 +337,49 @@ async function save() {
         </button>
       </div>
       <button class="add" type="button" @click="addVariant">+ Ajouter une variante</button>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel__title">Rentabilité</h2>
+      <p class="note">
+        Données strictement administratives : aucune route publique n'expose le prix d'achat, les charges, la marge
+        ni la part d'un tiers.
+      </p>
+      <div class="fields">
+        <label class="field">
+          <span class="field__label">Prix d'achat HT (€)</span>
+          <input v-model="form.costPriceHt" type="number" min="0" step="0.01" class="ctl" >
+        </label>
+        <label class="field">
+          <span class="field__label">Charges (%)</span>
+          <input v-model="form.chargesPct" type="number" min="0" max="100" step="0.1" class="ctl" >
+          <span class="field__help">Vide = défaut de la configuration. 0 = pas de charge.</span>
+        </label>
+        <label class="field">
+          <span class="field__label">Charges (montant HT €)</span>
+          <input v-model="form.chargesAmountHt" type="number" min="0" step="0.01" class="ctl" >
+          <span class="field__help">Prioritaire sur le pourcentage.</span>
+        </label>
+        <label class="field">
+          <span class="field__label">Bénéficiaire</span>
+          <select v-model="form.beneficiaryId" class="ctl">
+            <option value="">— aucun —</option>
+            <option v-for="b in beneficiaryOptions" :key="b.id" :value="b.id">
+              {{ b.name }} ({{ b.defaultSharePct }} %)
+            </option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">Part renégociée (%)</span>
+          <input v-model="form.beneficiarySharePct" type="number" min="0" max="100" step="0.1" class="ctl" >
+          <span class="field__help">Vide = part par défaut du bénéficiaire.</span>
+        </label>
+      </div>
+
+      <div class="profwrap">
+        <AdminProfitabilityPanel :profitability="profitability" :beneficiary-name="beneficiaryName" />
+        <p v-if="!profitability" class="note">Enregistrez pour voir le calcul.</p>
+      </div>
     </section>
 
     <section class="panel">
@@ -472,6 +548,10 @@ h1 {
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
+}
+.profwrap {
+  margin-top: 1.4rem;
+  max-width: 460px;
 }
 .note {
   margin: 0 0 1rem;

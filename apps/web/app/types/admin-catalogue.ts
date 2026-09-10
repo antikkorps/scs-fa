@@ -35,6 +35,13 @@ export interface AdminArtworkPrint {
 }
 
 export interface AdminArtworkDetail {
+  // Rentabilité (story 11.10) — admin uniquement.
+  costPriceHt: number | null
+  chargesPct: number | null
+  chargesAmountHt: number | null
+  beneficiaryName: string | null
+  beneficiarySharePct: number | null
+  profitability: import("./admin-finance").AdminProfitability | null
   id: string
   productId: string
   slug: string
@@ -90,6 +97,14 @@ export interface AdminProductVariant {
 }
 
 export interface AdminProductDetail extends Omit<AdminProductListItem, "variantCount"> {
+  // Rentabilité (story 11.10) — admin uniquement.
+  costPriceHt: number | null
+  chargesPct: number | null
+  chargesAmountHt: number | null
+  beneficiaryId: string | null
+  beneficiaryName: string | null
+  beneficiarySharePct: number | null
+  profitability: import("./admin-finance").AdminProfitability | null
   description: string | null
   longDescription: string | null
   vatPct: number

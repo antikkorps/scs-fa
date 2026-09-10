@@ -10,6 +10,7 @@ import {
   productVariants,
   refunds,
 } from "../db/schema.js"
+import { settlePayoutsForOrder } from "../payouts/service.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import { PaymentError } from "./service.js"
 import { createRefund as stripeCreateRefund } from "./stripe.js"
@@ -216,6 +217,9 @@ export async function applyRefundEffects(orderId: string): Promise<string> {
       .set({ paymentStatus: "partially_refunded", updatedAt: new Date() })
       .where(and(eq(orders.id, orderId), inArray(orders.paymentStatus, ["received", "reconciled"])))
     await recomputeVipStatus(order.userId)
+    // A refund reduces what is owed to the beneficiaries in proportion — they
+    // are not paid on money that went back to the customer (story 11.10).
+    await settlePayoutsForOrder(orderId)
     return await currentStatus(orderId)
   }
 
@@ -246,6 +250,10 @@ export async function applyRefundEffects(orderId: string): Promise<string> {
   })
 
   if (flipped) await recomputeVipStatus(order.userId)
+  // Fully refunded: the beneficiaries are owed nothing on this sale. Payouts an
+  // admin has already settled are left alone — money out is a fact, not a
+  // projection (story 11.10).
+  await settlePayoutsForOrder(orderId)
   return "refunded"
 }
 

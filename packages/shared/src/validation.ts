@@ -641,6 +641,8 @@ export const createArtistSchema = z
     // Affiliate link, rendered rel="sponsored noopener" — see the artist page.
     bookUrl: optionalUrl,
     published: z.boolean().default(false),
+    /** Identité financière de l'artiste (story 11.10), tenue à part de l'éditorial. */
+    beneficiaryId: z.string().uuid().nullish(),
     metaTitle: optionalText(255),
     metaDescription: optionalText(500),
   })
@@ -737,6 +739,13 @@ const artworkBaseSchema = z
     basePriceHt: z.coerce.number().min(0).max(1_000_000),
     priceIncrementHt: z.coerce.number().min(0).max(1_000_000),
     vatPct: z.coerce.number().min(0).max(100).default(20),
+
+    // Rentabilité (story 11.10). Le bénéficiaire vient de l'ARTISTE ; seul le
+    // taux se renégocie pièce par pièce.
+    costPriceHt: z.coerce.number().min(0).max(10_000_000).nullish(),
+    chargesPct: z.coerce.number().min(0).max(100).nullish(),
+    chargesAmountHt: z.coerce.number().min(0).max(10_000_000).nullish(),
+    beneficiarySharePct: z.coerce.number().min(0).max(100).nullish(),
 
     orientation: z.enum(ARTWORK_ORIENTATIONS).default("portrait"),
     includeCertificate: z.boolean().default(true),
@@ -836,6 +845,13 @@ const productBaseSchema = z
     featured: z.boolean().default(false),
     tagSlugs: z.array(tagSlugSchema).max(MAX_TAG_FILTERS).default([]),
     variants: z.array(productVariantSchema).max(50).default([]),
+
+    // Rentabilité (story 11.10) — strictement administratif, jamais exposé.
+    costPriceHt: z.coerce.number().min(0).max(10_000_000).nullish(),
+    chargesPct: z.coerce.number().min(0).max(100).nullish(),
+    chargesAmountHt: z.coerce.number().min(0).max(10_000_000).nullish(),
+    beneficiaryId: z.string().uuid().nullish(),
+    beneficiarySharePct: z.coerce.number().min(0).max(100).nullish(),
     metaTitle: optionalText(255),
     metaDescription: optionalText(500),
   })
@@ -907,3 +923,50 @@ export const reorderMediaSchema = z
 export type MediaUploadFields = z.infer<typeof mediaUploadFieldsSchema>
 export type UpdateMediaInput = z.infer<typeof updateMediaSchema>
 export type ReorderMediaInput = z.infer<typeof reorderMediaSchema>
+
+// --- Bénéficiaires & reversements (story 11.10) ----------------------------
+
+export const BENEFICIARY_KINDS = ["artist", "advisor"] as const
+export const PAYOUT_STATUSES = ["pending", "due", "paid", "cancelled"] as const
+
+const sharePctSchema = z.coerce.number().min(0).max(100)
+
+export const createBeneficiarySchema = z
+  .object({
+    slug: entitySlugSchema,
+    name: z.string().trim().min(1).max(255),
+    kind: z.enum(BENEFICIARY_KINDS),
+    defaultSharePct: sharePctSchema.default(0),
+    contactEmail: emailSchema.optional(),
+    // ⚠️ Deliberately no IBAN: that is one more piece of banking data to protect
+    // for a need nothing has expressed. A free note is enough while payouts are
+    // settled outside the site.
+    paymentNotes: optionalText(2000),
+    active: z.boolean().default(true),
+  })
+  .strict()
+
+export const updateBeneficiarySchema = createBeneficiarySchema
+  .omit({ slug: true })
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+export const updatePayoutSchema = z
+  .object({
+    // Only the human decision is patchable: marking a payout settled. The rate,
+    // the basis and the amount were frozen at the sale and stay frozen.
+    status: z.enum(["due", "paid"]),
+    paidNotes: optionalText(2000),
+  })
+  .strict()
+
+export const payoutQuerySchema = z
+  .object({
+    beneficiaryId: z.string().uuid().optional(),
+    status: z.enum(PAYOUT_STATUSES).optional(),
+  })
+  .strict()
+
+export type CreateBeneficiaryInput = z.infer<typeof createBeneficiarySchema>
+export type UpdateBeneficiaryInput = z.infer<typeof updateBeneficiarySchema>
+export type UpdatePayoutInput = z.infer<typeof updatePayoutSchema>

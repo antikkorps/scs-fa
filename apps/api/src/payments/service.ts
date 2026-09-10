@@ -11,6 +11,7 @@ import type Stripe from "stripe"
 import { db } from "../db/client.js"
 import { auditLogs, orders, paymentCarte, paymentVirement } from "../db/schema.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
+import { settlePayoutsForOrder } from "../payouts/service.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import { settleStripeRefund } from "./refunds.js"
 import { createPaymentIntent, retrievePaymentIntent } from "./stripe.js"
@@ -602,6 +603,9 @@ export async function recomputeOrderPaymentStatus(orderId: string): Promise<void
   if (!carteSatisfied || !virementSatisfied) return
 
   await db.update(orders).set({ paymentStatus: "received", updatedAt: new Date() }).where(eq(orders.id, orderId))
+
+  // The money landed: what was owed becomes due (story 11.10).
+  await settlePayoutsForOrder(orderId)
 
   // Paid order → may unlock VIP and advance the legal workflow.
   await recomputeVipStatus(order.userId)

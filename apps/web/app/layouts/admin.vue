@@ -15,6 +15,8 @@ const nav = [
   { to: "/admin/gun-art/artistes", label: "Artistes", icon: "✦" },
   { to: "/admin/tags", label: "Tags", icon: "⌗" },
   { to: "/admin/gun-art/simulateur-prix", label: "Simulateur de prix", icon: "≋" },
+  { to: "/admin/reversements", label: "Reversements", icon: "⇄" },
+  { to: "/admin/beneficiaires", label: "Bénéficiaires", icon: "☗" },
   { to: "/admin/metrics", label: "Métriques", icon: "▥" },
 ]
 

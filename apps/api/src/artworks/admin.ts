@@ -1,6 +1,7 @@
 import {
   type ArtworkFormat,
   calculateArtworkPrice,
+  computeProfitability,
   createArtworkSchema,
   updateArtworkSchema,
   uuidParamSchema,
@@ -20,8 +21,10 @@ import {
   productCategories,
   products,
 } from "../db/schema.js"
+import { env } from "../env.js"
 import { validationError } from "../http.js"
 import { deleteMediaForOwner } from "../media/service.js"
+import { beneficiaryOfArtist } from "../payouts/index.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
 
 type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db
@@ -80,6 +83,10 @@ async function loadAdminArtwork(id: string) {
       basePriceHt: artworks.basePriceHt,
       priceIncrementHt: artworks.priceIncrementHt,
       vatPct: artworks.vatPct,
+      costPriceHt: artworks.costPriceHt,
+      chargesPct: artworks.chargesPct,
+      chargesAmountHt: artworks.chargesAmountHt,
+      beneficiarySharePct: artworks.beneficiarySharePct,
       orientation: artworks.orientation,
       includeCertificate: artworks.includeCertificate,
       featuredImageUrl: artworks.featuredImageUrl,
@@ -108,11 +115,42 @@ async function loadAdminArtwork(id: string) {
     .where(eq(artworkPrints.artworkId, id))
     .orderBy(asc(artworkPrints.printNumber))
 
+  // The beneficiary of an artwork is the beneficiary of its ARTIST; only the
+  // rate is renegotiable piece by piece (story 11.10).
+  const beneficiary = row.artistId ? await beneficiaryOfArtist(row.artistId) : null
+  const sharePct =
+    row.beneficiarySharePct === null
+      ? beneficiary
+        ? Number(beneficiary.defaultSharePct)
+        : 0
+      : Number(row.beneficiarySharePct)
+
+  // Profitability is quoted on the DEAREST print of the edition: it is the only
+  // single figure that is not arbitrary, and the admin sees which one it is.
+  const dearest = prints.length > 0 ? Math.max(...prints.map((p) => Number(p.priceHtUnit))) : Number(row.basePriceHt)
+
   return {
     ...row,
     basePriceHt: Number(row.basePriceHt),
     priceIncrementHt: Number(row.priceIncrementHt),
     vatPct: Number(row.vatPct ?? 20),
+    costPriceHt: row.costPriceHt === null ? null : Number(row.costPriceHt),
+    chargesPct: row.chargesPct === null ? null : Number(row.chargesPct),
+    chargesAmountHt: row.chargesAmountHt === null ? null : Number(row.chargesAmountHt),
+    beneficiarySharePct: row.beneficiarySharePct === null ? null : Number(row.beneficiarySharePct),
+    beneficiaryName: beneficiary?.name ?? null,
+    profitability: {
+      ...computeProfitability({
+        priceHt: dearest,
+        costPriceHt: row.costPriceHt === null ? null : Number(row.costPriceHt),
+        chargesPct: row.chargesPct === null ? null : Number(row.chargesPct),
+        chargesAmountHt: row.chargesAmountHt === null ? null : Number(row.chargesAmountHt),
+        defaultChargesPct: env.DEFAULT_CHARGES_PCT,
+        beneficiarySharePct: sharePct,
+      }),
+      /** Which print the figures above describe. */
+      basedOnPriceHt: dearest,
+    },
     prints: prints.map((p) => ({ ...p, priceHt: Number(p.priceHtUnit), priceHtUnit: undefined })),
   }
 }
@@ -273,6 +311,10 @@ export const adminArtworkRoutes: FastifyPluginAsync = async (fastify) => {
           featured: body.featured,
           metaTitle: body.metaTitle,
           metaDescription: body.metaDescription,
+          costPriceHt: body.costPriceHt?.toFixed(2) ?? null,
+          chargesPct: body.chargesPct?.toFixed(2) ?? null,
+          chargesAmountHt: body.chargesAmountHt?.toFixed(2) ?? null,
+          beneficiarySharePct: body.beneficiarySharePct?.toFixed(2) ?? null,
         })
         .returning({ id: artworks.id })
       if (!artwork) throw new Error("Artwork insert returned no row")
@@ -352,6 +394,11 @@ export const adminArtworkRoutes: FastifyPluginAsync = async (fastify) => {
       if (body.basePriceHt !== undefined) patch.basePriceHt = body.basePriceHt.toFixed(2)
       if (body.priceIncrementHt !== undefined) patch.priceIncrementHt = body.priceIncrementHt.toFixed(2)
       if (body.vatPct !== undefined) patch.vatPct = body.vatPct.toFixed(2)
+      for (const key of ["costPriceHt", "chargesPct", "chargesAmountHt", "beneficiarySharePct"] as const) {
+        const value = body[key]
+        // `null` clears the override; `undefined` means the form left it alone.
+        if (value !== undefined) patch[key] = value === null ? null : value.toFixed(2)
+      }
 
       await tx.update(artworks).set(patch).where(eq(artworks.id, params.data.id))
 

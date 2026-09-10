@@ -32,6 +32,7 @@ import { adminOrderRoutes } from "./orders/admin.js"
 import { orderRoutes } from "./orders/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
+import { adminPayoutRoutes } from "./payouts/index.js"
 import { productCategoryRoutes } from "./product-categories/index.js"
 import { adminProductRoutes } from "./products/admin.js"
 import { productRoutes } from "./products/index.js"
@@ -120,6 +121,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminProductRoutes, { prefix: "/api/admin/products" })
   await fastify.register(adminTagRoutes, { prefix: "/api/admin/tags" })
   await fastify.register(adminMediaRoutes, { prefix: "/api/admin/media" })
+  await fastify.register(adminPayoutRoutes, { prefix: "/api/admin/finance" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)

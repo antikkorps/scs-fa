@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { buildArtworkPriceGrid } from "@armurier/shared"
 import type { AdminArtworkDetail, AdminArtworkFormat } from "~/types/admin-catalogue"
+import type { AdminProfitability } from "~/types/admin-finance"
 import { formatEuros } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
@@ -43,9 +44,15 @@ const form = reactive({
   featured: false,
   metaTitle: "",
   metaDescription: "",
+  costPriceHt: null as number | null,
+  chargesPct: null as number | null,
+  chargesAmountHt: null as number | null,
+  beneficiarySharePct: null as number | null,
 })
 
 const prints = ref<AdminArtworkDetail["prints"]>([])
+const profitability = ref<AdminProfitability | null>(null)
+const beneficiaryName = ref<string | null>(null)
 const loadError = ref(false)
 const saveError = ref<string | null>(null)
 const saving = ref(false)
@@ -86,8 +93,14 @@ async function load() {
       featured: d.featured,
       metaTitle: d.metaTitle ?? "",
       metaDescription: d.metaDescription ?? "",
+      costPriceHt: d.costPriceHt ?? null,
+      chargesPct: d.chargesPct ?? null,
+      chargesAmountHt: d.chargesAmountHt ?? null,
+      beneficiarySharePct: d.beneficiarySharePct ?? null,
     })
     prints.value = d.prints
+    profitability.value = d.profitability ?? null
+    beneficiaryName.value = d.beneficiaryName ?? null
   } catch {
     loadError.value = true
   }
@@ -150,6 +163,15 @@ function payload() {
     vatPct: Number(form.vatPct),
     orientation: form.orientation,
     includeCertificate: form.includeCertificate,
+    // `null` clears an override and puts the piece back on the default.
+    costPriceHt: form.costPriceHt === null || form.costPriceHt === ("" as unknown) ? null : Number(form.costPriceHt),
+    chargesPct: form.chargesPct === null || form.chargesPct === ("" as unknown) ? null : Number(form.chargesPct),
+    chargesAmountHt:
+      form.chargesAmountHt === null || form.chargesAmountHt === ("" as unknown) ? null : Number(form.chargesAmountHt),
+    beneficiarySharePct:
+      form.beneficiarySharePct === null || form.beneficiarySharePct === ("" as unknown)
+        ? null
+        : Number(form.beneficiarySharePct),
     published: form.published,
     featured: form.featured,
   }
@@ -185,6 +207,8 @@ async function save() {
         body: payload(),
       })
       prints.value = res.data.prints
+      profitability.value = res.data.profitability ?? null
+      beneficiaryName.value = res.data.beneficiaryName ?? null
     }
   } catch (err) {
     saveError.value = messageFrom(err)
@@ -405,6 +429,41 @@ const PRINT_STATUS: Record<string, string> = {
     </section>
 
     <section class="panel">
+      <h2 class="panel__title">Rentabilité</h2>
+      <p class="note">
+        Données strictement administratives. Le bénéficiaire d'une œuvre est celui de son <strong>artiste</strong> —
+        il se règle sur la fiche artiste ; seul le taux se renégocie ici, pièce par pièce.
+      </p>
+      <div class="fields">
+        <label class="field">
+          <span class="field__label">Coût de production HT (€)</span>
+          <input v-model="form.costPriceHt" type="number" min="0" step="0.01" class="ctl" >
+          <span class="field__help">Matériel, impression, encadrement.</span>
+        </label>
+        <label class="field">
+          <span class="field__label">Charges (%)</span>
+          <input v-model="form.chargesPct" type="number" min="0" max="100" step="0.1" class="ctl" >
+          <span class="field__help">Vide = défaut de la configuration. 0 = pas de charge.</span>
+        </label>
+        <label class="field">
+          <span class="field__label">Charges (montant HT €)</span>
+          <input v-model="form.chargesAmountHt" type="number" min="0" step="0.01" class="ctl" >
+          <span class="field__help">Prioritaire sur le pourcentage.</span>
+        </label>
+        <label class="field">
+          <span class="field__label">Part de l'artiste renégociée (%)</span>
+          <input v-model="form.beneficiarySharePct" type="number" min="0" max="100" step="0.1" class="ctl" >
+          <span class="field__help">Vide = part par défaut du bénéficiaire de l'artiste.</span>
+        </label>
+      </div>
+
+      <div class="profwrap">
+        <AdminProfitabilityPanel :profitability="profitability" :beneficiary-name="beneficiaryName" />
+        <p v-if="!profitability" class="note">Enregistrez pour voir le calcul.</p>
+      </div>
+    </section>
+
+    <section class="panel">
       <AdminMediaGallery owner-type="artwork" :owner-id="isNew ? null : id" />
     </section>
 
@@ -615,6 +674,10 @@ h1 {
 .verdict__link a {
   color: var(--brass);
   font-size: 0.82rem;
+}
+.profwrap {
+  margin-top: 1.4rem;
+  max-width: 460px;
 }
 .note {
   margin: 0 0 1rem;

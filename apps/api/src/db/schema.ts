@@ -498,6 +498,38 @@ export const suppliersRelations = relations(suppliers, ({ many }) => ({
 }))
 
 // ============================================================================
+// ============================================================================
+// BÉNÉFICIAIRES (story 11.10)
+// ============================================================================
+// Déclarée ICI, avant `products` et `artists`, parce que les deux la référencent
+// — une table Drizzle ne peut pointer que vers une table déjà déclarée. La table
+// des reversements, elle, vit plus bas : elle référence `orders`.
+export const beneficiaryKindEnum = pgEnum("beneficiary_kind", ["artist", "advisor"])
+
+export const beneficiaries = pgTable(
+  "beneficiaries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 255 }).unique().notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    kind: beneficiaryKindEnum("kind").notNull(),
+
+    /** Taux par défaut, redéfinissable article par article quand c'est négocié. */
+    defaultSharePct: decimal("default_share_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+
+    contactEmail: varchar("contact_email", { length: 255 }),
+    // ⚠️ Volontairement PAS d'IBAN : ce serait une donnée bancaire de plus à
+    // protéger pour un besoin que rien n'exige encore. Une note libre suffit
+    // tant que les versements se font hors du site.
+    paymentNotes: text("payment_notes"),
+
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [index("idx_beneficiaries_active").on(t.active, t.name)],
+)
+
 export const products = pgTable(
   "products",
   {
@@ -525,6 +557,17 @@ export const products = pgTable(
     priceHt: decimal("price_ht", { precision: 10, scale: 2 }).notNull(),
     marginPct: decimal("margin_pct", { precision: 5, scale: 2 }).default("30"),
     costPrice: decimal("cost_price_ht", { precision: 10, scale: 2 }),
+
+    // Charges d'un article (story 11.10) : en pourcentage OU en montant, les
+    // deux étant laissés vides quand le défaut global de configuration suffit.
+    // ⚠️ Strictement administratif — aucune route publique ne les expose.
+    chargesPct: decimal("charges_pct", { precision: 5, scale: 2 }),
+    chargesAmountHt: decimal("charges_amount_ht", { precision: 10, scale: 2 }),
+
+    // Reversement (story 11.10) : qui touche une part sur la vente de cet
+    // article, et à quel taux si le défaut du bénéficiaire est renégocié ici.
+    beneficiaryId: uuid("beneficiary_id"),
+    beneficiarySharePct: decimal("beneficiary_share_pct", { precision: 5, scale: 2 }),
 
     // TVA
     vatPct: decimal("vat_pct", { precision: 4, scale: 2 }).default("20"),
@@ -571,6 +614,9 @@ export const products = pgTable(
       t.requiresLegalVerification,
     ),
      index("idx_products_search").using("gin", t.searchVector),
+     // Un bénéficiaire supprimé ne doit pas laisser de référence morte sur un
+     // article : le lien se vide, l'article reste vendable.
+     foreignKey({ columns: [t.beneficiaryId], foreignColumns: [beneficiaries.id] }).onDelete("set null"),
      foreignKey({
       columns: [t.categoryId],
       foreignColumns: [productCategories.id],
@@ -818,6 +864,11 @@ export const artists = pgTable(
 
     published: boolean("published").default(false),
 
+    // Identité FINANCIÈRE de l'artiste (story 11.10), tenue à part de sa fiche
+    // éditoriale : ce ne sont ni les mêmes données ni les mêmes personnes qui
+    // les saisissent.
+    beneficiaryId: uuid("beneficiary_id"),
+
     // SEO
     metaTitle: varchar("meta_title", { length: 255 }),
     metaDescription: varchar("meta_description", { length: 500 }),
@@ -825,7 +876,10 @@ export const artists = pgTable(
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },
-  (t) => [index("idx_artists_slug").on(t.slug)],
+  (t) => [
+    index("idx_artists_slug").on(t.slug),
+    foreignKey({ columns: [t.beneficiaryId], foreignColumns: [beneficiaries.id] }).onDelete("set null"),
+  ],
 )
 
 export const artworkThemes = pgTable(
@@ -942,6 +996,14 @@ export const artworks = pgTable(
     // Formule: basePriceHt * formatPriceFactor + (priceIncrementHt * (editionLimit - printNumber))
 
     vatPct: decimal("vat_pct", { precision: 4, scale: 2 }).default("20"),
+
+    // Rentabilité (story 11.10). Le bénéficiaire d'une œuvre n'est pas répété
+    // ici : c'est celui de son ARTISTE (`artists.beneficiary_id`). Seul le taux
+    // peut être renégocié pièce par pièce.
+    costPriceHt: decimal("cost_price_ht", { precision: 10, scale: 2 }),
+    chargesPct: decimal("charges_pct", { precision: 5, scale: 2 }),
+    chargesAmountHt: decimal("charges_amount_ht", { precision: 10, scale: 2 }),
+    beneficiarySharePct: decimal("beneficiary_share_pct", { precision: 5, scale: 2 }),
 
     // Certificat
     certificateTemplateUrl: varchar("certificate_template_url", { length: 512 }),
@@ -1314,6 +1376,69 @@ export const orderItems = pgTable(
       columns: [t.variantId],
       foreignColumns: [productVariants.id],
     }),
+  ],
+)
+
+// ============================================================================
+// BÉNÉFICIAIRES & REVERSEMENTS (story 11.10)
+// ============================================================================
+// Deux tiers sont rémunérés sur les ventes, et la mécanique est la même :
+//   - **Sylvain** (artiste Gun Art) : le site vend **pour son compte**, il touche
+//     une part de chaque tirage vendu ;
+//   - **Florian** (conseil) : Fred et Steph achètent les armes de collection sur
+//     ses conseils et lui reversent une commission **sur la vente**.
+// Un seul aujourd'hui de chaque côté, plusieurs possibles demain — d'où une
+// entité dédiée plutôt que deux champs taillés sur mesure.
+//
+// La fiche `artists` (11.6) reste **éditoriale** (bio, parcours, livre) et pointe
+// vers son identité **financière** ici : les deux ne se gèrent pas au même
+// endroit ni par les mêmes personnes.
+export const payoutStatusEnum = pgEnum("payout_status", ["pending", "due", "paid", "cancelled"])
+
+/**
+ * Ce qui est dû à un bénéficiaire sur une vente.
+ *
+ * ⚠️ Le taux, la base et le montant sont **figés à la commande** — même principe
+ * que l'instantané `orders.items_json` : changer un taux demain ne doit jamais
+ * réécrire ce qui était dû sur une vente d'hier.
+ *
+ * ⚠️ Les lignes de commande ne vivent PAS dans `order_items` (inutilisée au
+ * tunnel) mais dans `orders.items_json`. Une ligne de reversement désigne donc
+ * la sienne par `variant_id` (armurerie) ou `print_id` (Gun Art), et en conserve
+ * le libellé.
+ */
+export const beneficiaryPayouts = pgTable(
+  "beneficiary_payouts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id").notNull(),
+    beneficiaryId: uuid("beneficiary_id").notNull(),
+
+    variantId: uuid("variant_id"),
+    printId: uuid("print_id"),
+    label: varchar("label", { length: 255 }).notNull(),
+
+    sharePct: decimal("share_pct", { precision: 5, scale: 2 }).notNull(),
+    /** Assiette HT, nette de remboursement — la TVA n'est pas du chiffre d'affaires. */
+    baseHt: decimal("base_ht", { precision: 10, scale: 2 }).notNull(),
+    amountHt: decimal("amount_ht", { precision: 10, scale: 2 }).notNull(),
+
+    // pending : la commande n'est pas payée, rien n'est encore dû.
+    // due     : encaissée, le reversement est exigible.
+    // paid    : versé.
+    // cancelled : commande annulée ou intégralement remboursée.
+    status: payoutStatusEnum("status").notNull().default("pending"),
+    paidAt: timestamp("paid_at"),
+    paidNotes: text("paid_notes"),
+
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_payouts_beneficiary").on(t.beneficiaryId, t.status),
+    index("idx_payouts_order").on(t.orderId),
+    foreignKey({ columns: [t.orderId], foreignColumns: [orders.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.beneficiaryId], foreignColumns: [beneficiaries.id] }),
   ],
 )
 

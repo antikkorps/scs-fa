@@ -44,6 +44,10 @@ const DETAIL = {
 function routeApi(url: string) {
   // The forms now embed the media gallery (story 7.5b); it asks for its own list.
   if (String(url).includes("/admin/media")) return Promise.resolve({ data: [] })
+  // …and the beneficiary picker of story 11.10.
+  if (String(url).includes("/beneficiary-options")) {
+    return Promise.resolve({ data: [{ id: "ben1", name: "Florian", kind: "advisor", defaultSharePct: 10 }] })
+  }
   if (String(url).includes("/product-categories")) {
     return Promise.resolve({
       data: [

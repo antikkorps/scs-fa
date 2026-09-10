@@ -55,6 +55,7 @@ export const adminArtworkEditorialRoutes: FastifyPluginAsync = async (fastify) =
         portraitUrl: artists.portraitUrl,
         bookTitle: artists.bookTitle,
         bookUrl: artists.bookUrl,
+        beneficiaryId: artists.beneficiaryId,
         seriesCount: DISTINCT_SERIES,
         artworkCount: DISTINCT_ARTWORKS,
       })
