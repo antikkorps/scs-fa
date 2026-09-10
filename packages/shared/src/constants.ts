@@ -91,3 +91,8 @@ export type TagFacet = (typeof TAG_FACETS)[number]
 // selection adds an EXISTS sub-query, so this bounds the work a crafted URL can
 // ask the database to do.
 export const MAX_TAG_FILTERS = 20
+
+// Catalogue media (story 7.5b). Sits between the blog cap (10 MB) and the Gun
+// Art original cap (30 MB): a gallery photo is not a print-grade file, but an
+// artwork visual uploaded here still becomes one.
+export const MAX_MEDIA_SIZE_BYTES = 30 * 1024 * 1024 // 30 MB

@@ -46,6 +46,8 @@ const DETAIL = {
 }
 
 function routeApi(url: string) {
+  // The forms now embed the media gallery (story 7.5b); it asks for its own list.
+  if (String(url).includes("/admin/media")) return Promise.resolve({ data: [] })
   if (url.includes("/admin/gun-art/artists")) return Promise.resolve({ data: [{ id: "ar1", name: "Camille" }] })
   if (url.includes("/admin/gun-art/series")) return Promise.resolve({ data: [{ id: "s1", title: "Âge d'or" }] })
   return Promise.resolve({ data: DETAIL })

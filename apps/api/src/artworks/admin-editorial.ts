@@ -14,6 +14,7 @@ import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { artists, artworkSeries, artworks, artworkThemes } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { deleteMediaForOwner } from "../media/service.js"
 
 // How many rows point at an entity — the admin must see what a deletion would
 // orphan BEFORE clicking, not discover it afterwards.
@@ -102,6 +103,8 @@ export const adminArtworkEditorialRoutes: FastifyPluginAsync = async (fastify) =
   fastify.delete("/artists/:id", async (request, reply) => {
     const params = uuidParamSchema.safeParse(request.params)
     if (!params.success) return reply.code(400).send(validationError(params.error.issues))
+    // No foreign key reaches the polymorphic media table — the cleanup is ours.
+    await deleteMediaForOwner("artist", params.data.id)
     const [row] = await db.delete(artists).where(eq(artists.id, params.data.id)).returning({ id: artists.id })
     if (!row) return reply.code(404).send({ error: "NotFound", message: "Artist not found" })
     return reply.code(204).send()
@@ -240,6 +243,7 @@ export const adminArtworkEditorialRoutes: FastifyPluginAsync = async (fastify) =
   fastify.delete("/series/:id", async (request, reply) => {
     const params = uuidParamSchema.safeParse(request.params)
     if (!params.success) return reply.code(400).send(validationError(params.error.issues))
+    await deleteMediaForOwner("artwork_series", params.data.id)
     const [row] = await db
       .delete(artworkSeries)
       .where(eq(artworkSeries.id, params.data.id))

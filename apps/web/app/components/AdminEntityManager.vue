@@ -46,6 +46,11 @@ const props = defineProps<{
   emptyLabel: string
   /** Shown under the title — say what the entity is for. */
   intro?: string
+  /**
+   * When set, an existing row gets its media gallery under the form. Absent
+   * while creating: there is no owner id to attach an image to yet.
+   */
+  mediaOwnerType?: "product" | "artwork" | "artwork_series" | "artist"
 }>()
 
 type Row = Record<string, unknown> & { id: string }
@@ -253,6 +258,12 @@ const editableFields = computed(() => props.fields.filter((f) => editing.value =
           <span v-if="f.help" class="field__help">{{ f.help }}</span>
         </label>
       </div>
+
+      <AdminMediaGallery
+        v-if="mediaOwnerType"
+        :owner-type="mediaOwnerType"
+        :owner-id="editing === 'new' ? null : (editing as any).id"
+      />
 
       <div class="actions">
         <button class="btn btn-primary" type="button" :disabled="saving" @click="save">

@@ -43,6 +43,13 @@
       "when": 1789065744897,
       "tag": "0005_old_sleeper",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789069504978,
+      "tag": "0006_yielding_butterfly",
+      "breakpoints": true
     }
   ]
 }

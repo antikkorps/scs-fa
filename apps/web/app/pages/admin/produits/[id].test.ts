@@ -42,6 +42,8 @@ const DETAIL = {
 }
 
 function routeApi(url: string) {
+  // The forms now embed the media gallery (story 7.5b); it asks for its own list.
+  if (String(url).includes("/admin/media")) return Promise.resolve({ data: [] })
   if (String(url).includes("/product-categories")) {
     return Promise.resolve({
       data: [

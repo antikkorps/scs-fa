@@ -153,7 +153,9 @@ function payload() {
     published: form.published,
     featured: form.featured,
   }
-  for (const key of ["description", "longDescription", "featuredImageUrl", "metaTitle", "metaDescription"] as const) {
+  // `featuredImageUrl` is written by the server from the gallery's position 0 —
+  // sending it from here would put back the second source of truth.
+  for (const key of ["description", "longDescription", "metaTitle", "metaDescription"] as const) {
     if (form[key].trim()) body[key] = form[key]
   }
   if (isNew.value) {
@@ -383,13 +385,6 @@ const PRINT_STATUS: Record<string, string> = {
     <section class="panel">
       <h2 class="panel__title">Publication</h2>
       <div class="fields">
-        <label class="field field--wide">
-          <span class="field__label">Visuel principal (URL)</span>
-          <input v-model="form.featuredImageUrl" class="ctl" >
-          <span class="field__help">
-            Un visuel téléversé depuis l'API de protection (story 11.5) renseigne ce champ automatiquement.
-          </span>
-        </label>
         <label class="field field--check">
           <input v-model="form.published" type="checkbox" class="check" >
           <span>Publiée sur le site</span>
@@ -407,6 +402,10 @@ const PRINT_STATUS: Record<string, string> = {
           <textarea v-model="form.metaDescription" class="ctl ctl--area" rows="2" />
         </label>
       </div>
+    </section>
+
+    <section class="panel">
+      <AdminMediaGallery owner-type="artwork" :owner-id="isNew ? null : id" />
     </section>
 
     <section v-if="!isNew && prints.length > 0" class="panel">

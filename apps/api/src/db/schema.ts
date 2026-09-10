@@ -733,6 +733,56 @@ export const ancientWeaponsRelations = relations(ancientWeapons, ({ one }) => ({
 }))
 
 // ============================================================================
+// MÉDIAS (story 7.5b)
+// ============================================================================
+// Une seule table pour TOUS les visuels du catalogue, parce qu'il y a déjà
+// quatre porteurs — produit, œuvre, série, artiste — et qu'il y en aura
+// d'autres. Quatre tables quasi identiques auraient voulu dire quatre CRUD et
+// une cinquième à chaque nouveau porteur.
+//
+// ⚠️ Le prix assumé du polymorphisme : **aucune FK ne garantit que `owner_id`
+// existe encore**. La suppression du porteur ne cascade donc pas toute seule —
+// le nettoyage est explicite dans `media/service.ts` et verrouillé par un test.
+export const mediaOwnerTypeEnum = pgEnum("media_owner_type", ["product", "artwork", "artwork_series", "artist"])
+
+export const media = pgTable(
+  "media",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    ownerType: mediaOwnerTypeEnum("owner_type").notNull(),
+    ownerId: uuid("owner_id").notNull(),
+
+    // Rang dans la galerie. La position 0 est l'image principale : c'est elle
+    // qui alimente `featuredImageUrl` (ou son équivalent) du porteur.
+    position: integer("position").notNull().default(0),
+
+    // Obligatoire à l'upload (a11y + SEO) : une galerie d'images sans alt est
+    // une galerie inaccessible.
+    alt: varchar("alt", { length: 500 }).notNull(),
+
+    // Largeurs réellement disponibles, en px. Une petite image n'est jamais
+    // agrandie, donc la liste varie d'un fichier à l'autre et ne peut pas être
+    // devinée côté front.
+    widths: jsonb("widths").$type<number[]>().notNull().default(sql`'[]'::jsonb`),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+
+    // ⚠️ Vrai pour les œuvres : le fichier servi porte le filigrane de la 11.5 et
+    // sa résolution est plafonnée. Stocké plutôt que déduit du type de porteur,
+    // pour qu'un visuel protégé le reste même si la règle évolue.
+    watermarked: boolean("watermarked").notNull().default(false),
+
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_media_owner").on(t.ownerType, t.ownerId, t.position),
+  ],
+)
+
+// ============================================================================
 // 5. GUN ART (Tableaux, Photos, Tirages limités)
 // ============================================================================
 
