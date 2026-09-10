@@ -7,6 +7,7 @@ const nav = [
   { to: "/admin/blog", label: "Journal", icon: "✎" },
   { to: "/admin/legal-docs", label: "Documents", icon: "▣" },
   { to: "/admin/payments/virements", label: "Virements", icon: "▤" },
+  { to: "/admin/gun-art/simulateur-prix", label: "Prix Gun Art", icon: "◈" },
   { to: "/admin/metrics", label: "Métriques", icon: "▥" },
 ]
 

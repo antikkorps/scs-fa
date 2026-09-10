@@ -557,3 +557,36 @@ export const newsletterUnsubscribeSchema = z
 
 export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>
 export type NewsletterUnsubscribeInput = z.infer<typeof newsletterUnsubscribeSchema>
+
+// --- Gun Art price simulator (story 11.7) ---
+
+// The simulated grid is `editionLimit x formats` cells wide, so both dimensions
+// are bounded: they size the response, not just the input. 250 prints is far
+// above the 25 the client works with, and 10 formats far above his 3 to 4.
+export const artworkPriceFormatSchema = z
+  .object({
+    id: z.string().min(1).max(100),
+    name: z.string().min(1).max(100),
+    widthCm: z.number().positive().max(1000).optional(),
+    heightCm: z.number().positive().max(1000).optional(),
+    priceFactor: z.number().positive().max(100),
+  })
+  .strict()
+
+export const artworkPriceGridSchema = z
+  .object({
+    basePriceHt: z.number().min(0).max(1_000_000),
+    priceIncrementHt: z.number().min(0).max(1_000_000),
+    editionLimit: z.number().int().min(1).max(250),
+    vatPct: z.number().min(0).max(100).default(20),
+    formats: z.array(artworkPriceFormatSchema).min(1).max(10),
+  })
+  .strict()
+  // Ids address the cells of the returned grid, so two formats sharing one would
+  // make the simulator ambiguous rather than merely wrong.
+  .refine((v) => new Set(v.formats.map((f) => f.id)).size === v.formats.length, {
+    message: "Format ids must be unique",
+    path: ["formats"],
+  })
+
+export type ArtworkPriceGridInput = z.infer<typeof artworkPriceGridSchema>
