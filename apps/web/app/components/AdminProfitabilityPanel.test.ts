@@ -1,9 +1,10 @@
 // @vitest-environment nuxt
 import { mountSuspended } from "@nuxt/test-utils/runtime"
 import { describe, expect, it } from "vitest"
+import type { AdminProfitability } from "~/types/admin-finance"
 import AdminProfitabilityPanel from "./AdminProfitabilityPanel.vue"
 
-const base = {
+const base: AdminProfitability = {
   priceHt: 1000,
   costPriceHt: 600,
   chargesHt: 50,
@@ -13,7 +14,7 @@ const base = {
   costUnknown: false,
 }
 
-const mounted = (profitability: unknown, beneficiaryName?: string | null) =>
+const mounted = (profitability: AdminProfitability | null, beneficiaryName?: string | null) =>
   mountSuspended(AdminProfitabilityPanel, { props: { profitability, beneficiaryName } })
 
 describe("AdminProfitabilityPanel (story 11.10)", () => {
