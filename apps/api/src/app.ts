@@ -9,6 +9,8 @@ import { addressRoutes } from "./addresses/index.js"
 import { adminAncientWeaponRoutes } from "./ancient-weapons/admin.js"
 import { ancientWeaponRoutes } from "./ancient-weapons/index.js"
 import { artistRoutes } from "./artists/index.js"
+import { adminArtworkRoutes } from "./artworks/admin.js"
+import { adminArtworkEditorialRoutes } from "./artworks/admin-editorial.js"
 import { adminArtworkImageRoutes, artworkImageRoutes } from "./artworks/images.js"
 import { artworkRoutes } from "./artworks/index.js"
 import { adminArtworkPricingRoutes } from "./artworks/pricing.js"
@@ -30,8 +32,10 @@ import { orderRoutes } from "./orders/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
 import { productCategoryRoutes } from "./product-categories/index.js"
+import { adminProductRoutes } from "./products/admin.js"
 import { productRoutes } from "./products/index.js"
 import { searchRoutes } from "./search/index.js"
+import { adminTagRoutes } from "./tags/admin.js"
 import { tagRoutes } from "./tags/index.js"
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -109,6 +113,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminAncientWeaponRoutes, { prefix: "/api/admin/ancient-weapons" })
   await fastify.register(adminArtworkImageRoutes, { prefix: "/api/admin/artworks" })
   await fastify.register(adminArtworkPricingRoutes, { prefix: "/api/admin/artworks" })
+  await fastify.register(adminArtworkRoutes, { prefix: "/api/admin/artworks" })
+  await fastify.register(adminArtworkEditorialRoutes, { prefix: "/api/admin/gun-art" })
+  await fastify.register(adminProductRoutes, { prefix: "/api/admin/products" })
+  await fastify.register(adminTagRoutes, { prefix: "/api/admin/tags" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)

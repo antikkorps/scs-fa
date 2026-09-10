@@ -306,22 +306,44 @@
 
 **PHASE 7 — COMPLÈTE** (7.1 dashboard admin, 7.2 logs+alerting, 7.3 métriques+commission, 7.4 actions paiement UI)
 
-**Story 7.5** — Médias produit : upload & galerie admin — 🔜 **À FAIRE** _(ajoutée après clôture de la phase, 2026-09-06)_
+**Story 7.5a** — Backoffice catalogue : le CRUD complet ✅ _(scindée de la 7.5 le 2026-09-10)_
 
-> Constat : il n'existe **aucun pipeline d'upload pour les visuels produit/œuvre**. Seuls le blog (9.4b) et les documents légaux (4.1) en ont un. Côté catalogue, le schéma stocke une **URL saisie à la main** (`products.featuredImageUrl` / `artworks.featuredImageUrl`, `varchar(512)`, cf. `db/schema.ts:475`, `703`) et un `imagesCount` sans table d'images associée. Le client annonce un volume de photos important → il faut une **interface admin** de gestion des médias. **Contrainte : rester agnostique du fournisseur** — tout passe par l'abstraction `StorageService` (`apps/api/src/storage/types.ts`), zéro spécificité provider hors env (cible prod = Scaleway `fr-par`, cf. `.env.prod.example`).
+> Constat de Franck : « sinon comment tu veux qu'ils les mettent ? ils vont pas faire des requêtes SQL ». Tout le contenu livré depuis la 11.1 — tags, armes de collection, œuvres, séries, thèmes, artistes — ne se saisissait que **par le seed**. La 7.5 d'origine ne parlait que du **pipeline d'images** ; elle est scindée : **7.5a** = les écrans de saisie (celle-ci), **7.5b** = les médias.
+>
+> ⚠️ Périmètre **tout le catalogue d'un coup**, choisi par Franck contre ma recommandation de commencer par Gun Art seul. Livré en entier.
+
+- [x] **Schémas partagés** (`packages/shared/src/validation.ts`) : artiste, thème, série, œuvre (avec ses formats), tag, produit (avec ses variantes). Une seule porte d'entrée, tenue par l'API et reflétée par les formulaires
+- [x] ⚠️ **Piège zod 4 attrapé au démarrage** : `.omit()` sur un schéma **affiné** passe le typecheck et **explose à l'exécution**. Les objets de base restent donc nus, les `.refine()` vivent sur les schémas dérivés
+- [x] **API Gun Art éditorial** (`/api/admin/gun-art/{artists,themes,series}`) : CRUD complet, slug en conflit renvoyé en **409** plutôt qu'une 500 Postgres, référence pendante **nommée** (« Unknown theme: … ») plutôt qu'une erreur de clé étrangère. Chaque liste affiche **ce qui pointe vers l'entité** : les FK sont en `set null`, donc supprimer un thème vide une étiquette au lieu de détruire une série — encore faut-il le voir avant de cliquer
+- [x] **API œuvres** (`/api/admin/artworks`) : création de l'**œuvre, de son produit support et de toute l'édition numérotée** en une transaction — sans produit, une œuvre ne pourrait jamais être achetée. **Le garde-fou de prix de la 11.7 trouve enfin son point d'application** : il est vérifié à la création *et* au patch, et **sur la grille d'après le patch**, pas sur les champs que le patch transporte — changer le seul incrément suffit à casser une grille dont les facteurs n'ont pas bougé. Le refus transporte les **deux remèdes chiffrés**
+- [x] **Re-tarification honnête** : un tirage vendu ou réservé **garde son prix**, c'est ce qui a été promis à l'acheteur ; seuls les tirages encore en rayon suivent un changement de prix ou de format. Suppression **refusée** dès qu'un tirage est au panier, réservé ou vendu, avec l'alternative dans le message (« dépubliez-la »)
+- [x] ⚠️ **Tension de modèle documentée, pas masquée** : `artwork_prints.format_id` fige un format à la création alors que la règle client (11.7) veut les 25 numéros **partagés entre formats**, l'acheteur choisissant sa taille. En attendant l'arbitrage, l'édition est numérotée dans le **format d'entrée** — ce que le seed faisait déjà — et l'admin peut **re-formater un tirage encore disponible**, ce qui le re-tarife
+- [x] **API produits** (`/api/admin/products`) : CRUD avec **variantes réconciliées, pas écrasées** (l'id d'une variante voyage dans les paniers et les lignes de commande) ; retirer une variante présente sur une commande est **refusé** avec « mettez son stock à zéro ». `requiresLegalVerification` est **déduit** de la catégorie légale, jamais saisi. Les produits qui portent une œuvre ou une arme de collection sont **exclus** du formulaire générique : ils ont leurs propres écrans, qui savent ce qu'est une édition ou une provenance
+- [x] **API tags** (`/api/admin/tags`) — l'écran laissé ouvert par la 11.1. La **facette n'est pas modifiable** : elle pilote le sens du filtrage (OU dans une facette, ET entre facettes), la changer réécrirait silencieusement tous les filtres enregistrés
+- [x] ⚠️ **Piège Drizzle attrapé au smoke** : dans un fragment `sql` brut, Drizzle ne **qualifie** les colonnes que si la requête externe a une **jointure**. Sur une requête mono-table, la colonne externe sort nue et Postgres la rattache à la table de la sous-requête — **compteurs à zéro sans une erreur**. Tous les compteurs passent désormais par une jointure + `count(distinct)`. *(Vérifié : le code de la 11.6 déjà mergé est correct, ses requêtes ont des jointures.)*
+- [x] **Écrans** : `/admin/produits`, `/admin/armes-anciennes`, `/admin/gun-art/oeuvres` (liste + formulaire chacun), et un composant générique `AdminEntityManager` pour artistes, thèmes, séries et tags — quatre entités « une poignée de lignes, une dizaine de champs » qui auraient sinon été quatre fois le même code. Navigation admin complétée
+- [x] **Le garde-fou de prix est aussi rendu en direct** dans le formulaire d'œuvre, via **la même fonction partagée** que le serveur : ce n'est pas un remplacement du contrôle serveur, c'est la différence entre le savoir maintenant et le découvrir après un refus
+- [x] ⚠️ **Défaut vu au rendu, pas au code** : `[...DEFAULT_FORMATS]` copie le tableau mais **partage les objets** — éditer les formats d'une nouvelle œuvre réécrivait le gabarit pour toute la session. Copie profonde
+- [x] ⚠️ **Défaut de langue** : « + Nouveau artiste », « Aucun série ». Le français élide et genre : les libellés sont **donnés**, plus assemblés
+- [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 423 / shared 91 / web 187 = 701** au vert (+51) ; **smoke réel au navigateur** (les 6 écrans chargent sans erreur, création d'un artiste à la souris de bout en bout, garde-fou de prix réagissant à la saisie, tirages et variantes affichés). Captures : `/tmp/scs-pw/crud-*.png`
+- Reste ouvert : **saisie du visuel par URL** en attendant la 7.5b (l'upload Gun Art de la 11.5 renseigne déjà le champ) ; pas encore de **prévisualisation** ni de **journalisation d'audit** sur ces écrans
+
+**Story 7.5b** — Médias produit : upload & galerie admin — 🔜 **À FAIRE**
+
+> Reliquat de la 7.5 d'origine, une fois la saisie débloquée par la 7.5a. Il n'existe toujours **aucun pipeline d'upload pour les visuels produit/œuvre** au-delà du visuel unique Gun Art (11.5) : le schéma stocke une **URL saisie à la main** (`products.featuredImageUrl` / `artworks.featuredImageUrl`) et un `imagesCount` sans table d'images. **Contrainte : rester agnostique du fournisseur** — tout passe par `StorageService`.
 
 - **⚠️ Décisions à trancher avec Franck avant de coder** :
-  - **Modèle de données** : table `product_images` + table `artwork_images` (2 tables explicites) **vs** table `media` polymorphe (`ownerType`/`ownerId`) partagée par les 2 univers. Impacte les FK, les index et le cascade delete.
-  - **Variantes responsives** : **pré-générer N largeurs au upload** (stockage ×N, indépendant du CDN) **vs** stocker un seul original et **redimensionner au edge** (Cloudflare Image Resizing — moins de stockage, couplage CDN). Choix lié à la ligne « images responsives » de la story 9.6.
-  - Sort de l'existant `featuredImageUrl` : conservé en fallback/dénormalisation, ou dérivé de l'image en position 0.
-- **API** : `POST /api/admin/products/:id/images` (multipart, `requireRole("admin")`), `DELETE /:imageId`, `PATCH` (réordonnancement + texte alternatif). Réutiliser le pipeline durci de 9.4b : décodage **sharp** comme contrôle de contenu réel (rejet des fichiers mislabellisés/polyglots), `.rotate()` EXIF puis **strip des métadonnées** (EXIF GPS = fuite de données), re-encodage, plafond de largeur, limite de taille, **pas de SVG**. Validation magic-bytes `shared/file-signature.ts`.
-- **Service** : route publique durable façon `GET /api/blog/images/:filename` — URL stable, `cache-control: public, max-age=31536000, immutable`, clé opaque (UUID), regex de nom stricte anti-traversal. ⚠️ Ne **pas** réutiliser `getUrl()` présigné (TTL 5 min + `Content-Disposition: attachment`) : inadapté à un visuel public, non cacheable au edge et non indexable.
-- **Admin UI** : galerie par produit/œuvre — upload multiple (drag & drop), miniatures, **réordonnancement**, image principale, **suppression**, barre de progression, états d'erreur. Réutiliser les conventions PrimeVue du backoffice existant.
-- **Texte alternatif obligatoire** à l'upload (a11y + SEO) ; réutiliser le champ `orientation` déjà présent sur les œuvres (`db/schema.ts:705`) et l'étendre aux produits si le front en a besoin pour les ratios de cartes.
-- **Formats** : WebP systématique, **AVIF** à évaluer (gain LCP, coût CPU d'encodage) — cohérent avec l'objectif Core Web Vitals de la 9.6.
-- **Hors périmètre — vidéo** : décidé en externe (embed **Vimeo**, cf. comptes à ouvrir). L'API sert les octets en mémoire (`getBytes` → `reply.send`) sans *range requests* : self-héberger de la vidéo casserait le seek et la lecture progressive. Prévoir au plus un champ `videoEmbedUrl` + façade *click-to-load* (RGPD cookies tiers + LCP).
-- **Débloque** : l'**image sitemap** et les OG images par produit de la story 9.6.
-- **Done** : tests-first (upload e2e via driver mémoire, rejets non-image, 403/401, path-traversal, suppression idempotente, réordonnancement), `pnpm -r typecheck` + Biome clean, smoke réel sur serveur live.
+  - **Modèle de données** : `product_images` + `artwork_images` (2 tables explicites) **vs** table `media` polymorphe (`ownerType`/`ownerId`). Impacte FK, index et cascade delete.
+  - **Variantes responsives** : **pré-générer N largeurs au upload** (stockage ×N, indépendant du CDN) **vs** redimensionner **au edge**. Choix lié à la ligne « images responsives » de la 9.6.
+  - Sort de `featuredImageUrl` : conservé en dénormalisation, ou dérivé de l'image en position 0.
+- **API** : `POST /api/admin/products/:id/images` (multipart, admin), `DELETE /:imageId`, `PATCH` (réordonnancement + texte alternatif). Réutiliser le pipeline durci de 9.4b : décodage **sharp** comme contrôle de contenu réel, `.rotate()` EXIF puis **strip des métadonnées** (EXIF GPS = fuite), re-encodage, plafond de largeur, limite de taille, **pas de SVG**, magic-bytes `shared/file-signature.ts`.
+- **Service** : route publique durable façon `GET /api/blog/images/:filename` — URL stable, `cache-control: immutable`, clé opaque, regex anti-traversal. ⚠️ Ne **pas** réutiliser `getUrl()` présigné (TTL 5 min + attachment) : inadapté à un visuel public.
+- **Admin UI** : galerie par produit/œuvre — upload multiple, miniatures, **réordonnancement**, image principale, suppression, progression, erreurs. À brancher sur les formulaires livrés en 7.5a.
+- **Texte alternatif obligatoire** à l'upload (a11y + SEO).
+- **Formats** : WebP systématique, **AVIF** à évaluer.
+- **Hors périmètre — vidéo** : embed **Vimeo**. L'API sert les octets en mémoire sans *range requests* : self-héberger de la vidéo casserait le seek. Au plus un `videoEmbedUrl` + façade *click-to-load*.
+- **Débloque** : l'**image sitemap** et les OG images par produit de la 9.6.
+- **Done** : tests-first, `pnpm -r typecheck` + Biome clean, smoke réel.
 
 ## PHASE 8 — Mise en prod
 
@@ -657,6 +679,12 @@
 - Étendre aux œuvres Gun Art (coût matériel / impression / encadrement).
 - Complète la story 7.3 (métriques CA + commission globales) par une vue **par article**.
 - Ne jamais exposer prix d'achat, charges ni marge sur une route publique — données strictement admin.
+- ⚠️ **Manque relevé le 2026-09-10 (Franck) : les rémunérations de tiers ne sont modélisées nulle part.** Seule **la commission de Franck** existe (`COMMISSION_RATE_PCT`, 5% en `.env`, globale, story 7.3). Rien pour :
+  - la **rémunération de l'artiste** sur une œuvre Gun Art vendue — **Sylvain** aujourd'hui ;
+  - la **rémunération du pourvoyeur des armes de collection** — **Florian** aujourd'hui. ⚠️ **Ce n'est PAS du dépôt-vente** (erreur de lecture corrigée le 2026-09-10) : Florian **déniche et achète** les pièces, puis les revend via le site. Son prix d'achat est donc un **coût réel**, et sa rémunération une **part de la vente**, pas une garde de marchandise qui ne nous appartiendrait pas.
+  - ⚠️ **Un aujourd'hui, plusieurs demain — dans les deux cas.** Sylvain et Florian sont seuls sur leur univers pour l'instant, et Franck a explicitement posé qu'ils pourraient être plusieurs. Le modèle ne doit donc **pas** être deux champs taillés sur mesure : les deux cas ont la même forme — un **bénéficiaire** touche une **part** sur une vente. Cela ressemble beaucoup à ce que la 11.6 a fait pour `artists`, et une table de bénéficiaires (artiste, pourvoyeur, autre) reliée aux produits/œuvres est le candidat naturel.
+  - **⚠️ À trancher avec Franck avant de coder** : un reversement à un tiers n'est **pas** une charge et **pas** une marge — c'est une **dette envers un tiers**, avec un bénéficiaire, une assiette (HT ? TTC ? net de remboursement ?) et un état (dû / payé). Questions ouvertes : la part est-elle portée par le **bénéficiaire** (un taux par défaut) ou par l'**article** (négociée pièce par pièce) ? Faut-il un **suivi des reversements dus** (qui doit quoi à qui, sur quelle commande, payé ou non) ou une simple ligne de reporting ? Et le bénéficiaire d'une œuvre est-il **le même enregistrement** que l'`artists` de la 11.6, ou une entité distincte que l'artiste référence ?
+  - Tant que ce n'est pas tranché, la 11.10 ne livre que **coût / charges / marge** — et le dira explicitement plutôt que de faire croire que la rentabilité affichée est nette de tout reversement.
 
 ---
 

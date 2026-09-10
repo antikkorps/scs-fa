@@ -7,7 +7,14 @@ const nav = [
   { to: "/admin/blog", label: "Journal", icon: "✎" },
   { to: "/admin/legal-docs", label: "Documents", icon: "▣" },
   { to: "/admin/payments/virements", label: "Virements", icon: "▤" },
-  { to: "/admin/gun-art/simulateur-prix", label: "Prix Gun Art", icon: "◈" },
+  { to: "/admin/produits", label: "Produits", icon: "▧" },
+  { to: "/admin/armes-anciennes", label: "Armes de collection", icon: "⚑" },
+  { to: "/admin/gun-art/oeuvres", label: "Œuvres Gun Art", icon: "◈" },
+  { to: "/admin/gun-art/series", label: "Séries", icon: "❋" },
+  { to: "/admin/gun-art/themes", label: "Thèmes", icon: "◇" },
+  { to: "/admin/gun-art/artistes", label: "Artistes", icon: "✦" },
+  { to: "/admin/tags", label: "Tags", icon: "⌗" },
+  { to: "/admin/gun-art/simulateur-prix", label: "Simulateur de prix", icon: "≋" },
   { to: "/admin/metrics", label: "Métriques", icon: "▥" },
 ]
 
