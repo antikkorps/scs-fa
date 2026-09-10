@@ -426,6 +426,18 @@
 - [x] `justfile` à la racine : recettes `deploy` (compose build + up -d), `migrate` (profile migrate), `seed`, `update` (pull+migrate+build+prune), `up` / `down` / `ps`, `logs <svc>`, `restart <svc>`, `psql`, `backup`, `backups` (liste S3), `restore [dump]` (destructif → **confirmation** via bloc bash). Validé avec `just 1.58.0` (`--list` + `--dry-run`). Pointé depuis `docs/DEPLOY.md`.
 - **Décision tranchée (2026-09-05)** : `just` **plutôt que Make** — pas de pièges tabs/`.PHONY`, paramètres, `--list` auto-documenté, chargement `.env` natif, binaire unique facile à déposer sur le VM Hetzner (Ubuntu minimal). Ne **remplace pas** les scripts pnpm dev/build/test. Voir [[project_delivery_strategy]] pour le bar qualité.
 
+**Story 8.9** — Isolation des suites de tests : supprimer la dépendance à l'ordre des fichiers — 🔜 **À FAIRE**
+
+> Relevé le 2026-09-10 en cherchant l'échec CI de la 7.5b (qui, lui, avait une tout autre cause : le boot Nuxt dépassait le `hookTimeout`). La suite API **passe ou échoue selon l'ordre des fichiers**. Aujourd'hui l'ordre est déterministe et tombe du bon côté, donc la CI est verte — mais elle l'est **par chance**, pas par construction. Ajouter, renommer ou scinder un fichier de test peut faire basculer l'ordre et rendre rouge une suite que personne n'a touchée.
+
+- **Mesure** : en ne mélangeant que l'**ordre des fichiers** (`--sequence.shuffle.files=true --sequence.shuffle.tests=false`), 2 passes sur 3 sont propres et la 3ᵉ casse **4 tests**. ⚠️ Ne pas mesurer avec `--sequence.shuffle` tout court : celui-ci mélange aussi les tests **à l'intérieur** d'un fichier, ce qui casse par construction toute suite d'intégration écrite comme un récit (créer → modifier → supprimer) et gonfle le chiffre à ~25 échecs sans rien révéler d'utile.
+- **Cause identifiée, précise** :
+  - `legal-documents/sla.test.ts:43` fait `delete(users).where(eq(users.role, "admin"))` — il supprime **tous** les admins, **y compris celui du seed**. C'est délibéré : son test « aucun admin à notifier » exige qu'il n'en reste aucun.
+  - `ancient-weapons/ancient-weapons.test.ts:380` **emprunte** l'admin qui se trouve là (`where(eq(users.role, "admin")).limit(1)`) au lieu d'en créer un, comme le font toutes les autres suites. Si la SLA passe avant, il échoue sur `No admin seeded (run db:seed)`.
+- **Correctif proposé** (petit) : faire créer à `ancient-weapons.test.ts` **son propre** admin dans son `beforeAll`, avec un préfixe d'e-mail qui lui est propre, et le supprimer dans son `afterAll` — la convention que suivent déjà les 20 autres suites.
+- **À vérifier au passage** : `sla.test.ts` porte deux assertions qui dépendent de l'**état global** (« exactement 2 destinataires », « aucun admin »). Elles tiennent tant que les suites nettoient derrière elles, mais elles casseraient dès qu'une suite fuirait un admin — par exemple si elle échoue avant son `afterAll`. Envisager d'assouplir la première (`toContain` plutôt que `toHaveLength`).
+- **Done** : les trois passes en ordre de fichiers mélangé sont vertes, et la mesure est documentée dans le README pour qu'on la refasse au lieu de la redécouvrir.
+
 ## PHASE 9 — Front, SEO & Découvrabilité (transverse)
 
 > Remarques Franck (2026-06-10, après démo front 5.3). Palette laiton + charbon **validée** — à conserver.
