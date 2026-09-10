@@ -25,6 +25,7 @@ import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
+import { adminMediaRoutes, mediaRoutes } from "./media/index.js"
 import { adminMetricsRoutes } from "./metrics/admin.js"
 import { newsletterRoutes } from "./newsletter/index.js"
 import { adminOrderRoutes } from "./orders/admin.js"
@@ -93,6 +94,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
   await fastify.register(artworkImageRoutes, { prefix: "/api/artworks/images" })
   await fastify.register(artistRoutes, { prefix: "/api/artists" })
+  await fastify.register(mediaRoutes, { prefix: "/api/media" })
   await fastify.register(blogRoutes, { prefix: "/api/blog" })
   await fastify.register(blogImageRoutes, { prefix: "/api/blog/images" })
   await fastify.register(newsletterRoutes, { prefix: "/api/newsletter" })
@@ -117,6 +119,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminArtworkEditorialRoutes, { prefix: "/api/admin/gun-art" })
   await fastify.register(adminProductRoutes, { prefix: "/api/admin/products" })
   await fastify.register(adminTagRoutes, { prefix: "/api/admin/tags" })
+  await fastify.register(adminMediaRoutes, { prefix: "/api/admin/media" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)

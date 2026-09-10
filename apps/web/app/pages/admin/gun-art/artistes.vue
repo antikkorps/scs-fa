@@ -17,7 +17,6 @@ const fields: AdminField[] = [
   { key: "headline", label: "Accroche", type: "text", help: "Une ligne sous le nom." },
   { key: "bio", label: "Biographie", type: "textarea" },
   { key: "journey", label: "Parcours", type: "textarea" },
-  { key: "portraitUrl", label: "Portrait (URL)", type: "url" },
   { key: "bookTitle", label: "Titre du livre", type: "text" },
   {
     key: "bookUrl",
@@ -49,5 +48,6 @@ const columns: AdminColumn[] = [
     intro="La fiche artiste alimente la page publique /collection/artiste/… : bio, parcours, portrait et lien du livre. Un artiste non publié n'a pas de page et n'apparaît sous aucune œuvre."
     :fields="fields"
     :columns="columns"
+    media-owner-type="artist"
   />
 </template>

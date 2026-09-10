@@ -864,3 +864,46 @@ export const updateProductSchema = productBaseSchema
 export type ProductVariantInput = z.infer<typeof productVariantSchema>
 export type CreateProductInput = z.infer<typeof createProductSchema>
 export type UpdateProductInput = z.infer<typeof updateProductSchema>
+
+// --- Catalogue media (story 7.5b) ------------------------------------------
+
+export const MEDIA_OWNER_TYPES = ["product", "artwork", "artwork_series", "artist"] as const
+export type MediaOwnerTypeInput = (typeof MEDIA_OWNER_TYPES)[number]
+
+export const mediaOwnerQuerySchema = z
+  .object({
+    ownerType: z.enum(MEDIA_OWNER_TYPES),
+    ownerId: z.string().uuid(),
+  })
+  .strict()
+
+// Alternative text is REQUIRED, not optional: a gallery without it is a gallery
+// screen readers and search engines cannot use.
+export const mediaUploadFieldsSchema = z
+  .object({
+    ownerType: z.enum(MEDIA_OWNER_TYPES),
+    ownerId: z.string().uuid(),
+    alt: z.string().trim().min(1).max(500),
+  })
+  .strict()
+
+export const updateMediaSchema = z
+  .object({
+    alt: z.string().trim().min(1).max(500).optional(),
+    position: z.coerce.number().int().min(0).max(999).optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+/** Whole-gallery reorder: the ids in their new order. */
+export const reorderMediaSchema = z
+  .object({
+    ownerType: z.enum(MEDIA_OWNER_TYPES),
+    ownerId: z.string().uuid(),
+    ids: z.array(z.string().uuid()).min(1).max(200),
+  })
+  .strict()
+
+export type MediaUploadFields = z.infer<typeof mediaUploadFieldsSchema>
+export type UpdateMediaInput = z.infer<typeof updateMediaSchema>
+export type ReorderMediaInput = z.infer<typeof reorderMediaSchema>

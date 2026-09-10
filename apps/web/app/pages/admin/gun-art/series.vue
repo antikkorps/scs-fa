@@ -29,7 +29,6 @@ const fields: AdminField[] = [
     optionsEndpoint: "/admin/gun-art/artists",
     optionsLabel: "name",
   },
-  { key: "coverImageUrl", label: "Visuel de couverture (URL)", type: "url" },
   { key: "displayOrder", label: "Ordre d'affichage", type: "number" },
   { key: "published", label: "Publiée", type: "checkbox" },
   { key: "metaTitle", label: "Titre SEO", type: "text" },
@@ -55,5 +54,6 @@ const columns: AdminColumn[] = [
     intro="La série est l'unité éditoriale de la collection. Une série non publiée n'apparaît nulle part, mais ses œuvres restent visibles : elles perdent seulement leur étiquette de série."
     :fields="fields"
     :columns="columns"
+    media-owner-type="artwork_series"
   />
 </template>

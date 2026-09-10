@@ -209,6 +209,18 @@ Every entity the storefront shows is now created and edited from `/admin` — no
 - ⚠️ **zod 4 refuses `.omit()` on a refined object at runtime** while the types still check. Base objects stay plain; refinements live on the derived schemas.
 - ⚠️ **Known model tension, stated not hidden**: `artwork_prints.format_id` fixes a format at creation, while the client rule (11.7) shares the 25 numbers across formats with the buyer picking a size. Until that is settled the edition is numbered in the entry format, and an admin can re-format any still-available print.
 
+## Catalogue media (story 7.5b)
+
+One `media` table for every visual — product, artwork, series cover, artist portrait — because there were already four owners and there will be more.
+
+- **Renditions are pre-generated at upload** (400 / 800 / 1400 px, WebP), never resized at the edge: storage has to stay provider-agnostic. Small images are never upscaled, so each row records the widths it actually has and the API returns a ready-made `srcset`.
+- **`featuredImageUrl` (and `coverImageUrl`, `portraitUrl`) is written by the server** from the gallery's position 0. The column stays — cards, OG images, sitemap and llms.txt all read it — but it is no longer typed in: one source of truth for "which image is the main one".
+- ⚠️ **The gallery does not punch a hole through story 11.5.** An `artwork` upload is watermarked and capped inside this pipeline, and the print-grade original is stored privately (admin-only, `no-store`). A test asserts ink is actually laid down.
+- ⚠️ **The price of the polymorphic table**: no foreign key removes media rows when the owner goes. Every owner deletion — product, artwork, collection weapon, artist, series — calls `deleteMediaForOwner` explicitly, and a test locks it down. Without it every deletion would leave files in the bucket forever.
+- **Hardened upload** (from 9.4b): sharp's decode is the real content check, `.rotate()` before metadata is stripped (EXIF GPS is a leak), WebP re-encode, no SVG, and the size cap enforced **in the handler** — `@fastify/multipart`'s per-request limits are inoperative (11.5).
+- **Alternative text is required**, not optional. Reordering happens in one `PATCH /reorder` call: image-by-image would leave the gallery half-sorted and the main visual flickering.
+- Deleting an image **closes the position gap**, because "position 0" only means something if the sequence has no holes.
+
 ## Engineering principles
 
 1. **Tests-first** — Vitest on every feature; no merge without a test.

@@ -17,6 +17,7 @@ import {
   tags,
 } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { deleteMediaForOwner } from "../media/service.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
 
 type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db
@@ -350,6 +351,8 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
       })
     }
 
+    // No foreign key reaches the polymorphic media table — the cleanup is ours.
+    await deleteMediaForOwner("product", params.data.id)
     await db.delete(products).where(eq(products.id, params.data.id))
     return reply.code(204).send()
   })

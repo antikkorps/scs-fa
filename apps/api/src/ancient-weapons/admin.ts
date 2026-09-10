@@ -14,6 +14,7 @@ import {
   tags,
 } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { deleteMediaForOwner } from "../media/service.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
 
 /**
@@ -320,6 +321,8 @@ export const adminAncientWeaponRoutes: FastifyPluginAsync = async (fastify) => {
     if (deleted.length === 0) {
       return reply.code(404).send({ error: "NotFound", message: "Collection weapon not found" })
     }
+    // No foreign key reaches the polymorphic media table — the cleanup is ours.
+    await deleteMediaForOwner("product", params.data.id)
     return reply.code(204).send()
   })
 }

@@ -124,7 +124,8 @@ function payload() {
       stockQty: Number(v.stockQty) || 0,
     })),
   }
-  for (const key of ["description", "longDescription", "featuredImageUrl", "metaTitle", "metaDescription"] as const) {
+  // `featuredImageUrl` is written by the server from the gallery's position 0.
+  for (const key of ["description", "longDescription", "metaTitle", "metaDescription"] as const) {
     if (form[key].trim()) body[key] = form[key]
   }
   if (isNew.value) {
@@ -306,12 +307,12 @@ async function save() {
     </section>
 
     <section class="panel">
+      <AdminMediaGallery owner-type="product" :owner-id="isNew ? null : id" />
+    </section>
+
+    <section class="panel">
       <h2 class="panel__title">Publication</h2>
       <div class="fields">
-        <label class="field field--wide">
-          <span class="field__label">Visuel principal (URL)</span>
-          <input v-model="form.featuredImageUrl" class="ctl" >
-        </label>
         <label class="field field--check">
           <input v-model="form.published" type="checkbox" class="check" >
           <span>Publié sur le site</span>

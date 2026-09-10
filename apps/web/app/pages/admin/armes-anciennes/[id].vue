@@ -114,7 +114,6 @@ function payload() {
   for (const key of [
     "description",
     "longDescription",
-    "featuredImageUrl",
     "period",
     "provenance",
     "makerName",
@@ -285,6 +284,10 @@ async function save() {
     </section>
 
     <section class="panel">
+      <AdminMediaGallery owner-type="product" :owner-id="isNew ? null : id" />
+    </section>
+
+    <section class="panel">
       <h2 class="panel__title">Tags & publication</h2>
       <div v-if="allTags.length > 0" class="tags">
         <button
@@ -300,10 +303,6 @@ async function save() {
         </button>
       </div>
       <div class="fields fields--spaced">
-        <label class="field field--wide">
-          <span class="field__label">Visuel principal (URL)</span>
-          <input v-model="form.featuredImageUrl" class="ctl" >
-        </label>
         <label class="field field--check">
           <input v-model="form.published" type="checkbox" class="check" >
           <span>Publiée sur le site</span>
