@@ -221,6 +221,19 @@ One `media` table for every visual — product, artwork, series cover, artist po
 - **Alternative text is required**, not optional. Reordering happens in one `PATCH /reorder` call: image-by-image would leave the gallery half-sorted and the main visual flickering.
 - Deleting an image **closes the position gap**, because "position 0" only means something if the sequence has no holes.
 
+## Profitability and third-party payouts (story 11.10)
+
+Two people are paid on a sale, and the arrangement is the same shape for both: **Sylvain** (the shop sells his Gun Art prints on his behalf) and **Florian** (the gunsmiths buy collection pieces on his advice and pay him a commission when they sell). One today on each side, possibly several tomorrow — hence a `beneficiaries` table rather than two bespoke fields.
+
+- **The margin subtracts the payout**, on purpose: `margin = price − cost − charges − payout`. A margin that ignored what is owed to a third party would read as profit and would not be. Where no purchase price is recorded, the UI says the margin is a **ceiling**, not a result.
+- **Charges** are a percentage *or* a flat amount (the amount wins), with a global `DEFAULT_CHARGES_PCT` fallback. ⚠️ `0` is an answer, not an absence: an article explicitly set to 0% does **not** fall back to the default.
+- **The rate is frozen at the sale**, exactly as `orders.items_json` freezes the price. Renegotiating a rate never rewrites what was owed on a past sale; the next sale takes the new rate.
+- ⚠️ **Order lines do not live in `order_items`** (the table exists but the checkout does not use it) — they live in `orders.items_json`. A payout row therefore points at its line by `variant_id` or `print_id` and keeps its label.
+- **Lifecycle**: `pending` at checkout (nothing is owed until the money lands) → `due` on payment → `paid` when an admin settles it → `cancelled` on a cancelled or fully refunded sale. A partial refund reduces the share pro rata, since refunds are recorded per order, not per line. **A settled payout is never re-touched**: money that left the account is a fact, not a projection.
+- An artwork's beneficiary is the beneficiary of its **artist**; only the rate is renegotiable piece by piece. An artwork's profitability is quoted on the **dearest print** of the edition, and the screen says so.
+- ⚠️ **No IBAN is stored**: that is one more piece of banking data to protect for a need nothing has expressed — payouts are settled outside the site, and a free-text note carries the modalities.
+- Purchase prices, charges, margins and third-party shares are **admin-only**. No public route exposes any of them.
+
 ## Engineering principles
 
 1. **Tests-first** — Vitest on every feature; no merge without a test.

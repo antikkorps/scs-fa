@@ -50,6 +50,13 @@
       "when": 1789069504978,
       "tag": "0006_yielding_butterfly",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789072729751,
+      "tag": "0007_bumpy_stranger",
+      "breakpoints": true
     }
   ]
 }

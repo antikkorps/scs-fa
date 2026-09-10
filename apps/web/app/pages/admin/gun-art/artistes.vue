@@ -25,6 +25,14 @@ const fields: AdminField[] = [
     help: "Lien affilié : rendu en rel=\"sponsored noopener\", nouvel onglet. Titre ET lien sont nécessaires pour qu'il s'affiche.",
   },
   { key: "published", label: "Publié", type: "checkbox" },
+  {
+    key: "beneficiaryId",
+    label: "Bénéficiaire (reversements)",
+    type: "select",
+    optionsEndpoint: "/admin/finance/beneficiary-options",
+    optionsLabel: "name",
+    help: "Identité financière de l'artiste, tenue à part de sa fiche éditoriale. Sans elle, aucune part ne lui est reversée sur les ventes.",
+  },
   { key: "metaTitle", label: "Titre SEO", type: "text" },
   { key: "metaDescription", label: "Description SEO", type: "textarea" },
 ]

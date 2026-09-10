@@ -682,23 +682,24 @@
 - Client : suivi **par colis** dans l'espace compte, pas un statut global unique.
 - À prévoir de façon générique (tout produit peut être multi-colis), la catégorie B n'étant que le cas déclencheur.
 
-**Story 11.10** — Rentabilité par article : marge & charges — 🔜 **À FAIRE**
+**Story 11.10** — Rentabilité par article : marge, charges & reversements ✅
 
-> Existant : `products.costPrice` et `products.marginPct` sont **déjà en base** (`db/schema.ts:456`) mais **aucune interface ne les expose** et il n'y a pas de notion de charges.
+> Existant au départ : `products.costPrice` et `products.marginPct` étaient **déjà en base** mais **aucune interface ne les exposait**, et il n'y avait ni notion de charges ni de rémunération de tiers. Seule la commission de Franck existait (`COMMISSION_RATE_PCT`, globale, 7.3).
 
-- Ajouter les **charges**, saisissables en **pourcentage ou en montant**, avec un **défaut global paramétrable** en configuration, surchargeable article par article.
-- Admin : formulaire affichant prix d'achat, charges, prix de vente **HT et TTC**, et **marge calculée en direct** (en € et en %) à la saisie.
-- Étendre aux œuvres Gun Art (coût matériel / impression / encadrement).
-- Complète la story 7.3 (métriques CA + commission globales) par une vue **par article**.
-- Ne jamais exposer prix d'achat, charges ni marge sur une route publique — données strictement admin.
-- ⚠️ **Rémunérations de tiers — rien n'est modélisé.** Seule **la commission de Franck** existe (`COMMISSION_RATE_PCT`, 5% en `.env`, globale, story 7.3).
-  - **Qui est qui** (précisé par Florian le 2026-09-10) : **Fred et Steph** sont les armuriers qui exploitent le site. **Florian les conseille** ; ils **achètent les pièces eux-mêmes, sur ses conseils**, et lui **reversent une commission**. Le stock leur appartient donc.
-  - ⚠️ **Deux lectures erronées corrigées, dans cet ordre** — les noter pour qu'elles ne reviennent pas : ce n'est **ni du dépôt-vente** (la marchandise nous appartient bien), **ni un achat-revente par Florian** (il n'achète pas pour son compte). Florian est **rémunéré pour son conseil**.
-  - **Montant inconnu, mais il doit être paramétrable.** C'est exactement le mécanisme que cette story prévoit déjà pour les charges : **défaut global en configuration, surchargeable article par article**.
-  - **Reste ouvert pour l'artiste** : la mécanique de **Sylvain** n'est pas décrite. Le site **achète-t-il les tirages** (auquel cas c'est un coût d'acquisition comme les armes) ou **vend-il pour le compte de l'artiste** (auquel cas c'est un reversement sur le chiffre, avec une dette à suivre) ? Les deux ne se modélisent pas pareil.
-  - **⚠️ La question qui décide du modèle : l'assiette.** Une commission assise sur le **prix d'achat** est un **coût d'acquisition** — elle entre dans la marge comme une charge, et le mécanisme charges suffit. Une commission assise sur le **prix de vente** est un **reversement sur le chiffre** — il faut alors un bénéficiaire, une assiette (HT ? TTC ? net de remboursement ?) et un **état dû / payé**. À confirmer avant de coder.
-  - ⚠️ **Un aujourd'hui, plusieurs demain — dans les deux cas.** Sylvain et Florian sont seuls sur leur univers, et Franck a explicitement posé qu'ils pourraient être plusieurs. Donc **pas deux champs taillés sur mesure** : une entité bénéficiaire, comme la 11.6 l'a fait pour `artists`.
-  - Tant que ce n'est pas tranché, la 11.10 ne livre que **coût / charges / marge** — et le dira explicitement plutôt que de faire croire que la rentabilité affichée est nette de tout reversement.
+- [x] **Qui est payé, tiré au clair avec le client** — après **deux lectures erronées de ma part, corrigées** : ce n'est ni du dépôt-vente pour les armes, ni un achat-revente par Florian. **Fred et Steph** exploitent le site ; **Florian les conseille** et touche une **commission sur la vente** ; **Sylvain** confie ses tirages, le site vend **pour son compte** et il touche une part. Les deux ont donc **la même forme** — un bénéficiaire, une part sur une vente — d'où une entité dédiée et non deux champs sur mesure
+- [x] **Décisions validées avec Franck avant de coder** : table `beneficiaries` dédiée (la fiche `artists` de la 11.6 reste **éditoriale** et pointe vers l'identité **financière**) ; taux **par défaut sur le bénéficiaire, renégociable article par article** ; assiette **HT et nette de remboursement** ; **une ligne de reversement par vente, avec statut**
+- [x] **Calcul partagé et testé à part** (`packages/shared/src/profitability.ts`) : `marge = prix − achat − charges − reversement`. Les charges acceptent un **pourcentage OU un montant** (le montant l'emporte), avec un **défaut global** en configuration (`DEFAULT_CHARGES_PCT`). ⚠️ **`0` est une réponse, pas une absence** : un article explicitement à 0 % ne retombe **pas** sur le défaut
+- [x] ⚠️ **La marge intègre le reversement, délibérément.** L'ignorer aurait affiché un chiffre qui se lit comme du bénéfice et n'en est pas — c'est exactement ce que la note d'origine de cette story annonçait
+- [x] **Le taux est figé à la vente**, comme `orders.items_json` fige déjà le prix : renégocier demain ne réécrit **jamais** ce qui était dû hier. Un test le prouve dans les deux sens — l'ancienne vente garde son taux, la vente suivante prend le nouveau
+- [x] ⚠️ **Les lignes de commande ne vivent pas dans `order_items`** (table présente mais inutilisée au tunnel) : elles sont dans `orders.items_json`. Un reversement désigne donc la sienne par `variant_id` ou `print_id`, et en conserve le libellé
+- [x] **Cycle de vie** : `pending` à la commande (rien n'est dû tant que l'argent n'est pas là) → `due` à l'encaissement → `paid` quand l'admin le marque → `cancelled` si la vente est annulée ou intégralement remboursée. Un remboursement **partiel** réduit la part au prorata (les remboursements sont enregistrés **par commande**, pas par ligne). ⚠️ **Un reversement déjà versé n'est plus jamais retouché** : de l'argent sorti est un fait, pas une projection
+- [x] ⚠️ **Bug attrapé par un test** : une commande **remboursée** retombait en `pending`, c'est-à-dire dans la file des ventes qui attendent un encaissement qui ne viendra jamais. Une vente remboursée a été payée puis défaite — elle est `cancelled`
+- [x] **API** `/api/admin/finance/{beneficiaries,payouts,beneficiary-options}` : totaux à venir / dû / versé par bénéficiaire, filtres par bénéficiaire et statut. Seule la **décision humaine** est modifiable sur un reversement — taux, base et montant sont figés. Supprimer un bénéficiaire qui figure sur une vente est **refusé** (« désactivez-le ») : une trace de reversement est de la comptabilité
+- [x] **Écrans** : `/admin/beneficiaires` et `/admin/reversements`, plus un **panneau de rentabilité** sur les formulaires produit et œuvre — prix, achat, charges, reversement nommé, marge en € et en %. ⚠️ **Sans prix d'achat, la marge est annoncée comme un plafond**, pas un résultat. Pour une œuvre, elle est calculée sur le **tirage le plus cher** et l'écran le dit
+- [x] ⚠️ **Pas d'IBAN en base** : ce serait une donnée bancaire de plus à protéger pour un besoin que rien n'exige — les versements se font hors du site. Une note libre suffit
+- [x] **Jamais exposé publiquement** : prix d'achat, charges, marge et part d'un tiers sont strictement admin
+- [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 451 / shared 108 / web 209 = 768** au vert (+42) ; **smoke réel** (bénéficiaires créés, produit rattaché, marge recalculée à la renégociation) et **parcours navigateur** sur les deux écrans et le panneau
+- Reste ouvert : **pas d'export comptable** des reversements (CSV / récapitulatif par période) ; la rentabilité d'une œuvre est donnée pour un seul tirage, pas pour l'édition entière ; aucun **journal d'audit** sur le passage à « versé »
 
 ---
 

@@ -80,6 +80,13 @@ const envSchema = z.object({
   // dashboard as the partner's share of net revenue. Percent, default 5%.
   COMMISSION_RATE_PCT: z.coerce.number().min(0).max(100).default(5),
 
+  // Default charges on an article (Story 11.10): overheads that eat into the
+  // margin — packaging, handling, payment fees. Percent of the selling price,
+  // overridable article by article (in percent OR as a flat amount). Kept in
+  // configuration rather than in the database because it is a house-wide
+  // setting, like the commission rate above.
+  DEFAULT_CHARGES_PCT: z.coerce.number().min(0).max(100).default(0),
+
   // Newsletter (Story 11.4). The provider is spoken to through NewsletterService;
   // "memory" is an in-process driver for tests/CI/local (default outside
   // production). Segments map onto Brevo lists purely through these ids, so a

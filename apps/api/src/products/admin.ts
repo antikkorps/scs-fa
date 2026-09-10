@@ -1,4 +1,10 @@
-import { createProductSchema, type ProductVariantInput, updateProductSchema, uuidParamSchema } from "@armurier/shared"
+import {
+  computeProfitability,
+  createProductSchema,
+  type ProductVariantInput,
+  updateProductSchema,
+  uuidParamSchema,
+} from "@armurier/shared"
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
@@ -16,8 +22,10 @@ import {
   productVariants,
   tags,
 } from "../db/schema.js"
+import { env } from "../env.js"
 import { validationError } from "../http.js"
 import { deleteMediaForOwner } from "../media/service.js"
+import { beneficiaryOfProduct } from "../payouts/index.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
 
 type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db
@@ -115,6 +123,11 @@ async function loadAdminProduct(id: string) {
       featuredImageUrl: products.featuredImageUrl,
       metaTitle: products.metaTitle,
       metaDescription: products.metaDescription,
+      costPriceHt: products.costPrice,
+      chargesPct: products.chargesPct,
+      chargesAmountHt: products.chargesAmountHt,
+      beneficiaryId: products.beneficiaryId,
+      beneficiarySharePct: products.beneficiarySharePct,
       categorySlug: productCategories.slug,
       categoryName: productCategories.name,
       legalCategory: legalCategories.category,
@@ -125,6 +138,10 @@ async function loadAdminProduct(id: string) {
     .where(and(eq(products.id, id), GENERIC_ONLY))
     .limit(1)
   if (!row) return null
+
+  const beneficiary = row.beneficiaryId ? await beneficiaryOfProduct(id) : null
+  const beneficiaryName = beneficiary?.name ?? null
+  const beneficiaryShare = beneficiary ? Number(beneficiary.defaultSharePct) : null
 
   const [variants, tagRows] = await Promise.all([
     db
@@ -148,10 +165,26 @@ async function loadAdminProduct(id: string) {
       .orderBy(asc(tags.displayOrder), asc(tags.name)),
   ])
 
+  // ⚠️ Admin-only figures. No public route reads any of this.
+  const profitability = computeProfitability({
+    priceHt: Number(row.priceHt),
+    costPriceHt: row.costPriceHt === null ? null : Number(row.costPriceHt),
+    chargesPct: row.chargesPct === null ? null : Number(row.chargesPct),
+    chargesAmountHt: row.chargesAmountHt === null ? null : Number(row.chargesAmountHt),
+    defaultChargesPct: env.DEFAULT_CHARGES_PCT,
+    beneficiarySharePct: row.beneficiarySharePct === null ? (beneficiaryShare ?? 0) : Number(row.beneficiarySharePct),
+  })
+
   return {
     ...row,
     priceHt: Number(row.priceHt),
     vatPct: Number(row.vatPct ?? 20),
+    costPriceHt: row.costPriceHt === null ? null : Number(row.costPriceHt),
+    chargesPct: row.chargesPct === null ? null : Number(row.chargesPct),
+    chargesAmountHt: row.chargesAmountHt === null ? null : Number(row.chargesAmountHt),
+    beneficiarySharePct: row.beneficiarySharePct === null ? null : Number(row.beneficiarySharePct),
+    beneficiaryName,
+    profitability,
     variants: variants.map((v) => ({ ...v, priceDeltaHt: Number(v.priceDeltaHt) })),
     tags: tagRows,
     tagSlugs: tagRows.map((t) => t.slug),
@@ -248,6 +281,11 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
           featured: body.featured,
           metaTitle: body.metaTitle,
           metaDescription: body.metaDescription,
+          costPrice: body.costPriceHt?.toFixed(2) ?? null,
+          chargesPct: body.chargesPct?.toFixed(2) ?? null,
+          chargesAmountHt: body.chargesAmountHt?.toFixed(2) ?? null,
+          beneficiaryId: body.beneficiaryId ?? null,
+          beneficiarySharePct: body.beneficiarySharePct?.toFixed(2) ?? null,
         })
         .returning({ id: products.id })
       if (!product) throw new Error("Product insert returned no row")
@@ -290,6 +328,18 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
         if (body.longDescription !== undefined) patch.longDescription = sanitizeRichTextHtml(body.longDescription)
         if (body.priceHt !== undefined) patch.priceHt = body.priceHt.toFixed(2)
         if (body.vatPct !== undefined) patch.vatPct = body.vatPct.toFixed(2)
+        if (body.beneficiaryId !== undefined) patch.beneficiaryId = body.beneficiaryId
+        for (const [key, column] of [
+          ["costPriceHt", "costPrice"],
+          ["chargesPct", "chargesPct"],
+          ["chargesAmountHt", "chargesAmountHt"],
+          ["beneficiarySharePct", "beneficiarySharePct"],
+        ] as const) {
+          const value = body[key]
+          // `null` clears the override and puts the article back on the default;
+          // `undefined` means the form did not touch the field at all.
+          if (value !== undefined) patch[column] = value === null ? null : value.toFixed(2)
+        }
 
         if (categorySlug) {
           const [category] = await tx
