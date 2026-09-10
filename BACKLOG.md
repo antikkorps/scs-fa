@@ -673,14 +673,27 @@
 - **⚠️ Décision** : associations **saisies manuellement** en admin **vs** calculées sur les co-achats réels. Reco : **manuel d'abord** — au lancement il n'y a aucun historique de commandes à exploiter.
 - Respecter les **restrictions d'accessoires** déjà modélisées (`hasAccessoryRestrictions`, `accessoryRestrictionNotes`) : ne jamais suggérer un accessoire interdit pour la catégorie légale de l'arme.
 
-**Story 11.9** — Expédition multi-colis — 🔜 **À FAIRE**
+**Story 11.9** — Expédition multi-colis — 🔜 **À FAIRE** _(branche `feat/story-11.9-shipments` préparée le 2026-09-10)_
 
-> Une arme de **catégorie B se livre en 2 colis** (arme et éléments séparés). Constat : **aucun modèle d'expédition n'existe** — `orders` ne porte qu'un `shippingMethod`, un `shippingCost` et une adresse (`db/schema.ts:961`).
+> Une arme de **catégorie B se livre en 2 colis** (arme et éléments séparés). C'est le manque fonctionnel le plus concret qui reste : il bloque une vente réelle.
 
-- Nouvelle table `shipments` (plusieurs par commande) : transporteur, **numéro de suivi**, contenu (lignes de commande rattachées), statut, date d'expédition.
-- Admin : création et suivi des colis depuis le détail commande.
-- Client : suivi **par colis** dans l'espace compte, pas un statut global unique.
-- À prévoir de façon générique (tout produit peut être multi-colis), la catégorie B n'étant que le cas déclencheur.
+**État des lieux vérifié le 2026-09-10** (à ne pas re-fouiller demain) :
+
+- `orders` ne porte que `shipping_method` (`'std' | 'express' | 'retrait'`), `shipping_cost` et l'adresse — **ni transporteur, ni numéro de suivi, ni date d'expédition**.
+- **Aucun statut d'expédition n'existe nulle part.** `ORDER_LEGAL_STATUSES` concerne les documents légaux, `paymentStatus` l'argent : rien ne dit si une commande est partie.
+- Les deux écrans à étendre existent déjà : **admin** `/admin/orders/[id]` et **client** `/compte/commandes/[id]`.
+- ⚠️ **Les lignes de commande vivent dans `orders.items_json`**, pas dans `order_items` (table présente mais inutilisée au tunnel — constat de la 11.10). Rattacher un colis à « ces lignes-là » se fera donc par `variant_id` / `print_id`, comme les reversements.
+
+**⚠️ Décisions à trancher avec Franck avant de coder :**
+
+- **Contenu d'un colis** : table de liaison colis ↔ lignes (on sait exactement ce qu'il y a dans chaque carton) **vs** simple libellé libre (« arme », « culasse et chargeurs »). La première est juste, la seconde est ce que fait la plupart des petits marchands.
+- **Statut** : par colis seulement, ou faut-il aussi un **statut d'expédition agrégé sur la commande** (« partiellement expédiée » / « expédiée ») pour la liste admin et les e-mails ?
+- **Transporteurs** : liste fermée en configuration, ou champ libre ? Et faut-il une **URL de suivi** construite par transporteur, ou l'admin colle-t-il le lien complet ?
+- **Notification client** : un e-mail par colis expédié, ou un seul quand tout est parti ? (Le service e-mail existe depuis la 4.x.)
+- **Découpage automatique** : la catégorie B impose 2 colis — est-ce **suggéré** à l'admin, ou entièrement manuel ? (Suggérer demande de savoir quelles lignes vont dans quel colis, donc dépend de la première décision.)
+
+- À prévoir de façon **générique** — tout produit peut être multi-colis, la catégorie B n'étant que le cas déclencheur.
+- **Done** : tests-first, `pnpm -r typecheck` + Biome clean, smoke réel (création de 2 colis sur une commande, suivi visible côté client).
 
 **Story 11.10** — Rentabilité par article : marge, charges & reversements ✅
 
