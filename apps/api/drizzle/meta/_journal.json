@@ -29,6 +29,20 @@
       "when": 1788809120332,
       "tag": "0003_tidy_sentinels",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789065729815,
+      "tag": "0004_perpetual_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789065744897,
+      "tag": "0005_old_sleeper",
+      "breakpoints": true
     }
   ]
 }

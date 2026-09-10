@@ -8,6 +8,7 @@ import Fastify, { type FastifyInstance } from "fastify"
 import { addressRoutes } from "./addresses/index.js"
 import { adminAncientWeaponRoutes } from "./ancient-weapons/admin.js"
 import { ancientWeaponRoutes } from "./ancient-weapons/index.js"
+import { artistRoutes } from "./artists/index.js"
 import { adminArtworkImageRoutes, artworkImageRoutes } from "./artworks/images.js"
 import { artworkRoutes } from "./artworks/index.js"
 import { adminArtworkPricingRoutes } from "./artworks/pricing.js"
@@ -87,6 +88,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(ancientWeaponRoutes, { prefix: "/api/ancient-weapons" })
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
   await fastify.register(artworkImageRoutes, { prefix: "/api/artworks/images" })
+  await fastify.register(artistRoutes, { prefix: "/api/artists" })
   await fastify.register(blogRoutes, { prefix: "/api/blog" })
   await fastify.register(blogImageRoutes, { prefix: "/api/blog/images" })
   await fastify.register(newsletterRoutes, { prefix: "/api/newsletter" })

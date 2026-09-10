@@ -1,63 +1,14 @@
 import { computePriceTtc } from "@armurier/shared"
-import { and, asc, desc, eq, sql } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
-import { artworkPrints, artworks } from "../db/schema.js"
-
-// Aggregated availability/price-from for the collection grid.
-const AVAILABLE_COUNT = sql<number>`count(${artworkPrints.id}) filter (where ${artworkPrints.status} = 'available')::int`
-const SOLD_COUNT = sql<number>`count(${artworkPrints.id}) filter (where ${artworkPrints.status} = 'sold')::int`
-const PRICE_FROM = sql<
-  string | null
->`min(${artworkPrints.priceHtUnit}) filter (where ${artworkPrints.status} = 'available')`
+import { artists, artworkPrints, artworkSeries, artworks, artworkThemes } from "../db/schema.js"
+import { selectArtworkCards } from "./cards.js"
 
 /** GET /api/artworks — published Gun Art collection (one card per artwork). */
 export const listArtworksRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (_request, reply) => {
-    const rows = await db
-      .select({
-        id: artworks.id,
-        slug: artworks.slug,
-        title: artworks.title,
-        artistName: artworks.artistName,
-        description: artworks.description,
-        featuredImageUrl: artworks.featuredImageUrl,
-        orientation: artworks.orientation,
-        editionLimit: artworks.editionLimit,
-        editionYear: artworks.editionYear,
-        vatPct: artworks.vatPct,
-        featured: artworks.featured,
-        availableCount: AVAILABLE_COUNT,
-        soldCount: SOLD_COUNT,
-        priceFromHt: PRICE_FROM,
-      })
-      .from(artworks)
-      .leftJoin(artworkPrints, eq(artworkPrints.artworkId, artworks.id))
-      .where(eq(artworks.published, true))
-      .groupBy(artworks.id)
-      .orderBy(desc(artworks.featured), desc(artworks.createdAt))
-
-    const data = rows.map((r) => {
-      const vatPct = Number(r.vatPct ?? 20)
-      const priceFromHt = r.priceFromHt === null ? null : Number(r.priceFromHt)
-      return {
-        id: r.id,
-        slug: r.slug,
-        title: r.title,
-        artistName: r.artistName,
-        description: r.description,
-        featuredImageUrl: r.featuredImageUrl,
-        orientation: r.orientation,
-        editionLimit: r.editionLimit,
-        editionYear: r.editionYear,
-        availableCount: r.availableCount,
-        soldCount: r.soldCount,
-        priceFromHt,
-        priceFromTtc: priceFromHt === null ? null : computePriceTtc(priceFromHt, vatPct),
-      }
-    })
-
-    return reply.code(200).send({ data })
+    return reply.code(200).send({ data: await selectArtworkCards(undefined) })
   })
 }
 
@@ -77,8 +28,17 @@ export const getArtworkRoute: FastifyPluginAsync = async (fastify) => {
         title: artworks.title,
         description: artworks.description,
         longDescription: artworks.longDescription,
-        artistName: artworks.artistName,
-        artistBio: artworks.artistBio,
+        artistSlug: artists.slug,
+        artistName: artists.name,
+        artistHeadline: artists.headline,
+        artistBio: artists.bio,
+        artistPortraitUrl: artists.portraitUrl,
+        seriesSlug: artworkSeries.slug,
+        seriesTitle: artworkSeries.title,
+        seriesIntro: artworkSeries.intro,
+        seriesReference: artworkSeries.reference,
+        themeSlug: artworkThemes.slug,
+        themeName: artworkThemes.name,
         featuredImageUrl: artworks.featuredImageUrl,
         orientation: artworks.orientation,
         editionLimit: artworks.editionLimit,
@@ -88,6 +48,9 @@ export const getArtworkRoute: FastifyPluginAsync = async (fastify) => {
         includeCertificate: artworks.includeCertificate,
       })
       .from(artworks)
+      .leftJoin(artists, and(eq(artworks.artistId, artists.id), eq(artists.published, true)))
+      .leftJoin(artworkSeries, and(eq(artworks.seriesId, artworkSeries.id), eq(artworkSeries.published, true)))
+      .leftJoin(artworkThemes, eq(artworkSeries.themeId, artworkThemes.id))
       .where(and(eq(artworks.slug, slug), eq(artworks.published, true)))
       .limit(1)
 
@@ -125,9 +88,44 @@ export const getArtworkRoute: FastifyPluginAsync = async (fastify) => {
     const availablePrints = prints.filter((p) => p.status === "available")
     const priceFromHt = availablePrints.length > 0 ? Math.min(...availablePrints.map((p) => p.priceHt)) : null
 
+    const {
+      artistSlug,
+      artistName,
+      artistHeadline,
+      artistBio,
+      artistPortraitUrl,
+      seriesSlug,
+      seriesTitle,
+      seriesIntro,
+      seriesReference,
+      themeSlug,
+      themeName,
+      ...core
+    } = art
+
     return reply.code(200).send({
       data: {
-        ...art,
+        ...core,
+        // Nested rather than flattened: the detail page links to the artist and
+        // to the series, so it needs their slugs, not just their labels.
+        artist: artistSlug
+          ? {
+              slug: artistSlug,
+              name: artistName,
+              headline: artistHeadline,
+              bio: artistBio,
+              portraitUrl: artistPortraitUrl,
+            }
+          : null,
+        series: seriesSlug
+          ? {
+              slug: seriesSlug,
+              title: seriesTitle,
+              intro: seriesIntro,
+              reference: seriesReference,
+              theme: themeSlug ? { slug: themeSlug, name: themeName } : null,
+            }
+          : null,
         vatPct,
         prints,
         availableCount: availablePrints.length,

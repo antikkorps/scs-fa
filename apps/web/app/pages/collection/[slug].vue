@@ -23,7 +23,9 @@ const hero = computed(() =>
   artworkImage(art.value.featuredImageUrl, art.value.slug, heroGeometry.value.width, heroGeometry.value.height),
 )
 const lightboxOpen = ref(false)
-const heroAlt = computed(() => `${art.value.title}${art.value.artistName ? ` — ${art.value.artistName}` : ""}`)
+const artist = computed(() => art.value.artist)
+const series = computed(() => art.value.series)
+const heroAlt = computed(() => `${art.value.title}${artist.value ? ` — ${artist.value.name}` : ""}`)
 const formatName = (id: string) => art.value.availableFormats?.find((f) => f.id === id)?.name ?? id
 const availablePrints = computed(() => art.value.prints.filter((p) => p.status === "available"))
 const soldOut = computed(() => availablePrints.value.length === 0)
@@ -56,7 +58,18 @@ useHead({
           image: hero.value,
           artform: "Photographie",
           artMedium: "Tirage pigmentaire",
-          creator: art.value.artistName ? { "@type": "Person", name: art.value.artistName } : undefined,
+          creator: artist.value
+            ? { "@type": "Person", name: artist.value.name, url: `${siteUrl}/collection/artiste/${artist.value.slug}` }
+            : undefined,
+          // The series is the editorial unit: saying which one this print belongs
+          // to is what lets a search engine read the collection as a body of work.
+          isPartOf: series.value
+            ? {
+                "@type": "CreativeWorkSeries",
+                name: series.value.title,
+                url: `${siteUrl}/collection/serie/${series.value.slug}`,
+              }
+            : undefined,
           description: description.value,
           url: pageUrl,
           ...(art.value.priceFromTtc !== null && {
@@ -112,8 +125,19 @@ useHead({
         <ImageLightbox v-model="lightboxOpen" :src="hero" :alt="heroAlt" protect />
 
         <div class="detail__info">
-          <p v-if="art.artistName" class="eyebrow">{{ art.artistName }}</p>
+          <NuxtLink v-if="artist" :to="`/collection/artiste/${artist.slug}`" class="eyebrow eyebrow--link">
+            {{ artist.name }}
+          </NuxtLink>
           <h1 class="detail__title">{{ art.title }}</h1>
+
+          <p v-if="series" class="detail__series">
+            Série
+            <NuxtLink :to="`/collection/serie/${series.slug}`">{{ series.title }}</NuxtLink>
+            <template v-if="series.theme">
+              ·
+              <NuxtLink :to="`/collection/theme/${series.theme.slug}`">{{ series.theme.name }}</NuxtLink>
+            </template>
+          </p>
 
           <AvailabilityBadge
             :state="soldOut ? 'sold' : 'available'"
@@ -164,6 +188,26 @@ useHead({
 </template>
 
 <style scoped>
+.eyebrow--link {
+  display: inline-block;
+  color: var(--paper-faint);
+  text-decoration: none;
+}
+.eyebrow--link:hover {
+  color: var(--brass);
+}
+.detail__series {
+  margin: 0.4rem 0 1rem;
+  font-size: 0.85rem;
+  color: var(--paper-dim);
+}
+.detail__series a {
+  color: var(--brass);
+  text-decoration: none;
+}
+.detail__series a:hover {
+  text-decoration: underline;
+}
 .detail {
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
 }

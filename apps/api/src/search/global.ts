@@ -2,7 +2,7 @@ import { computePriceTtc, searchQuerySchema } from "@armurier/shared"
 import { and, desc, eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
-import { artworkPrints, artworks, legalCategories, productCategories, products } from "../db/schema.js"
+import { artists, artworkPrints, artworks, legalCategories, productCategories, products } from "../db/schema.js"
 
 // Aggregated availability/price-from for artwork cards (mirrors artworks/public.ts).
 const AVAILABLE_COUNT = sql<number>`count(${artworkPrints.id}) filter (where ${artworkPrints.status} = 'available')::int`
@@ -69,7 +69,8 @@ export const globalSearchRoute: FastifyPluginAsync = async (fastify) => {
         id: artworks.id,
         slug: artworks.slug,
         title: artworks.title,
-        artistName: artworks.artistName,
+        artistName: artists.name,
+        artistSlug: artists.slug,
         description: artworks.description,
         featuredImageUrl: artworks.featuredImageUrl,
         orientation: artworks.orientation,
@@ -82,9 +83,25 @@ export const globalSearchRoute: FastifyPluginAsync = async (fastify) => {
       })
       .from(artworks)
       .leftJoin(artworkPrints, eq(artworkPrints.artworkId, artworks.id))
-      .where(and(eq(artworks.published, true), sql`${artworks.searchVector} @@ ${tsquery}`))
-      .groupBy(artworks.id)
-      .orderBy(desc(sql`ts_rank(${artworks.searchVector}, ${tsquery})`), desc(artworks.createdAt))
+      .leftJoin(artists, and(eq(artworks.artistId, artists.id), eq(artists.published, true)))
+      .where(
+        and(
+          eq(artworks.published, true),
+          // ⚠️ Story 11.6 moved the artist out of `artworks`, and a generated
+          // column can only read its own row — the artist name is therefore no
+          // longer inside `search_vector`. Matching it through the join keeps
+          // "Sylvain" finding his works; without this clause searching an
+          // artist would silently return nothing.
+          sql`${artworks.searchVector} @@ ${tsquery} or to_tsvector('french', coalesce(${artists.name}, '')) @@ ${tsquery}`,
+        ),
+      )
+      .groupBy(artworks.id, artists.name, artists.slug)
+      .orderBy(
+        desc(
+          sql`greatest(ts_rank(${artworks.searchVector}, ${tsquery}), ts_rank(to_tsvector('french', coalesce(${artists.name}, '')), ${tsquery}))`,
+        ),
+        desc(artworks.createdAt),
+      )
       .limit(limit)
 
     const productData = productRows.map((r) => {
@@ -115,6 +132,7 @@ export const globalSearchRoute: FastifyPluginAsync = async (fastify) => {
         slug: r.slug,
         title: r.title,
         artistName: r.artistName,
+        artistSlug: r.artistSlug,
         description: r.description,
         featuredImageUrl: r.featuredImageUrl,
         orientation: r.orientation,

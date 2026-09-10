@@ -3,12 +3,13 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { artworkPrints, artworks, productCategories, products } from "../db/schema.js"
+import { artists, artworkPrints, artworks, productCategories, products } from "../db/schema.js"
 
 // A distinctive token so the fixtures are isolated from any seeded/demo rows and
 // from each other's full-text matches.
 const PREFIX = "TESTSEARCH-"
 const TOKEN = "zorglubium"
+const ARTIST_TOKEN = "vorpalienne"
 
 async function categoryId(slug: string): Promise<string> {
   const [row] = await db
@@ -31,6 +32,7 @@ describe("GET /api/search", () => {
     await db.delete(artworkPrints).where(inArray(artworkPrints.artworkId, artIds))
     await db.delete(artworks).where(like(artworks.sku, `${PREFIX}%`))
     await db.delete(products).where(like(products.sku, `${PREFIX}%`))
+    await db.delete(artists).where(like(artists.slug, `${PREFIX.toLowerCase()}%`))
   }
 
   beforeAll(async () => {
@@ -40,6 +42,14 @@ describe("GET /api/search", () => {
 
     const armePoing = await categoryId("arme-poing")
     const gunArt = await categoryId("gun-art")
+
+    // The artist carries a token of its own: story 11.6 moved the name out of
+    // `artworks`, so searching it exercises the join, not the search vector.
+    const [artist] = await db
+      .insert(artists)
+      .values({ slug: `${PREFIX.toLowerCase()}artist`, name: `Peintre ${ARTIST_TOKEN}`, published: true })
+      .returning({ id: artists.id })
+    if (!artist) throw new Error("Test artist insert returned no row")
 
     // A published firearm whose name carries the token.
     await db.insert(products).values({
@@ -88,7 +98,7 @@ describe("GET /api/search", () => {
         slug: `${PREFIX}art`,
         sku: `${PREFIX}art`,
         title: `Tirage ${TOKEN}`,
-        artistName: "Test Artist",
+        artistId: artist.id,
         editionLimit: 10,
         availableFormats: [{ id: "A4", name: "A4", widthCm: 21, heightCm: 29.7, priceFactor: 1 }],
         basePriceHt: "300.00",
@@ -152,6 +162,22 @@ describe("GET /api/search", () => {
     expect(art.availableCount).toBe(1)
     expect(art.priceFromHt).toBe(300)
     expect(art.priceFromTtc).toBe(360)
+  })
+
+  /**
+   * Story 11.6 moved the artist name out of `artworks`, and a generated column
+   * can only read its own row — so the name left `search_vector`. Searching an
+   * artist must still find their works, through the join.
+   */
+  it("finds an artwork by its artist's name, which no longer lives in the search vector", async () => {
+    const res = await app.inject({ method: "GET", url: `/api/search?q=${ARTIST_TOKEN}` })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    const slugs = body.artworks.map((a: { slug: string }) => a.slug)
+    expect(slugs).toContain(`${PREFIX}art`)
+    const art = body.artworks.find((a: { slug: string }) => a.slug === `${PREFIX}art`)
+    expect(art.artistName).toBe(`Peintre ${ARTIST_TOKEN}`)
+    expect(art.artistSlug).toBe(`${PREFIX.toLowerCase()}artist`)
   })
 
   it("returns empty arrays for a non-matching query", async () => {

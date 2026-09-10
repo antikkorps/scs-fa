@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { artworkPrints, artworks, productCategories, products } from "../db/schema.js"
+import { artists, artworkPrints, artworks, productCategories, products } from "../db/schema.js"
 
 const PREFIX = "TESTART-"
 
@@ -20,6 +20,7 @@ async function categoryId(slug: string): Promise<string> {
 describe("public artwork routes (/api/artworks)", () => {
   let app: FastifyInstance
   let publishedSlug: string
+  let artistId: string
 
   async function cleanup() {
     const artIds = db
@@ -29,6 +30,7 @@ describe("public artwork routes (/api/artworks)", () => {
     await db.delete(artworkPrints).where(inArray(artworkPrints.artworkId, artIds))
     await db.delete(artworks).where(like(artworks.sku, `${PREFIX}%`))
     await db.delete(products).where(like(products.sku, `${PREFIX}%`))
+    await db.delete(artists).where(like(artists.slug, `${PREFIX.toLowerCase()}%`))
   }
 
   async function seedArtwork(opts: {
@@ -59,7 +61,7 @@ describe("public artwork routes (/api/artworks)", () => {
         slug: `${PREFIX}${opts.suffix}`,
         sku: `${PREFIX}${opts.suffix}`,
         title: `Art ${opts.suffix}`,
-        artistName: "Test Artist",
+        artistId,
         editionLimit: opts.editionLimit,
         availableFormats: [{ id: "A4", name: "A4", widthCm: 21, heightCm: 29.7, priceFactor: 1 }],
         basePriceHt: opts.basePriceHt.toFixed(2),
@@ -93,6 +95,15 @@ describe("public artwork routes (/api/artworks)", () => {
     app = await buildApp()
     await app.ready()
     await cleanup()
+
+    // Story 11.6: the artist is a row of its own, no longer a column on the artwork.
+    const [artist] = await db
+      .insert(artists)
+      .values({ slug: `${PREFIX.toLowerCase()}artist`, name: "Test Artist", bio: "Bio de test", published: true })
+      .returning({ id: artists.id })
+    if (!artist) throw new Error("Test artist insert returned no row")
+    artistId = artist.id
+
     publishedSlug = await seedArtwork({
       suffix: "pub",
       published: true,
@@ -133,6 +144,14 @@ describe("public artwork routes (/api/artworks)", () => {
     expect(items.some((a) => a.slug === `${PREFIX}hidden`)).toBe(false)
   })
 
+  it("labels a card with its artist, read through the join rather than a column", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/artworks" })
+    const items = res.json().data as Array<{ slug: string; artistName: string | null; artistSlug: string | null }>
+    const pub = items.find((a) => a.slug === publishedSlug)
+    expect(pub?.artistName).toBe("Test Artist")
+    expect(pub?.artistSlug).toBe(`${PREFIX.toLowerCase()}artist`)
+  })
+
   it("returns a published artwork with its prints", async () => {
     const res = await app.inject({ method: "GET", url: `/api/artworks/${publishedSlug}` })
     expect(res.statusCode).toBe(200)
@@ -147,6 +166,19 @@ describe("public artwork routes (/api/artworks)", () => {
     const last = data.prints.find((p: { printNumber: number }) => p.printNumber === 10)
     expect(last.priceHt).toBe(100)
     expect(last.priceTtc).toBe(120)
+  })
+
+  it("nests the artist so the page can link to it, and reports no series when there is none", async () => {
+    const data = (await app.inject({ method: "GET", url: `/api/artworks/${publishedSlug}` })).json().data
+    expect(data.artist).toMatchObject({
+      slug: `${PREFIX.toLowerCase()}artist`,
+      name: "Test Artist",
+      bio: "Bio de test",
+    })
+    expect(data.series).toBeNull()
+    // The flat legacy columns are gone, not merely emptied.
+    expect(data.artistName).toBeUndefined()
+    expect(data.artistBio).toBeUndefined()
   })
 
   it("404s on an unknown slug", async () => {
