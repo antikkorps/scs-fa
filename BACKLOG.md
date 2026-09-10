@@ -608,16 +608,19 @@
 - **Page de présentation de Sylvain** : bio, portrait, parcours (les champs `artistName` / `artistBio` / `artistImageUrl` existent déjà sur `artworks` mais aucune page ne les expose) + **lien Amazon vers son livre** (`rel="sponsored noopener"`, ouverture nouvel onglet).
 - SEO : `Person` + `CreativeWorkSeries` en JSON-LD, à coordonner avec 9.6.
 
-**Story 11.7** — Cohérence des prix Gun Art entre formats — 🔜 **À FAIRE**
+**Story 11.7** — Cohérence des prix Gun Art entre formats ✅
 
-> ⚠️ **Règle client non respectée par la formule actuelle.** `calculateArtworkPrice` (`packages/shared/src/artwork.ts:60`) applique `base × facteurFormat + increment × (editionLimit − numéro)`. Avec des valeurs plausibles (base 50 €, increment 2 €, 25 tirages, facteurs 1 / 1,5 / 2), le **petit format n°1 (98 €) dépasse le moyen format n°25 (75 €)** — exactement ce que le client refuse.
+> Constat de départ : `calculateArtworkPrice` applique `base × facteurFormat + increment × (editionLimit − numéro)`. Avec les valeurs plausibles du client (base 50 €, increment 2 €, 25 tirages, facteurs 1 / 1,5 / 2), le **petit format n°1 (98 €) dépassait le moyen format n°25 (75 €)** — exactement ce que le client refuse. La formule n'est **pas** corrigée : la décroissance avec le numéro est voulue. C'est la **grille de formats** qui est désormais validée.
 
-- **Garde-fou de validation** à la saisie admin : refuser une grille où le prix **maximum** d'un format dépasse le prix **minimum** du format supérieur. Condition : `base × (facteur[n+1] − facteur[n]) ≥ increment × (editionLimit − 1)`.
-- **Simulateur visuel** dans l'admin : grille complète des 25 tirages × formats, chevauchements surlignés — le client fixe ses pourcentages en voyant le résultat.
-- Formats cibles : **3 à 4 formats, de 40×50 cm à 1 m × 1 m** (`availableFormats` en JSONB le permet déjà).
-- **25 exemplaires tous formats confondus** : déjà le comportement actuel (compteur global sur `artworks.editionLimit`) — à confirmer par un test explicite.
-- ⚠️ Effet de bord à documenter : les numéros étant **partagés entre formats**, « la dernière d'un format » dépend de l'ordre des achats et n'est pas prévisible à l'avance. Le garde-fou doit donc porter sur les **bornes théoriques** de chaque format, pas sur l'état des ventes.
-- La décroissance du prix avec le numéro est **confirmée comme voulue** — ne pas « corriger » la formule sur ce point.
+- [x] **Règle partagée** (`packages/shared/src/artwork.ts`) : `buildArtworkPriceBands`, `validateArtworkPriceGrid`, `buildArtworkPriceGrid`. Le garde-fou refuse une grille où le prix **maximum** d'un format dépasse le prix **minimum** du format supérieur, soit `base × (facteur[n+1] − facteur[n]) ≥ increment × (editionLimit − 1)`. Seules les **paires consécutives** sont testées : les bornes étant ordonnées par facteur, une chaîne de voisins disjoints ne peut pas se croiser plus loin
+- [x] **Diagnostic actionnable, pas seulement un refus** : chaque chevauchement renvoie les deux bornes fautives *et* les deux façons de le lever — `maxIncrementHt` (incrément maximal admissible) et `minUpperPriceFactor` (facteur minimal du format supérieur). Un test vérifie qu'appliquer l'une **ou** l'autre suffit
+- [x] **Route admin** `POST /api/admin/artworks/price-grid` (`apps/api/src/artworks/pricing.ts`) : **sans état**, elle simule une grille sans lire ni écrire la moindre œuvre. Admin quand même — prix de base et incrément sont des paramètres commerciaux. Entrées bornées par zod (`editionLimit` 1–250, 1–10 formats, ids uniques) : les deux dimensions **dimensionnent la réponse**, pas seulement l'entrée
+- [x] **Simulateur visuel** `/admin/gun-art/simulateur-prix` : paramètres de l'œuvre, formats ajoutables/supprimables, **grille complète 25 tirages × formats** avec les cellules fautives surlignées et les bornes par format. Il **ouvre sur la grille cassée du client**, pas sur un exemple bien rangé. Le verdict vient de l'API, donc ce que voit Sylvain est exactement ce que répondra le garde-fou serveur quand la 7.5 enregistrera une œuvre
+- [x] ⚠️ **Bornes théoriques, jamais l'état des ventes** : les numéros étant partagés entre formats, « la dernière d'un format » dépend de l'ordre des achats et n'est pas prévisible. La règle porte donc sur ce que chaque format *peut* coûter — c'est écrit dans le code, dans l'API et dans l'écran
+- [x] **25 exemplaires tous formats confondus** — verrouillé par un test explicite : l'index unique `uniq_print_per_artwork` sur `(artwork_id, print_number)` fait qu'un numéro déjà pris dans un format ne peut pas être réutilisé dans un autre
+- [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 376 / shared 91 / web 151 = 618** au vert (+29) ; **smoke réel** en admin (grille client → verdict incohérent + les deux remèdes chiffrés, 24 cellules surlignées sur 75 ; facteurs portés à 1 / 2 / 3 → verdict cohérent, 0 cellule). Captures : `/tmp/scs-pw/price-{broken,fixed,grid}.png`
+- ⚠️ **Défaut vu au rendu, pas au code** : la page était écrite en palette claire alors que le back-office est sombre — titres de panneaux invisibles. Repris sur les tokens du thème (`--ink-soft`, `--paper-faint`, `--brass`, `--danger`) et re-rendu
+- Reste ouvert : **brancher le garde-fou sur le formulaire d'œuvre** (il n'existe pas encore — 7.5) ; la valeur du garde-fou est là, son point d'application arrivera avec le CRUD
 
 **Story 11.8** — Cross-sell « Fréquemment achetés ensemble » — 🔜 **À FAIRE (activable à la demande)**
 

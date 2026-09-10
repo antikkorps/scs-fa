@@ -10,6 +10,7 @@ import { adminAncientWeaponRoutes } from "./ancient-weapons/admin.js"
 import { ancientWeaponRoutes } from "./ancient-weapons/index.js"
 import { adminArtworkImageRoutes, artworkImageRoutes } from "./artworks/images.js"
 import { artworkRoutes } from "./artworks/index.js"
+import { adminArtworkPricingRoutes } from "./artworks/pricing.js"
 import { authRoutes } from "./auth/index.js"
 import { adminBlogRoutes } from "./blog/admin.js"
 import { adminBlogImageRoutes, blogImageRoutes } from "./blog/images.js"
@@ -105,6 +106,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminMetricsRoutes, { prefix: "/api/admin/metrics" })
   await fastify.register(adminAncientWeaponRoutes, { prefix: "/api/admin/ancient-weapons" })
   await fastify.register(adminArtworkImageRoutes, { prefix: "/api/admin/artworks" })
+  await fastify.register(adminArtworkPricingRoutes, { prefix: "/api/admin/artworks" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)
