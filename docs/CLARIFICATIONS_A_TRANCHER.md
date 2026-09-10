@@ -172,6 +172,13 @@
 - [ ] **Données minimum** requises par Henrri? (structure API/format encore à vérifier)
 - [ ] **Retry logic** si sync échoue? (X tentatives avec backoff exponentiel?)
 
+### F3. Reversements aux bénéficiaires (ouvert par la story 11.10)
+
+- Contexte : la 11.10 calcule ce qui est dû à **Sylvain** (part sur ses tirages vendus pour son compte) et à **Florian** (commission de conseil sur les ventes), avec un état dû / payé. Le site **ne stocke aucun IBAN** — décision assumée, justement parce que Henrri sera branché ensuite.
+- [ ] Les **versements** aux bénéficiaires passent-ils par Henrri (facture d'honoraires, note de débit) ou restent-ils hors système, le site ne servant que de récapitulatif ?
+- [ ] Si Henrri : faut-il **pousser** les reversements dus vers lui, ou **tirer** l'état payé depuis lui pour éviter la double saisie ?
+- [ ] Un **export comptable** (CSV par période et par bénéficiaire) est-il nécessaire en attendant, ou serait-ce du travail jeté ?
+
 ### F2. TVA & déclaration
 
 - [ ] **Régime TVA**: Normal, micro-entreprise, franchise?
