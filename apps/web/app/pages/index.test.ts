@@ -9,6 +9,8 @@ const artwork = {
   slug: "eclat",
   title: "Éclat",
   artistName: "SCS",
+  artistSlug: null,
+  series: null,
   description: null,
   featuredImageUrl: null,
   orientation: "landscape",

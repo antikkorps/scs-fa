@@ -170,6 +170,24 @@ One contact carries N subscriptions, each with its own timestamped consent.
 - ⚠️ The mark is **SVG text**, so the runtime needs a font: the API image installs `fonts-dejavu-core`. A font-less runtime would publish visuals with an **empty** watermark — a test asserts ink is actually laid down.
 - Deliberately **not** applied to armurerie product photos: no reproduction stake there.
 
+## Gun Art editorial: series, themes and artist (story 11.6)
+
+The collection is read **by series**, not only piece by piece. Three notions became tables rather than columns:
+
+| Table | Why a table |
+| ----- | ----------- |
+| `artists` | The name, bio and portrait used to be duplicated on **every** artwork — an artist page had no source of truth to read. One row now, with the book link |
+| `artwork_themes` | A theme carries its own indexable page, so its label must be unique and stable instead of retyped per series |
+| `artwork_series` | The editorial unit: title, presentation text, film or universe of reference, display order |
+
+- **Public routes**: `/collection/serie/:slug`, `/collection/theme/:slug`, `/collection/artiste/:slug`. `/collection/artiste` redirects to the sole artist while there is only one, and is `noindex`.
+- **API**: `GET /api/artworks/series`, `/series/:slug`, `/themes`, `/themes/:slug`, and `GET /api/artists`, `/api/artists/:slug`.
+- ⚠️ **Reserved artwork slugs** — a static segment wins over `/api/artworks/:slug`, so an artwork carrying one of these becomes unreachable: **`images`** (story 11.5), **`series`**, **`themes`**.
+- ⚠️ **The artist name left `search_vector`.** A generated column can only read its own row, so moving the artist out of `artworks` took the name out of the index. `search/global.ts` matches it through the join instead — a test locks that down, because the failure mode is a silent empty result.
+- ⚠️ **Migration 0005 drops and re-creates the generated column**, which silently takes its GIN index with it; the Drizzle snapshot still believes the index exists, so the migration re-creates `idx_artworks_search` by hand. Migration 0004 backfills `artists` from the old columns before 0005 removes them.
+- **The affiliate book link** is stored on the artist (editable from the backoffice, not by redeploy) and rendered `target="_blank" rel="sponsored noopener"`.
+- **SEO**: `Person` on the artist page, `CreativeWorkSeries` on a series, `isPartOf` on an artwork; series, themes and artists are in `sitemap.xml` and `llms-full.txt`.
+
 ## Engineering principles
 
 1. **Tests-first** — Vitest on every feature; no merge without a test.

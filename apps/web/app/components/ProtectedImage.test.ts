@@ -10,6 +10,8 @@ const artwork: ArtworkListItem = {
   slug: "piece-test",
   title: "Pièce de test",
   artistName: "Sylvain",
+  artistSlug: "sylvain",
+  series: null,
   description: null,
   featuredImageUrl: "/api/artworks/images/11111111-1111-1111-1111-111111111111.webp",
   orientation: "landscape",

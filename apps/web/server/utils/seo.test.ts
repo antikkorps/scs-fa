@@ -51,6 +51,13 @@ describe("buildLlmsTxt", () => {
     expect(txt).toContain(`${SITE}/llms-full.txt`)
     expect(txt).toContain(`GET ${SITE}/api/artworks`)
   })
+
+  it("points agents at the editorial routes added by story 11.6", () => {
+    const txt = buildLlmsTxt(SITE)
+    expect(txt).toContain(`GET ${SITE}/api/artworks/series`)
+    expect(txt).toContain(`GET ${SITE}/api/artworks/themes`)
+    expect(txt).toContain(`GET ${SITE}/api/artists/{slug}`)
+  })
 })
 
 describe("buildLlmsFull", () => {
@@ -76,9 +83,34 @@ describe("buildLlmsFull", () => {
     expect(txt).toContain(`[Histoire](${SITE}/blog/histoire)`)
   })
 
+  it("lists the series with their theme, reference and artist", () => {
+    const txt = buildLlmsFull(
+      SITE,
+      [],
+      [],
+      [
+        {
+          slug: "age-d-or",
+          title: "Âge d'or",
+          intro: "Une série sur l'avant-guerre.",
+          reference: "Le cinéma d'espionnage",
+          theme: { name: "Cinéma" },
+          artist: { name: "Camille" },
+          artworkCount: 2,
+        },
+      ],
+    )
+    expect(txt).toContain("## Séries")
+    expect(txt).toContain(`[Âge d'or](${SITE}/collection/serie/age-d-or)`)
+    expect(txt).toContain("thème : Cinéma")
+    expect(txt).toContain("référence : Le cinéma d'espionnage")
+    expect(txt).toContain("2 œuvre(s)")
+  })
+
   it("degrades gracefully with no content", () => {
     const txt = buildLlmsFull(SITE, [], [])
     expect(txt).toContain("(aucune œuvre publiée)")
     expect(txt).toContain("(aucun article publié)")
+    expect(txt).toContain("(aucune série publiée)")
   })
 })

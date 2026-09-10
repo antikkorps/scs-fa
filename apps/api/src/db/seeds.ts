@@ -3,12 +3,15 @@
 
 import { calculateArtworkPrice, CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { db } from "./client.js"
 import {
   ancientWeapons,
+  artists,
   artworkPrints,
   artworks,
+  artworkSeries,
+  artworkThemes,
   blogPosts,
   legalCategories,
   productCategories,
@@ -234,11 +237,100 @@ const A3_FORMAT = { id: "A3", name: "A3 (29,7 × 42 cm)", widthCm: 29.7, heightC
 const A2_FORMAT = { id: "A2", name: "A2 (42 × 59,4 cm)", widthCm: 42, heightCm: 59.4, priceFactor: 2.0 }
 const FORMATS = [A4_FORMAT, A3_FORMAT, A2_FORMAT]
 
+// --- Éditorial Gun Art (story 11.6) -----------------------------------------
+// L'artiste, le thème et la série sont désormais des entités à part entière :
+// la collection se lit par séries, pas seulement pièce par pièce.
+
+const ARTISTS = [
+  {
+    slug: "camille-vasseur",
+    name: "Camille Vasseur",
+    headline: "Photographe de l'objet, lumière d'atelier",
+    bio: "Camille Vasseur photographie les armes comme on photographie une sculpture : à la lumière rasante, sur fond sourd, pour que la matière parle avant l'objet.",
+    journey: "Formée à la photographie de nature morte publicitaire, elle bascule vers l'objet de collection en 2016 et travaille depuis à la chambre, en séries fermées.",
+    bookTitle: "Matières armées",
+    bookUrl: "https://www.amazon.fr/dp/2010000001",
+    published: true,
+  },
+  {
+    slug: "jonas-lindqvist",
+    name: "Jonas Lindqvist",
+    headline: "Monochrome, patine et silence",
+    bio: "Jonas Lindqvist travaille exclusivement en noir et blanc. Ses tirages barytés cherchent la trace du temps sur le métal plutôt que son éclat.",
+    journey: "Venu du reportage, il abandonne la couleur en 2012 et consacre son travail aux pièces historiques conservées en collections privées.",
+    published: true,
+  },
+  {
+    slug: "theo-marchand",
+    name: "Théo Marchand",
+    headline: "Géométrie, macro, design",
+    bio: "Théo Marchand isole la ligne. Optiques, culasses, arêtes : ses cadrages serrés font de l'arme un objet de design avant tout.",
+    journey: "Designer produit de formation, il photographie depuis 2019 les mécanismes qu'il dessinait auparavant.",
+    published: true,
+  },
+] as const
+
+const ARTWORK_THEMES = [
+  {
+    slug: "cinema",
+    name: "Cinéma",
+    description: "Les armes telles que le cinéma les a fixées dans la mémoire collective.",
+    displayOrder: 1,
+  },
+  {
+    slug: "histoire",
+    name: "Histoire",
+    description: "Pièces datées, patines réelles : la dimension historique assumée, en noir et blanc.",
+    displayOrder: 2,
+  },
+  {
+    slug: "design",
+    name: "Design",
+    description: "L'arme regardée comme un objet dessiné : ligne, matière, géométrie.",
+    displayOrder: 3,
+  },
+] as const
+
+const ARTWORK_SERIES = [
+  {
+    slug: "age-d-or",
+    title: "Âge d'or",
+    intro:
+      "Une série sur l'armurerie de précision européenne d'avant-guerre, éclairée comme un plateau de tournage. Chaque pièce y est traitée en lumière chaude, à rebours du noir et blanc documentaire.",
+    reference: "Le cinéma d'espionnage des années 1960",
+    themeSlug: "cinema",
+    artistSlug: "camille-vasseur",
+    displayOrder: 1,
+  },
+  {
+    slug: "patines",
+    title: "Patines",
+    intro:
+      "Série complète en noir et blanc, consacrée aux pièces qui ont vécu. Le sujet n'est pas l'arme mais le temps déposé dessus — usure du bois, gravure émoussée, métal terni.",
+    reference: "Les collections d'armes anciennes conservées en mains privées",
+    themeSlug: "histoire",
+    artistSlug: "jonas-lindqvist",
+    displayOrder: 2,
+  },
+  {
+    slug: "lignes",
+    title: "Lignes",
+    intro:
+      "Macro et géométrie. La série cherche le point où le mécanisme devient forme pure et où l'on cesse de reconnaître l'objet.",
+    reference: "Le design industriel du XXᵉ siècle",
+    themeSlug: "design",
+    artistSlug: "theo-marchand",
+    displayOrder: 3,
+  },
+] as const
+
 const GUN_ART_PIECES = [
   {
     slug: "eclat-de-bronze",
     title: "Éclat de Bronze",
-    artistName: "Camille Vasseur",
+    artistSlug: "camille-vasseur",
+    seriesSlug: "age-d-or",
+    seriesOrder: 1,
     description: "Un Luger P08 saisi dans une lumière dorée, hommage à l'âge d'or de l'armurerie de précision.",
     longDescription:
       "Tirage pigmentaire sur papier coton 310 g, signé et numéroté à la main. Chaque exemplaire est accompagné de son certificat d'authenticité.",
@@ -253,7 +345,9 @@ const GUN_ART_PIECES = [
   {
     slug: "acier-nocturne",
     title: "Acier Nocturne",
-    artistName: "Jonas Lindqvist",
+    artistSlug: "jonas-lindqvist",
+    seriesSlug: "patines",
+    seriesOrder: 1,
     description: "Étude monochrome d'un revolver de collection, entre ombre et reflet métallique.",
     longDescription:
       "Impression fine art sur papier baryté, encadrement caisse américaine en option. Tirage strictement limité à 25 pièces.",
@@ -268,7 +362,9 @@ const GUN_ART_PIECES = [
   {
     slug: "memoire-de-poudre",
     title: "Mémoire de Poudre",
-    artistName: "Camille Vasseur",
+    artistSlug: "camille-vasseur",
+    seriesSlug: "age-d-or",
+    seriesOrder: 2,
     description: "Nature morte contemporaine : douilles, cuir et laiton patiné sur fond charbon.",
     longDescription: "Tirage pigmentaire signé, numéroté, livré avec certificat. Papier coton mat 310 g.",
     editionLimit: 20,
@@ -282,7 +378,9 @@ const GUN_ART_PIECES = [
   {
     slug: "ligne-de-mire",
     title: "Ligne de Mire",
-    artistName: "Théo Marchand",
+    artistSlug: "theo-marchand",
+    seriesSlug: "lignes",
+    seriesOrder: 1,
     description: "Macro graphique d'une optique de tir, géométrie pure et profondeur de champ travaillée.",
     longDescription: "Impression giclée haute densité, signée et numérotée. Édition limitée à 25 exemplaires.",
     editionLimit: 25,
@@ -296,7 +394,9 @@ const GUN_ART_PIECES = [
   {
     slug: "patine-historique",
     title: "Patine Historique",
-    artistName: "Jonas Lindqvist",
+    artistSlug: "jonas-lindqvist",
+    seriesSlug: "patines",
+    seriesOrder: 2,
     description: "Portrait d'une arme ancienne, bois noble et gravures, dans une lumière de musée.",
     longDescription: "Tirage fine art sur baryté, certificat d'authenticité inclus. Pièce de collection.",
     editionLimit: 15,
@@ -310,7 +410,9 @@ const GUN_ART_PIECES = [
   {
     slug: "silence-calibre",
     title: "Silence Calibre .45",
-    artistName: "Théo Marchand",
+    artistSlug: "theo-marchand",
+    seriesSlug: "lignes",
+    seriesOrder: 2,
     description: "Composition minimaliste, un pistolet posé comme un objet de design intemporel.",
     longDescription: "Impression pigmentaire signée et numérotée, papier coton 310 g. Édition de 25 pièces.",
     editionLimit: 25,
@@ -365,10 +467,86 @@ async function seedGunArt() {
     return
   }
 
+  // Artistes, thèmes puis séries — dans cet ordre, une série référençant les deux.
+  // Tout est idempotent : un seed rejoué ne duplique rien.
+  //
+  // ⚠️ L'artiste ne peut pas se contenter d'un `DO NOTHING` : la migration 0004
+  // a promu les noms trouvés sur les œuvres en lignes d'`artists`, donc les
+  // bases existantes portent déjà des artistes **sans bio, sans parcours et sans
+  // livre**. Le seed comble donc les trous (`coalesce`) sans jamais écraser un
+  // texte saisi depuis le backoffice.
+  const artistIds = new Map<string, string>()
+  for (const artist of ARTISTS) {
+    const [row] = await db
+      .insert(artists)
+      .values(artist)
+      .onConflictDoUpdate({
+        target: artists.slug,
+        set: {
+          headline: sql`coalesce(${artists.headline}, excluded.headline)`,
+          bio: sql`coalesce(${artists.bio}, excluded.bio)`,
+          journey: sql`coalesce(${artists.journey}, excluded.journey)`,
+          portraitUrl: sql`coalesce(${artists.portraitUrl}, excluded.portrait_url)`,
+          bookTitle: sql`coalesce(${artists.bookTitle}, excluded.book_title)`,
+          bookUrl: sql`coalesce(${artists.bookUrl}, excluded.book_url)`,
+        },
+      })
+      .returning({ id: artists.id })
+    const id = row?.id ?? (await db.select({ id: artists.id }).from(artists).where(eq(artists.slug, artist.slug)))[0]?.id
+    if (id) artistIds.set(artist.slug, id)
+  }
+
+  const themeIds = new Map<string, string>()
+  for (const theme of ARTWORK_THEMES) {
+    const [row] = await db
+      .insert(artworkThemes)
+      .values(theme)
+      .onConflictDoNothing({ target: artworkThemes.slug })
+      .returning({ id: artworkThemes.id })
+    const id =
+      row?.id ??
+      (await db.select({ id: artworkThemes.id }).from(artworkThemes).where(eq(artworkThemes.slug, theme.slug)))[0]?.id
+    if (id) themeIds.set(theme.slug, id)
+  }
+
+  const seriesIds = new Map<string, string>()
+  for (const series of ARTWORK_SERIES) {
+    const [row] = await db
+      .insert(artworkSeries)
+      .values({
+        slug: series.slug,
+        title: series.title,
+        intro: series.intro,
+        reference: series.reference,
+        themeId: themeIds.get(series.themeSlug) ?? null,
+        artistId: artistIds.get(series.artistSlug) ?? null,
+        displayOrder: series.displayOrder,
+        published: true,
+      })
+      .onConflictDoNothing({ target: artworkSeries.slug })
+      .returning({ id: artworkSeries.id })
+    const id =
+      row?.id ??
+      (await db.select({ id: artworkSeries.id }).from(artworkSeries).where(eq(artworkSeries.slug, series.slug)))[0]?.id
+    if (id) seriesIds.set(series.slug, id)
+  }
+
   for (const piece of GUN_ART_PIECES) {
-    // Idempotent: skip if this artwork already exists
     const [existing] = await db.select({ id: artworks.id }).from(artworks).where(eq(artworks.slug, piece.slug)).limit(1)
-    if (existing) continue
+    if (existing) {
+      // The artwork predates story 11.6, so it carries no series. Attach it
+      // where the attachment is still missing — without touching an artwork an
+      // admin has since moved to another series.
+      await db
+        .update(artworks)
+        .set({
+          artistId: sql`coalesce(${artworks.artistId}, ${artistIds.get(piece.artistSlug) ?? null})`,
+          seriesId: sql`coalesce(${artworks.seriesId}, ${seriesIds.get(piece.seriesSlug) ?? null})`,
+          seriesOrder: sql`coalesce(nullif(${artworks.seriesOrder}, 0), ${piece.seriesOrder})`,
+        })
+        .where(eq(artworks.id, existing.id))
+      continue
+    }
 
     const [product] = await db
       .insert(products)
@@ -393,7 +571,9 @@ async function seedGunArt() {
         title: piece.title,
         description: piece.description,
         longDescription: piece.longDescription,
-        artistName: piece.artistName,
+        artistId: artistIds.get(piece.artistSlug) ?? null,
+        seriesId: seriesIds.get(piece.seriesSlug) ?? null,
+        seriesOrder: piece.seriesOrder,
         editionLimit: piece.editionLimit,
         editionYear: piece.editionYear,
         availableFormats: FORMATS,

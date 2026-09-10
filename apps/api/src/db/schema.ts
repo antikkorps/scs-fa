@@ -736,6 +736,115 @@ export const ancientWeaponsRelations = relations(ancientWeapons, ({ one }) => ({
 // 5. GUN ART (Tableaux, Photos, Tirages limités)
 // ============================================================================
 
+// --- Éditorial Gun Art (story 11.6) -----------------------------------------
+// L'œuvre isolée ne suffit pas : Sylvain travaille par SÉRIES, chacune adossée à
+// un THÈME (un film, un univers de référence) et signée par un ARTISTE. Ces
+// trois notions sont des tables et non des colonnes, pour trois raisons :
+//   - un thème doit pouvoir porter sa propre page indexable, avec un libellé
+//     unique qui ne dérive pas d'une saisie à l'autre ;
+//   - la bio de l'artiste vivait dupliquée sur CHAQUE œuvre — une page artiste
+//     n'aurait eu aucune source de vérité à lire ;
+//   - le modèle ne présume pas d'un artiste unique, même si le client n'en a
+//     qu'un aujourd'hui.
+
+export const artists = pgTable(
+  "artists",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 255 }).unique().notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+
+    // Éditorial
+    headline: varchar("headline", { length: 255 }), // accroche sous le nom
+    bio: text("bio"),
+    journey: text("journey"), // parcours
+    portraitUrl: varchar("portrait_url", { length: 512 }),
+
+    // Livre de l'artiste (lien affilié : rendu en rel="sponsored noopener").
+    // En base et non en configuration, pour que le lien se change depuis le
+    // backoffice plutôt que par un déploiement.
+    bookTitle: varchar("book_title", { length: 255 }),
+    bookUrl: varchar("book_url", { length: 512 }),
+
+    published: boolean("published").default(false),
+
+    // SEO
+    metaTitle: varchar("meta_title", { length: 255 }),
+    metaDescription: varchar("meta_description", { length: 500 }),
+
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [index("idx_artists_slug").on(t.slug)],
+)
+
+export const artworkThemes = pgTable(
+  "artwork_themes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 100 }).unique().notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    displayOrder: integer("display_order").default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [index("idx_artwork_themes_order").on(t.displayOrder)],
+)
+
+export const artworkSeries = pgTable(
+  "artwork_series",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 255 }).unique().notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+
+    // Le texte de présentation : ce qui fait de la série une unité éditoriale
+    // et non un simple regroupement.
+    intro: text("intro"),
+    // Le film ou l'univers dont la série s'inspire, en clair.
+    reference: varchar("reference", { length: 255 }),
+
+    themeId: uuid("theme_id"),
+    artistId: uuid("artist_id"),
+
+    coverImageUrl: varchar("cover_image_url", { length: 512 }),
+    displayOrder: integer("display_order").default(0),
+    published: boolean("published").default(false),
+
+    // SEO
+    metaTitle: varchar("meta_title", { length: 255 }),
+    metaDescription: varchar("meta_description", { length: 500 }),
+
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_artwork_series_slug").on(t.slug),
+    index("idx_artwork_series_theme").on(t.themeId, t.displayOrder),
+    index("idx_artwork_series_published").on(t.published),
+    // Une série survit à la suppression de son thème ou de son artiste : elle
+    // reste publiable, seule sa navigation éditoriale se vide.
+    foreignKey({ columns: [t.themeId], foreignColumns: [artworkThemes.id] }).onDelete("set null"),
+    foreignKey({ columns: [t.artistId], foreignColumns: [artists.id] }).onDelete("set null"),
+  ],
+)
+
+export const artistsRelations = relations(artists, ({ many }) => ({
+  series: many(artworkSeries),
+  artworks: many(artworks),
+}))
+
+export const artworkThemesRelations = relations(artworkThemes, ({ many }) => ({
+  series: many(artworkSeries),
+}))
+
+export const artworkSeriesRelations = relations(artworkSeries, ({ one, many }) => ({
+  theme: one(artworkThemes, { fields: [artworkSeries.themeId], references: [artworkThemes.id] }),
+  artist: one(artists, { fields: [artworkSeries.artistId], references: [artists.id] }),
+  artworks: many(artworks),
+}))
+
 export const artworks = pgTable(
   "artworks",
   {
@@ -751,10 +860,12 @@ export const artworks = pgTable(
     description: text("description"),
     longDescription: text("long_description"),
 
-    // Artiste
-    artistName: varchar("artist_name", { length: 255 }),
-    artistBio: text("artist_bio"),
-    artistImageUrl: varchar("artist_image_url", { length: 512 }),
+    // Artiste & série (story 11.6) — la bio de l'artiste vivait ici, dupliquée
+    // sur chaque œuvre ; elle vit désormais dans `artists`, source unique.
+    artistId: uuid("artist_id"),
+    seriesId: uuid("series_id"),
+    // Rang de l'œuvre DANS sa série : une série se lit dans un ordre voulu.
+    seriesOrder: integer("series_order").default(0),
 
     // Série
     editionLimit: integer("edition_limit").notNull(), // 25 max pour photos
@@ -808,8 +919,12 @@ export const artworks = pgTable(
     keywords: varchar("keywords", { length: 500 }),
 
     // Recherche full-text (généré: title pondéré A, artist_name B, description C)
+    // ⚠️ Une colonne générée ne peut lire que SA propre ligne : le nom de
+    // l'artiste ayant quitté la table, il ne peut plus être indexé ici. La
+    // recherche globale le rattrape en joignant `artists` (cf. search/global.ts),
+    // donc « Sylvain » retrouve toujours ses œuvres.
     searchVector: tsvector("search_vector").generatedAlwaysAs(
-      sql`setweight(to_tsvector('french', coalesce(title, '')), 'A') || setweight(to_tsvector('french', coalesce(artist_name, '')), 'B') || setweight(to_tsvector('french', coalesce(description, '')), 'C')`,
+      sql`setweight(to_tsvector('french', coalesce(title, '')), 'A') || setweight(to_tsvector('french', coalesce(description, '')), 'C')`,
     ),
 
     // Métadonnées
@@ -821,10 +936,16 @@ export const artworks = pgTable(
      index("idx_artworks_published").on(t.published),
      index("idx_artworks_available").on(t.availableFrom, t.availableUntil),
      index("idx_artworks_search").using("gin", t.searchVector),
+     index("idx_artworks_series").on(t.seriesId, t.seriesOrder),
+     index("idx_artworks_artist").on(t.artistId),
      foreignKey({
       columns: [t.productId],
       foreignColumns: [products.id],
     }).onDelete("cascade"),
+     // Une œuvre survit à la suppression de sa série ou de son artiste : elle
+     // reste vendable, elle perd seulement son rattachement éditorial.
+     foreignKey({ columns: [t.artistId], foreignColumns: [artists.id] }).onDelete("set null"),
+     foreignKey({ columns: [t.seriesId], foreignColumns: [artworkSeries.id] }).onDelete("set null"),
   ],
 )
 
@@ -833,6 +954,8 @@ export const artworksRelations = relations(artworks, ({ one, many }) => ({
     fields: [artworks.productId],
     references: [products.id],
   }),
+  artist: one(artists, { fields: [artworks.artistId], references: [artists.id] }),
+  series: one(artworkSeries, { fields: [artworks.seriesId], references: [artworkSeries.id] }),
   prints: many(artworkPrints),
 }))
 
