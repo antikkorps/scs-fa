@@ -188,6 +188,27 @@ The collection is read **by series**, not only piece by piece. Three notions bec
 - **The affiliate book link** is stored on the artist (editable from the backoffice, not by redeploy) and rendered `target="_blank" rel="sponsored noopener"`.
 - **SEO**: `Person` on the artist page, `CreativeWorkSeries` on a series, `isPartOf` on an artwork; series, themes and artists are in `sitemap.xml` and `llms-full.txt`.
 
+## Catalogue backoffice (story 7.5a)
+
+Every entity the storefront shows is now created and edited from `/admin` — nothing requires SQL.
+
+| Screen | API |
+| ------ | --- |
+| `/admin/produits` | `/api/admin/products` (variants, tags, legal category) |
+| `/admin/armes-anciennes` | `/api/admin/ancient-weapons` (delivered in 11.2) |
+| `/admin/gun-art/oeuvres` | `/api/admin/artworks` (artwork + backing product + numbered edition) |
+| `/admin/gun-art/{series,themes,artistes}` | `/api/admin/gun-art/{series,themes,artists}` |
+| `/admin/tags` | `/api/admin/tags` |
+
+- **The 11.7 price guard rail applies here**: an artwork is refused when a smaller format would out-price a bigger one, on create *and* on patch — and it validates the grid **after** the patch, since changing the increment alone can break a grid whose factors were untouched. The refusal carries both remedies with numbers. The same shared function also runs live in the form.
+- **What is promised stays promised**: a sold or reserved print keeps its price; only prints still on the shelf follow a price change. Deleting an edition with a claimed print is refused — unpublish it instead.
+- **Variants are reconciled, never wiped**: a variant id travels through carts and order lines, so removing one that appears on an order is refused ("set its stock to 0 instead").
+- A **tag's facet is immutable**: it decides the query semantics (OR inside a facet, AND across facets), so moving a tag would silently change every saved filter.
+- Products backing an artwork or a collection weapon are **excluded** from the generic product form: they have their own screens, which know about editions and provenance.
+- ⚠️ **Drizzle qualifies columns in a raw `sql` fragment only when the outer query has a join.** In a single-table query the outer column comes out bare and Postgres binds it to the sub-query's own table — a correlated count then returns zero with no error. Counters here go through a join plus `count(distinct)`.
+- ⚠️ **zod 4 refuses `.omit()` on a refined object at runtime** while the types still check. Base objects stay plain; refinements live on the derived schemas.
+- ⚠️ **Known model tension, stated not hidden**: `artwork_prints.format_id` fixes a format at creation, while the client rule (11.7) shares the 25 numbers across formats with the buyer picking a size. Until that is settled the edition is numbered in the entry format, and an admin can re-format any still-available print.
+
 ## Engineering principles
 
 1. **Tests-first** — Vitest on every feature; no merge without a test.

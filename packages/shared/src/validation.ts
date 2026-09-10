@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { ARTWORK_ORIENTATIONS } from "./artwork.js"
 import {
   ADDRESS_TYPES,
   LEGAL_CATEGORIES,
@@ -6,6 +7,7 @@ import {
   LEGAL_DOC_TYPES,
   LEGAL_DOC_VERIFICATION_STATUS,
   MAX_TAG_FILTERS,
+  TAG_FACETS,
 } from "./constants.js"
 import { NEWSLETTER_SEGMENTS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
@@ -590,3 +592,275 @@ export const artworkPriceGridSchema = z
   })
 
 export type ArtworkPriceGridInput = z.infer<typeof artworkPriceGridSchema>
+
+// ===========================================================================
+// Admin catalogue CRUD (story 7.5a)
+// ===========================================================================
+// The backoffice is the only way content gets in — nobody is going to write SQL.
+// Every schema below is the single gate an entity passes through on the way in,
+// shared by the API (which enforces it) and the admin forms (which mirror it).
+
+/** A public-facing slug. Lower-case only: every slug route in the API rejects the rest. */
+export const entitySlugSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid slug (lower-case words separated by single dashes)")
+
+/** Optional free text that must be either absent or non-empty — never an empty string in the DB. */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((v) => (v.length === 0 ? undefined : v))
+    .optional()
+
+const optionalUrl = z
+  .string()
+  .trim()
+  .max(512)
+  .transform((v) => (v.length === 0 ? undefined : v))
+  .optional()
+  .refine((v) => v === undefined || /^https?:\/\//.test(v) || v.startsWith("/"), {
+    message: "Must be an absolute http(s) URL or a site-relative path",
+  })
+
+// --- Artists ---------------------------------------------------------------
+
+export const createArtistSchema = z
+  .object({
+    slug: entitySlugSchema,
+    name: z.string().trim().min(1).max(255),
+    headline: optionalText(255),
+    bio: optionalText(20000),
+    journey: optionalText(20000),
+    portraitUrl: optionalUrl,
+    bookTitle: optionalText(255),
+    // Affiliate link, rendered rel="sponsored noopener" — see the artist page.
+    bookUrl: optionalUrl,
+    published: z.boolean().default(false),
+    metaTitle: optionalText(255),
+    metaDescription: optionalText(500),
+  })
+  .strict()
+
+export const updateArtistSchema = createArtistSchema
+  .omit({ slug: true })
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+export type CreateArtistInput = z.infer<typeof createArtistSchema>
+export type UpdateArtistInput = z.infer<typeof updateArtistSchema>
+
+// --- Artwork themes --------------------------------------------------------
+
+export const createArtworkThemeSchema = z
+  .object({
+    slug: entitySlugSchema,
+    name: z.string().trim().min(1).max(100),
+    description: optionalText(5000),
+    displayOrder: z.coerce.number().int().min(0).max(9999).default(0),
+  })
+  .strict()
+
+export const updateArtworkThemeSchema = createArtworkThemeSchema
+  .omit({ slug: true })
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+export type CreateArtworkThemeInput = z.infer<typeof createArtworkThemeSchema>
+export type UpdateArtworkThemeInput = z.infer<typeof updateArtworkThemeSchema>
+
+// --- Artwork series --------------------------------------------------------
+
+export const createArtworkSeriesSchema = z
+  .object({
+    slug: entitySlugSchema,
+    title: z.string().trim().min(1).max(255),
+    intro: optionalText(20000),
+    // The film or universe the series draws on, in plain words.
+    reference: optionalText(255),
+    themeId: z.string().uuid().nullish(),
+    artistId: z.string().uuid().nullish(),
+    coverImageUrl: optionalUrl,
+    displayOrder: z.coerce.number().int().min(0).max(9999).default(0),
+    published: z.boolean().default(false),
+    metaTitle: optionalText(255),
+    metaDescription: optionalText(500),
+  })
+  .strict()
+
+export const updateArtworkSeriesSchema = createArtworkSeriesSchema
+  .omit({ slug: true })
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+export type CreateArtworkSeriesInput = z.infer<typeof createArtworkSeriesSchema>
+export type UpdateArtworkSeriesInput = z.infer<typeof updateArtworkSeriesSchema>
+
+// --- Artworks --------------------------------------------------------------
+
+/** A purchasable size. `priceFactor` scales the base price; the 11.7 guard rail validates the set. */
+export const artworkFormatSchema = z
+  .object({
+    id: z.string().trim().min(1).max(100),
+    name: z.string().trim().min(1).max(100),
+    widthCm: z.coerce.number().positive().max(1000),
+    heightCm: z.coerce.number().positive().max(1000),
+    priceFactor: z.coerce.number().positive().max(100),
+  })
+  .strict()
+
+// ⚠️ The refinement lives on the *derived* schemas, never on the base: zod 4
+// refuses `.omit()` on a refined object — and it refuses it at RUNTIME, while
+// the types still check. The base object is therefore kept plain.
+const artworkBaseSchema = z
+  .object({
+    sku: z.string().trim().min(1).max(100),
+    slug: entitySlugSchema,
+    title: z.string().trim().min(1).max(255),
+    description: optionalText(1000),
+    longDescription: optionalText(20000),
+
+    artistId: z.string().uuid().nullish(),
+    seriesId: z.string().uuid().nullish(),
+    seriesOrder: z.coerce.number().int().min(0).max(9999).default(0),
+
+    // The edition is counted ACROSS formats: `editionLimit` prints in total, not
+    // per format. Capped at the same 250 as the price simulator.
+    editionLimit: z.coerce.number().int().min(1).max(250),
+    editionYear: z.coerce.number().int().min(1800).max(2200).nullish(),
+    availableFormats: z.array(artworkFormatSchema).min(1).max(10),
+
+    basePriceHt: z.coerce.number().min(0).max(1_000_000),
+    priceIncrementHt: z.coerce.number().min(0).max(1_000_000),
+    vatPct: z.coerce.number().min(0).max(100).default(20),
+
+    orientation: z.enum(ARTWORK_ORIENTATIONS).default("portrait"),
+    includeCertificate: z.boolean().default(true),
+    featuredImageUrl: optionalUrl,
+    published: z.boolean().default(false),
+    featured: z.boolean().default(false),
+
+    metaTitle: optionalText(255),
+    metaDescription: optionalText(500),
+  })
+  .strict()
+
+const uniqueFormatIds = {
+  message: "Format ids must be unique",
+  path: ["availableFormats"],
+}
+
+export const createArtworkSchema = artworkBaseSchema.refine(
+  (v) => new Set(v.availableFormats.map((f) => f.id)).size === v.availableFormats.length,
+  uniqueFormatIds,
+)
+
+// `sku`, `slug` and `editionLimit` are deliberately absent: the first two are
+// indexed URLs, and the third is the size of an edition already numbered and
+// partly sold — changing it would rewrite what buyers were promised.
+export const updateArtworkSchema = artworkBaseSchema
+  .omit({ sku: true, slug: true, editionLimit: true })
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+  .refine(
+    (patch) =>
+      patch.availableFormats === undefined ||
+      new Set(patch.availableFormats.map((f) => f.id)).size === patch.availableFormats.length,
+    { message: "Format ids must be unique", path: ["availableFormats"] },
+  )
+
+export type CreateArtworkInput = z.infer<typeof createArtworkSchema>
+export type UpdateArtworkInput = z.infer<typeof updateArtworkSchema>
+
+// --- Tags ------------------------------------------------------------------
+
+export const createTagSchema = z
+  .object({
+    slug: tagSlugSchema,
+    name: z.string().trim().min(1).max(100),
+    facet: z.enum(TAG_FACETS),
+    description: optionalText(1000),
+    displayOrder: z.coerce.number().int().min(0).max(9999).default(0),
+  })
+  .strict()
+
+// The facet drives the query semantics (OR inside a facet, AND across facets),
+// so moving a tag between facets silently changes every saved filter — refused.
+export const updateTagSchema = createTagSchema
+  .omit({ slug: true, facet: true })
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+export type CreateTagInput = z.infer<typeof createTagSchema>
+export type UpdateTagInput = z.infer<typeof updateTagSchema>
+
+// --- Products (armurerie) --------------------------------------------------
+
+export const productVariantSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    skuVariant: z.string().trim().min(1).max(150),
+    // The three attributes the table actually carries — see `product_variants`.
+    finition: optionalText(100),
+    munition: optionalText(100),
+    couleur: optionalText(100),
+    priceDeltaHt: z.coerce.number().min(-1_000_000).max(1_000_000).default(0),
+    stockQty: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  })
+  .strict()
+  // `chk_variant_attrs` demands at least one of them; catching it here turns a
+  // 500 from Postgres into a field-level message.
+  .refine((v) => Boolean(v.finition || v.munition || v.couleur), {
+    message: "A variant needs at least one attribute (finish, ammunition or colour)",
+  })
+
+const productBaseSchema = z
+  .object({
+    sku: z.string().trim().min(1).max(100),
+    slug: entitySlugSchema,
+    name: z.string().trim().min(1).max(255),
+    description: optionalText(1000),
+    longDescription: optionalText(20000),
+    categorySlug: categorySlugSchema,
+    legalCategory: z.enum(LEGAL_CATEGORIES),
+    priceHt: z.coerce.number().min(0).max(10_000_000),
+    vatPct: z.coerce.number().min(0).max(100).default(20),
+    stockQty: z.coerce.number().int().min(0).max(1_000_000).default(0),
+    trackStock: z.boolean().default(true),
+    featuredImageUrl: optionalUrl,
+    published: z.boolean().default(false),
+    featured: z.boolean().default(false),
+    tagSlugs: z.array(tagSlugSchema).max(MAX_TAG_FILTERS).default([]),
+    variants: z.array(productVariantSchema).max(50).default([]),
+    metaTitle: optionalText(255),
+    metaDescription: optionalText(500),
+  })
+  .strict()
+
+const uniqueVariantSkus = {
+  message: "Variant SKUs must be unique",
+  path: ["variants"],
+}
+
+export const createProductSchema = productBaseSchema.refine(
+  (v) => new Set(v.variants.map((x) => x.skuVariant)).size === v.variants.length,
+  uniqueVariantSkus,
+)
+
+export const updateProductSchema = productBaseSchema
+  .omit({ sku: true, slug: true })
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+  .refine(
+    (patch) =>
+      patch.variants === undefined || new Set(patch.variants.map((x) => x.skuVariant)).size === patch.variants.length,
+    { message: "Variant SKUs must be unique", path: ["variants"] },
+  )
+
+export type ProductVariantInput = z.infer<typeof productVariantSchema>
+export type CreateProductInput = z.infer<typeof createProductSchema>
+export type UpdateProductInput = z.infer<typeof updateProductSchema>
