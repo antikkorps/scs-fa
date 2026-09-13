@@ -1,6 +1,7 @@
 import {
   computeProfitability,
   createProductSchema,
+  defaultParcelCount,
   type ProductVariantInput,
   updateProductSchema,
   uuidParamSchema,
@@ -128,6 +129,7 @@ async function loadAdminProduct(id: string) {
       chargesAmountHt: products.chargesAmountHt,
       beneficiaryId: products.beneficiaryId,
       beneficiarySharePct: products.beneficiarySharePct,
+      parcelCount: products.parcelCount,
       categorySlug: productCategories.slug,
       categoryName: productCategories.name,
       legalCategory: legalCategories.category,
@@ -286,6 +288,9 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
           chargesAmountHt: body.chargesAmountHt?.toFixed(2) ?? null,
           beneficiaryId: body.beneficiaryId ?? null,
           beneficiarySharePct: body.beneficiarySharePct?.toFixed(2) ?? null,
+          // A category B firearm is delivered in two parcels (weapon and parts
+          // apart): preset, and still editable article by article.
+          parcelCount: body.parcelCount ?? defaultParcelCount(legalCategory, categorySlug),
         })
         .returning({ id: products.id })
       if (!product) throw new Error("Product insert returned no row")
@@ -322,6 +327,7 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
           "featured",
           "metaTitle",
           "metaDescription",
+          "parcelCount",
         ] as const) {
           if (body[key] !== undefined) patch[key] = body[key]
         }

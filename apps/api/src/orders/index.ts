@@ -28,6 +28,7 @@ import {
 import { env } from "../env.js"
 import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
+import { customerShipments } from "../shipments/service.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 
 class OrderError extends Error {
@@ -382,6 +383,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         items: orders.itemsJson,
         shippingAddress: orders.shippingAddress,
         billingAddress: orders.billingAddress,
+        shippingStatus: orders.shippingStatus,
       })
       .from(orders)
       .where(and(eq(orders.id, params.data.id), eq(orders.userId, userId)))
@@ -390,6 +392,9 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!order) {
       return reply.code(404).send({ error: "NotFound", message: "Order not found" })
     }
+
+    // Parcels and their tracking (story 11.9) — without the admin's internal notes.
+    const shipments = await customerShipments(order.id)
 
     // Payment buckets, so the storefront knows what to show (card form / RIB)
     // and each bucket's status without probing the payment endpoints.
@@ -420,6 +425,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         totalTtc: Number(order.totalTtc),
         vipDiscountAmount: Number(order.vipDiscountAmount),
         vipDiscountAppliedPct: Number(order.vipDiscountAppliedPct),
+        shipments,
         payment: {
           carte: carte ? { status: carte.paymentStatus, amountTtc: Number(carte.amountTtc) } : null,
           virement: virement

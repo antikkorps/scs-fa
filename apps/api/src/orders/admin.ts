@@ -6,6 +6,7 @@ import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { adminShippingView } from "../shipments/service.js"
 
 // Row shape for the admin orders list: enough to triage without the full detail.
 const LIST_FIELDS = {
@@ -14,6 +15,7 @@ const LIST_FIELDS = {
   updatedAt: orders.updatedAt,
   legalVerificationStatus: orders.legalVerificationStatus,
   paymentStatus: orders.paymentStatus,
+  shippingStatus: orders.shippingStatus,
   totalTtc: orders.totalTtc,
   itemsJson: orders.itemsJson,
   user: {
@@ -64,11 +66,12 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) {
       return reply.code(400).send(validationError(parsed.error.issues))
     }
-    const { paymentStatus, legalStatus, search, page, limit } = parsed.data
+    const { paymentStatus, legalStatus, shippingStatus, search, page, limit } = parsed.data
 
     const conditions = [
       paymentStatus ? eq(orders.paymentStatus, paymentStatus) : undefined,
       legalStatus ? eq(orders.legalVerificationStatus, legalStatus) : undefined,
+      shippingStatus ? eq(orders.shippingStatus, shippingStatus) : undefined,
       search ? ilike(users.email, `%${search}%`) : undefined,
     ].filter(Boolean)
     const where = conditions.length ? and(...conditions) : undefined
@@ -115,6 +118,7 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
         legalVerificationStatus: orders.legalVerificationStatus,
         legalRejectionReason: orders.legalRejectionReason,
         paymentStatus: orders.paymentStatus,
+        shippingStatus: orders.shippingStatus,
         subtotalHt: orders.subtotalHt,
         vatAmount: orders.vatAmount,
         totalTtc: orders.totalTtc,
@@ -139,6 +143,7 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
       .from(refunds)
       .where(eq(refunds.orderId, order.id))
       .orderBy(sql`${refunds.createdAt} DESC`)
+    const shipping = await adminShippingView(order)
 
     return reply.code(200).send({
       data: {
@@ -148,6 +153,7 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
         totalTtc: Number(order.totalTtc),
         vipDiscountAmount: Number(order.vipDiscountAmount),
         payment: { carte: carte ?? null, virement: virement ?? null, refunds: orderRefunds },
+        ...shipping,
       },
     })
   })

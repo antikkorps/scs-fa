@@ -11,6 +11,12 @@ import {
 } from "./constants.js"
 import { NEWSLETTER_SEGMENTS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
+import {
+  MAX_PARCELS_PER_ARTICLE,
+  ORDER_SHIPPING_STATUSES,
+  SHIPMENT_STATUSES,
+  SHIPPING_CARRIER_CODES,
+} from "./shipping.js"
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
@@ -393,6 +399,7 @@ export type CreateRefundInput = z.infer<typeof createRefundSchema>
 export const adminOrderQuerySchema = z.object({
   paymentStatus: z.enum(ORDER_PAYMENT_STATUSES).optional(),
   legalStatus: z.enum(ORDER_LEGAL_STATUSES).optional(),
+  shippingStatus: z.enum(ORDER_SHIPPING_STATUSES).optional(),
   search: z.string().trim().min(1).max(255).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
@@ -852,6 +859,9 @@ const productBaseSchema = z
     chargesAmountHt: z.coerce.number().min(0).max(10_000_000).nullish(),
     beneficiaryId: z.string().uuid().nullish(),
     beneficiarySharePct: z.coerce.number().min(0).max(100).nullish(),
+    // Expédition (story 11.9). Absent à la création : l'API le déduit de la
+    // catégorie légale (2 colis pour une catégorie B, 1 sinon).
+    parcelCount: z.coerce.number().int().min(1).max(MAX_PARCELS_PER_ARTICLE).optional(),
     metaTitle: optionalText(255),
     metaDescription: optionalText(500),
   })
@@ -966,6 +976,74 @@ export const payoutQuerySchema = z
     status: z.enum(PAYOUT_STATUSES).optional(),
   })
   .strict()
+
+// --- Expédition multi-colis (story 11.9) -----------------------------------
+
+const trackingNumberField = z
+  .string()
+  .trim()
+  .max(100)
+  .transform((v) => (v.length === 0 ? undefined : v))
+  .optional()
+  .refine((v) => v === undefined || /^[A-Za-z0-9 .-]+$/.test(v), {
+    message: "A tracking number holds letters, digits, spaces, dots and dashes only",
+  })
+
+// Only ever shown to the customer as a link: https, nothing else.
+const trackingUrlField = z
+  .string()
+  .trim()
+  .max(512)
+  .transform((v) => (v.length === 0 ? undefined : v))
+  .optional()
+  .refine((v) => v === undefined || /^https:\/\/[^\s]+$/.test(v), { message: "The tracking link must be an https URL" })
+
+export const shipmentItemInputSchema = z
+  .object({
+    variantId: z.string().uuid().optional(),
+    printId: z.string().uuid().optional(),
+    qty: z.coerce.number().int().min(1).max(1000),
+    part: z.coerce.number().int().min(1).max(MAX_PARCELS_PER_ARTICLE).default(1),
+    parts: z.coerce.number().int().min(1).max(MAX_PARCELS_PER_ARTICLE).default(1),
+  })
+  .strict()
+  .refine((i) => Boolean(i.variantId) !== Boolean(i.printId), {
+    message: "A parcel item references exactly one of variantId or printId",
+  })
+
+export const createShipmentSchema = z
+  .object({
+    orderId: z.string().uuid(),
+    carrier: z.enum(SHIPPING_CARRIER_CODES),
+    trackingNumber: trackingNumberField,
+    trackingUrl: trackingUrlField,
+    notes: optionalText(1000),
+    items: z.array(shipmentItemInputSchema).min(1).max(50),
+  })
+  .strict()
+  .refine((v) => v.carrier === "other" || v.trackingUrl === undefined, {
+    message: "A tracking link can only be pasted for a carrier outside the list",
+    path: ["trackingUrl"],
+  })
+
+/**
+ * PATCH a parcel. Its content is not editable: a parcel still being prepared is
+ * deleted and packed again, one that has left is a fact. `null` clears a field.
+ */
+export const updateShipmentSchema = z
+  .object({
+    carrier: z.enum(SHIPPING_CARRIER_CODES).optional(),
+    trackingNumber: trackingNumberField.nullable(),
+    trackingUrl: trackingUrlField.nullable(),
+    notes: optionalText(1000).nullable(),
+    status: z.enum(SHIPMENT_STATUSES).optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+export type ShipmentItemInput = z.infer<typeof shipmentItemInputSchema>
+export type CreateShipmentInput = z.infer<typeof createShipmentSchema>
+export type UpdateShipmentInput = z.infer<typeof updateShipmentSchema>
 
 export type CreateBeneficiaryInput = z.infer<typeof createBeneficiarySchema>
 export type UpdateBeneficiaryInput = z.infer<typeof updateBeneficiarySchema>

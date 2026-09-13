@@ -164,6 +164,58 @@ export async function sendLegalDocRejectedEmail(
   })
 }
 
+export type ShipmentShippedEmail = {
+  orderId: string
+  orderRef: string
+  /** Rank of this parcel in the order, and how many parcels the order has. */
+  position: number
+  total: number
+  carrierLabel: string
+  trackingNumber: string | null
+  trackingUrl: string | null
+  items: Array<{ label: string; qty: number; part: number; parts: number }>
+}
+
+/**
+ * "Your parcel is on its way" (Story 11.9) — one mail per parcel, the order
+ * being possibly split (a category B firearm travels in two). Idempotence is
+ * the caller's job (see shipments/service.ts).
+ */
+export async function sendShipmentShippedEmail(to: string, p: ShipmentShippedEmail): Promise<void> {
+  const orderUrl = `${env.WEB_BASE_URL}/compte/commandes/${p.orderId}`
+  const parcel = p.total > 1 ? `Votre colis ${p.position}/${p.total}` : "Votre colis"
+  const itemLabel = (i: ShipmentShippedEmail["items"][number]) =>
+    `${i.label}${i.qty > 1 ? ` × ${i.qty}` : ""}${i.parts > 1 ? ` (partie ${i.part}/${i.parts})` : ""}`
+  const trackingText = [
+    p.trackingNumber ? `Numéro de suivi : ${p.trackingNumber}` : "",
+    p.trackingUrl ? `Suivre le colis : ${p.trackingUrl}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+  const splitNote =
+    p.total > 1 ? "Votre commande est expédiée en plusieurs colis : un e-mail vous est envoyé à chaque départ." : ""
+
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: `${parcel} est en route — commande ${p.orderRef}`,
+    text:
+      `${parcel} de la commande ${p.orderRef} a été remis à ${p.carrierLabel}.\n\n` +
+      `Contenu :\n${p.items.map((i) => `- ${itemLabel(i)}`).join("\n")}\n\n` +
+      (trackingText ? `${trackingText}\n\n` : "") +
+      (splitNote ? `${splitNote}\n\n` : "") +
+      `Le détail de votre commande : ${orderUrl}`,
+    html:
+      `<p>${parcel} de la commande <strong>${escapeHtml(p.orderRef)}</strong> a été remis à ` +
+      `<strong>${escapeHtml(p.carrierLabel)}</strong>.</p>` +
+      `<p>Contenu :</p><ul>${p.items.map((i) => `<li>${escapeHtml(itemLabel(i))}</li>`).join("")}</ul>` +
+      (p.trackingNumber ? `<p>Numéro de suivi : <strong>${escapeHtml(p.trackingNumber)}</strong></p>` : "") +
+      (p.trackingUrl ? `<p><a href="${escapeHtml(p.trackingUrl)}">Suivre le colis</a></p>` : "") +
+      (splitNote ? `<p>${splitNote}</p>` : "") +
+      `<p><a href="${orderUrl}">Voir ma commande</a></p>`,
+  })
+}
+
 /**
  * Double opt-in confirmation (Story 11.4). Sent to an address that has just been
  * captured: nothing is mailed to it — and it never reaches the sending provider

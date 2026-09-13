@@ -673,14 +673,34 @@
 - **⚠️ Décision** : associations **saisies manuellement** en admin **vs** calculées sur les co-achats réels. Reco : **manuel d'abord** — au lancement il n'y a aucun historique de commandes à exploiter.
 - Respecter les **restrictions d'accessoires** déjà modélisées (`hasAccessoryRestrictions`, `accessoryRestrictionNotes`) : ne jamais suggérer un accessoire interdit pour la catégorie légale de l'arme.
 
-**Story 11.9** — Expédition multi-colis — 🔜 **À FAIRE**
+**Story 11.9** — Expédition multi-colis ✅ _(livrée le 2026-09-13, branche `feat/story-11.9-shipments`)_
 
-> Une arme de **catégorie B se livre en 2 colis** (arme et éléments séparés). Constat : **aucun modèle d'expédition n'existe** — `orders` ne porte qu'un `shippingMethod`, un `shippingCost` et une adresse (`db/schema.ts:961`).
+> Une arme de **catégorie B se livre en 2 colis** (arme et éléments séparés). C'est le manque fonctionnel le plus concret qui reste : il bloque une vente réelle.
 
-- Nouvelle table `shipments` (plusieurs par commande) : transporteur, **numéro de suivi**, contenu (lignes de commande rattachées), statut, date d'expédition.
-- Admin : création et suivi des colis depuis le détail commande.
-- Client : suivi **par colis** dans l'espace compte, pas un statut global unique.
-- À prévoir de façon générique (tout produit peut être multi-colis), la catégorie B n'étant que le cas déclencheur.
+**État des lieux vérifié le 2026-09-10** (à ne pas re-fouiller demain) :
+
+- `orders` ne porte que `shipping_method` (`'std' | 'express' | 'retrait'`), `shipping_cost` et l'adresse — **ni transporteur, ni numéro de suivi, ni date d'expédition**.
+- **Aucun statut d'expédition n'existe nulle part.** `ORDER_LEGAL_STATUSES` concerne les documents légaux, `paymentStatus` l'argent : rien ne dit si une commande est partie.
+- Les deux écrans à étendre existent déjà : **admin** `/admin/orders/[id]` et **client** `/compte/commandes/[id]`.
+- ⚠️ **Les lignes de commande vivent dans `orders.items_json`**, pas dans `order_items` (table présente mais inutilisée au tunnel — constat de la 11.10). Rattacher un colis à « ces lignes-là » se fera donc par `variant_id` / `print_id`, comme les reversements.
+
+**✅ Décisions validées avec Franck le 2026-09-13 :**
+
+- **Contenu d'un colis** : **table de liaison** `shipment_items` (colis ↔ lignes par `variant_id` / `print_id` + quantité, contrainte « exactement l'un des deux »), note libre facultative en plus. Une ligne ×2 peut se répartir sur deux colis.
+- **Statut** : **par colis** (`preparing` → `shipped` → `delivered`) **et agrégé** sur la commande (`orders.shipping_status` : non expédiée / partiellement / expédiée / livrée). Stocké pour filtrer la liste admin, mais **écrit par une seule fonction de recalcul** appelée à chaque changement de colis — même discipline que `settlePayoutsForOrder`.
+- **Transporteurs** : **liste fermée dans `packages/shared`** avec gabarit d'URL de suivi ; `varchar` en base (ajouter un transporteur ≠ migration), code inconnu refusé par l'API. « Autre » autorise un lien collé.
+- **Notification client** : **un e-mail par colis** au passage à `shipped` (« colis 1/2 » + suivi), rendu idempotent par `notified_at`.
+- **Découpage** : **suggéré, modifiable**, jamais créé tout seul. Règle portée par **`products.parcel_count`** (défaut 1, **pré-rempli à 2 pour la catégorie B** à la création, backfill des B existants par la migration).
+- **Garde-fou** : un colis peut être **préparé** à tout moment, mais **pas expédié** tant que la commande n'est pas **payée** et, si elle contient une arme réglementée, tant que le **dossier légal n'est pas validé**.
+
+- [x] **Règles pures et partagées** (`packages/shared/src/shipping.ts`) : transporteurs + URL de suivi, statut agrégé, contrôle de répartition, suggestion de découpage, garde-fou `canShipOrder`. ⚠️ **Une ligne scindée ne compte expédiée que quand TOUTES ses parties sont parties** : `shipment_items.part/parts` (« partie 1/2 ») figés à la création du colis
+- [x] **Schéma** : migrations `0008` (tables `shipments` / `shipment_items`, `orders.shipping_status`, `products.parcel_count`, contraintes CHECK) et `0009` (rattrapage des armes B existantes)
+- [x] ⚠️ **Piège attrapé au smoke réel** : la règle « catégorie B → 2 colis » avait passé la **boîte de munitions 9×19** (classée B) en 2 colis. Corrigé : `defaultParcelCount` ne vise que les **armes** B (`arme-poing`, `arme-longue`, `arme-defense`) ; migration, API, formulaire et seeds partagent la même fonction
+- [x] **API** `/api/admin/shipments` (POST / PATCH / DELETE) : verrou de ligne sur la commande à l'emballage, préparation toujours possible, **départ refusé (409)** tant que la commande n'est pas payée ou que le dossier légal n'est pas validé, n° de suivi exigé pour un transporteur de la liste, suppression limitée aux colis en préparation, **journal d'audit** sur chaque action. Le détail admin porte `shipGate`, `shipments`, `suggestedParcels` ; la liste admin filtre par `shippingStatus` ; le client voit ses colis **sans les notes internes**
+- [x] **E-mail « colis N/M en route »** : réservé par `notified_at` avant l'envoi (un aller-retour de statut ne renvoie rien), réservation **libérée si le fournisseur échoue** — l'expédition n'est jamais bloquée par une panne d'e-mail
+- [x] **Écrans** : panneau `AdminShipmentsPanel` (emballage depuis la suggestion, suivi, statuts), colonne + filtre « Expédition » dans la liste, champ « Colis par unité » sur la fiche produit, bloc « Suivi de livraison » côté client (lien `noopener noreferrer nofollow`)
+- [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 466 / shared 134 / web 218** au vert ; **smoke réel** : commande Glock 17 (cat. B) + lunette passée par l'API publique → 2 colis proposés (arme 1/2 seule, 2/2 avec la lunette) → départ bloqué tant que non payée → colis 1 parti (« Expédiée en partie », client voit « En route » + lien Colissimo) → colis 2 parti → `shipped`, **exactement 2 e-mails** (captés par un SMTP local : l'`.env` de dev pointe sur le vrai relais OVH)
+- Reste ouvert : **retrait en armurerie** (`shipping_method = 'retrait'`) non distingué — une telle commande reste « non expédiée » ; pas de suivi transporteur automatique (statut « livré » saisi à la main) ; le paiement et le dossier légal du smoke ont été forcés en base (leurs parcours ont leurs propres stories)
 
 **Story 11.10** — Rentabilité par article : marge, charges & reversements ✅
 

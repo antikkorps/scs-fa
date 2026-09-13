@@ -1,5 +1,7 @@
 // Shapes consumed by the admin dashboard (mirror the API responses).
 
+import type { ShipGate, SuggestedParcel } from "@armurier/shared"
+
 export interface AuthUser {
   id: string
   email: string
@@ -29,9 +31,39 @@ export interface AdminOrderListItem {
   updatedAt: string
   legalVerificationStatus: string
   paymentStatus: string
+  shippingStatus: string
   totalTtc: number
   itemCount: number
   user: OrderCustomer
+}
+
+// Story 11.9 — a parcel as the admin sees it (internal notes included).
+export interface AdminShipmentItem {
+  id: string
+  variantId: string | null
+  printId: string | null
+  label: string
+  qty: number
+  part: number
+  parts: number
+}
+
+export interface AdminShipment {
+  id: string
+  orderId: string
+  position: number
+  carrier: string
+  carrierLabel: string
+  trackingNumber: string | null
+  trackingUrl: string | null
+  status: string
+  shippedAt: string | null
+  deliveredAt: string | null
+  notifiedAt: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+  items: AdminShipmentItem[]
 }
 
 export interface OrderItem {
@@ -95,6 +127,10 @@ export interface AdminOrderDetail {
   legalVerificationStatus: string
   legalRejectionReason: string | null
   paymentStatus: string
+  shippingStatus: string
+  shipGate: ShipGate
+  shipments: AdminShipment[]
+  suggestedParcels: SuggestedParcel[]
   subtotalHt: number
   vatAmount: number
   totalTtc: number

@@ -105,6 +105,8 @@ export interface AdminProductDetail extends Omit<AdminProductListItem, "variantC
   beneficiaryName: string | null
   beneficiarySharePct: number | null
   profitability: import("./admin-finance").AdminProfitability | null
+  /** Story 11.9 — how many parcels one unit travels in. */
+  parcelCount: number
   description: string | null
   longDescription: string | null
   vatPct: number
