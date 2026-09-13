@@ -42,6 +42,19 @@ export interface CreatedOrder {
   paymentSplit: PaymentSplit
 }
 
+/** Story 11.9 — a parcel as the customer sees it: where it is, never the admin's notes. */
+export interface CustomerShipment {
+  position: number
+  status: string
+  carrier: string
+  carrierLabel: string
+  trackingNumber: string | null
+  trackingUrl: string | null
+  shippedAt: string | null
+  deliveredAt: string | null
+  items: Array<{ label: string; qty: number; part: number; parts: number }>
+}
+
 export interface OrderDetail {
   id: string
   createdAt: string
@@ -56,6 +69,8 @@ export interface OrderDetail {
   items: unknown
   shippingAddress: unknown
   billingAddress: unknown
+  shippingStatus: string
+  shipments: CustomerShipment[]
   payment: {
     carte: { status: string; amountTtc: number } | null
     virement: {

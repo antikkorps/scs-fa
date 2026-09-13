@@ -1,7 +1,7 @@
 // apps/api/src/db/seeds.ts
 // Données de base à insérer au démarrage
 
-import { calculateArtworkPrice, CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, calculateArtworkPrice, defaultParcelCount } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, sql } from "drizzle-orm"
 import { db } from "./client.js"
@@ -856,6 +856,8 @@ async function seedArmurerie() {
             stockQty: totalStock,
             requiresLegalVerification: p.requiresLegalVerification,
             ageMinRequired: p.ageMinRequired,
+            // Story 11.9 : une arme de catégorie B se livre en deux colis.
+            parcelCount: defaultParcelCount(p.legal, p.categorySlug),
             featured: p.featured ?? false,
             // No demo photo: the storefront renders its own placeholder.
             featuredImageUrl: null,
@@ -1068,6 +1070,8 @@ async function seedAncientWeapons() {
         priceHt: w.priceHt.toFixed(2),
         stockQty: 1,
         requiresLegalVerification: w.legalCategory !== "none",
+        // Story 11.9 : une arme de catégorie B se livre en deux colis.
+        parcelCount: defaultParcelCount(w.legalCategory, w.categorySlug),
         featuredImageUrl: null,
         published: true,
       })

@@ -118,6 +118,49 @@ describe("admin product & tag CRUD (story 7.5a)", () => {
       // Derived from the legal category, never taken from the form.
       const [row] = await db.select().from(products).where(eq(products.id, productId)).limit(1)
       expect(row?.requiresLegalVerification).toBe(true)
+      // Not category B: one unit travels in one parcel.
+      expect(data.parcelCount).toBe(1)
+    })
+
+    /** Story 11.9 — a category B firearm is delivered in two parcels (weapon and parts apart). */
+    it("presets two parcels for a category B firearm, unless the form says otherwise", async () => {
+      const preset = await asAdmin("POST", BASE, {
+        sku: `${PREFIX}B1`,
+        slug: "testprodadmin-cat-b",
+        name: "Arme cat. B",
+        categorySlug: "arme-longue",
+        legalCategory: "B",
+        priceHt: 900,
+      })
+      expect(preset.statusCode).toBe(201)
+      expect(preset.json().data.parcelCount).toBe(2)
+
+      // Category B ammunition is not a firearm to split: a box travels whole.
+      const ammo = await asAdmin("POST", BASE, {
+        sku: `${PREFIX}B3`,
+        slug: "testprodadmin-munitions-b",
+        name: "Munitions cat. B",
+        categorySlug: "munition",
+        legalCategory: "B",
+        priceHt: 30,
+      })
+      expect(ammo.json().data.parcelCount).toBe(1)
+
+      const explicit = await asAdmin("POST", BASE, {
+        sku: `${PREFIX}B2`,
+        slug: "testprodadmin-cat-b-un-colis",
+        name: "Arme cat. B en un colis",
+        categorySlug: "arme-longue",
+        legalCategory: "B",
+        priceHt: 900,
+        parcelCount: 1,
+      })
+      expect(explicit.json().data.parcelCount).toBe(1)
+
+      const patched = await asAdmin("PATCH", `${BASE}/${explicit.json().data.id}`, { parcelCount: 3 })
+      expect(patched.statusCode).toBe(200)
+      expect(patched.json().data.parcelCount).toBe(3)
+      expect((await asAdmin("PATCH", `${BASE}/${explicit.json().data.id}`, { parcelCount: 9 })).statusCode).toBe(400)
     })
 
     it("refuses a variant with no attribute at all, before Postgres does", async () => {

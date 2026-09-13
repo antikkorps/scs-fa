@@ -49,6 +49,14 @@ export interface OrderAddressSnapshot {
 export const userRoleEnum = pgEnum("user_role", ["customer", "vendor", "admin"])
 export const addressTypeEnum = pgEnum("address_type", ["shipping", "billing", "both"])
 export const legalCategoryEnum = pgEnum("legal_category", ["A", "B", "C", "D", "none"])
+// Expédition (story 11.9) — reflets exacts de SHIPMENT_STATUSES / ORDER_SHIPPING_STATUSES (@armurier/shared)
+export const shipmentStatusEnum = pgEnum("shipment_status", ["preparing", "shipped", "delivered"])
+export const orderShippingStatusEnum = pgEnum("order_shipping_status", [
+  "unshipped",
+  "partially_shipped",
+  "shipped",
+  "delivered",
+])
 export const docTypeEnum = pgEnum("doc_type", [
   "cni",
   "permis_chasse",
@@ -569,6 +577,11 @@ export const products = pgTable(
     beneficiaryId: uuid("beneficiary_id"),
     beneficiarySharePct: decimal("beneficiary_share_pct", { precision: 5, scale: 2 }),
 
+    // Expédition (story 11.9) : en combien de colis part UNE unité de l'article —
+    // une arme de catégorie B se livre en 2 (arme et éléments séparés). Ne sert
+    // qu'à SUGGÉRER un découpage : chaque colis réel fige le sien.
+    parcelCount: integer("parcel_count").notNull().default(1),
+
     // TVA
     vatPct: decimal("vat_pct", { precision: 4, scale: 2 }).default("20"),
 
@@ -614,6 +627,7 @@ export const products = pgTable(
       t.requiresLegalVerification,
     ),
      index("idx_products_search").using("gin", t.searchVector),
+     check("chk_products_parcel_count", sql`parcel_count BETWEEN 1 AND 5`),
      // Un bénéficiaire supprimé ne doit pas laisser de référence morte sur un
      // article : le lien se vide, l'article reste vendable.
      foreignKey({ columns: [t.beneficiaryId], foreignColumns: [beneficiaries.id] }).onDelete("set null"),
@@ -1293,6 +1307,10 @@ export const orders = pgTable(
     shippingAddress: jsonb("shipping_address").$type<OrderAddressSnapshot>(),
     billingAddress: jsonb("billing_address").$type<OrderAddressSnapshot>(),
 
+    // Statut d'expédition agrégé (story 11.9) : DÉRIVÉ des colis et écrit par
+    // `recomputeOrderShippingStatus` seulement. Stocké pour filtrer la liste admin.
+    shippingStatus: orderShippingStatusEnum("shipping_status").notNull().default("unshipped"),
+
     // Henrri
     henrriInvoiceId: varchar("henrri_invoice_id", { length: 100 }).unique(),
     henrriSyncAt: timestamp("henrri_sync_at"),
@@ -1309,6 +1327,7 @@ export const orders = pgTable(
      index("idx_orders_payment_status").on(t.paymentStatus),
      index("idx_orders_created").on(t.createdAt),
      index("idx_orders_henrri").on(t.henrriInvoiceId),
+     index("idx_orders_shipping_status").on(t.shippingStatus),
      foreignKey({
       columns: [t.userId],
       foreignColumns: [users.id],
@@ -1331,6 +1350,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     relationName: "verifiedByOrders",
   }),
   items: many(orderItems),
+  shipments: many(shipments),
   paymentVirement: one(paymentVirement),
   paymentCarte: one(paymentCarte),
   invoice: one(invoices),
@@ -1441,6 +1461,90 @@ export const beneficiaryPayouts = pgTable(
     foreignKey({ columns: [t.beneficiaryId], foreignColumns: [beneficiaries.id] }),
   ],
 )
+
+// ============================================================================
+// EXPÉDITION MULTI-COLIS (story 11.9)
+// ============================================================================
+/**
+ * Un colis d'une commande. Il se PRÉPARE à tout moment, mais ne PART (`shipped`)
+ * qu'une fois la commande payée et, pour une arme réglementée, le dossier légal
+ * validé — cf. `canShipOrder`.
+ *
+ * Le transporteur est un code de la liste fermée `SHIPPING_CARRIERS` : texte en
+ * base pour qu'ajouter un transporteur ne soit pas une migration. `tracking_url`
+ * n'est renseigné que pour « autre » ; sinon le lien se construit à la lecture.
+ *
+ * `notified_at` rend l'e-mail « colis expédié » idempotent : repasser un colis
+ * en préparation puis en expédié ne renvoie rien au client.
+ */
+export const shipments = pgTable(
+  "shipments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id").notNull(),
+    /** Rang du colis dans la commande (1, 2…), dans l'ordre de création. */
+    position: integer("position").notNull(),
+
+    carrier: varchar("carrier", { length: 50 }).notNull(),
+    trackingNumber: varchar("tracking_number", { length: 100 }),
+    trackingUrl: varchar("tracking_url", { length: 512 }),
+
+    status: shipmentStatusEnum("status").notNull().default("preparing"),
+    shippedAt: timestamp("shipped_at"),
+    deliveredAt: timestamp("delivered_at"),
+    notifiedAt: timestamp("notified_at"),
+
+    /** Note interne — jamais montrée au client. */
+    notes: text("notes"),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_shipments_order_position").on(t.orderId, t.position),
+    index("idx_shipments_status").on(t.status),
+    foreignKey({ columns: [t.orderId], foreignColumns: [orders.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.createdBy], foreignColumns: [users.id] }).onDelete("set null"),
+  ],
+)
+
+/**
+ * Ce que contient un colis. Comme les reversements, une entrée désigne sa ligne
+ * de `orders.items_json` par `variant_id` OU `print_id` (jamais les deux) et en
+ * garde le libellé.
+ *
+ * `part` / `parts` décrivent un article scindé : une arme de catégorie B en deux
+ * colis figure deux fois, en 1/2 et 2/2. Une unité n'est expédiée que lorsque
+ * TOUTES ses parties le sont.
+ */
+export const shipmentItems = pgTable(
+  "shipment_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    shipmentId: uuid("shipment_id").notNull(),
+    variantId: uuid("variant_id"),
+    printId: uuid("print_id"),
+    label: varchar("label", { length: 255 }).notNull(),
+    qty: integer("qty").notNull(),
+    part: integer("part").notNull().default(1),
+    parts: integer("parts").notNull().default(1),
+  },
+  (t) => [
+    index("idx_shipment_items_shipment").on(t.shipmentId),
+    foreignKey({ columns: [t.shipmentId], foreignColumns: [shipments.id] }).onDelete("cascade"),
+    check("chk_shipment_items_ref", sql`(variant_id IS NULL) <> (print_id IS NULL)`),
+    check("chk_shipment_items_split", sql`qty >= 1 AND parts BETWEEN 1 AND 5 AND part BETWEEN 1 AND parts`),
+  ],
+)
+
+export const shipmentsRelations = relations(shipments, ({ one, many }) => ({
+  order: one(orders, { fields: [shipments.orderId], references: [orders.id] }),
+  items: many(shipmentItems),
+}))
+
+export const shipmentItemsRelations = relations(shipmentItems, ({ one }) => ({
+  shipment: one(shipments, { fields: [shipmentItems.shipmentId], references: [shipments.id] }),
+}))
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, {

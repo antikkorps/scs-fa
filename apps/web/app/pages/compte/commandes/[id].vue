@@ -3,7 +3,14 @@ import type { OrderAddressSnapshot, OrderLegal, OrderLineItem, RequiredDoc } fro
 import type { OrderDetail } from "~/types/checkout"
 import { formatDate, formatDateTime, formatEuros } from "~/utils/format"
 import { needsUpload, requiredDocStatusLabel, requiredDocTone } from "~/utils/legal"
-import { legalStatusLabel, paymentStatusLabel, statusTone } from "~/utils/order"
+import {
+  legalStatusLabel,
+  parcelItemLabel,
+  paymentStatusLabel,
+  shipmentStatusLabel,
+  shippingStatusLabel,
+  statusTone,
+} from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
 useHead({ title: "Détail de la commande — SCS Firearm" })
@@ -128,6 +135,12 @@ function toggleUpload(docType: string) {
               {{ legalStatusLabel(order.legalVerificationStatus) }}
             </p>
           </div>
+          <div>
+            <p class="status__label">Expédition</p>
+            <p class="status__value" :class="`tone-${statusTone(order.shippingStatus)}`">
+              {{ shippingStatusLabel(order.shippingStatus) }}
+            </p>
+          </div>
         </section>
 
         <p v-if="paymentOutstanding" class="cta-pay">
@@ -192,6 +205,45 @@ function toggleUpload(docType: string) {
               </div>
 
               <LegalDocUpload v-if="openUpload === doc.docType" :doc-type="doc.docType" @uploaded="onUploaded" />
+            </li>
+          </ul>
+        </section>
+
+        <!-- Parcels & tracking (story 11.9) -->
+        <section v-if="order.shipments.length" class="block" aria-labelledby="ship-h">
+          <h2 id="ship-h" class="block__h">Suivi de livraison</h2>
+          <p v-if="order.shipments.length > 1" class="block__lede">
+            Votre commande voyage en {{ order.shipments.length }} colis, qui peuvent partir et arriver séparément.
+          </p>
+          <ul class="parcels" role="list">
+            <li v-for="(s, i) in order.shipments" :key="s.position" class="parcel">
+              <div class="parcel__row">
+                <div>
+                  <p class="parcel__name">
+                    Colis {{ i + 1 }}<template v-if="order.shipments.length > 1">/{{ order.shipments.length }}</template>
+                  </p>
+                  <p class="parcel__status" :class="`tone-${statusTone(s.status)}`">
+                    {{ shipmentStatusLabel(s.status) }}
+                    <template v-if="s.deliveredAt"> le {{ formatDate(s.deliveredAt) }}</template>
+                    <template v-else-if="s.shippedAt"> depuis le {{ formatDate(s.shippedAt) }}</template>
+                  </p>
+                  <p class="parcel__meta">
+                    {{ s.carrierLabel }}<template v-if="s.trackingNumber"> · n° {{ s.trackingNumber }}</template>
+                  </p>
+                </div>
+                <a
+                  v-if="s.trackingUrl && s.status !== 'preparing'"
+                  :href="s.trackingUrl"
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  class="btn btn-ghost btn-sm"
+                >
+                  Suivre le colis<span class="sr-only"> {{ i + 1 }} (nouvel onglet)</span>
+                </a>
+              </div>
+              <ul class="parcel__items" role="list">
+                <li v-for="(it, j) in s.items" :key="j">{{ parcelItemLabel(it) }}</li>
+              </ul>
             </li>
           </ul>
         </section>
@@ -389,6 +441,58 @@ function toggleUpload(docType: string) {
   height: 38px;
   padding: 0 0.9rem;
   font-size: 0.82rem;
+}
+.parcels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.parcel {
+  padding: 1rem;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  background: var(--ink);
+}
+.parcel__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.parcel__name {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  color: var(--paper);
+}
+.parcel__status {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.parcel__meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--paper-faint);
+}
+.parcel__items {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--ink-line);
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.88rem;
+  color: var(--paper-dim);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .items {
   list-style: none;

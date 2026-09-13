@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import type { AdminOrderListItem, Pagination } from "~/types/admin"
 import { formatDateTime, formatEuros } from "~/utils/format"
-import { LEGAL_STATUS_OPTIONS, legalStatus, PAYMENT_STATUS_OPTIONS, paymentStatus } from "~/utils/status"
+import {
+  LEGAL_STATUS_OPTIONS,
+  legalStatus,
+  PAYMENT_STATUS_OPTIONS,
+  paymentStatus,
+  SHIPPING_STATUS_OPTIONS,
+  shippingStatus,
+} from "~/utils/status"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Commandes — Administration SCS" })
@@ -13,6 +20,7 @@ const router = useRouter()
 // Filters are mirrored in the URL so dashboard deep-links (?paymentStatus=…) land pre-filtered.
 const paymentFilter = ref((route.query.paymentStatus as string) || "")
 const legalFilter = ref((route.query.legalStatus as string) || "")
+const shippingFilter = ref((route.query.shippingStatus as string) || "")
 const search = ref((route.query.search as string) || "")
 const page = ref(Number(route.query.page) || 1)
 
@@ -20,6 +28,7 @@ const query = computed(() => {
   const p = new URLSearchParams()
   if (paymentFilter.value) p.set("paymentStatus", paymentFilter.value)
   if (legalFilter.value) p.set("legalStatus", legalFilter.value)
+  if (shippingFilter.value) p.set("shippingStatus", shippingFilter.value)
   if (search.value.trim()) p.set("search", search.value.trim())
   p.set("page", String(page.value))
   p.set("limit", "20")
@@ -42,6 +51,7 @@ function applyFilters() {
 function resetFilters() {
   paymentFilter.value = ""
   legalFilter.value = ""
+  shippingFilter.value = ""
   search.value = ""
   page.value = 1
   syncUrl()
@@ -51,6 +61,7 @@ function syncUrl() {
     query: {
       ...(paymentFilter.value ? { paymentStatus: paymentFilter.value } : {}),
       ...(legalFilter.value ? { legalStatus: legalFilter.value } : {}),
+      ...(shippingFilter.value ? { shippingStatus: shippingFilter.value } : {}),
       ...(search.value.trim() ? { search: search.value.trim() } : {}),
       ...(page.value > 1 ? { page: String(page.value) } : {}),
     },
@@ -69,6 +80,7 @@ watch(
   (q) => {
     paymentFilter.value = (q.paymentStatus as string) || ""
     legalFilter.value = (q.legalStatus as string) || ""
+    shippingFilter.value = (q.shippingStatus as string) || ""
     search.value = (q.search as string) || ""
     page.value = Number(q.page) || 1
   },
@@ -92,6 +104,10 @@ watch(
         <option value="">Tous statuts légaux</option>
         <option v-for="o in LEGAL_STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
+      <select v-model="shippingFilter" class="ctl" @change="applyFilters">
+        <option value="">Toutes expéditions</option>
+        <option v-for="o in SHIPPING_STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+      </select>
       <button type="submit" class="btn btn-ghost">Filtrer</button>
       <button type="button" class="btn btn-ghost" @click="resetFilters">Réinitialiser</button>
     </form>
@@ -110,6 +126,7 @@ watch(
             <th class="num">Total</th>
             <th>Paiement</th>
             <th>Légal</th>
+            <th>Expédition</th>
           </tr>
         </thead>
         <tbody>
@@ -125,6 +142,7 @@ watch(
             <td class="num strong">{{ formatEuros(o.totalTtc) }}</td>
             <td><AdminStatusTag v-bind="paymentStatus(o.paymentStatus)" /></td>
             <td><AdminStatusTag v-bind="legalStatus(o.legalVerificationStatus)" /></td>
+            <td><AdminStatusTag v-bind="shippingStatus(o.shippingStatus)" /></td>
           </tr>
         </tbody>
       </table>
@@ -175,7 +193,7 @@ watch(
   width: 100%;
   border-collapse: collapse;
   font-size: 0.88rem;
-  min-width: 680px;
+  min-width: 780px;
 }
 .table th {
   text-align: left;

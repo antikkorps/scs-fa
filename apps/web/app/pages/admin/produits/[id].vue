@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LEGAL_CATEGORIES } from "@armurier/shared"
+import { defaultParcelCount, LEGAL_CATEGORIES } from "@armurier/shared"
 import type { AdminProductDetail, AdminProductVariant } from "~/types/admin-catalogue"
 import type { AdminProfitability } from "~/types/admin-finance"
 
@@ -34,6 +34,7 @@ const form = reactive({
   chargesAmountHt: null as number | null,
   beneficiaryId: "",
   beneficiarySharePct: null as number | null,
+  parcelCount: 1,
   metaTitle: "",
   metaDescription: "",
 })
@@ -88,6 +89,7 @@ async function load() {
       chargesAmountHt: d.chargesAmountHt ?? null,
       beneficiaryId: d.beneficiaryId ?? "",
       beneficiarySharePct: d.beneficiarySharePct ?? null,
+      parcelCount: d.parcelCount ?? 1,
       metaTitle: d.metaTitle ?? "",
       metaDescription: d.metaDescription ?? "",
     })
@@ -101,6 +103,16 @@ await load()
 
 // Mirrors the server: the flag is derived from the legal category, never typed in.
 const requiresVerification = computed(() => form.legalCategory !== "none")
+
+// Story 11.9 — a category B firearm travels in two parcels. On a new product the
+// count follows the classification until the admin sets it by hand.
+const parcelCountTouched = ref(false)
+watch(
+  () => [form.legalCategory, form.categorySlug] as const,
+  ([legal, category]) => {
+    if (isNew.value && !parcelCountTouched.value) form.parcelCount = defaultParcelCount(legal, category)
+  },
+)
 
 function addVariant() {
   if (form.variants.length >= 50) return
@@ -135,6 +147,7 @@ function payload() {
     published: form.published,
     featured: form.featured,
     tagSlugs: form.tagSlugs,
+    parcelCount: Number(form.parcelCount) || 1,
     // `null` clears an override and puts the article back on the default.
     costPriceHt: form.costPriceHt === null || form.costPriceHt === ("" as unknown) ? null : Number(form.costPriceHt),
     chargesPct: form.chargesPct === null || form.chargesPct === ("" as unknown) ? null : Number(form.chargesPct),
@@ -299,6 +312,21 @@ async function save() {
         <label class="field field--check">
           <input v-model="form.trackStock" type="checkbox" class="check" >
           <span>Suivre le stock</span>
+        </label>
+        <label class="field">
+          <span class="field__label">Colis par unité</span>
+          <input
+            v-model.number="form.parcelCount"
+            type="number"
+            min="1"
+            max="5"
+            class="ctl"
+            @input="parcelCountTouched = true"
+          >
+          <span class="field__help">
+            Une arme de catégorie B se livre en 2 colis (arme et éléments séparés). Sert à proposer le découpage à
+            l'expédition.
+          </span>
         </label>
       </div>
 

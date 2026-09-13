@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AdminOrderDetail } from "~/types/admin"
 import { formatDateTime, formatEuros } from "~/utils/format"
-import { legalStatus, paymentStatus, refundStatus } from "~/utils/status"
+import { legalStatus, paymentStatus, refundStatus, shippingStatus } from "~/utils/status"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 
@@ -108,6 +108,7 @@ function num(v: unknown): number | null {
         <div class="tags">
           <AdminStatusTag v-bind="paymentStatus(order.paymentStatus)" />
           <AdminStatusTag v-bind="legalStatus(order.legalVerificationStatus)" />
+          <AdminStatusTag v-bind="shippingStatus(order.shippingStatus)" />
         </div>
       </header>
 
@@ -180,6 +181,8 @@ function num(v: unknown): number | null {
           </button>
         </section>
       </div>
+
+      <AdminShipmentsPanel :order="order" class="shipping" @changed="refresh" />
     </template>
 
     <!-- Refund modal -->
@@ -370,6 +373,9 @@ function num(v: unknown): number | null {
 }
 .state--error {
   color: var(--danger);
+}
+.shipping {
+  margin-top: 1.2rem;
 }
 .refund-btn {
   margin-top: 1.2rem;

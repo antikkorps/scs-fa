@@ -44,6 +44,20 @@ const REFUND: Record<string, StatusMeta> = {
   cancelled: { label: "Annulé", severity: "muted" },
 }
 
+// Story 11.9 — the order-level view, derived from its parcels.
+const SHIPPING: Record<string, StatusMeta> = {
+  unshipped: { label: "Non expédiée", severity: "muted" },
+  partially_shipped: { label: "Expédiée en partie", severity: "warn" },
+  shipped: { label: "Expédiée", severity: "ok" },
+  delivered: { label: "Livrée", severity: "ok" },
+}
+
+const SHIPMENT: Record<string, StatusMeta> = {
+  preparing: { label: "En préparation", severity: "warn" },
+  shipped: { label: "Expédié", severity: "ok" },
+  delivered: { label: "Livré", severity: "ok" },
+}
+
 const FALLBACK = (value: string): StatusMeta => ({ label: value, severity: "muted" })
 
 export function paymentStatus(value: string): StatusMeta {
@@ -58,10 +72,17 @@ export function docVerificationStatus(value: string): StatusMeta {
 export function refundStatus(value: string): StatusMeta {
   return REFUND[value] ?? FALLBACK(value)
 }
+export function shippingStatus(value: string): StatusMeta {
+  return SHIPPING[value] ?? FALLBACK(value)
+}
+export function shipmentStatus(value: string): StatusMeta {
+  return SHIPMENT[value] ?? FALLBACK(value)
+}
 
 // Filter dropdown options (value/label) for the order list screens.
 export const PAYMENT_STATUS_OPTIONS = Object.entries(PAYMENT).map(([value, m]) => ({ value, label: m.label }))
 export const LEGAL_STATUS_OPTIONS = Object.entries(LEGAL).map(([value, m]) => ({ value, label: m.label }))
+export const SHIPPING_STATUS_OPTIONS = Object.entries(SHIPPING).map(([value, m]) => ({ value, label: m.label }))
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   cni: "CNI",
