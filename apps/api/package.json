@@ -18,7 +18,8 @@
     "db:drop": "drizzle-kit drop",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed-cli.ts",
-    "sla:check": "tsx src/legal-documents/sla-cli.ts"
+    "sla:check": "tsx src/legal-documents/sla-cli.ts",
+    "tracking:sync": "tsx src/shipments/tracking/tracking-cli.ts"
   },
   "dependencies": {
     "@armurier/shared": "workspace:*",

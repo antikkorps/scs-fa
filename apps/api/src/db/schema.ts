@@ -1494,6 +1494,15 @@ export const shipments = pgTable(
     deliveredAt: timestamp("delivered_at"),
     notifiedAt: timestamp("notified_at"),
 
+    /**
+     * Suivi automatique (story 11.9b). `tracking_checked_at` date la dernière
+     * question posée au transporteur, `tracking_label` garde sa réponse dans SES
+     * mots — c'est ce qu'un admin lit quand un colis a l'air bloqué. Ni l'un ni
+     * l'autre ne décide de quoi que ce soit : seul `status` fait foi.
+     */
+    trackingCheckedAt: timestamp("tracking_checked_at"),
+    trackingLabel: varchar("tracking_label", { length: 255 }),
+
     /** Note interne — jamais montrée au client. */
     notes: text("notes"),
     createdBy: uuid("created_by"),

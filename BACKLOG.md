@@ -544,6 +544,33 @@
   - **Mobile** : **burger plein écran** (overlay pleine page) + **animation** d'ouverture/fermeture.
   - Le lien « Panier » + badge (ajouté en 10.4a) est temporaire en attendant cette refonte.
 
+**Story 10.7** — Typographie & finitions visuelles — 🔜 **À FAIRE** _(audit du 2026-09-13)_
+
+> Demande de Franck (2026-09-13) : améliorer le visuel du site, **notamment les typos**. Audit mesuré sur le **rendu réel** (Playwright, 7 pages publiques en desktop 1440 px + mobile 390 px, styles calculés) et sur l'inventaire du CSS — pas sur une impression.
+
+**Constats de l'audit :**
+
+- **Aucune échelle typographique** : `main.css` ne définit que 2 tokens (les familles). On compte **59 tailles de police distinctes**, dont des quasi-doublons (`0.62 / 0.66 / 0.68 / 0.72 / 0.74 / 0.76rem`, `1.05 / 1.08 / 1.15 / 1.2 / 1.25rem`) et une vingtaine de `clamp()` de titres tous différents ; **15** `letter-spacing` et **11** `line-height` différents. Chaque page réinvente sa typo.
+- **Trop de texte sous 12 px** : **58 éléments sur `/boutique`**, 30 sur l'accueil, 28 sur `/collection` — badge « Catégorie B » à 10,9 px, sur-titres à 11,5 px, libellés « Variante » / « Édition » à 11,2 px.
+- **Majuscules espacées partout** : 81 déclarations `uppercase` (40 fichiers). `.eyebrow` = 11,5 px + 3,7 px d'interlettrage ; boutons et navigation = 12,8 px + 1,8 px. Élégant à dose, fatigant en continu.
+- ⚠️ **Serif fin en tout petit — le pire cas** : les titres de section « Les séries » / « Toutes les œuvres » (`/collection`) sont en **Cormorant Garamond 11,5 px, majuscules, gris** — quasi invisibles sur la capture ; « Filtrer par tag » en Cormorant 15 px majuscules. Cormorant (petite hauteur d'x, déliés très fins) n'est lisible qu'en grand.
+- ⚠️ **Chiffres elzéviriens sur les montants et références** : Cormorant a des chiffres « bas de casse » de hauteurs variables. Ils servent au **prix de la fiche produit** (`.detail__price`, 32 px), aux **totaux** de l'espace compte (`.card__total`), à la **référence de virement du RIB** (`.rib__ref dd` — un code que le client recopie dans sa banque) et au n° de commande admin (`#b1fed38c` illisible sur la capture 11.9). Aucun `font-variant-numeric` côté public (`tabular-nums` n'existe qu'en admin).
+- **Deux traitements du prix sur la même fiche œuvre** : Cormorant 25,6 px pour l'un, Inter 16 px pour l'autre.
+- **Polices servies par Google Fonts** (CSS externe) : requête tierce bloquante au premier affichage **et** transfert de l'IP du visiteur à Google — sujet RGPD connu. À **auto-héberger** (sous-ensemble latin, `font-display: swap`, préchargement des 2 fichiers critiques).
+- Ce qui va bien : les 6 graisses chargées sont exactement celles utilisées (pas de gras synthétique) ; `body` en 16 px / 1,6 ; hiérarchie des grands titres (h1 88 → 51 px) cohérente.
+- Vu en passant (hors typo) : **visuels d'œuvres cassés** sur les captures dev (texte alternatif affiché à la place de l'image, `/collection` et fiche œuvre). Le dev est en `STORAGE_DRIVER=s3` (pas `memory`) : stockage local injoignable ou vrai bug — **à diagnostiquer**.
+
+**⚠️ Décisions à trancher avec Franck avant de coder** (direction artistique, registre « classe / luxe » de la Phase 11) :
+
+- **Couple de polices** : garder Cormorant Garamond + Inter, ou remplacer le serif par une display plus robuste aux petites tailles ? (Si on garde Cormorant : **jamais sous ~20 px**.)
+- **Échelle** : 7 à 8 paliers fluides en tokens (`--fs-xs` … `--fs-display`) + interlignages et interlettrages associés ; **plancher de lisibilité** proposé : 12 px absolu, 14 px pour tout texte courant.
+- **Majuscules espacées** : les réserver aux sur-titres (et réduire l'interlettrage), ou les garder comme signature sur boutons et navigation ?
+- **Chiffres** : tous les montants, quantités et références en **Inter, chiffres alignés et tabulaires** ; Cormorant réservé aux titres ?
+- **Auto-hébergement** : `@nuxt/fonts` (nouvelle dépendance → politique de versions) ou fichiers `woff2` versionnés dans le dépôt ?
+- **Périmètre** : site public seul, ou back-office aussi (même dette : 20 `font-size` en dur sur la seule page virements) ?
+
+- **Done** : tokens typographiques dans `main.css` et plus aucune taille en dur hors échelle ; polices auto-hébergées ; captures **avant / après** desktop + mobile des pages clés (accueil, boutique, fiche produit, collection, fiche œuvre, compte, RIB) ; Lighthouse accessibilité et performance sans régression.
+
 ---
 
 ## PHASE 11 — Armes de collection, tags & Gun Art éditorial
@@ -666,7 +693,7 @@
 - ⚠️ **Défaut vu au rendu, pas au code** : la page était écrite en palette claire alors que le back-office est sombre — titres de panneaux invisibles. Repris sur les tokens du thème (`--ink-soft`, `--paper-faint`, `--brass`, `--danger`) et re-rendu
 - Reste ouvert : **brancher le garde-fou sur le formulaire d'œuvre** (il n'existe pas encore — 7.5) ; la valeur du garde-fou est là, son point d'application arrivera avec le CRUD
 
-**Story 11.8** — Cross-sell « Fréquemment achetés ensemble » — 🔜 **À FAIRE (activable à la demande)**
+**Story 11.8** — Cross-sell « Fréquemment achetés ensemble » — 🔜 **À FAIRE (activable à la demande)** _(prévue le 2026-09-14, après la 11.9b — branche à créer depuis `main` une fois la 11.9b mergée)_
 
 - Bloc de suggestions d'accessoires sur la **fiche détail** d'une arme.
 - **Désactivé par défaut** (feature flag) : le client a explicitement dit « activé à la demande, pas forcément au début ».
@@ -700,7 +727,27 @@
 - [x] **E-mail « colis N/M en route »** : réservé par `notified_at` avant l'envoi (un aller-retour de statut ne renvoie rien), réservation **libérée si le fournisseur échoue** — l'expédition n'est jamais bloquée par une panne d'e-mail
 - [x] **Écrans** : panneau `AdminShipmentsPanel` (emballage depuis la suggestion, suivi, statuts), colonne + filtre « Expédition » dans la liste, champ « Colis par unité » sur la fiche produit, bloc « Suivi de livraison » côté client (lien `noopener noreferrer nofollow`)
 - [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 466 / shared 134 / web 218** au vert ; **smoke réel** : commande Glock 17 (cat. B) + lunette passée par l'API publique → 2 colis proposés (arme 1/2 seule, 2/2 avec la lunette) → départ bloqué tant que non payée → colis 1 parti (« Expédiée en partie », client voit « En route » + lien Colissimo) → colis 2 parti → `shipped`, **exactement 2 e-mails** (captés par un SMTP local : l'`.env` de dev pointe sur le vrai relais OVH)
-- Reste ouvert : **retrait en armurerie** (`shipping_method = 'retrait'`) non distingué — une telle commande reste « non expédiée » ; pas de suivi transporteur automatique (statut « livré » saisi à la main) ; le paiement et le dossier légal du smoke ont été forcés en base (leurs parcours ont leurs propres stories)
+- Reste ouvert : **retrait en armurerie** (`shipping_method = 'retrait'`) non distingué — une telle commande reste « non expédiée » ; pas de suivi transporteur automatique (statut « livré » saisi à la main) ; le paiement et le dossier légal du smoke ont été forcés en base (leurs parcours ont leurs propres stories) → repris en **11.9b**
+
+**Story 11.9b** — Expédition : les points restés ouverts ✅
+
+> Suite directe de la 11.9 (mergée, #79). Les quatre points ouverts étaient d'abord **quatre décisions**, tranchées avec Franck le 2026-09-16 avant d'écrire une ligne.
+
+- [x] **Retrait en armurerie : pas proposé** — ⚠️ **décision produit de Franck**, prise après vérification : **aucun code n'écrit `shipping_method`**, le choix n'existe nulle part dans le tunnel. Plutôt que de construire un parcours dont personne n'a besoin, on pose un **garde-fou** : `canShipOrder` refuse une commande en retrait (`shipGate.reason = "pickup"`), l'API refuse d'emballer un colis (409), et le panneau admin le **dit** au lieu d'afficher « aucun article à expédier ». ⚠️ **Le retrait passe avant le paiement et le dossier légal** dans les raisons affichées : payer ou valider des papiers ne rendrait pas la commande expédiable, nommer l'argent enverrait l'admin chercher un problème qui n'existe pas. Les deux orthographes que le schéma a portées (`retrait`, `retirait`) sont couvertes
+- [x] **Suivi transporteur automatique** — ⚠️ **décision de Franck : La Poste/Colissimo *et* Mondial Relay**. Deux contrats très différents, constatés avant de coder :
+  - **La Poste « Suivi v2 »** (`api.laposte.fr`, en-tête `X-Okapi-Key`) : REST, codes de statut normalisés, et **une seule clé couvre Colissimo ET Chronopost** — le service harmonise les deux
+  - ⚠️ **Mondial Relay n'a pas d'API REST de suivi publique** : c'est du **SOAP** (`WSI2_TracingColisDetaille`), signé par un **MD5** de la clé privée, qui renvoie des **libellés français en texte libre** — aucun code de statut. « Livré » s'y **lit** au lieu de se **consulter**, donc la règle est isolée dans une fonction pure et testée, et **penche toujours vers « voyage encore »** sur ce qu'elle ne reconnaît pas. Le transporteur n'était pas dans la liste : ajouté
+  - [x] ⚠️ **Piège attrapé par un test** : `\b` en JavaScript est **ASCII** — il ne voit aucune frontière de mot après le « é » de « livré », donc `/livr[ée]\b/` ne matche **jamais**. Remplacé par un lookahead négatif. Et « livraison » ne doit jamais se lire « livré » : « en cours de livraison » reste en transit
+  - [x] **Le mouvement est à sens unique** (`shipped` → `delivered`) : un transporteur qui nous dit « en transit » ne **défait pas** un « livré » coché par un humain. Relecture sous verrou de ligne avant d'écrire
+  - [x] ⚠️ **Une question sans réponse n'est pas une réponse** : un transporteur injoignable laisse le colis **exactement** en l'état — rien n'est daté, rien n'est marqué, la passe suivante redemande
+  - [x] **Journal d'audit en `system`**, jamais en admin : personne n'a cliqué, la trace doit dire **quoi** a fermé le colis (`source: "carrier_api"`)
+  - [x] **Les deux fournisseurs sont optionnels** : sans identifiants, rien n'est interrogé et « livré » reste un clic admin, exactement comme avant. Un déploiement partiel (La Poste branché, Mondial Relay non) est un état **normal**, pas une panne
+  - [x] **Scheduler in-process** toutes les `TRACKING_POLL_INTERVAL_MINUTES` (180 par défaut) **+ CLI** `tracking:sync` pour un cron externe — même patron que le SLA légal (7.x). Bouton **« Rafraîchir le suivi »** côté admin pour ne pas attendre la passe suivante ; quand aucun transporteur n'est interrogeable, le bouton **explique pourquoi** au lieu de ne rien faire
+  - [x] Colonnes `tracking_checked_at` / `tracking_label` (migration `0010`) : les mots du transporteur, montrés à l'admin **et au client** — c'est la même chose que montre le lien de suivi. Les notes internes restent internes
+- [x] **Avertissements d'hydratation sur tout l'admin** — `routeRules { ssr: false }` sur `/admin` **et** `/admin/**` (⚠️ `/admin/**` ne couvre pas `/admin` lui-même). Le back-office est privé et authentifié : ni SSR ni SEO à y gagner, et la cause disparaît à la racine plutôt que page par page. **Vérifié au smoke** : `/admin` et `/admin/produits` renvoient **0 caractère** de contenu rendu côté serveur, `/boutique` en renvoie 35 783 — le SEO public est intact
+- [x] **E-mails en dev : Mailpit** dans `docker-compose.dev.yml` (SMTP 1025, interface 8025), et `.env.example` **pointe dessus par défaut**. ⚠️ Atteindre le vrai relais OVH devient une **modification explicite** du `.env`, plus le comportement par défaut. **Vérifié au smoke** : un mot de passe oublié et un « votre colis est en route » ont atterri **dans Mailpit**
+- [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 495 / shared 139 / web 223 = 857** au vert (+39) ; **smoke réel** — refus d'emballer une commande en retrait (409), `shipGate` à `pickup` et aucune suggestion, refus honnête du suivi à la demande sans clé transporteur (409), colis Mondial Relay expédié avec son lien de suivi, e-mail capté par Mailpit, et SSR admin confirmé à zéro
+- Reste ouvert : **les clés transporteur ne sont pas fournies** — le code est en place et testé contre des fournisseurs substitués, mais **rien n'a été interrogé pour de vrai**. Il faut une clé Okapi (developer.laposte.fr, produit « Suivi ») et un couple enseigne/clé privée Mondial Relay pour un premier appel réel ; ⚠️ la lecture des libellés Mondial Relay **doit être reconfrontée** à de vraies réponses. Pas d'**e-mail « votre colis est arrivé »** (la 11.9 ne prévient que du départ) ; pas de statut pour un **incident** de livraison (nos colis ne connaissent que préparé/expédié/livré) — le libellé du transporteur le porte, mais rien ne le signale
 
 **Story 11.10** — Rentabilité par article : marge, charges & reversements ✅
 

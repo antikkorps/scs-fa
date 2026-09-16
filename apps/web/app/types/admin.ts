@@ -60,6 +60,9 @@ export interface AdminShipment {
   shippedAt: string | null
   deliveredAt: string | null
   notifiedAt: string | null
+  /** Suivi automatique (11.9b) : dernière interrogation du transporteur et sa réponse. */
+  trackingCheckedAt: string | null
+  trackingLabel: string | null
   notes: string | null
   createdAt: string
   updatedAt: string

@@ -280,6 +280,74 @@ describe("multi-parcel shipping (story 11.9)", () => {
     expect((await orderDetail()).shipGate).toEqual({ ok: false, reason: "legal" })
   })
 
+  /**
+   * Story 11.9b — in-store pickup is not offered, and nothing writes
+   * `shipping_method`. Should such a row ever appear, it must not quietly rot
+   * as "unshipped" with the panel suggesting parcels nobody will ever post.
+   */
+  describe("an order marked for in-store pickup", () => {
+    beforeEach(async () => {
+      await clearOrder()
+      await db.update(orders).set({ shippingMethod: "retrait" }).where(eq(orders.id, orderId))
+    })
+
+    it("is not shippable, and nothing is suggested for it", async () => {
+      const data = await orderDetail()
+      expect(data.shipGate).toEqual({ ok: false, reason: "pickup" })
+      expect(data.suggestedParcels).toEqual([])
+    })
+
+    it("refuses to pack a parcel at all", async () => {
+      const res = await createParcel([scopes()])
+      expect(res.statusCode).toBe(409)
+      expect(res.json().message).toMatch(/pickup/i)
+    })
+
+    it("refuses to hand a pre-existing parcel to a carrier", async () => {
+      // Packed before the order was flipped to pickup.
+      await db.update(orders).set({ shippingMethod: null }).where(eq(orders.id, orderId))
+      const parcel = (await createParcel([scopes()])).json().data
+      await db.update(orders).set({ shippingMethod: "retrait" }).where(eq(orders.id, orderId))
+
+      const res = await setStatus(parcel.id, "shipped")
+      expect(res.statusCode).toBe(409)
+      expect(res.json().message).toMatch(/pickup/i)
+      expect(sendShipmentShippedEmail).not.toHaveBeenCalled()
+    })
+  })
+
+  /**
+   * Story 11.9b — on-demand tracking. No carrier key is configured under test,
+   * so what is asserted here is the gate, not the carrier call: the refusals an
+   * admin must be able to read, rather than a button that does nothing.
+   */
+  describe("refreshing a parcel's tracking on demand", () => {
+    it("refuses a parcel that has not left yet", async () => {
+      await clearOrder()
+      const parcel = (await createParcel([scopes()])).json().data
+      const res = await asAdmin("POST", `${BASE}/${parcel.id}/refresh-tracking`)
+      expect(res.statusCode).toBe(409)
+      expect(res.json().message).toMatch(/on its way/)
+    })
+
+    it("says so plainly when no carrier can be asked, instead of pretending", async () => {
+      await clearOrder()
+      const parcel = (await createParcel([scopes()])).json().data
+      await setStatus(parcel.id, "shipped")
+
+      const res = await asAdmin("POST", `${BASE}/${parcel.id}/refresh-tracking`)
+      expect(res.statusCode).toBe(409)
+      expect(res.json().message).toMatch(/mark it delivered by hand/)
+    })
+
+    it("refuses anyone but an admin, and an unknown parcel", async () => {
+      expect(
+        (await app.inject({ method: "POST", url: `${BASE}/${UNKNOWN_VARIANT}/refresh-tracking` })).statusCode,
+      ).toBe(401)
+      expect((await asAdmin("POST", `${BASE}/${UNKNOWN_VARIANT}/refresh-tracking`)).statusCode).toBe(404)
+    })
+  })
+
   it("requires a tracking number to hand a parcel to a listed carrier", async () => {
     await clearOrder()
     const parcel = (await createParcel([scopes()], { trackingNumber: undefined })).json().data
@@ -390,6 +458,9 @@ describe("multi-parcel shipping (story 11.9)", () => {
         trackingUrl: "https://www.laposte.fr/outils/suivre-vos-envois?code=6A0001",
         shippedAt: expect.any(String),
         deliveredAt: null,
+        // The carrier's own public wording (story 11.9b) — null until a
+        // tracking sync has actually been told something.
+        trackingLabel: null,
         items: [{ label: "Carabine cat. B", qty: 1, part: 1, parts: 2 }],
       },
     ])

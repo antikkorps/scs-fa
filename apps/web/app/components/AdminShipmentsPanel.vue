@@ -23,11 +23,20 @@ const GATE_MESSAGES = {
     "La commande n'est pas encore payée : les colis peuvent être préparés, mais aucun ne peut partir avant l'encaissement.",
   legal:
     "Les documents légaux ne sont pas validés : les colis peuvent être préparés, mais aucune arme réglementée ne peut partir avant leur validation.",
+  // Story 11.9b — le retrait n'est pas proposé aujourd'hui. Si une commande en
+  // porte quand même la mention, il vaut mieux le dire que de laisser le
+  // panneau proposer des colis que personne ne postera jamais.
+  pickup: "Cette commande est à retirer en armurerie : elle n'est pas expédiée, il n'y a aucun colis à préparer.",
 } as const
 
 const gateMessage = computed(() => {
   const gate = props.order.shipGate
   return gate.ok ? null : GATE_MESSAGES[gate.reason]
+})
+
+const isPickup = computed(() => {
+  const gate = props.order.shipGate
+  return !gate.ok && gate.reason === "pickup"
 })
 
 function messageFrom(err: unknown): string {
@@ -134,6 +143,12 @@ async function submitPacking() {
 const setStatus = (s: AdminShipment, status: string) =>
   run(() => api(`/admin/shipments/${s.id}`, { method: "PATCH", body: { status } }))
 
+// Suivi automatique (11.9b). L'API refuse proprement quand aucun transporteur
+// n'est interrogeable : on relaie sa phrase plutôt que de masquer le bouton,
+// pour que l'admin sache POURQUOI il doit cocher « livré » à la main.
+const refreshTracking = (s: AdminShipment) =>
+  run(() => api(`/admin/shipments/${s.id}/refresh-tracking`, { method: "POST" }))
+
 function remove(s: AdminShipment) {
   if (!window.confirm("Supprimer ce colis ? Son contenu redeviendra à expédier.")) return
   return run(() => api(`/admin/shipments/${s.id}`, { method: "DELETE" }))
@@ -200,6 +215,12 @@ async function saveEdit(s: AdminShipment) {
           <template v-if="s.deliveredAt"> · livré le {{ formatDateTime(s.deliveredAt) }}</template>
           <template v-if="s.notifiedAt"> · client prévenu</template>
         </p>
+        <p v-if="s.trackingLabel" class="parcel__tracking">
+          « {{ s.trackingLabel }} »
+          <template v-if="s.trackingCheckedAt">
+            <span class="parcel__tracking-at">— transporteur interrogé le {{ formatDateTime(s.trackingCheckedAt) }}</span>
+          </template>
+        </p>
 
         <ul class="parcel__items">
           <li v-for="it in s.items" :key="it.id">{{ parcelItemLabel(it) }}</li>
@@ -246,6 +267,9 @@ async function saveEdit(s: AdminShipment) {
             </button>
           </template>
           <template v-else-if="s.status === 'shipped'">
+            <button type="button" class="btn btn-ghost track-btn" :disabled="busy" @click="refreshTracking(s)">
+              Rafraîchir le suivi
+            </button>
             <button type="button" class="btn btn-primary deliver-btn" :disabled="busy" @click="setStatus(s, 'delivered')">
               Marquer livré
             </button>
@@ -261,7 +285,7 @@ async function saveEdit(s: AdminShipment) {
       </li>
     </ol>
 
-    <p v-else-if="!order.suggestedParcels.length" class="empty">Aucun article à expédier.</p>
+    <p v-else-if="!isPickup && !order.suggestedParcels.length" class="empty">Aucun article à expédier.</p>
 
     <!-- Packing what is left, from the suggestion -->
     <template v-if="order.suggestedParcels.length">
@@ -368,6 +392,18 @@ async function saveEdit(s: AdminShipment) {
   margin: 0;
   font-weight: 600;
 }
+.parcel__tracking {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--p-text-muted-color);
+}
+
+.parcel__tracking-at {
+  font-style: normal;
+  opacity: 0.75;
+}
+
 .parcel__meta {
   margin: 0.3rem 0 0;
   font-size: 0.8rem;

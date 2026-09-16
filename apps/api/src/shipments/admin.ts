@@ -3,6 +3,7 @@ import {
   carrierLabel,
   createShipmentSchema,
   findAllocationError,
+  isPickupOrder,
   updateShipmentSchema,
   uuidParamSchema,
 } from "@armurier/shared"
@@ -20,6 +21,8 @@ import {
   recomputeOrderShippingStatus,
   toAdminShipment,
 } from "./service.js"
+import { trackingProviderFor } from "./tracking/index.js"
+import { refreshShipmentTracking } from "./tracking/sync.js"
 
 /** Thrown inside a transaction to roll it back and answer with a status code. */
 class ShipmentProblem extends Error {
@@ -36,6 +39,7 @@ const ERROR_NAMES = { 400: "ValidationError", 404: "NotFound", 409: "Conflict" }
 const GATE_MESSAGES = {
   unpaid: "The order is not paid yet — a parcel cannot leave before the money is in",
   legal: "The legal documents of this order are not validated — a regulated firearm cannot leave before they are",
+  pickup: "This order is marked for in-store pickup — it is collected, not shipped",
 } as const
 
 /**
@@ -70,12 +74,15 @@ export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
       // Row lock: two admins packing the same order at once must not both pass
       // the allocation check against the same "what is left".
       const [order] = await tx
-        .select({ id: orders.id, itemsJson: orders.itemsJson })
+        .select({ id: orders.id, itemsJson: orders.itemsJson, shippingMethod: orders.shippingMethod })
         .from(orders)
         .where(eq(orders.id, body.orderId))
         .limit(1)
         .for("update")
       if (!order) throw new ShipmentProblem(404, "Order not found")
+      // Packing is otherwise allowed at any time — but a pickup order has no
+      // parcel to pack: refusing here beats letting one sit unsendable forever.
+      if (isPickupOrder(order.shippingMethod)) throw new ShipmentProblem(409, GATE_MESSAGES.pickup)
 
       const existing = await loadShipments(order.id, tx)
       const problem = findAllocationError(order.itemsJson, allocatedItems(existing), body.items)
@@ -142,7 +149,11 @@ export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
       const [current] = await tx.select().from(shipments).where(eq(shipments.id, params.data.id)).limit(1).for("update")
       if (!current) throw new ShipmentProblem(404, "Shipment not found")
       const [order] = await tx
-        .select({ paymentStatus: orders.paymentStatus, legalVerificationStatus: orders.legalVerificationStatus })
+        .select({
+          paymentStatus: orders.paymentStatus,
+          legalVerificationStatus: orders.legalVerificationStatus,
+          shippingMethod: orders.shippingMethod,
+        })
         .from(orders)
         .where(eq(orders.id, current.orderId))
         .limit(1)
@@ -202,6 +213,34 @@ export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
     // After the commit: the customer is only told about a dispatch that is recorded.
     if (outcome.leftNow) await notifyShipmentShipped(params.data.id, request.log)
     return reply.send({ data: await reload(outcome.orderId, params.data.id) })
+  })
+
+  /**
+   * POST /:id/refresh-tracking — ask the carrier about this parcel, now.
+   *
+   * The same code path the scheduler runs, aimed at one parcel: an admin who
+   * wants an answer should not have to wait for the next poll. Marking a parcel
+   * delivered by hand stays available, and is what happens for a carrier we
+   * cannot ask.
+   */
+  fastify.post("/:id/refresh-tracking", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) return reply.code(400).send(validationError(params.error.issues))
+
+    const [parcel] = await db.select().from(shipments).where(eq(shipments.id, params.data.id)).limit(1)
+    if (!parcel) throw new ShipmentProblem(404, "Shipment not found")
+    if (parcel.status !== "shipped") {
+      throw new ShipmentProblem(409, "Only a parcel on its way can be tracked")
+    }
+    if (!parcel.trackingNumber || !trackingProviderFor(parcel.carrier)) {
+      throw new ShipmentProblem(
+        409,
+        `Automatic tracking is not available for this parcel — mark it delivered by hand when it arrives`,
+      )
+    }
+
+    await refreshShipmentTracking(parcel.id, request.log)
+    return reply.send({ data: await reload(parcel.orderId, parcel.id) })
   })
 
   /** DELETE /:id — only a parcel still being prepared. One that has left is a fact. */

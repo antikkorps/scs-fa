@@ -230,6 +230,9 @@ function toggleUpload(docType: string) {
                   <p class="parcel__meta">
                     {{ s.carrierLabel }}<template v-if="s.trackingNumber"> · n° {{ s.trackingNumber }}</template>
                   </p>
+                  <!-- Le dernier message du transporteur (11.9b) : la même chose
+                       que montre le lien de suivi, sans avoir à le suivre. -->
+                  <p v-if="s.trackingLabel" class="parcel__tracking">{{ s.trackingLabel }}</p>
                 </div>
                 <a
                   v-if="s.trackingUrl && s.status !== 'preparing'"
@@ -471,6 +474,13 @@ function toggleUpload(docType: string) {
   margin: 0;
   font-size: 0.85rem;
 }
+.parcel__tracking {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--p-text-muted-color);
+}
+
 .parcel__meta {
   margin: 0.25rem 0 0;
   font-size: 0.78rem;

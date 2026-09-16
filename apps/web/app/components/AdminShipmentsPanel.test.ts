@@ -23,6 +23,8 @@ const parcel = (overrides: Partial<AdminShipment> = {}): AdminShipment => ({
   shippedAt: null,
   deliveredAt: null,
   notifiedAt: null,
+  trackingCheckedAt: null,
+  trackingLabel: null,
   notes: null,
   createdAt: "2026-09-13T10:00:00.000Z",
   updatedAt: "2026-09-13T10:00:00.000Z",
@@ -110,6 +112,61 @@ describe("AdminShipmentsPanel (story 11.9)", () => {
     const wrapper = await mounted(order({ shipGate: { ok: false, reason: "legal" }, shipments: [parcel()] }))
     expect(wrapper.text()).toContain("documents légaux")
     expect(wrapper.find(".ship-btn").attributes("disabled")).toBeDefined()
+  })
+
+  /** Story 11.9b — pickup is not offered; a pickup order must not read as "nothing to ship". */
+  it("says an order is collected in store rather than pretending it has nothing to ship", async () => {
+    const wrapper = await mounted(order({ shipGate: { ok: false, reason: "pickup" }, suggestedParcels: [] }))
+    expect(wrapper.text()).toContain("retirer en armurerie")
+    expect(wrapper.text()).not.toContain("Aucun article à expédier")
+    expect(wrapper.find(".pack-open").exists()).toBe(false)
+  })
+
+  /** Story 11.9b — automatic tracking, and its honest failure mode. */
+  describe("carrier tracking", () => {
+    it("shows the carrier's own words about a parcel on its way", async () => {
+      const wrapper = await mounted(
+        order({
+          shipments: [
+            parcel({
+              status: "shipped",
+              trackingLabel: "Votre colis est arrivé sur la plateforme de distribution.",
+              trackingCheckedAt: "2026-09-16T08:00:00.000Z",
+            }),
+          ],
+          suggestedParcels: [],
+        }),
+      )
+      expect(wrapper.text()).toContain("Votre colis est arrivé sur la plateforme de distribution.")
+      expect(wrapper.text()).toContain("transporteur interrogé le")
+    })
+
+    it("asks the carrier on demand", async () => {
+      const wrapper = await mounted(order({ shipments: [parcel({ status: "shipped" })], suggestedParcels: [] }))
+      await wrapper.find(".track-btn").trigger("click")
+      await flushPromises()
+
+      const call = apiMock.mock.calls.find(([url]) => String(url).endsWith("/refresh-tracking"))
+      expect(call?.[0]).toBe("/admin/shipments/s1/refresh-tracking")
+      expect((call?.[1] as { method: string }).method).toBe("POST")
+    })
+
+    /** A button that silently does nothing is worse than one that explains itself. */
+    it("relays the server's explanation when no carrier can be asked", async () => {
+      const wrapper = await mounted(order({ shipments: [parcel({ status: "shipped" })], suggestedParcels: [] }))
+      apiMock.mockRejectedValueOnce({
+        data: { message: "Automatic tracking is not available for this parcel — mark it delivered by hand" },
+      })
+
+      await wrapper.find(".track-btn").trigger("click")
+      await flushPromises()
+      expect(wrapper.find(".alert").text()).toContain("mark it delivered by hand")
+    })
+
+    it("offers no tracking refresh on a parcel that has not left", async () => {
+      const wrapper = await mounted(order({ shipments: [parcel({ status: "preparing" })], suggestedParcels: [] }))
+      expect(wrapper.find(".track-btn").exists()).toBe(false)
+    })
   })
 
   it("marks a parcel shipped, and relays the server's refusal instead of failing silently", async () => {
