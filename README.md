@@ -26,7 +26,7 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 # edit apps/api/.env if needed (ports, S3, SMTP)
 
-# 3. Start Postgres (host port 5435)
+# 3. Start Postgres (5435) + Mailpit, the local SMTP trap (8025)
 pnpm docker:up
 
 # 4. Apply the schema + seeds (legal categories + products)
@@ -234,6 +234,21 @@ Two people are paid on a sale, and the arrangement is the same shape for both: *
 - ⚠️ **No IBAN is stored**: that is one more piece of banking data to protect for a need nothing has expressed — payouts are settled outside the site, and a free-text note carries the modalities.
 - Purchase prices, charges, margins and third-party shares are **admin-only**. No public route exposes any of them.
 
+## Carrier tracking (story 11.9b)
+
+Parcels can be marked delivered automatically, by asking the carrier. **Both providers are optional**: with no credentials nothing is polled and "delivered" stays an admin click, exactly as it was — a laptop, CI and a launch without carrier accounts all behave unchanged.
+
+- **La Poste "Suivi v2"** (`LAPOSTE_OKAPI_KEY`, from [developer.laposte.fr](https://developer.laposte.fr), product *Suivi*). One key covers **Colissimo and Chronopost**: the service harmonises them behind a single tracking number.
+- **Mondial Relay** (`MONDIAL_RELAY_ENSEIGNE` + `MONDIAL_RELAY_PRIVATE_KEY`). ⚠️ No public REST tracking API exists: this is their SOAP service, signed with an MD5 of the private key, and it returns **free-text French labels** rather than status codes. "Delivered" is therefore *read* rather than looked up — `interpret.ts` holds that rule, on its own, tested, and it errs towards "still travelling" on anything it does not recognise.
+- **The move is one-way**, `shipped` → `delivered`. A carrier reporting "in transit" never undoes a delivery an admin recorded by hand.
+- ⚠️ **An unanswered question is not an answer**: a carrier that is down, rate-limiting us or refusing our key leaves the parcel exactly as it is. Nothing is dated, nothing is marked, and the next pass asks again.
+- Automatic deliveries are audited as **`system`**, never as an admin: nobody clicked, and the trail has to say what closed the parcel.
+- **Scheduling**: in-process every `TRACKING_POLL_INTERVAL_MINUTES` (180 by default, 0 disables, always off under test), or `pnpm --filter @armurier/api tracking:sync` from an external cron — the same pattern as the legal-document SLA check. An admin who will not wait for the next pass has a **"Rafraîchir le suivi"** button; when no carrier can be asked, it says so rather than doing nothing.
+
+## E-mails in development
+
+`docker-compose.dev.yml` runs **Mailpit**, and `apps/api/.env.example` points at it by default (SMTP on **1025**, web UI on **<http://localhost:8025>**). Read what the app sent there. ⚠️ Reaching the real OVH relay is a deliberate `.env` edit — never the default — so a smoke test that ships a parcel cannot mail a real customer.
+
 ## Engineering principles
 
 1. **Tests-first** — Vitest on every feature; no merge without a test.
@@ -260,5 +275,6 @@ If you run other Docker projects on the same machine:
 - Dev Postgres on **5435** (5432–5434 are often taken).
 - Dev API on **8081**.
 - Front on **3000** (Nuxt default).
+- Mailpit on **1025** (SMTP) and **8025** (web UI).
 
 Adjust `apps/api/.env` and `docker-compose.dev.yml` if you hit a conflict.

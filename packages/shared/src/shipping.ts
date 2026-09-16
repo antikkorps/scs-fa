@@ -51,6 +51,11 @@ export const SHIPPING_CARRIERS = [
   },
   { code: "ups", label: "UPS", trackingUrl: "https://www.ups.com/track?loc=fr_FR&tracknum={number}" },
   { code: "dpd", label: "DPD", trackingUrl: "https://www.dpd.fr/trace/{number}" },
+  {
+    code: "mondial-relay",
+    label: "Mondial Relay",
+    trackingUrl: "https://www.mondialrelay.fr/suivi-de-colis?numeroExpedition={number}",
+  },
   { code: "gls", label: "GLS", trackingUrl: "https://gls-group.com/FR/fr/suivi-colis?match={number}" },
   { code: "other", label: "Autre transporteur", trackingUrl: null },
 ] as const
@@ -262,14 +267,40 @@ export function suggestShipmentSplit(lines: SplitLine[], allocated: ShipmentItem
 // or never required (`payment_pending` is where such an order rests until paid).
 const LEGAL_CLEARED_STATES: readonly string[] = ["docs_verified", "payment_pending", "completed"]
 
-export type ShipGate = { ok: true } | { ok: false; reason: "unpaid" | "legal" }
+/**
+ * Shipping methods that mean "the customer comes and collects it" rather than
+ * "a carrier takes it away".
+ *
+ * ⚠️ Story 11.9b — in-store pickup is NOT offered. Nothing writes
+ * `orders.shipping_method`: the choice appears nowhere in the tunnel, and the
+ * decision of 2026-09-16 is to leave it that way for now. This list exists so
+ * that a row which somehow carries such a method cannot rot forever as
+ * "unshipped" while the admin panel cheerfully suggests parcels for it. Both
+ * spellings the schema has used are covered.
+ */
+export const PICKUP_SHIPPING_METHODS: readonly string[] = ["retrait", "retirait", "pickup"]
+
+export function isPickupOrder(shippingMethod: string | null | undefined): boolean {
+  return PICKUP_SHIPPING_METHODS.includes(shippingMethod?.trim().toLowerCase() ?? "")
+}
+
+export type ShipGate = { ok: true } | { ok: false; reason: "unpaid" | "legal" | "pickup" }
 
 /**
  * Whether a parcel may be handed to the carrier. A parcel can be PREPARED at
  * any time; it cannot LEAVE before the money is in and — for a regulated
  * firearm — before the documents are validated.
+ *
+ * Pickup comes first: paying or validating a dossier would not make such an
+ * order shippable, so naming money or papers would send the admin chasing a fix
+ * that does not exist.
  */
-export function canShipOrder(order: { paymentStatus: string; legalVerificationStatus: string }): ShipGate {
+export function canShipOrder(order: {
+  paymentStatus: string
+  legalVerificationStatus: string
+  shippingMethod?: string | null
+}): ShipGate {
+  if (isPickupOrder(order.shippingMethod)) return { ok: false, reason: "pickup" }
   if (!PAID_PAYMENT_STATUSES.includes(order.paymentStatus)) return { ok: false, reason: "unpaid" }
   if (!LEGAL_CLEARED_STATES.includes(order.legalVerificationStatus)) return { ok: false, reason: "legal" }
   return { ok: true }

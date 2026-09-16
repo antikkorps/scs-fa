@@ -17,5 +17,20 @@ services:
       timeout: 5s
       retries: 10
 
+  # Local SMTP trap. Dev must NEVER reach the real OVH relay: a smoke test that
+  # ships a parcel would send a real e-mail to a real customer. Mailpit accepts
+  # everything on 1025 and shows it at http://localhost:8025 — reaching the real
+  # relay is now a deliberate .env edit, not the default.
+  mailpit:
+    image: axllent/mailpit:v1.30.2
+    container_name: armurier_mailpit_dev
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
 volumes:
   postgres_data:

@@ -30,6 +30,18 @@ export default defineNuxtConfig({
     },
   },
 
+  // The back-office is a private, authenticated tool: it needs neither SSR nor
+  // SEO. Rendering it on the server only produced hydration warnings — every
+  // admin page loads through `useAsyncData({ server: false })`, so the server
+  // shipped the empty/error state ("Aucune commande pour ces critères",
+  // "Commande introuvable") while the client showed "Chargement…". Serving the
+  // shell alone removes the mismatch at its root, and spares the server the work.
+  // `/admin/**` does not match `/admin` itself — the dashboard needs its own rule.
+  routeRules: {
+    "/admin": { ssr: false },
+    "/admin/**": { ssr: false },
+  },
+
   // Dev only: relative `/api/**` (e.g. blog image URLs embedded in articles)
   // resolve to the API origin. In production a single origin (Caddy) routes /api,
   // so no proxy is needed there. `useFetch` uses the absolute apiBase and bypasses this.

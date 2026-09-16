@@ -54,6 +54,23 @@ const envSchema = z.object({
   // disabled in tests regardless). External cron can call the sla CLI instead.
   SLA_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
 
+  // Automatic carrier tracking (Story 11.9b). Both providers are OPTIONAL: with
+  // no credentials the sync simply does nothing and "delivered" stays a manual
+  // admin action, exactly as before — a laptop, CI and a launch without carrier
+  // accounts all boot unchanged.
+  //
+  // One La Poste key ("Okapi") covers Colissimo AND Chronopost: the Suivi v2
+  // service harmonises them behind a single tracking number.
+  LAPOSTE_OKAPI_KEY: z.string().optional(),
+  // Mondial Relay's SOAP tracing service. The private key signs each call (MD5).
+  MONDIAL_RELAY_ENSEIGNE: z.string().optional(),
+  MONDIAL_RELAY_PRIVATE_KEY: z.string().optional(),
+  // In-process poll of the parcels in transit, every N minutes (0 disables;
+  // disabled in tests regardless). Three hours is plenty: a parcel changes hands
+  // a few times a day, and a carrier API is a quota to spend sparingly. External
+  // cron can call the tracking CLI instead.
+  TRACKING_POLL_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(180),
+
   // Observability (Story 7.2). LOG_LEVEL overrides the per-env default (silent in
   // test, info in prod, debug locally). Server errors (5xx) email the admins,
   // throttled per error signature to avoid alert storms; alerts are off outside

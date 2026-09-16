@@ -112,6 +112,8 @@ export function toAdminShipment(s: ShipmentWithItems) {
     shippedAt: s.shippedAt,
     deliveredAt: s.deliveredAt,
     notifiedAt: s.notifiedAt,
+    trackingCheckedAt: s.trackingCheckedAt,
+    trackingLabel: s.trackingLabel,
     notes: s.notes,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
@@ -138,6 +140,9 @@ function toCustomerShipment(s: ShipmentWithItems) {
     trackingUrl: trackingUrlFor(s.carrier, s.trackingNumber, s.trackingUrl),
     shippedAt: s.shippedAt,
     deliveredAt: s.deliveredAt,
+    // The carrier's own public wording — the same thing the tracking link shows.
+    // The internal note stays out, as it always has.
+    trackingLabel: s.trackingLabel,
     items: s.items.map((i) => ({ label: i.label, qty: i.qty, part: i.part, parts: i.parts })),
   }
 }
@@ -148,12 +153,16 @@ export async function adminShippingView(order: {
   items: OrderLines
   paymentStatus: string
   legalVerificationStatus: string
+  shippingMethod?: string | null
 }) {
   const list = await loadShipments(order.id)
+  const gate = canShipOrder(order)
   return {
-    shipGate: canShipOrder(order),
+    shipGate: gate,
     shipments: list.map(toAdminShipment),
-    suggestedParcels: await suggestParcels(order.items, list),
+    // Nothing will ever be posted for a pickup order: suggesting parcels for it
+    // would only invite an admin to pack something that cannot leave.
+    suggestedParcels: gate.ok === false && gate.reason === "pickup" ? [] : await suggestParcels(order.items, list),
   }
 }
 

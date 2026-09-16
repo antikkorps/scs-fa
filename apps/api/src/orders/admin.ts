@@ -119,6 +119,7 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
         legalRejectionReason: orders.legalRejectionReason,
         paymentStatus: orders.paymentStatus,
         shippingStatus: orders.shippingStatus,
+        shippingMethod: orders.shippingMethod,
         subtotalHt: orders.subtotalHt,
         vatAmount: orders.vatAmount,
         totalTtc: orders.totalTtc,

@@ -52,6 +52,8 @@ export interface CustomerShipment {
   trackingUrl: string | null
   shippedAt: string | null
   deliveredAt: string | null
+  /** Le dernier message public du transporteur, dans ses mots. */
+  trackingLabel: string | null
   items: Array<{ label: string; qty: number; part: number; parts: number }>
 }
 

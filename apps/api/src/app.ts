@@ -38,6 +38,7 @@ import { adminProductRoutes } from "./products/admin.js"
 import { productRoutes } from "./products/index.js"
 import { searchRoutes } from "./search/index.js"
 import { adminShipmentRoutes } from "./shipments/admin.js"
+import { startShipmentTrackingScheduler } from "./shipments/tracking/sync.js"
 import { adminTagRoutes } from "./tags/admin.js"
 import { tagRoutes } from "./tags/index.js"
 
@@ -127,6 +128,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)
+  startShipmentTrackingScheduler(fastify)
 
   return fastify
 }

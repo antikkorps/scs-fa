@@ -4,6 +4,7 @@ import {
   canShipOrder,
   defaultParcelCount,
   findAllocationError,
+  isPickupOrder,
   type ShipmentItemRef,
   suggestShipmentSplit,
   trackingUrlFor,
@@ -210,5 +211,51 @@ describe("canShipOrder", () => {
         reason: "legal",
       })
     }
+  })
+
+  /**
+   * Story 11.9b — pickup is not offered. An order that nevertheless carries a
+   * pickup method has nothing to hand a carrier: it must not look shippable.
+   */
+  it("holds a pickup order, even paid and cleared", () => {
+    for (const method of ["retrait", "retirait", "pickup", "  Retrait  "]) {
+      expect(
+        canShipOrder({ paymentStatus: "received", legalVerificationStatus: "completed", shippingMethod: method }),
+      ).toEqual({ ok: false, reason: "pickup" })
+    }
+  })
+
+  /** The reason the admin sees must be the one they can act on first. */
+  it("reports pickup before payment, since paying would not make it shippable", () => {
+    expect(
+      canShipOrder({
+        paymentStatus: "awaiting_transfer",
+        legalVerificationStatus: "pending",
+        shippingMethod: "retrait",
+      }),
+    ).toEqual({ ok: false, reason: "pickup" })
+  })
+
+  it("leaves a carrier delivery untouched", () => {
+    for (const method of [null, undefined, "", "std", "express"]) {
+      expect(
+        canShipOrder({ paymentStatus: "received", legalVerificationStatus: "completed", shippingMethod: method }),
+      ).toEqual({ ok: true })
+    }
+  })
+})
+
+describe("isPickupOrder", () => {
+  it("recognises both spellings the schema has used, case and space tolerant", () => {
+    expect(isPickupOrder("retrait")).toBe(true)
+    expect(isPickupOrder("retirait")).toBe(true)
+    expect(isPickupOrder(" PICKUP ")).toBe(true)
+  })
+
+  it("says no when there is no method at all — the common case today", () => {
+    expect(isPickupOrder(null)).toBe(false)
+    expect(isPickupOrder(undefined)).toBe(false)
+    expect(isPickupOrder("")).toBe(false)
+    expect(isPickupOrder("std")).toBe(false)
   })
 })
