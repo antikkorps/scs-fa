@@ -71,6 +71,15 @@ const envSchema = z.object({
   // cron can call the tracking CLI instead.
   TRACKING_POLL_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(180),
 
+  // Cross-sell « fréquemment achetés ensemble » (Story 11.8). ⚠️ ÉTEINT PAR
+  // DÉFAUT : le client a demandé un bloc « activé à la demande, pas forcément au
+  // début ». Éteint, aucune fiche publique ne renvoie la moindre suggestion —
+  // l'administration reste utilisable pour préparer les associations à l'avance.
+  CROSS_SELL_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
   // Observability (Story 7.2). LOG_LEVEL overrides the per-env default (silent in
   // test, info in prod, debug locally). Server errors (5xx) email the admins,
   // throttled per error signature to avoid alert storms; alerts are off outside

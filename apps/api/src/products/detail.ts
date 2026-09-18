@@ -3,6 +3,7 @@ import { and, asc, eq, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { ancientWeapons, legalCategories, productCategories, products, productVariants } from "../db/schema.js"
+import { publicCrossSellsFor } from "./cross-sell.js"
 import { productTagsJson } from "./tag-filter.js"
 
 // Shared lookup for a single published product (by id or by slug). Returns the
@@ -108,6 +109,11 @@ async function fetchPublishedProduct(match: SQL) {
     }
   })
 
+  // Story 11.8 — suggestions d'accessoires. Liste vide tant que le bloc n'est
+  // pas activé, et filtrée par les mêmes règles qu'à la saisie : l'arme a pu
+  // changer de catégorie légale depuis.
+  const crossSells = await publicCrossSellsFor(row.id, vatPct)
+
   return {
     id: row.id,
     sku: row.sku,
@@ -133,6 +139,7 @@ async function fetchPublishedProduct(match: SQL) {
       keywords: row.keywords,
     },
     category: { slug: row.categorySlug, name: row.categoryName },
+    crossSells,
     tags: row.tags,
     // Null for an ordinary product; the whole historical dossier for a
     // collection weapon, which the front renders as its story section.

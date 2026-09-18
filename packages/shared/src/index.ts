@@ -1,5 +1,6 @@
 export * from "./artwork.js"
 export * from "./constants.js"
+export * from "./cross-sell.js"
 export * from "./file-signature.js"
 export * from "./newsletter.js"
 export * from "./orders.js"

@@ -661,6 +661,10 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   }),
   variants: many(productVariants),
   tags: many(productTags),
+  // Deux relations vers la même table : Drizzle a besoin d'un nom pour les
+  // distinguer de part et d'autre (story 11.8).
+  crossSells: many(productCrossSells, { relationName: "crossSellSource" }),
+  suggestedOn: many(productCrossSells, { relationName: "crossSellAccessory" }),
   ancientWeapon: one(ancientWeapons),
   artwork: one(artworks),
   orderItems: many(orderItems),
@@ -728,6 +732,46 @@ export const productVariantsRelations = relations(productVariants, ({ one, many 
   cartItems: many(cartItems),
   orderItems: many(orderItems),
   stockMovements: many(stockMovements),
+}))
+
+// Cross-sell « fréquemment achetés ensemble » (story 11.8). L'association est
+// DIRIGÉE : la fiche d'une arme (`product_id`) suggère un accessoire
+// (`accessory_id`), jamais l'inverse — une fiche d'accessoire ne renvoie pas
+// vers une arme. Les paires sont saisies à la main : au lancement il n'y a
+// aucun historique de co-achats, et surtout les restrictions d'accessoires ne
+// sont qu'une note en texte libre qu'aucune règle ne sait lire.
+export const productCrossSells = pgTable(
+  "product_cross_sells",
+  {
+    productId: uuid("product_id").notNull(),
+    accessoryId: uuid("accessory_id").notNull(),
+    // Ordre voulu par l'admin, et non l'ordre d'insertion : la première
+    // suggestion est celle qui compte.
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.productId, t.accessoryId] }),
+    foreignKey({ columns: [t.productId], foreignColumns: [products.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.accessoryId], foreignColumns: [products.id] }).onDelete("cascade"),
+    // Le couple se lit aussi à l'envers en administration (« où cet accessoire
+    // est-il suggéré ? ») ; la PK composite ne sert que le sens direct.
+    index("idx_product_cross_sells_accessory").on(t.accessoryId),
+    check("chk_product_cross_sells_not_self", sql`product_id <> accessory_id`),
+  ],
+)
+
+export const productCrossSellsRelations = relations(productCrossSells, ({ one }) => ({
+  product: one(products, {
+    fields: [productCrossSells.productId],
+    references: [products.id],
+    relationName: "crossSellSource",
+  }),
+  accessory: one(products, {
+    fields: [productCrossSells.accessoryId],
+    references: [products.id],
+    relationName: "crossSellAccessory",
+  }),
 }))
 
 // ============================================================================

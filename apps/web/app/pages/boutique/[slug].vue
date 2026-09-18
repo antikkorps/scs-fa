@@ -321,6 +321,10 @@ useHead({
           </div>
         </div>
       </div>
+
+      <!-- Story 11.8 : accessoires suggérés. La liste arrive vide tant que le
+           bloc n'est pas activé, et le composant ne rend alors rien. -->
+      <ProductCrossSell :items="product.crossSells ?? []" :weapon-name="product.name" />
     </div>
   </article>
 </template>
