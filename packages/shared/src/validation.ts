@@ -9,6 +9,7 @@ import {
   MAX_TAG_FILTERS,
   TAG_FACETS,
 } from "./constants.js"
+import { MAX_CROSS_SELLS_PER_PRODUCT } from "./cross-sell.js"
 import { NEWSLETTER_SEGMENTS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
 import {
@@ -17,6 +18,35 @@ import {
   SHIPMENT_STATUSES,
   SHIPPING_CARRIER_CODES,
 } from "./shipping.js"
+
+/**
+ * Rend chaque champ facultatif POUR UN PATCH, en retirant d'abord sa valeur par
+ * défaut.
+ *
+ * ⚠️ `.partial()` seul ne suffit pas : zod applique la valeur par défaut d'un
+ * champ même rendu facultatif. Une requête ne portant qu'un champ se voyait donc
+ * compléter par tous les défauts du schéma de création — `published: false`
+ * **dépubliait** l'article, `variants: []` effaçait ses déclinaisons,
+ * `tagSlugs: []` ses tags, `stockQty: 0` son stock. Un PATCH ne doit jamais
+ * écrire ce que la requête ne contient pas.
+ *
+ * Effet de bord voulu : le garde-fou « au moins un champ » des schémas de mise à
+ * jour se met enfin à voir passer un corps vide, qu'il refuse.
+ *
+ * `.extend()` plutôt qu'un `z.object()` reconstruit : la rigueur du schéma
+ * d'origine (`.strict()`) est conservée.
+ */
+function stripDefault(field: z.ZodType): z.ZodType {
+  const inner = (field as { def?: { innerType?: z.ZodType } }).def?.innerType
+  return field instanceof z.ZodDefault && inner ? stripDefault(inner) : field
+}
+
+export function toPatchSchema<T extends z.ZodObject>(schema: T): ReturnType<T["partial"]> {
+  const stripped = Object.fromEntries(Object.entries(schema.shape).map(([key, field]) => [key, stripDefault(field)]))
+  // Retirer un défaut ne change pas le type de sortie, seulement ce que l'entrée
+  // doit fournir : la signature reste celle de `.partial()`.
+  return schema.extend(stripped as T["shape"]).partial() as ReturnType<T["partial"]>
+}
 
 export const emailSchema = z.string().email().max(255)
 export const passwordSchema = z.string().min(12).max(128)
@@ -292,10 +322,9 @@ export type CreateAncientWeaponInput = z.infer<typeof createAncientWeaponSchema>
 
 // Every field optional, but `sku`/`slug`/`categorySlug` are deliberately absent:
 // changing them would break indexed URLs and the variant SKU derived from them.
-export const updateAncientWeaponSchema = createAncientWeaponSchema
-  .omit({ sku: true, slug: true, categorySlug: true })
-  .partial()
-  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+export const updateAncientWeaponSchema = toPatchSchema(
+  createAncientWeaponSchema.omit({ sku: true, slug: true, categorySlug: true }),
+).refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
 
 export type UpdateAncientWeaponInput = z.infer<typeof updateAncientWeaponSchema>
 
@@ -655,10 +684,10 @@ export const createArtistSchema = z
   })
   .strict()
 
-export const updateArtistSchema = createArtistSchema
-  .omit({ slug: true })
-  .partial()
-  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+export const updateArtistSchema = toPatchSchema(createArtistSchema.omit({ slug: true })).refine(
+  (patch) => Object.keys(patch).length > 0,
+  { message: "At least one field must be provided" },
+)
 
 export type CreateArtistInput = z.infer<typeof createArtistSchema>
 export type UpdateArtistInput = z.infer<typeof updateArtistSchema>
@@ -674,10 +703,10 @@ export const createArtworkThemeSchema = z
   })
   .strict()
 
-export const updateArtworkThemeSchema = createArtworkThemeSchema
-  .omit({ slug: true })
-  .partial()
-  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+export const updateArtworkThemeSchema = toPatchSchema(createArtworkThemeSchema.omit({ slug: true })).refine(
+  (patch) => Object.keys(patch).length > 0,
+  { message: "At least one field must be provided" },
+)
 
 export type CreateArtworkThemeInput = z.infer<typeof createArtworkThemeSchema>
 export type UpdateArtworkThemeInput = z.infer<typeof updateArtworkThemeSchema>
@@ -701,10 +730,10 @@ export const createArtworkSeriesSchema = z
   })
   .strict()
 
-export const updateArtworkSeriesSchema = createArtworkSeriesSchema
-  .omit({ slug: true })
-  .partial()
-  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+export const updateArtworkSeriesSchema = toPatchSchema(createArtworkSeriesSchema.omit({ slug: true })).refine(
+  (patch) => Object.keys(patch).length > 0,
+  { message: "At least one field must be provided" },
+)
 
 export type CreateArtworkSeriesInput = z.infer<typeof createArtworkSeriesSchema>
 export type UpdateArtworkSeriesInput = z.infer<typeof updateArtworkSeriesSchema>
@@ -778,9 +807,7 @@ export const createArtworkSchema = artworkBaseSchema.refine(
 // `sku`, `slug` and `editionLimit` are deliberately absent: the first two are
 // indexed URLs, and the third is the size of an edition already numbered and
 // partly sold — changing it would rewrite what buyers were promised.
-export const updateArtworkSchema = artworkBaseSchema
-  .omit({ sku: true, slug: true, editionLimit: true })
-  .partial()
+export const updateArtworkSchema = toPatchSchema(artworkBaseSchema.omit({ sku: true, slug: true, editionLimit: true }))
   .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
   .refine(
     (patch) =>
@@ -806,10 +833,10 @@ export const createTagSchema = z
 
 // The facet drives the query semantics (OR inside a facet, AND across facets),
 // so moving a tag between facets silently changes every saved filter — refused.
-export const updateTagSchema = createTagSchema
-  .omit({ slug: true, facet: true })
-  .partial()
-  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+export const updateTagSchema = toPatchSchema(createTagSchema.omit({ slug: true, facet: true })).refine(
+  (patch) => Object.keys(patch).length > 0,
+  { message: "At least one field must be provided" },
+)
 
 export type CreateTagInput = z.infer<typeof createTagSchema>
 export type UpdateTagInput = z.infer<typeof updateTagSchema>
@@ -877,15 +904,27 @@ export const createProductSchema = productBaseSchema.refine(
   uniqueVariantSkus,
 )
 
-export const updateProductSchema = productBaseSchema
-  .omit({ sku: true, slug: true })
-  .partial()
+export const updateProductSchema = toPatchSchema(productBaseSchema.omit({ sku: true, slug: true }))
   .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
   .refine(
     (patch) =>
       patch.variants === undefined || new Set(patch.variants.map((x) => x.skuVariant)).size === patch.variants.length,
     { message: "Variant SKUs must be unique", path: ["variants"] },
   )
+
+/**
+ * Story 11.8 — the whole suggestion list of one firearm, sent in the order the
+ * admin arranged it. A replacement rather than a patch: reordering and removing
+ * are the same gesture on screen, and the list is short by design.
+ */
+export const crossSellsUpdateSchema = z.object({
+  accessoryIds: z
+    .array(z.string().uuid())
+    .max(MAX_CROSS_SELLS_PER_PRODUCT)
+    .refine((ids) => new Set(ids).size === ids.length, { message: "An accessory can only be suggested once" }),
+})
+
+export type CrossSellsUpdateInput = z.infer<typeof crossSellsUpdateSchema>
 
 export type ProductVariantInput = z.infer<typeof productVariantSchema>
 export type CreateProductInput = z.infer<typeof createProductSchema>
@@ -956,10 +995,10 @@ export const createBeneficiarySchema = z
   })
   .strict()
 
-export const updateBeneficiarySchema = createBeneficiarySchema
-  .omit({ slug: true })
-  .partial()
-  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+export const updateBeneficiarySchema = toPatchSchema(createBeneficiarySchema.omit({ slug: true })).refine(
+  (patch) => Object.keys(patch).length > 0,
+  { message: "At least one field must be provided" },
+)
 
 export const updatePayoutSchema = z
   .object({

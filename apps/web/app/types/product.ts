@@ -132,6 +132,21 @@ export interface AncientWeaponListResponse {
   pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean }
 }
 
+/**
+ * Une suggestion « fréquemment achetée ensemble » (story 11.8). L'API rend une
+ * liste vide tant que le bloc n'est pas activé.
+ */
+export interface ProductCrossSellItem {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  priceHt: number
+  priceTtc: number
+  featuredImageUrl: string | null
+  category: { slug: string | null; name: string | null }
+}
+
 export interface ProductDetail {
   id: string
   sku: string
@@ -153,6 +168,7 @@ export interface ProductDetail {
   imagesCount: number | null
   seo: { metaTitle: string | null; metaDescription: string | null; keywords: string | null }
   category: { slug: string | null; name: string | null }
+  crossSells: ProductCrossSellItem[]
   tags: ProductTag[]
   ancientWeapon: AncientWeaponDetail | null
   legalCategory: {

@@ -28,6 +28,7 @@ import { validationError } from "../http.js"
 import { deleteMediaForOwner } from "../media/service.js"
 import { beneficiaryOfProduct } from "../payouts/index.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
+import { adminProductCrossSellRoutes } from "./cross-sell.js"
 
 type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db
 
@@ -197,6 +198,10 @@ async function loadAdminProduct(id: string) {
 export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
   fastify.addHook("preHandler", requireRole("admin"))
+
+  // Suggestions « fréquemment achetés ensemble » (story 11.8) : greffées ici
+  // pour hériter de l'authentification et du rôle posés juste au-dessus.
+  await fastify.register(adminProductCrossSellRoutes)
 
   fastify.get("/", async (_request, reply) => {
     const rows = await db

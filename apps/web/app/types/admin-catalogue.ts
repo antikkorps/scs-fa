@@ -152,3 +152,45 @@ export interface AdminAncientWeaponDetail extends AdminAncientWeaponListItem {
   isUnique: boolean | null
   tags: Array<{ slug: string; name: string; facet: string }>
 }
+
+/**
+ * Suggestions « fréquemment achetés ensemble » d'une arme (story 11.8).
+ * `enabled` est le drapeau serveur : à faux, les associations se préparent mais
+ * la fiche publique n'affiche rien.
+ */
+export interface AdminCrossSellItem {
+  id: string
+  sku: string
+  slug: string
+  name: string
+  priceHt: number
+  featuredImageUrl: string | null
+  category: { slug: string | null; name: string | null }
+  legalCategory: string | null
+  published: boolean | null
+  stockQty: number | null
+  trackStock: boolean | null
+  position: number
+}
+
+export interface AdminCrossSellState {
+  enabled: boolean
+  eligible: boolean
+  reason: string | null
+  legalCategory: string
+  hasAccessoryRestrictions: boolean
+  accessoryRestrictionNotes: string | null
+  items: AdminCrossSellItem[]
+}
+
+export interface AdminCrossSellOption {
+  id: string
+  sku: string
+  name: string
+  priceHt: number
+  featuredImageUrl: string | null
+  category: { slug: string | null; name: string | null }
+  legalCategory: string | null
+  stockQty: number | null
+  trackStock: boolean | null
+}

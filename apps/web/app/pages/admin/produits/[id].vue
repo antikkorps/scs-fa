@@ -414,6 +414,14 @@ async function save() {
       <AdminMediaGallery owner-type="product" :owner-id="isNew ? null : id" />
     </section>
 
+    <!-- Story 11.8 : accessoires suggérés sur la fiche d'une arme. Le panneau
+         se charge et s'enregistre seul — les suggestions ne passent pas par le
+         formulaire, elles ne sont pas un champ du produit. -->
+    <section class="panel">
+      <h2 class="panel__title">Fréquemment achetés ensemble</h2>
+      <AdminCrossSellPanel :product-id="isNew ? null : id" />
+    </section>
+
     <section class="panel">
       <h2 class="panel__title">Publication</h2>
       <div class="fields">

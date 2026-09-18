@@ -693,12 +693,25 @@
 - ⚠️ **Défaut vu au rendu, pas au code** : la page était écrite en palette claire alors que le back-office est sombre — titres de panneaux invisibles. Repris sur les tokens du thème (`--ink-soft`, `--paper-faint`, `--brass`, `--danger`) et re-rendu
 - Reste ouvert : **brancher le garde-fou sur le formulaire d'œuvre** (il n'existe pas encore — 7.5) ; la valeur du garde-fou est là, son point d'application arrivera avec le CRUD
 
-**Story 11.8** — Cross-sell « Fréquemment achetés ensemble » — 🔜 **À FAIRE (activable à la demande)** _(prévue le 2026-09-14, après la 11.9b — branche à créer depuis `main` une fois la 11.9b mergée)_
+**Story 11.8** — Cross-sell « Fréquemment achetés ensemble » ✅ _(livrée le 2026-09-18, branche `feat/story-11.8-cross-sell`)_
 
-- Bloc de suggestions d'accessoires sur la **fiche détail** d'une arme.
-- **Désactivé par défaut** (feature flag) : le client a explicitement dit « activé à la demande, pas forcément au début ».
-- **⚠️ Décision** : associations **saisies manuellement** en admin **vs** calculées sur les co-achats réels. Reco : **manuel d'abord** — au lancement il n'y a aucun historique de commandes à exploiter.
-- Respecter les **restrictions d'accessoires** déjà modélisées (`hasAccessoryRestrictions`, `accessoryRestrictionNotes`) : ne jamais suggérer un accessoire interdit pour la catégorie légale de l'arme.
+> Bloc de suggestions d'accessoires sur la **fiche détail** d'une arme, **éteint par défaut** : le client a dit « activé à la demande, pas forcément au début ».
+
+**✅ Décisions validées avec Franck le 2026-09-18, avant d'écrire une ligne :**
+
+- **Associations saisies à la main** (et non calculées sur les co-achats) : au lancement il n'y a aucun historique de commandes, et surtout les restrictions d'accessoires ne sont qu'une **note en texte libre** qu'aucune règle ne sait lire — seul un humain peut garantir qu'on ne suggère pas un accessoire interdit
+- **Drapeau en variable d'environnement** (`CROSS_SELL_ENABLED`, faux par défaut) plutôt qu'un réglage en base : pas de migration, cohérent avec le reste de la configuration, activer = redémarrer l'API
+- **Association dirigée, arme → accessoire** : la fiche d'un accessoire ne renvoie jamais vers une arme
+
+- [x] **Règles pures et partagées** (`packages/shared/src/cross-sell.ts`) : catégories source/cible, plafond de 6 suggestions, motif de refus nommé, filtre d'affichage. ⚠️ **La seule règle qui touche au droit est étroite et à sens unique** : un accessoire ne peut pas exiger **plus de formalités** que l'arme sur laquelle il apparaît (une munition B sur une arme D enverrait le client vers un achat qu'il ne peut pas conclure ; l'inverse ne pose aucun problème). Tout le reste — la compatibilité réelle — reste une décision humaine
+- [x] ⚠️ **Ce que le code ne prétend PAS faire** : vérifier `accessoryRestrictionNotes`. C'est du texte libre. L'écran d'administration l'**affiche en évidence** au moment de choisir, avec la phrase « aucune règle ne peut les vérifier à votre place » — c'est la seule protection honnête
+- [x] **Schéma** : migration `0011`, table de liaison `product_cross_sells` (PK composite, `position` pour l'ordre voulu, CHECK `product_id <> accessory_id`, cascade des deux côtés)
+- [x] **API** : `GET/PUT /api/admin/products/:id/cross-sells` (remplacement de la liste entière, dans l'ordre reçu, **journal d'audit** `cross_sell.updated` avec l'ancienne liste) et `GET .../cross-sell-options` (déjà filtré : un accessoire refusé n'est pas proposé puis rejeté). Refus en 409 pour une source qui n'est pas une arme, une arme suggérée, un accessoire trop exigeant
+- [x] ⚠️ **Les règles sont réappliquées à l'affichage**, pas seulement à la saisie : une arme **reclassée après coup** cesse de proposer ce qui est devenu trop exigeant pour elle, sans qu'on ait à repasser sur les associations. Un accessoire **dépublié ou épuisé** disparaît du bloc — une suggestion qu'on ne peut pas acheter est une déception
+- [x] **Écrans** : panneau `AdminCrossSellPanel` sur la fiche produit (ajout, réordonnancement, suppression, état du drapeau annoncé) et bloc public `ProductCrossSell` (cartes liées vers la fiche de l'accessoire, **jamais un ajout direct au panier** : un accessoire peut avoir des déclinaisons)
+- [x] ⚠️ **Bug préexistant attrapé en écrivant les tests, hors périmètre mais destructeur** : zod applique les valeurs par défaut **même sur un champ rendu facultatif par `.partial()`**. Un PATCH ne portant qu'un champ se voyait compléter par tous les défauts du schéma de création — `published: false` **dépubliait** l'article, `variants: []` effaçait ses déclinaisons, `tagSlugs: []` ses tags, `stockQty: 0` son stock. Corrigé à la racine par `toPatchSchema()` dans `packages/shared`, appliqué aux **8 schémas de mise à jour** (produit, œuvre, arme ancienne, artiste, thème, série, tag, bénéficiaire). Effet de bord voulu : le garde-fou « au moins un champ » se met enfin à refuser un corps vide
+- [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 508 / shared 153 / web 232 = 893** au vert (+36) ; **smoke réel** sur la base de dev — options proposées au Glock (cat. B) incluant les munitions 9×19, les mêmes options **sans** ces munitions pour le spray (cat. D), trois suggestions posées dans l'ordre, refus 409 des deux cas interdits, fiche publique les affichant **rendues côté serveur** (donc indexables), puis **liste vide après redémarrage sans le drapeau** — les associations restent en base, rien n'est exposé
+- Reste ouvert : **aucune vérification visuelle automatisée** (Playwright n'est pas installé sur cette machine) — le rendu des deux écrans est à regarder à l'œil ; pas de calcul sur les **co-achats réels** (à rouvrir quand il y aura un historique de commandes) ; le bloc ne s'affiche que sur une **arme**, jamais sur un accessoire ni sur un tirage Gun Art ; la **base de dev** porte désormais trois associations posées pendant le smoke
 
 **Story 11.9** — Expédition multi-colis ✅ _(livrée le 2026-09-13, branche `feat/story-11.9-shipments`)_
 

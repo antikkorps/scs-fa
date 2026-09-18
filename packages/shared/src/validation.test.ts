@@ -9,6 +9,7 @@ import {
   newsletterUnsubscribeSchema,
   refreshSchema,
   registerSchema,
+  updateProductSchema,
 } from "./validation.js"
 
 describe("registerSchema", () => {
@@ -192,5 +193,30 @@ describe("newsletterUnsubscribeSchema", () => {
     expect(newsletterUnsubscribeSchema.safeParse({ token, segments: ["boutique"] }).success).toBe(false)
     expect(newsletterUnsubscribeSchema.safeParse({ token: "short" }).success).toBe(false)
     expect(newsletterUnsubscribeSchema.safeParse({ token: `${token}<script>` }).success).toBe(false)
+  })
+})
+
+describe("toPatchSchema (correctif 2026-09-18)", () => {
+  /**
+   * ⚠️ Bug trouvé en écrivant les tests de la 11.8 : `.partial()` seul laisse
+   * zod appliquer les valeurs par défaut du schéma de création. Un PATCH qui ne
+   * portait qu'une catégorie légale **dépubliait** l'article (`published: false`)
+   * et effaçait ses déclinaisons et ses tags.
+   */
+  it("n'invente aucun champ que la requête ne portait pas", () => {
+    const patch = updateProductSchema.parse({ legalCategory: "D" })
+    expect(Object.keys(patch)).toEqual(["legalCategory"])
+    expect("published" in patch).toBe(false)
+    expect("variants" in patch).toBe(false)
+  })
+
+  it("laisse passer ce que la requête porte vraiment, valeur fausse comprise", () => {
+    const patch = updateProductSchema.parse({ published: false, stockQty: 0 })
+    expect(patch).toEqual({ published: false, stockQty: 0 })
+  })
+
+  /** Conséquence directe : un corps vide n'est plus silencieusement accepté. */
+  it("refuse enfin un patch vide", () => {
+    expect(updateProductSchema.safeParse({}).success).toBe(false)
   })
 })
