@@ -23,10 +23,12 @@ const SLUG = "test112-"
 const PASSWORD = "MotDePasseTresLong123!"
 const BUYER = "buyer-test112@collection.local"
 const RIVAL = "rival-test112@collection.local"
+const ADMIN = "admin-test112@collection.local"
 
 let app: FastifyInstance
 let buyerToken: string
 let rivalToken: string
+let adminId: string
 let uniqueVariantId: string
 let plainVariantId: string
 
@@ -41,6 +43,24 @@ async function makeUser(email: string): Promise<string> {
   })
   const res = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
   return res.json().accessToken
+}
+
+// This suite owns its admin instead of borrowing the seeded one: another suite
+// (legal-documents/sla) legitimately wipes every admin, so relying on the seed
+// would make this file pass or fail on test-file ordering. See story 8.9.
+async function makeAdmin(email: string): Promise<string> {
+  const passwordHash = await hash(PASSWORD, { memoryCost: 19_456, timeCost: 2, parallelism: 1 })
+  const [admin] = await db
+    .insert(users)
+    .values({
+      email,
+      passwordHash,
+      role: "admin",
+      rgpdConsentAt: new Date(),
+      rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
+    })
+    .returning({ id: users.id })
+  return admin.id
 }
 
 async function categoryId(slug: string): Promise<string> {
@@ -98,6 +118,7 @@ describe("Collection weapons (story 11.2)", () => {
 
     buyerToken = await makeUser(BUYER)
     rivalToken = await makeUser(RIVAL)
+    adminId = await makeAdmin(ADMIN)
 
     const armePoing = await categoryId("arme-poing")
     const legalB = await legalId("B")
@@ -376,10 +397,8 @@ describe("Collection weapons (story 11.2)", () => {
   describe("admin CRUD", () => {
     const created: string[] = []
 
-    async function adminHeaders() {
-      const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1)
-      if (!admin) throw new Error("No admin seeded (run db:seed)")
-      const token = app.jwt.sign({ sub: admin.id, role: "admin" })
+    function adminHeaders() {
+      const token = app.jwt.sign({ sub: adminId, role: "admin" })
       return { authorization: `Bearer ${token}` }
     }
 
@@ -406,7 +425,7 @@ describe("Collection weapons (story 11.2)", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/admin/ancient-weapons",
-        headers: await adminHeaders(),
+        headers: adminHeaders(),
         payload: payload(),
       })
       expect(res.statusCode).toBe(201)
@@ -432,7 +451,7 @@ describe("Collection weapons (story 11.2)", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/admin/ancient-weapons",
-        headers: await adminHeaders(),
+        headers: adminHeaders(),
         payload: payload({
           sku: `${PREFIX}xss`,
           slug: `${SLUG}xss`,
@@ -457,7 +476,7 @@ describe("Collection weapons (story 11.2)", () => {
       const first = await app.inject({
         method: "POST",
         url: "/api/admin/ancient-weapons",
-        headers: await adminHeaders(),
+        headers: adminHeaders(),
         payload: payload({ sku: `${PREFIX}dup`, slug: `${SLUG}dup` }),
       })
       created.push(first.json().data.id)
@@ -465,7 +484,7 @@ describe("Collection weapons (story 11.2)", () => {
       const second = await app.inject({
         method: "POST",
         url: "/api/admin/ancient-weapons",
-        headers: await adminHeaders(),
+        headers: adminHeaders(),
         payload: payload({ sku: `${PREFIX}dup`, slug: `${SLUG}dup` }),
       })
       expect(second.statusCode).toBe(409)
@@ -475,7 +494,7 @@ describe("Collection weapons (story 11.2)", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/admin/ancient-weapons",
-        headers: await adminHeaders(),
+        headers: adminHeaders(),
         payload: payload({ sku: `${PREFIX}held`, slug: `${SLUG}held` }),
       })
       const weapon = res.json().data
@@ -490,7 +509,7 @@ describe("Collection weapons (story 11.2)", () => {
       const del = await app.inject({
         method: "DELETE",
         url: `/api/admin/ancient-weapons/${weapon.id}`,
-        headers: await adminHeaders(),
+        headers: adminHeaders(),
       })
       // Deleting it would erase a piece out from under a shopper mid-purchase.
       expect(del.statusCode).toBe(409)

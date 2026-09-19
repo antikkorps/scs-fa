@@ -189,8 +189,8 @@ describe("legal doc SLA breach check (runLegalDocSlaBreachCheck)", () => {
   })
 
   it("sends a single digest to every admin, covering all breaches", async () => {
-    await makeUser("admin1", "admin")
-    await makeUser("admin2", "admin")
+    const admin1 = await makeUser("admin1", "admin")
+    const admin2 = await makeUser("admin2", "admin")
     const customerId = await makeUser("customer", "customer")
     const now = new Date()
     const past = new Date(now.getTime() - 5 * HOUR_MS)
@@ -203,7 +203,14 @@ describe("legal doc SLA breach check (runLegalDocSlaBreachCheck)", () => {
     expect(res.breached).toBe(2)
     expect(mockSend).toHaveBeenCalledTimes(1)
     const [recipients, items] = mockSend.mock.calls[0]
-    expect(recipients).toHaveLength(2)
+    // Assert on *our* two admins rather than on the global count: an admin
+    // leaked by a suite that died before its afterAll would otherwise turn this
+    // green-or-red on file ordering (story 8.9).
+    const mine = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(inArray(users.id, [admin1, admin2]))
+    expect(recipients).toEqual(expect.arrayContaining(mine.map((u) => u.email)))
     expect(items).toHaveLength(2)
     expect(items.map((i) => i.docType).sort()).toEqual(["cni", "permis_chasse"])
   })

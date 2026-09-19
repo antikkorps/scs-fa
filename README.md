@@ -73,6 +73,28 @@ Locally, tests auto-provision a throwaway `armurier_test` database — see
 build the schema by **applying the migrations**, so CI, dev and prod are created
 the same way and cannot drift. Run the same gate locally with `pnpm verify`.
 
+### Test isolation: checking the suite does not depend on file order
+
+The API tests share one Postgres and run one file at a time
+(`fileParallelism: false`), so a suite that leaks or borrows global state can
+make an untouched suite go red simply because a new test file changed the
+ordering. To check that no such coupling has crept back in, shuffle **the file
+order only** and run three passes:
+
+```bash
+cd apps/api
+pnpm exec vitest run --sequence.shuffle.files=true --sequence.shuffle.tests=false
+```
+
+All three must be green. Two rules keep them that way: a suite needing an admin
+**creates its own** (with its own e-mail prefix) and deletes it in `afterAll`
+rather than borrowing the seeded one, and assertions target the rows the suite
+created rather than a global count.
+
+Do **not** measure with plain `--sequence.shuffle`: it also shuffles the tests
+*inside* a file, which breaks every integration suite written as a narrative
+(create → update → delete) and reports dozens of meaningless failures.
+
 ## Database schema
 
 `apps/api/src/db/schema.ts` is what you edit; `apps/api/drizzle/` holds the

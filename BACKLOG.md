@@ -426,7 +426,7 @@
 - [x] `justfile` à la racine : recettes `deploy` (compose build + up -d), `migrate` (profile migrate), `seed`, `update` (pull+migrate+build+prune), `up` / `down` / `ps`, `logs <svc>`, `restart <svc>`, `psql`, `backup`, `backups` (liste S3), `restore [dump]` (destructif → **confirmation** via bloc bash). Validé avec `just 1.58.0` (`--list` + `--dry-run`). Pointé depuis `docs/DEPLOY.md`.
 - **Décision tranchée (2026-09-05)** : `just` **plutôt que Make** — pas de pièges tabs/`.PHONY`, paramètres, `--list` auto-documenté, chargement `.env` natif, binaire unique facile à déposer sur le VM Hetzner (Ubuntu minimal). Ne **remplace pas** les scripts pnpm dev/build/test. Voir [[project_delivery_strategy]] pour le bar qualité.
 
-**Story 8.9** — Isolation des suites de tests : supprimer la dépendance à l'ordre des fichiers — 🔜 **À FAIRE**
+**Story 8.9** — Isolation des suites de tests : supprimer la dépendance à l'ordre des fichiers ✅
 
 > Relevé le 2026-09-10 en cherchant l'échec CI de la 7.5b (qui, lui, avait une tout autre cause : le boot Nuxt dépassait le `hookTimeout`). La suite API **passe ou échoue selon l'ordre des fichiers**. Aujourd'hui l'ordre est déterministe et tombe du bon côté, donc la CI est verte — mais elle l'est **par chance**, pas par construction. Ajouter, renommer ou scinder un fichier de test peut faire basculer l'ordre et rendre rouge une suite que personne n'a touchée.
 
@@ -436,6 +436,10 @@
   - `ancient-weapons/ancient-weapons.test.ts:380` **emprunte** l'admin qui se trouve là (`where(eq(users.role, "admin")).limit(1)`) au lieu d'en créer un, comme le font toutes les autres suites. Si la SLA passe avant, il échoue sur `No admin seeded (run db:seed)`.
 - **Correctif proposé** (petit) : faire créer à `ancient-weapons.test.ts` **son propre** admin dans son `beforeAll`, avec un préfixe d'e-mail qui lui est propre, et le supprimer dans son `afterAll` — la convention que suivent déjà les 20 autres suites.
 - **À vérifier au passage** : `sla.test.ts` porte deux assertions qui dépendent de l'**état global** (« exactement 2 destinataires », « aucun admin »). Elles tiennent tant que les suites nettoient derrière elles, mais elles casseraient dès qu'une suite fuirait un admin — par exemple si elle échoue avant son `afterAll`. Envisager d'assouplir la première (`toContain` plutôt que `toHaveLength`).
+- [x] **Correctif** : `ancient-weapons.test.ts` crée **son propre** admin (`admin-test112@collection.local`) dans son `beforeAll` via un helper `makeAdmin`, signe le JWT avec cet id (plus de requête `where(role = admin)` ni d'`await` dans `adminHeaders`) ; le `cleanup()` existant le supprime déjà (préfixe `%test112@collection.local`, audit_logs purgés avant à cause de la FK)
+- [x] **Durci** : dans `sla.test.ts`, « un seul digest à tous les admins » n'assertait plus `recipients.toHaveLength(2)` mais `arrayContaining` sur les e-mails des **deux admins créés par le test** — un admin fuité par une suite morte avant son `afterAll` ne rend plus ce test rouge
+- [x] **Reproduction confirmée** : avant correctif, 2 passes sur 4 (2 fichiers, ordre mélangé) échouaient sur 4 tests `No admin seeded (run db:seed)` ; après correctif, 4/4 vertes sur le couple et **3/3 passes vertes sur la suite complète** (45 fichiers, **508 tests**)
+- [x] **Documenté** dans le `README.md` (§ « Test isolation: checking the suite does not depend on file order ») : la commande de mesure, les deux règles (une suite crée son admin ; on assert sur ses propres lignes, pas sur un compte global) et l'avertissement de ne pas utiliser `--sequence.shuffle` tout court
 - **Done** : les trois passes en ordre de fichiers mélangé sont vertes, et la mesure est documentée dans le README pour qu'on la refasse au lieu de la redécouvrir.
 
 ## PHASE 9 — Front, SEO & Découvrabilité (transverse)
