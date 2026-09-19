@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto"
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
@@ -207,22 +208,21 @@ describe("Gun Art image protection (story 11.5)", () => {
     expect((await upload(png, "image/png", adminToken, "no-such-piece")).statusCode).toBe(404)
   })
 
+  // The only test that pushes a genuinely large original through the whole
+  // pipeline (decode, watermark, resize, webp encode), so it needs far more
+  // than the 5 s default: ~0.4 s on a dev laptop, but a shared CI runner is an
+  // order of magnitude slower and timed out here. Random bytes rather than
+  // sharp's gaussian generator: incompressible all the same, ~13x cheaper.
   it("accepts an original larger than the app-wide upload limit", async () => {
     // Legal documents are capped at 10 MB; a print-grade visual must not be.
-    const noisy = await sharp({
-      create: {
-        width: 2200,
-        height: 1800,
-        channels: 3,
-        background: { r: 0, g: 0, b: 0 },
-        noise: { type: "gaussian", mean: 128, sigma: 60 },
-      },
-    })
+    const width = 2200
+    const height = 1800
+    const noisy = await sharp(randomBytes(width * height * 3), { raw: { width, height, channels: 3 } })
       .png({ compressionLevel: 0 })
       .toBuffer()
     expect(noisy.length).toBeGreaterThan(10 * 1024 * 1024)
     expect((await upload(noisy)).statusCode).toBe(201)
-  })
+  }, 30_000)
 
   it("404s on a malformed filename and an unknown image", async () => {
     expect((await app.inject({ method: "GET", url: "/api/artworks/images/..%2f..%2fetc" })).statusCode).toBe(404)
