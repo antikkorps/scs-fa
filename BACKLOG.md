@@ -394,9 +394,12 @@
 - [x] Piège busybox crond résolu : les jobs cron tournent avec un **env vide** → l'entrypoint persiste l'environnement (`export -p > /etc/backup.env`) que les scripts sourcent ; sortie des jobs redirigée vers `/proc/1/fd/*` (crond = PID 1) pour apparaître dans `docker logs`
 - [x] **Vérifié en réel e2e** (Postgres + MinIO éphémères) : build image OK (pg_dump 17.10, aws-cli 2.34), 3 backups avec rétention=2 → 2 conservés + le plus ancien purgé, puis **drop table → restore → données récupérées**. Vars documentées (`.env.prod.example`) + procédure complète (`docs/DEPLOY.md` §6, avec note PII/chiffrement bucket)
 - Note : dump = PII clients → bucket privé à credentials scopés ; object-lock/versioning + SSE recommandés (defence-in-depth)
-**Story 8.5** — Monitoring uptime + alertes — ⏸️ **DIFFÉRÉE** (2026-06-18)
+**Story 8.5** — Monitoring uptime + alertes — ⏸️ **DIFFÉRÉE** (2026-06-18), approche tranchée (2026-09-19)
 
-- Approche à trancher (Uptime Kuma auto-hébergé vs service externe vs stack Prometheus/Grafana/Loki) ; reprise ultérieure. L'alerting applicatif sur 5xx existe déjà (Story 7.2).
+- **Décision (2026-09-19)** : **healthchecks.io**. Uptime Kuma auto-hébergé écarté — un moniteur qui tourne sur la machine qu'il surveille tombe avec elle, exactement le jour où on veut être prévenu. Prometheus/Grafana/Loki écarté aussi : c'est un chantier, pas une story. Sentry reste un candidat **complémentaire** (erreurs applicatives), pas une sonde uptime : son offre gratuite se limite à ~1 moniteur uptime et ~5 000 erreurs/mois.
+- **Modèle à retenir** : healthchecks.io est un **dead man's switch**, il ne sonde pas le site — c'est le VM qui le ping. C'est ce qui le rend pertinent ici : un ping cron depuis le VM Hetzner disparaît *de facto* si la machine tombe, et l'alerte part depuis l'extérieur. Conditionner le ping à un `curl` local sur `GET /health` (`app.ts:87`) pour distinguer « la machine répond » de « l'app fonctionne », et utiliser `/fail` en cas d'échec plutôt que de rester muet.
+- **Surfaces à brancher** (3 checks, tiennent dans l'offre gratuite) : le heartbeat VM+app ci-dessus ; le **cron de backup** `pg_dump → S3` (`infra/backup/`, story 8.4) — un backup qui ne tourne plus est une panne silencieuse coûteuse ; le **cron SLA** `sla-cli.ts` (voir `sla.ts:85`).
+- Reste à faire le jour de la reprise : créer les checks (compte au nom du client, cf. [[project_service_providers]]), poser les pings dans les crons, documenter dans `docs/DEPLOY.md`. L'alerting applicatif sur 5xx existe déjà (Story 7.2).
 
 **Story 8.6** — Pentest interne avant mise en ligne ✅
 
