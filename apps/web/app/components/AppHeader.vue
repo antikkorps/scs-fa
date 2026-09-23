@@ -285,7 +285,7 @@ async function signOut() {
     <Teleport to="body">
       <button
         v-if="accountOpen"
-        class="hdr-scrim hdr-scrim--clear"
+        class="hdr-scrim"
         aria-label="Fermer le menu"
         @click="accountOpen = false"
       />
@@ -727,7 +727,16 @@ async function signOut() {
 .hdr-scrim {
   position: fixed;
   inset: 0;
-  z-index: 55;
+  /* ⚠️ Must stay BELOW the header's z-index (50), not above it.
+     `.hdr` is `position: sticky` with a z-index, so it opens a stacking
+     context: the dropdown's own `z-index: 60` only ranks it inside the header,
+     and the whole header still stacks at 50. A scrim at 55 therefore covered
+     the menu it was meant to sit behind — every click landed on the scrim,
+     which just closed the menu. The dropdown rendered perfectly and did
+     nothing, connexion and inscription included.
+     Below the header, the menu is clickable and a click anywhere else still
+     closes it. */
+  z-index: 40;
   background: transparent;
   border: none;
   cursor: default;
