@@ -1,4 +1,4 @@
-import sharp from "sharp"
+import sharp, { type Sharp } from "sharp"
 import { describe, expect, it } from "vitest"
 import { renderProtectedImage, type WatermarkOptions, watermarkSvg } from "./watermark.js"
 
@@ -12,7 +12,11 @@ async function meanLuma(buffer: Buffer): Promise<number> {
   return total / (info.width * info.height)
 }
 
-function blackCanvas(width: number, height: number): sharp.Sharp {
+// `Sharp` is imported by name rather than reached through the default export.
+// sharp 0.35 stopped shipping its types as a namespace beside that export, so
+// `sharp.Sharp` no longer resolves — the named import works on both 0.34 and
+// 0.35, so this compiles before and after the upgrade.
+function blackCanvas(width: number, height: number): Sharp {
   return sharp({ create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
 }
 
