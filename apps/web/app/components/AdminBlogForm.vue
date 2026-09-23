@@ -137,7 +137,7 @@ function onTitleInput() {
   padding: 0.7rem 1rem;
   border-radius: var(--radius);
   margin-bottom: 1.2rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .grid {
   display: grid;
@@ -150,11 +150,11 @@ function onTitleInput() {
   gap: 0.4rem;
 }
 .field__label {
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .ctl {
   padding: 0.6rem 0.8rem;
@@ -163,7 +163,7 @@ function onTitleInput() {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   width: 100%;
 }
 .ctl:focus {
@@ -172,8 +172,8 @@ function onTitleInput() {
 }
 .ctl--mono {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.85rem;
-  line-height: 1.6;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
 }
 .toggles {
   flex-direction: row;
@@ -184,7 +184,7 @@ function onTitleInput() {
   align-items: center;
   gap: 0.5rem;
   color: var(--paper-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .actions {
   display: flex;

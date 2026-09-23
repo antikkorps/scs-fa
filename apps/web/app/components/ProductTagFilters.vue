@@ -66,9 +66,8 @@ const hasSelection = computed(() => props.selected.length > 0)
 }
 
 .tagf__title {
-  font-size: 0.95rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: var(--fs-base);
+  letter-spacing: var(--ls-display);
   margin: 0;
 }
 
@@ -77,7 +76,7 @@ const hasSelection = computed(() => props.selected.length > 0)
   border: none;
   color: var(--brass);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   padding: 0;
   text-decoration: underline;
 }
@@ -93,15 +92,15 @@ const hasSelection = computed(() => props.selected.length > 0)
 }
 
 .tagf__legend {
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-wide);
   text-transform: uppercase;
   opacity: 0.75;
   padding: 0;
 }
 
 .tagf__hint {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   opacity: 0.6;
   margin: 0.15rem 0 0.5rem;
 }
@@ -122,7 +121,7 @@ const hasSelection = computed(() => props.selected.length > 0)
   cursor: pointer;
   display: inline-flex;
   gap: 0.45rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   padding: 0.35rem 0.75rem;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
@@ -153,7 +152,7 @@ const hasSelection = computed(() => props.selected.length > 0)
 }
 
 .tagf__count {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   opacity: 0.6;
   font-variant-numeric: tabular-nums;
 }

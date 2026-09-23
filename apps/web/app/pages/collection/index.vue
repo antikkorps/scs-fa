@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { ArtworkListItem, ArtworkSeriesListItem, ArtworkThemeListItem } from "~/types/artwork"
-import { artworkImage } from "~/utils/format"
+import type { ArtistListItem, ArtworkListItem, ArtworkSeriesListItem, ArtworkThemeListItem } from "~/types/artwork"
+import { ogImageUrl } from "~/utils/format"
 
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
@@ -24,6 +24,17 @@ const { data: themesData } = await useFetch<{ data: ArtworkThemeListItem[] }>(`$
 const series = computed(() => (seriesData.value?.data ?? []).filter((s) => s.artworkCount > 0))
 const themes = computed(() => (themesData.value?.data ?? []).filter((t) => t.seriesCount > 0))
 
+// The artists open the collection (Franck, 2026-09-23): the house sells
+// someone's work, so the page introduces whose before it shows what. Like the
+// series, this is editorial navigation — a failed call costs the entry point,
+// never the grid.
+const { data: artistsData } = await useFetch<{ data: ArtistListItem[] }>(`${apiBase}/artists`, { key: "artists" })
+const artists = computed(() => artistsData.value?.data ?? [])
+// One artist reads as a presentation, several as a row. The first is laid out
+// wide with their biography; the rest stay compact.
+const leadArtist = computed(() => artists.value[0] ?? null)
+const otherArtists = computed(() => artists.value.slice(1))
+
 const pageUrl = `${siteUrl}/collection`
 const description =
   "Découvrez la collection Gun Art : des tirages d'art photographiques en édition strictement limitée, signés, numérotés et livrés avec certificat d'authenticité."
@@ -34,8 +45,7 @@ useSeoMeta({
   ogTitle: "La collection Gun Art — SCS Firearm",
   ogDescription: description,
   ogUrl: pageUrl,
-  ogImage: () =>
-    artworks.value[0] ? artworkImage(artworks.value[0].featuredImageUrl, artworks.value[0].slug) : undefined,
+  ogImage: () => ogImageUrl(artworks.value[0]?.featuredImageUrl, siteUrl),
 })
 
 useHead({
@@ -70,6 +80,18 @@ useHead({
         Des pièces photographiques tirées à un nombre strictement limité d'exemplaires. Chaque tirage est signé,
         numéroté et accompagné de son certificat d'authenticité.
       </p>
+    </section>
+
+    <section v-if="leadArtist" class="container block" aria-labelledby="artists-h">
+      <h2 id="artists-h" class="section__h">
+        {{ artists.length > 1 ? "Les artistes" : "L'artiste" }}
+      </h2>
+      <ArtistCard :artist="leadArtist" lead />
+      <ul v-if="otherArtists.length > 0" class="artists" role="list">
+        <li v-for="a in otherArtists" :key="a.id">
+          <ArtistCard :artist="a" />
+        </li>
+      </ul>
     </section>
 
     <section v-if="series.length > 0" class="container block" aria-labelledby="series-h">
@@ -115,14 +137,21 @@ useHead({
   margin-bottom: 1.2rem;
 }
 .section__h {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  font-size: var(--fs-lg);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
   margin: 0 0 1.2rem;
 }
 .block__head .section__h {
   margin: 0;
+}
+.artists {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  list-style: none;
+  margin: 1.2rem 0 0;
+  padding: 0;
 }
 .themes {
   display: flex;
@@ -133,7 +162,7 @@ useHead({
   padding: 0.35rem 0.85rem;
   border: 1px solid var(--ink-line);
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
   text-decoration: none;
   transition:
@@ -158,11 +187,11 @@ useHead({
   max-width: 760px;
 }
 .intro__title {
-  font-size: clamp(2.6rem, 8vw, 4.5rem);
+  font-size: var(--fs-3xl);
   margin: 0.6rem 0 1rem;
 }
 .intro__lede {
-  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  font-size: var(--fs-md);
   color: var(--paper-dim);
   max-width: 56ch;
   margin: 0;

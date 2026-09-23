@@ -75,17 +75,17 @@ onMounted(async () => {
 }
 .nlc__title {
   font-family: var(--font-display);
-  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-size: var(--fs-xl);
   margin: 0 0 1rem;
 }
 .nlc__body {
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
   margin: 0 0 0.9rem;
 }
 .nlc__list {
   margin: 0 0 1rem;
   padding-left: 1.2rem;
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
 }
 .nlc__link {
   color: var(--brass);

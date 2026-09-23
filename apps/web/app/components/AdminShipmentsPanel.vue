@@ -350,13 +350,13 @@ async function saveEdit(s: AdminShipment) {
   padding: 1.3rem 1.4rem;
 }
 .ship__title {
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   margin-bottom: 1rem;
 }
 .gate {
   margin: 0 0 1rem;
   padding: 0.7rem 0.9rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   border-radius: var(--radius);
   color: var(--paper);
   background: color-mix(in srgb, var(--brass) 12%, transparent);
@@ -364,7 +364,7 @@ async function saveEdit(s: AdminShipment) {
 .alert {
   margin: 0 0 1rem;
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .parcels {
   list-style: none;
@@ -390,11 +390,11 @@ async function saveEdit(s: AdminShipment) {
 .parcel__name,
 .draft__title {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .parcel__tracking {
   margin: 0.15rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-style: italic;
   color: var(--p-text-muted-color);
 }
@@ -406,18 +406,18 @@ async function saveEdit(s: AdminShipment) {
 
 .parcel__meta {
   margin: 0.3rem 0 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
   overflow-wrap: anywhere;
 }
 .parcel__items {
   margin: 0.6rem 0 0;
   padding-left: 1.1rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .parcel__notes {
   margin: 0.5rem 0 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .link {
@@ -432,7 +432,7 @@ async function saveEdit(s: AdminShipment) {
 }
 .empty {
   color: var(--paper-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .pack {
   display: grid;
@@ -440,7 +440,7 @@ async function saveEdit(s: AdminShipment) {
 }
 .pack__lede {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .fields,
@@ -452,8 +452,8 @@ async function saveEdit(s: AdminShipment) {
 }
 .field span {
   display: block;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
   margin-bottom: 0.35rem;
@@ -466,7 +466,7 @@ async function saveEdit(s: AdminShipment) {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .ctl:focus {
   outline: none;
@@ -482,7 +482,7 @@ async function saveEdit(s: AdminShipment) {
   margin-top: 0.6rem;
 }
 .draft__name {
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .draft__qty {
   width: 5rem;

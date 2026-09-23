@@ -59,7 +59,9 @@ describe("AppHeader", () => {
   it("opens the Armurerie mega-menu with category and legal links", async () => {
     const wrapper = await mountSuspended(AppHeader)
     expect(wrapper.find("#mega-armurerie").exists()).toBe(false)
-    await wrapper.find('button[aria-controls="mega-armurerie"]').trigger("click")
+    // The label is a link to the universe now, not a toggle: the panel opens on
+    // hover and on keyboard focus, so a click never has to undo it.
+    await wrapper.find(".nav__item").trigger("pointerenter")
     const mega = wrapper.find("#mega-armurerie")
     expect(mega.exists()).toBe(true)
     expect(mega.text()).toContain("Carabines") // category from the mocked list
@@ -69,7 +71,10 @@ describe("AppHeader", () => {
 
   it("opens the Gun Art mega-menu with a link to the collection", async () => {
     const wrapper = await mountSuspended(AppHeader)
-    await wrapper.find('button[aria-controls="mega-gunart"]').trigger("click")
+    // Second universe item: Gun Art.
+    const gunArt = wrapper.findAll(".nav__item")[1]
+    expect(gunArt).toBeDefined()
+    await gunArt?.trigger("pointerenter")
     const mega = wrapper.find("#mega-gunart")
     expect(mega.exists()).toBe(true)
     expect(mega.find('a[href="/collection"]').exists()).toBe(true)

@@ -457,8 +457,8 @@ async function save() {
 }
 .eyebrow {
   margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
 }
@@ -471,7 +471,7 @@ async function save() {
 }
 h1 {
   margin: 0.3rem 0 0;
-  font-size: clamp(1.8rem, 5vw, 2.4rem);
+  font-size: var(--fs-2xl);
 }
 .panel {
   background: var(--ink-soft);
@@ -483,10 +483,9 @@ h1 {
 .panel__title,
 .sub {
   margin: 0 0 1.1rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
 }
 .sub {
   margin-top: 1.8rem;
@@ -506,19 +505,19 @@ h1 {
   align-items: center;
   gap: 0.6rem;
   color: var(--paper-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .field__label {
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .field__help {
-  font-size: 0.76rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  line-height: 1.5;
+  line-height: var(--lh-normal);
 }
 .ctl {
   padding: 0.6rem 0.8rem;
@@ -527,7 +526,7 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   width: 100%;
 }
 .ctl:focus {
@@ -538,7 +537,7 @@ h1 {
   opacity: 0.55;
 }
 .ctl--area {
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
   resize: vertical;
 }
 .check {
@@ -558,7 +557,7 @@ h1 {
   border-radius: 999px;
   color: var(--paper-dim);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .tag--on {
@@ -582,7 +581,7 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper-dim);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .profwrap {
@@ -591,9 +590,9 @@ h1 {
 }
 .note {
   margin: 0 0 1rem;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
 }
 .note a {
   color: var(--brass);
@@ -605,7 +604,7 @@ h1 {
   padding: 0.7rem 1rem;
   border-radius: var(--radius);
   margin: 0 0 1.2rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 
 @media (min-width: 720px) {

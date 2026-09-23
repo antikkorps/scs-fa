@@ -51,6 +51,14 @@ const { data, error, pending } = await useFetch<AncientWeaponListResponse>(`${ap
 })
 
 const weapons = computed(() => data.value?.data ?? [])
+// Resolved once per weapon: the template needs both the src and its placeholder,
+// and rebuilding the placeholder SVG twice per card would be wasted work.
+const cards = computed(() =>
+  weapons.value.map((w) => ({
+    w,
+    img: artworkImage(w.featuredImageUrl, w.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height),
+  })),
+)
 const pagination = computed(() => data.value?.pagination)
 const isEmpty = computed(() => !pending.value && !error.value && weapons.value.length === 0)
 
@@ -159,11 +167,12 @@ useHead({
         </p>
 
         <ul class="grid" role="list">
-          <li v-for="(w, i) in weapons" :key="w.id">
+          <li v-for="({ w, img }, i) in cards" :key="w.id">
             <NuxtLink :to="`/boutique/${w.slug}`" class="card" :class="{ 'card--sold': !w.available }">
               <div class="card__media">
                 <img
-                  :src="artworkImage(w.featuredImageUrl, w.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height)"
+                  v-img-fallback="img.fallback"
+                  :src="img.src"
                   :alt="w.name"
                   :width="CARD_GEOMETRY.width"
                   :height="CARD_GEOMETRY.height"
@@ -217,14 +226,14 @@ useHead({
 }
 .eyebrow {
   color: var(--brass);
-  font-size: 0.75rem;
-  letter-spacing: 0.18em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   margin: 0 0 0.5rem;
   text-transform: uppercase;
 }
 .intro__title {
   font-family: var(--font-display, serif);
-  font-size: clamp(2rem, 5vw, 3rem);
+  font-size: var(--fs-2xl);
   margin: 0 0 0.75rem;
 }
 .intro__lede {
@@ -249,8 +258,8 @@ useHead({
   gap: 0.5rem;
 }
 .filters__label {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
   opacity: 0.6;
   text-transform: uppercase;
 }
@@ -260,7 +269,7 @@ useHead({
   border-radius: 999px;
   color: inherit;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   padding: 0.35rem 0.8rem;
 }
 .chip:hover {
@@ -274,12 +283,12 @@ useHead({
   align-items: center;
   color: var(--paper-dim);
   display: inline-flex;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   gap: 0.4rem;
 }
 .count {
   color: var(--paper-dim);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0 0 1rem;
 }
 .state {
@@ -339,35 +348,35 @@ useHead({
 }
 .card__period {
   color: var(--brass);
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   margin: 0 0 0.35rem;
   text-transform: uppercase;
 }
 .card__name {
   font-family: var(--font-display, serif);
-  font-size: 1.2rem;
+  font-size: var(--fs-lg);
   margin: 0 0 0.4rem;
 }
 .card__desc {
   color: var(--paper-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   margin: 0 0 0.5rem;
 }
 .card__meta {
   color: var(--paper-dim);
   display: flex;
   flex-wrap: wrap;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   gap: 0.75rem;
   margin: 0 0 0.5rem;
 }
 .card__price {
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   margin: 0;
 }
 .card__price span {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   opacity: 0.6;
 }
 .collection__news {
@@ -394,6 +403,6 @@ useHead({
 }
 .pager__info {
   color: var(--paper-dim);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 </style>

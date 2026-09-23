@@ -3,6 +3,22 @@
 // driver (S3-compatible, in-memory, or a future non-S3 provider) must not
 // require any change at the call sites.
 
+/**
+ * The object is genuinely not in the store.
+ *
+ * ⚠️ Drivers must throw this ONLY for a real miss. Anything else — bad
+ * credentials, a network failure, the provider being down — has to propagate as
+ * itself, because the two demand opposite HTTP answers: a miss is permanent and
+ * a 404, an outage is transient and must not be cached or indexed as gone.
+ * Conflating them is what made a dev misconfiguration look like missing images.
+ */
+export class ObjectNotFoundError extends Error {
+  constructor(readonly key: string) {
+    super(`Object not found: ${key}`)
+    this.name = "ObjectNotFoundError"
+  }
+}
+
 export interface PutObjectParams {
   /** Storage key (path) the object is written under. */
   key: string

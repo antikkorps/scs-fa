@@ -261,7 +261,7 @@ function setStatus(s: typeof status.value) {
   margin-bottom: 1.2rem;
 }
 .head h1 {
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
   margin-top: 0.3rem;
 }
 .import {
@@ -273,7 +273,7 @@ function setStatus(s: typeof status.value) {
 }
 .import__hint {
   color: var(--paper-dim);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0 0 0.8rem;
 }
 .import__area {
@@ -283,7 +283,7 @@ function setStatus(s: typeof status.value) {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: ui-monospace, monospace;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   padding: 0.7rem;
   resize: vertical;
 }
@@ -299,7 +299,7 @@ function setStatus(s: typeof status.value) {
   padding-top: 0.9rem;
 }
 .report__summary {
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   margin: 0 0 0.6rem;
 }
 .report__lines {
@@ -314,14 +314,14 @@ function setStatus(s: typeof status.value) {
   display: flex;
   gap: 0.8rem;
   align-items: center;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   padding: 0.3rem 0;
   border-bottom: 1px solid var(--ink-line);
 }
 .report__outcome {
   min-width: 130px;
-  font-weight: 600;
-  font-size: 0.72rem;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
 }
 .out--reconciled .report__outcome {
   color: var(--brass);
@@ -342,7 +342,7 @@ function setStatus(s: typeof status.value) {
   white-space: nowrap;
 }
 .report__amt {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .tabs {
   display: flex;
@@ -356,7 +356,7 @@ function setStatus(s: typeof status.value) {
   color: var(--paper-dim);
   padding: 0.5rem 1rem;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition:
     color 0.2s,
@@ -374,16 +374,16 @@ function setStatus(s: typeof status.value) {
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   min-width: 680px;
 }
 .table th {
   text-align: left;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--ink-line);
   background: var(--ink-soft);
@@ -406,7 +406,7 @@ function setStatus(s: typeof status.value) {
   text-align: right;
 }
 .strong {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .mono {
   font-family: ui-monospace, monospace;
@@ -416,7 +416,7 @@ function setStatus(s: typeof status.value) {
 }
 .claim {
   display: block;
-  font-size: 0.74rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .pager {
@@ -427,7 +427,7 @@ function setStatus(s: typeof status.value) {
   margin-top: 1.4rem;
 }
 .pager__info {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .state {
@@ -439,7 +439,7 @@ function setStatus(s: typeof status.value) {
 }
 .err {
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 /* Drawer */
@@ -467,16 +467,16 @@ function setStatus(s: typeof status.value) {
   background: transparent;
   border: none;
   color: var(--paper-dim);
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   cursor: pointer;
 }
 .drawer__title {
-  font-size: 1.3rem;
+  font-size: var(--fs-lg);
   margin: 0.3rem 0 0.2rem;
 }
 .drawer__sub {
   color: var(--paper-dim);
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   margin: 0 0 1.4rem;
 }
 .meta {
@@ -491,17 +491,16 @@ function setStatus(s: typeof status.value) {
 }
 .meta dt {
   color: var(--paper-faint);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .meta dd {
   margin: 0;
   text-align: right;
 }
 .sub-h {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
   margin: 1.4rem 0 0.7rem;
 }
 .field {
@@ -510,8 +509,8 @@ function setStatus(s: typeof status.value) {
 }
 .field span {
   display: block;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
   margin-bottom: 0.4rem;
@@ -524,7 +523,7 @@ function setStatus(s: typeof status.value) {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .ctl:focus {
   outline: none;
@@ -536,7 +535,7 @@ function setStatus(s: typeof status.value) {
 }
 .reconciled-note {
   color: var(--paper-dim);
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   margin-top: 1rem;
 }
 </style>

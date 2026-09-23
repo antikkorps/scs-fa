@@ -33,7 +33,7 @@ useSeoMeta({
   ogUrl: pageUrl,
   ogImage: () =>
     series.value.coverImageUrl ??
-    (artworks.value[0] ? artworkImage(artworks.value[0].featuredImageUrl, artworks.value[0].slug) : undefined),
+    (artworks.value[0] ? artworkImage(artworks.value[0].featuredImageUrl, artworks.value[0].slug).src : undefined),
 })
 
 useHead({
@@ -132,9 +132,8 @@ useHead({
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-faint);
   margin-bottom: clamp(1.2rem, 4vw, 2rem);
 }
@@ -149,15 +148,15 @@ useHead({
   color: var(--paper);
 }
 .intro__title {
-  font-size: clamp(2.4rem, 7vw, 4rem);
+  font-size: var(--fs-3xl);
   margin: 0.6rem 0 1rem;
 }
 .intro__lede {
-  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  font-size: var(--fs-md);
   color: var(--paper-dim);
   max-width: 60ch;
   margin: 0 0 1.6rem;
-  line-height: 1.7;
+  line-height: var(--lh-relaxed);
 }
 .meta {
   display: flex;
@@ -166,15 +165,15 @@ useHead({
   margin: 0;
 }
 .meta dt {
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
   margin-bottom: 0.25rem;
 }
 .meta dd {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 .meta a {
   color: var(--brass);

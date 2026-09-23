@@ -67,21 +67,21 @@ const rows = computed(() => data.value?.data ?? [])
 }
 .eyebrow {
   margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
 }
 h1 {
   margin: 0.3rem 0 0;
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
 }
 .btn-add {
   padding: 0.55rem 1rem;
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   color: var(--paper-dim);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   text-decoration: none;
 }
 .btn-add:hover {
@@ -92,8 +92,8 @@ h1 {
   max-width: 72ch;
   margin: 0 0 1.5rem;
   color: var(--paper-dim);
-  font-size: 0.9rem;
-  line-height: 1.7;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
 }
 .state {
   color: var(--paper-dim);

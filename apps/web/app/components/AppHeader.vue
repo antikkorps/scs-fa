@@ -32,6 +32,12 @@ function toggleMobileUniverse(key: "armurerie" | "gunart") {
   mobileUniverse.value = mobileUniverse.value === key ? null : key
 }
 
+// The universe label is a link to its landing page, not a toggle (Franck,
+// 2026-09-23). It used to be a button that toggled: the pointer entering opened
+// the panel, and the click that naturally followed closed it again — hovering
+// then clicking the label, which is what anyone does, made the menu vanish.
+// Hover or keyboard focus opens it, leaving or Escape closes it, and the click
+// goes where the label says.
 function openMega(key: "armurerie" | "gunart") {
   searchOpen.value = false
   accountOpen.value = false
@@ -39,9 +45,6 @@ function openMega(key: "armurerie" | "gunart") {
 }
 function closeMega() {
   megaOpen.value = null
-}
-function toggleMega(key: "armurerie" | "gunart") {
-  megaOpen.value = megaOpen.value === key ? null : key
 }
 // Keyboard: close the panel when focus leaves the whole universe item.
 function onItemBlur(e: FocusEvent, key: "armurerie" | "gunart") {
@@ -99,19 +102,18 @@ async function signOut() {
           class="nav__item"
           @pointerenter="openMega('armurerie')"
           @pointerleave="closeMega"
+          @focusin="openMega('armurerie')"
           @focusout="onItemBlur($event, 'armurerie')"
         >
-          <button
-            type="button"
+          <NuxtLink
+            to="/boutique"
             class="nav__link nav__trigger"
             :class="{ 'is-open': megaOpen === 'armurerie' }"
             :aria-expanded="megaOpen === 'armurerie'"
             aria-controls="mega-armurerie"
-            aria-haspopup="true"
-            @click="toggleMega('armurerie')"
           >
             Armurerie
-          </button>
+          </NuxtLink>
           <Transition name="mega">
             <div v-if="megaOpen === 'armurerie'" id="mega-armurerie" class="mega mega--shop">
               <div class="mega__col">
@@ -153,19 +155,18 @@ async function signOut() {
           class="nav__item"
           @pointerenter="openMega('gunart')"
           @pointerleave="closeMega"
+          @focusin="openMega('gunart')"
           @focusout="onItemBlur($event, 'gunart')"
         >
-          <button
-            type="button"
+          <NuxtLink
+            to="/collection"
             class="nav__link nav__trigger"
             :class="{ 'is-open': megaOpen === 'gunart' }"
             :aria-expanded="megaOpen === 'gunart'"
             aria-controls="mega-gunart"
-            aria-haspopup="true"
-            @click="toggleMega('gunart')"
           >
             Gun Art
-          </button>
+          </NuxtLink>
           <Transition name="mega">
             <div v-if="megaOpen === 'gunart'" id="mega-gunart" class="mega mega--art">
               <div class="mega__pitch">
@@ -179,10 +180,20 @@ async function signOut() {
                   <li>Certificat d'authenticité</li>
                 </ul>
               </div>
-              <NuxtLink to="/collection" class="mega__cta">
-                <span class="mega__cta-title">Découvrir la collection <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
-                <span class="mega__cta-sub">La galerie Gun Art</span>
-              </NuxtLink>
+              <div class="mega__ctas">
+                <!-- The artist comes first: the house sells someone's work, and
+                     that is the entry point into Gun Art (Franck, 2026-09-23).
+                     `/collection/artiste` routes to the artist when there is
+                     only one, and lists them once there are several. -->
+                <NuxtLink to="/collection/artiste" class="mega__cta">
+                  <span class="mega__cta-title">L'artiste <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
+                  <span class="mega__cta-sub">Celui dont vous accrochez le travail</span>
+                </NuxtLink>
+                <NuxtLink to="/collection" class="mega__cta">
+                  <span class="mega__cta-title">Découvrir la collection <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
+                  <span class="mega__cta-sub">La galerie Gun Art</span>
+                </NuxtLink>
+              </div>
             </div>
           </Transition>
         </div>
@@ -285,7 +296,7 @@ async function signOut() {
     <Teleport to="body">
       <button
         v-if="accountOpen"
-        class="hdr-scrim hdr-scrim--clear"
+        class="hdr-scrim"
         aria-label="Fermer le menu"
         @click="accountOpen = false"
       />
@@ -369,6 +380,7 @@ async function signOut() {
                 <div class="msub-wrap" :class="{ 'is-open': mobileUniverse === 'gunart' }">
                   <div class="msub-inner">
                     <ul id="msub-gunart" class="msub" role="list">
+                      <li><NuxtLink to="/collection/artiste" class="msub__link">L'artiste</NuxtLink></li>
                       <li><NuxtLink to="/collection" class="msub__link">Voir la collection</NuxtLink></li>
                       <li class="msub__note">Éditions limitées ≤ 25, signées, numérotées &amp; certifiées</li>
                     </ul>
@@ -432,17 +444,17 @@ async function signOut() {
   align-items: baseline;
   gap: 0.5rem;
   font-family: var(--font-display);
-  font-size: 1.5rem;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-xl);
+  letter-spacing: var(--ls-wide);
   flex-shrink: 0;
 }
 .brand__mark {
   color: var(--brass);
-  font-weight: 700;
+  font-weight: var(--fw-bold);
 }
 .brand__word {
   color: var(--paper);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 
 /* Center spine */
@@ -453,10 +465,9 @@ async function signOut() {
   margin: 0 auto;
 }
 .nav__link {
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-wide);
   color: var(--paper-dim);
   transition: color 0.3s var(--ease);
 }
@@ -475,11 +486,6 @@ async function signOut() {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
 }
 .nav__trigger::after {
   content: "";
@@ -538,16 +544,16 @@ async function signOut() {
 }
 .mega__label {
   margin: 0 0 0.6rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
 }
 .mega__link {
   padding: 0.4rem 0.5rem;
   margin: 0 -0.5rem;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   color: var(--paper-dim);
   border-radius: var(--radius);
   transition:
@@ -564,8 +570,8 @@ async function signOut() {
 }
 .mega__lede {
   margin: 0 0 0.9rem;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
   color: var(--paper-dim);
 }
 .mega__points {
@@ -579,7 +585,7 @@ async function signOut() {
 .mega__points li {
   position: relative;
   padding-left: 1.1rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .mega__points li::before {
@@ -588,9 +594,14 @@ async function signOut() {
   left: 0;
   color: var(--brass);
 }
+.mega__ctas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-self: center;
+}
 .mega__cta {
   position: relative;
-  align-self: center;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -611,11 +622,11 @@ async function signOut() {
   align-items: center;
   gap: 0.4rem;
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
 }
 .mega__cta-sub {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .mega__cta-arrow {
@@ -676,8 +687,8 @@ async function signOut() {
   display: grid;
   place-items: center;
   padding: 0 4px;
-  font-size: 0.62rem;
-  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   color: #1a1407;
   background: var(--brass);
   border-radius: 999px;
@@ -704,16 +715,15 @@ async function signOut() {
 .menu__hello {
   padding: 0.5rem 0.7rem;
   margin: 0 0 0.25rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--brass);
   border-bottom: 1px solid var(--ink-line);
 }
 .menu__item {
   text-align: left;
   padding: 0.65rem 0.7rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   background: transparent;
   border: none;
@@ -729,7 +739,16 @@ async function signOut() {
 .hdr-scrim {
   position: fixed;
   inset: 0;
-  z-index: 55;
+  /* ⚠️ Must stay BELOW the header's z-index (50), not above it.
+     `.hdr` is `position: sticky` with a z-index, so it opens a stacking
+     context: the dropdown's own `z-index: 60` only ranks it inside the header,
+     and the whole header still stacks at 50. A scrim at 55 therefore covered
+     the menu it was meant to sit behind — every click landed on the scrim,
+     which just closed the menu. The dropdown rendered perfectly and did
+     nothing, connexion and inscription included.
+     Below the header, the menu is clickable and a click anywhere else still
+     closes it. */
+  z-index: 40;
   background: transparent;
   border: none;
   cursor: default;
@@ -758,7 +777,7 @@ async function signOut() {
   right: 0;
   width: 40px;
   height: 40px;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   background: transparent;
   border: 1px solid var(--ink-line);
@@ -835,14 +854,14 @@ async function signOut() {
   align-items: baseline;
   gap: 0.5rem;
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
 }
 .mobile__close {
   width: 44px;
   height: 44px;
   display: grid;
   place-items: center;
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   background: transparent;
   border: 1px solid var(--ink-line);
@@ -872,9 +891,9 @@ async function signOut() {
   justify-content: space-between;
   width: 100%;
   padding: 1.15rem 0.25rem;
-  font-size: 1.25rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-normal);
   color: var(--paper);
   border-bottom: 1px solid var(--ink-line);
   transition: color 0.25s var(--ease);
@@ -886,8 +905,8 @@ async function signOut() {
 }
 .mlink__chev {
   color: var(--brass);
-  font-size: 1.4rem;
-  line-height: 1;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
   transition: transform 0.25s var(--ease);
 }
 /* Accordion toggle rows reuse .mlink but are <button>s → reset UA styles. */
@@ -924,7 +943,7 @@ async function signOut() {
 .msub__link {
   display: block;
   padding: 0.6rem 0.25rem 0.6rem 1rem;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   color: var(--paper-dim);
   transition: color 0.2s var(--ease);
 }
@@ -935,7 +954,7 @@ async function signOut() {
 }
 .msub__note {
   padding: 0.5rem 0.25rem 0.5rem 1rem;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .mobile__foot {
@@ -950,9 +969,8 @@ async function signOut() {
   align-items: center;
   gap: 0.6rem;
   padding: 0.75rem 0.25rem;
-  font-size: 0.95rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: var(--fs-base);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-dim);
   background: transparent;
   border: none;
@@ -972,7 +990,7 @@ async function signOut() {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  font-size: 0.68rem;
+  font-size: var(--fs-sm);
   color: #1a1407;
   background: var(--brass);
   border-radius: 999px;

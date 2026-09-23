@@ -124,11 +124,11 @@ async function submit(all: boolean) {
 }
 .nlu__title {
   font-family: var(--font-display);
-  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-size: var(--fs-xl);
   margin: 0 0 1rem;
 }
 .nlu__body {
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
   margin: 0 0 0.9rem;
 }
 .nlu__set {
@@ -140,8 +140,8 @@ async function submit(all: boolean) {
   gap: 0.5rem;
 }
 .nlu__legend {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   opacity: 0.7;
   padding: 0 0 0.5rem;
@@ -151,7 +151,7 @@ async function submit(all: boolean) {
   align-items: flex-start;
   gap: 0.55rem;
   cursor: pointer;
-  line-height: 1.45;
+  line-height: var(--lh-normal);
 }
 .nlu__item input {
   margin-top: 0.25rem;
@@ -173,7 +173,7 @@ async function submit(all: boolean) {
   border: 1px solid var(--brass);
   background: var(--brass);
   color: var(--ink, #0e0e10);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .nlu__all {
   border: 1px solid var(--line, var(--ink-line));
@@ -183,7 +183,7 @@ async function submit(all: boolean) {
 .nlu__list {
   margin: 0 0 1rem;
   padding-left: 1.2rem;
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
 }
 .nlu__link {
   color: var(--brass);

@@ -136,7 +136,7 @@ async function onImageSelected(event: Event) {
   border-radius: var(--radius);
   color: var(--paper-dim);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   transition:
     background 0.15s,
     color 0.15s;
@@ -161,7 +161,7 @@ async function onImageSelected(event: Event) {
 }
 .rte__error {
   color: var(--danger);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   padding: 0.5rem 0.75rem 0;
   margin: 0;
 }
@@ -172,19 +172,19 @@ async function onImageSelected(event: Event) {
   min-height: 280px;
   outline: none;
   color: var(--paper);
-  line-height: 1.7;
+  line-height: var(--lh-relaxed);
 }
 .rte :deep(.rte__content:focus) {
   outline: none;
 }
 .rte :deep(.rte__content h2) {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   margin: 1.2rem 0 0.6rem;
 }
 .rte :deep(.rte__content h3) {
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: var(--fs-lg);
   margin: 1rem 0 0.5rem;
 }
 .rte :deep(.rte__content p) {

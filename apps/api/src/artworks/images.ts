@@ -8,6 +8,7 @@ import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { artworks, auditLogs } from "../db/schema.js"
 import { env } from "../env.js"
+import { replyForStorageReadFailure } from "../storage/http.js"
 import { storage } from "../storage/index.js"
 import { renderProtectedImage } from "./watermark.js"
 
@@ -62,8 +63,8 @@ export const artworkImageRoutes: FastifyPluginAsync = async (fastify) => {
     let bytes: Buffer
     try {
       bytes = await storage.getBytes(`${PUBLIC_PREFIX}/${filename}`)
-    } catch {
-      return reply.code(404).send({ error: "NotFound", message: "Image not found" })
+    } catch (error) {
+      return replyForStorageReadFailure(error, request, reply, `${PUBLIC_PREFIX}/${filename}`, "Image not found")
     }
 
     reply.header("content-type", "image/webp")
@@ -217,8 +218,14 @@ export const adminArtworkImageRoutes: FastifyPluginAsync = async (fastify) => {
     let bytes: Buffer
     try {
       bytes = await storage.getBytes(`${ORIGINAL_PREFIX}/${id}`)
-    } catch {
-      return reply.code(404).send({ error: "NotFound", message: "No original on file for this artwork" })
+    } catch (error) {
+      return replyForStorageReadFailure(
+        error,
+        request,
+        reply,
+        `${ORIGINAL_PREFIX}/${id}`,
+        "No original on file for this artwork",
+      )
     }
 
     // Sniffed from the bytes rather than remembered in a column: the format is

@@ -75,7 +75,7 @@ const cards = computed(() => {
   margin-bottom: 1.8rem;
 }
 .head h1 {
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
   margin-top: 0.3rem;
 }
 .cards {
@@ -101,18 +101,22 @@ const cards = computed(() => {
   border-color: var(--brass);
 }
 .card__value {
-  font-family: var(--font-display);
-  font-size: 2.4rem;
-  font-weight: 700;
-  line-height: 1;
+  /* An amount, an edition number or a transfer reference is read, compared
+     and copied out: Inter, with lining tabular figures. The display face
+     serves oldstyle figures, which are unusable here. */
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
 }
 .card__label {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
   margin-top: 0.4rem;
 }
 .card__hint {
-  font-size: 0.74rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .card--ok {

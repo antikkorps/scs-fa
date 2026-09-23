@@ -102,14 +102,14 @@ async function signOut() {
 }
 .brand__mark {
   font-family: var(--font-display);
-  font-size: 1.7rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-eyebrow);
   color: var(--brass);
 }
 .brand__sub {
-  font-size: 0.66rem;
-  letter-spacing: 0.28em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
 }
@@ -125,8 +125,11 @@ async function signOut() {
   padding: 0.7rem 0.8rem;
   border-radius: var(--radius);
   color: var(--paper-dim);
-  font-size: 0.9rem;
-  font-weight: 500;
+  /* A dense tool sidebar, not running text: --fs-sm keeps every entry on one
+     line at the fixed rail width ("Armes de collection" wrapped at --fs-base)
+     while staying on the 14px floor. */
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   transition:
     background 0.2s var(--ease),
     color 0.2s var(--ease);
@@ -140,7 +143,7 @@ async function signOut() {
   color: var(--brass);
 }
 .nav__icon {
-  font-size: 1rem;
+  font-size: var(--fs-base);
   width: 1.1rem;
   text-align: center;
 }
@@ -166,7 +169,7 @@ async function signOut() {
   border-radius: var(--radius);
   width: 2.3rem;
   height: 2.3rem;
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   cursor: pointer;
 }
 .spacer {
@@ -178,7 +181,7 @@ async function signOut() {
   gap: 0.9rem;
 }
 .account__name {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .account__out {
@@ -187,7 +190,7 @@ async function signOut() {
   color: var(--paper-dim);
   padding: 0.45rem 0.9rem;
   border-radius: var(--radius);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition:
     color 0.2s,

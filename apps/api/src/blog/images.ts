@@ -4,6 +4,7 @@ import type { FastifyPluginAsync } from "fastify"
 import sharp from "sharp"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
+import { replyForStorageReadFailure } from "../storage/http.js"
 import { storage } from "../storage/index.js"
 
 // Blog article images. Uploaded by admins, re-encoded to WebP, and served as
@@ -95,8 +96,8 @@ export const blogImageRoutes: FastifyPluginAsync = async (fastify) => {
     let bytes: Buffer
     try {
       bytes = await storage.getBytes(`${KEY_PREFIX}/${filename}`)
-    } catch {
-      return reply.code(404).send({ error: "NotFound", message: "Image not found" })
+    } catch (error) {
+      return replyForStorageReadFailure(error, request, reply, `${KEY_PREFIX}/${filename}`, "Image not found")
     }
 
     reply.header("content-type", "image/webp")

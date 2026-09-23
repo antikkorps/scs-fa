@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@armurier/shared": "workspace:*",
+    "@nuxt/fonts": "0.14.0",
     "@primevue/nuxt-module": "4.5.4",
     "@primevue/themes": "4.5.4",
     "@stripe/stripe-js": "8.11.0",

@@ -8,6 +8,11 @@ defineProps<{
   src: string
   alt: string
   /**
+   * Placeholder to show if `src` fails to load, from `artworkImage()`. Optional
+   * so a caller with nothing to fall back to still behaves as before.
+   */
+  fallback?: string
+  /**
    * Gun Art only (story 11.5): block the right-click and drag gestures. Opt-in
    * because this same overlay serves the boutique, where the visuals carry no
    * reproduction stake and a blocked context menu would just annoy.
@@ -52,8 +57,15 @@ onBeforeUnmount(() => {
         <button ref="closeBtn" type="button" class="lb__close" aria-label="Fermer" @click="close">
           <span aria-hidden="true">✕</span>
         </button>
-        <ProtectedImage v-if="protect" class="lb__img" :src="src" :alt="alt" loading="eager" />
-        <img v-else class="lb__img" :src="src" :alt="alt" />
+        <ProtectedImage
+          v-if="protect"
+          v-img-fallback="fallback"
+          class="lb__img"
+          :src="src"
+          :alt="alt"
+          loading="eager"
+        />
+        <img v-else v-img-fallback="fallback" class="lb__img" :src="src" :alt="alt" />
       </div>
     </Transition>
   </Teleport>
@@ -87,7 +99,7 @@ onBeforeUnmount(() => {
   height: 44px;
   display: grid;
   place-items: center;
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--ink-line);

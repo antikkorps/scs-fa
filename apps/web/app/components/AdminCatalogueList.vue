@@ -102,7 +102,7 @@ async function remove(row: CatalogueRow) {
 .grid {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .grid th,
 .grid td {
@@ -112,8 +112,8 @@ async function remove(row: CatalogueRow) {
 }
 .grid thead th {
   color: var(--paper-faint);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -138,7 +138,7 @@ async function remove(row: CatalogueRow) {
   border: 0;
   color: var(--paper-dim);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   padding: 0 0 0 0.8rem;
   text-decoration: none;
@@ -156,7 +156,7 @@ async function remove(row: CatalogueRow) {
   padding: 0.7rem 1rem;
   border-radius: var(--radius);
   margin: 0 0 1.2rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .state {
   color: var(--paper-dim);

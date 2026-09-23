@@ -90,12 +90,12 @@ async function pay() {
 }
 .card-pay__err {
   margin: 0.85rem 0 0;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--danger);
 }
 .card-pay__test {
   margin: 0.85rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 </style>

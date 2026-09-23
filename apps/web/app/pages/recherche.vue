@@ -118,7 +118,7 @@ useSeoMeta({
   max-width: 760px;
 }
 .head__title {
-  font-size: clamp(2.2rem, 7vw, 3.5rem);
+  font-size: var(--fs-3xl);
   margin: 0 0 1.25rem;
 }
 .head__field {
@@ -138,7 +138,7 @@ useSeoMeta({
   width: 100%;
   height: 54px;
   padding: 0 1rem 0 2.8rem;
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   background: var(--ink-soft);
   border: 1px solid var(--ink-line);
@@ -159,15 +159,15 @@ useSeoMeta({
   padding-bottom: 4rem;
 }
 .results__heading {
-  font-size: 1.05rem;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-wide);
   margin: 0 0 1.5rem;
   display: flex;
   align-items: baseline;
   gap: 0.6rem;
 }
 .results__count {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .state {

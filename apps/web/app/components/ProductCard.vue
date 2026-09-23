@@ -25,7 +25,8 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
     <NuxtLink :to="`/boutique/${product.slug}`" class="card__link">
       <div class="card__media">
         <img
-          :src="img"
+          v-img-fallback="img.fallback"
+          :src="img.src"
           :alt="product.name"
           :width="CARD_GEOMETRY.width"
           :height="CARD_GEOMETRY.height"
@@ -98,7 +99,7 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
   padding: 1.1rem 0.15rem 0;
 }
 .card__title {
-  font-size: 1.3rem;
+  font-size: var(--fs-lg);
   margin: 0.5rem 0 0.35rem;
   transition: color 0.3s var(--ease);
 }
@@ -106,20 +107,22 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
   color: var(--brass);
 }
 .card__legalnote {
-  font-size: 0.74rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  /* A statement, not a label: it sits under an uppercase eyebrow and next to
+     an uppercase badge, and a third run of capitals in the same card is what
+     the audit called tiring. Sentence case keeps it readable. */
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-faint);
   margin: 0 0 0.6rem;
 }
 .card__price {
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   margin: 0;
 }
 .card__vat {
   color: var(--paper-faint);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-wide);
 }
 </style>

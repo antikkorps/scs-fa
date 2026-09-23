@@ -282,11 +282,11 @@ useHead({
   max-width: 760px;
 }
 .intro__title {
-  font-size: clamp(2.6rem, 8vw, 4.5rem);
+  font-size: var(--fs-3xl);
   margin: 0.6rem 0 1rem;
 }
 .intro__lede {
-  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  font-size: var(--fs-md);
   color: var(--paper-dim);
   max-width: 56ch;
   margin: 0;
@@ -307,7 +307,7 @@ useHead({
   width: 100%;
   height: 48px;
   padding: 0 0.9rem;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   background: var(--ink-soft);
   border: 1px solid var(--ink-line);
@@ -330,13 +330,13 @@ select.input {
   background: transparent;
   border: none;
   color: var(--brass);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   padding: 0.3rem 0;
 }
 .count {
   color: var(--paper-faint);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0 0 1.25rem;
 }
 .state {
@@ -367,7 +367,7 @@ select.input {
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .pager__btn:hover:not(:disabled) {
   border-color: var(--brass);
@@ -378,7 +378,7 @@ select.input {
   cursor: not-allowed;
 }
 .pager__info {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .sr-only {

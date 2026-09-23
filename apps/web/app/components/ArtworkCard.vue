@@ -21,7 +21,8 @@ const img = computed(() =>
     <NuxtLink :to="`/collection/${artwork.slug}`" class="card__link">
       <div class="card__media">
         <ProtectedImage
-          :src="img"
+          v-img-fallback="img.fallback"
+          :src="img.src"
           :alt="`${artwork.title}${artwork.artistName ? ` — ${artwork.artistName}` : ''}`"
           :width="CARD_GEOMETRY.width"
           :height="CARD_GEOMETRY.height"
@@ -93,7 +94,7 @@ const img = computed(() =>
   padding: 1.1rem 0.15rem 0;
 }
 .card__title {
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   margin: 0.5rem 0 0.35rem;
   transition: color 0.3s var(--ease);
 }
@@ -101,22 +102,22 @@ const img = computed(() =>
   color: var(--brass);
 }
 .card__meta {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
   margin: 0 0 0.7rem;
 }
 .card__price {
-  font-size: 1rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   margin: 0;
 }
 .card__from {
   color: var(--paper-dim);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 .card__vat {
   color: var(--paper-faint);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-wide);
 }
 </style>

@@ -90,9 +90,8 @@ useHead({
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-faint);
   margin-bottom: clamp(1.2rem, 4vw, 2rem);
 }
@@ -107,15 +106,15 @@ useHead({
   color: var(--paper);
 }
 .intro__title {
-  font-size: clamp(2.4rem, 7vw, 4rem);
+  font-size: var(--fs-3xl);
   margin: 0.6rem 0 1rem;
 }
 .intro__lede {
-  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  font-size: var(--fs-md);
   color: var(--paper-dim);
   max-width: 60ch;
   margin: 0;
-  line-height: 1.7;
+  line-height: var(--lh-relaxed);
 }
 .serieslist {
   list-style: none;

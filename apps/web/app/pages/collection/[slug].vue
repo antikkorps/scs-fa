@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtworkDetail } from "~/types/artwork"
-import { artworkGeometry, artworkImage, availabilityLabel, formatEuros } from "~/utils/format"
+import { artworkGeometry, artworkImage, availabilityLabel, formatEuros, ogImageUrl } from "~/utils/format"
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -42,7 +42,7 @@ useSeoMeta({
   ogDescription: description,
   ogType: "article",
   ogUrl: pageUrl,
-  ogImage: hero,
+  ogImage: () => ogImageUrl(art.value?.featuredImageUrl, siteUrl),
 })
 
 useHead({
@@ -112,7 +112,8 @@ useHead({
         <figure class="detail__media" :style="{ aspectRatio: heroGeometry.ratio }">
           <button type="button" class="detail__zoom" :aria-label="`Agrandir l'image : ${art.title}`" @click="lightboxOpen = true">
             <ProtectedImage
-              :src="hero"
+              v-img-fallback="hero.fallback"
+              :src="hero.src"
               :alt="heroAlt"
               :width="heroGeometry.width"
               :height="heroGeometry.height"
@@ -122,7 +123,7 @@ useHead({
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="hero" :alt="heroAlt" protect />
+        <ImageLightbox v-model="lightboxOpen" :src="hero.src" :fallback="hero.fallback" :alt="heroAlt" protect />
 
         <div class="detail__info">
           <NuxtLink v-if="artist" :to="`/collection/artiste/${artist.slug}`" class="eyebrow eyebrow--link">
@@ -198,7 +199,7 @@ useHead({
 }
 .detail__series {
   margin: 0.4rem 0 1rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .detail__series a {
@@ -215,10 +216,9 @@ useHead({
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-faint);
-  text-transform: uppercase;
   margin-bottom: clamp(1.25rem, 4vw, 2.25rem);
 }
 .crumbs a {
@@ -268,7 +268,7 @@ useHead({
   height: 40px;
   display: grid;
   place-items: center;
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--ink-line);
@@ -282,11 +282,11 @@ useHead({
   opacity: 1;
 }
 .detail__title {
-  font-size: clamp(2.4rem, 7vw, 3.6rem);
+  font-size: var(--fs-3xl);
   margin: 0.5rem 0 1rem;
 }
 .detail__desc {
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   margin: 1.4rem 0 0.5rem;
 }
@@ -302,8 +302,8 @@ useHead({
   border-block: 1px solid var(--ink-line);
 }
 .detail__specs dt {
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
   margin-bottom: 0.25rem;
@@ -313,17 +313,21 @@ useHead({
   color: var(--paper);
 }
 .detail__price {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
+  /* An amount, an edition number or a transfer reference is read, compared
+     and copied out: Inter, with lining tabular figures. The display face
+     serves oldstyle figures, which are unusable here. */
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
+  font-size: var(--fs-xl);
 }
 .detail__price span {
   font-family: var(--font-body);
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ls-wide);
 }
 .prints__h {
-  font-size: 1.6rem;
+  font-size: var(--fs-xl);
   margin: 0 0 1rem;
 }
 .prints__sold {
@@ -345,16 +349,20 @@ useHead({
   border-bottom: 1px solid var(--ink-line);
 }
 .prints__num {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
+  /* An amount, an edition number or a transfer reference is read, compared
+     and copied out: Inter, with lining tabular figures. The display face
+     serves oldstyle figures, which are unusable here. */
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
+  font-size: var(--fs-lg);
   color: var(--brass);
 }
 .prints__fmt {
   color: var(--paper-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .prints__price {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .prints__cta {
   width: 100%;

@@ -9,7 +9,16 @@ describe("contentSecurityPolicy", () => {
   })
 
   it("keeps 'unsafe-inline' for styles (PrimeVue runtime injection)", () => {
-    expect(contentSecurityPolicy("n")).toContain("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com")
+    expect(contentSecurityPolicy("n")).toContain("style-src 'self' 'unsafe-inline'")
+  })
+
+  it("allows no third-party font origin (fonts are self-hosted, story 10.7)", () => {
+    const csp = contentSecurityPolicy("n")
+    expect(csp).toContain("font-src 'self'")
+    // Re-allowing Google Fonts would quietly reopen the GDPR exposure the
+    // self-hosting removed: every visitor's IP handed to a third party.
+    expect(csp).not.toContain("fonts.googleapis.com")
+    expect(csp).not.toContain("fonts.gstatic.com")
   })
 
   it("allows the Stripe origins needed by the Payment Element", () => {

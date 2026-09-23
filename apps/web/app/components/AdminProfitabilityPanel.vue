@@ -74,7 +74,7 @@ defineProps<{
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .prof__rows dt {
   color: var(--paper-dim);
@@ -87,7 +87,7 @@ defineProps<{
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--ink-line);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .prof__total dd {
   color: var(--brass);
@@ -97,19 +97,19 @@ defineProps<{
 }
 .prof__total span {
   color: var(--paper-faint);
-  font-weight: 400;
-  font-size: 0.85rem;
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-sm);
 }
 .warn {
   color: var(--danger);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   margin-left: 0.4rem;
 }
 .prof__note {
   margin: 0.8rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  line-height: 1.5;
+  line-height: var(--lh-normal);
 }
 .prof__note strong {
   color: var(--paper-dim);

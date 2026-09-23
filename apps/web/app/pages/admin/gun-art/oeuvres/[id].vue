@@ -518,8 +518,8 @@ const PRINT_STATUS: Record<string, string> = {
 }
 .eyebrow {
   margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
 }
@@ -532,7 +532,7 @@ const PRINT_STATUS: Record<string, string> = {
 }
 h1 {
   margin: 0.3rem 0 0;
-  font-size: clamp(1.8rem, 5vw, 2.4rem);
+  font-size: var(--fs-2xl);
 }
 .panel {
   background: var(--ink-soft);
@@ -544,10 +544,9 @@ h1 {
 .panel__title,
 .sub {
   margin: 0 0 1.1rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
 }
 .sub {
   margin-top: 1.8rem;
@@ -567,19 +566,19 @@ h1 {
   align-items: center;
   gap: 0.6rem;
   color: var(--paper-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .field__label {
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .field__help {
-  font-size: 0.76rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  line-height: 1.5;
+  line-height: var(--lh-normal);
 }
 .ctl {
   padding: 0.6rem 0.8rem;
@@ -588,7 +587,7 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   width: 100%;
 }
 .ctl:focus {
@@ -599,12 +598,12 @@ h1 {
   opacity: 0.55;
 }
 .ctl--area {
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
   resize: vertical;
 }
 .ctl--inline {
   padding: 0.3rem 0.5rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   width: auto;
 }
 .check {
@@ -629,7 +628,7 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper-dim);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .remove:disabled,
@@ -644,7 +643,7 @@ h1 {
   border: 1px solid var(--ink-line);
   border-left-width: 3px;
   background: var(--ink);
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .verdict--ok {
   border-left-color: var(--brass);
@@ -654,7 +653,7 @@ h1 {
 }
 .verdict__head {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .verdict--ok .verdict__head {
   color: var(--brass);
@@ -666,14 +665,14 @@ h1 {
   margin: 0.6rem 0 0;
   padding-left: 1.1rem;
   color: var(--paper-dim);
-  line-height: 1.7;
+  line-height: var(--lh-relaxed);
 }
 .verdict__link {
   margin: 0.7rem 0 0;
 }
 .verdict__link a {
   color: var(--brass);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 .profwrap {
   margin-top: 1.4rem;
@@ -681,9 +680,9 @@ h1 {
 }
 .note {
   margin: 0 0 1rem;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
 }
 .tablewrap {
   overflow-x: auto;
@@ -691,7 +690,7 @@ h1 {
 .grid {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.86rem;
+  font-size: var(--fs-sm);
 }
 .grid th,
 .grid td {
@@ -701,8 +700,8 @@ h1 {
 }
 .grid thead th {
   color: var(--paper-faint);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
 }
 .cell--num {
@@ -716,7 +715,7 @@ h1 {
   padding: 0.7rem 1rem;
   border-radius: var(--radius);
   margin: 0 0 1.2rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 
 @media (min-width: 720px) {

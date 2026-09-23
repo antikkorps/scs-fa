@@ -16,7 +16,9 @@ import { artworkImage, formatEuros } from "~/utils/format"
 const props = defineProps<{ items: ProductCrossSellItem[]; weaponName: string }>()
 
 const THUMB = { width: 320, height: 240 }
-const image = (item: ProductCrossSellItem) => artworkImage(item.featuredImageUrl, item.slug, THUMB.width, THUMB.height)
+const thumbs = computed(() =>
+  props.items.map((item) => ({ item, img: artworkImage(item.featuredImageUrl, item.slug, THUMB.width, THUMB.height) })),
+)
 const hasItems = computed(() => props.items.length > 0)
 </script>
 
@@ -26,10 +28,11 @@ const hasItems = computed(() => props.items.length > 0)
     <p class="xsell__intro">Les accessoires que nous recommandons avec {{ weaponName }}.</p>
 
     <ul class="xsell__list">
-      <li v-for="item in items" :key="item.id" class="xsell__item">
+      <li v-for="{ item, img } in thumbs" :key="item.id" class="xsell__item">
         <NuxtLink :to="`/boutique/${item.slug}`" class="xsell__link">
           <img
-            :src="image(item)"
+            v-img-fallback="img.fallback"
+            :src="img.src"
             :alt="item.name"
             :width="THUMB.width"
             :height="THUMB.height"
@@ -55,12 +58,12 @@ const hasItems = computed(() => props.items.length > 0)
 }
 .xsell__h {
   margin: 0 0 0.35rem;
-  font-size: clamp(1.15rem, 2.5vw, 1.5rem);
+  font-size: var(--fs-lg);
 }
 .xsell__intro {
   margin: 0 0 1.5rem;
   color: var(--paper-dim);
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
 }
 .xsell__list {
   list-style: none;
@@ -100,8 +103,8 @@ const hasItems = computed(() => props.items.length > 0)
   padding: 0 0.85rem 0.9rem;
 }
 .xsell__name {
-  font-weight: 600;
-  line-height: 1.3;
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-snug);
 }
 .xsell__price {
   color: var(--brass);

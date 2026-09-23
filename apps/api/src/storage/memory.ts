@@ -1,4 +1,10 @@
-import type { GetUrlOptions, PutObjectParams, StorageService, StoredObject } from "./types.js"
+import {
+  type GetUrlOptions,
+  ObjectNotFoundError,
+  type PutObjectParams,
+  type StorageService,
+  type StoredObject,
+} from "./types.js"
 
 interface MemoryObject {
   body: Buffer
@@ -21,7 +27,7 @@ export class InMemoryStorageService implements StorageService {
 
   async getBytes(key: string): Promise<Buffer> {
     const object = this.objects.get(key)
-    if (!object) throw new Error(`Object not found: ${key}`)
+    if (!object) throw new ObjectNotFoundError(key)
     return object.body
   }
 

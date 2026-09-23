@@ -134,7 +134,7 @@ function go(delta: number) {
   flex-wrap: wrap;
 }
 .head h1 {
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
   margin-top: 0.3rem;
 }
 .filters {
@@ -150,7 +150,7 @@ function go(delta: number) {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   min-width: 170px;
 }
 .ctl:focus {
@@ -165,16 +165,16 @@ function go(delta: number) {
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   min-width: 680px;
 }
 .table th {
   text-align: left;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--ink-line);
   background: var(--ink-soft);
@@ -200,13 +200,13 @@ function go(delta: number) {
 }
 .slug {
   display: block;
-  font-size: 0.76rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .tag {
   display: inline-block;
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-wide);
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   border: 1px solid var(--ink-line);
@@ -231,7 +231,7 @@ function go(delta: number) {
   flex-wrap: wrap;
 }
 .pager__info {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .state {

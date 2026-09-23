@@ -159,7 +159,7 @@ async function declareTransfer() {
   margin-bottom: 2rem;
 }
 .order__title {
-  font-size: clamp(2rem, 6vw, 3rem);
+  font-size: var(--fs-2xl);
   margin: 0.5rem 0 0.75rem;
 }
 .order__ref {
@@ -174,12 +174,12 @@ async function declareTransfer() {
   background: var(--ink-soft);
 }
 .pay__h {
-  font-size: 1.15rem;
+  font-size: var(--fs-md);
   margin: 0 0 0.6rem;
 }
 .pay__lede {
   color: var(--paper-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   margin: 0 0 1.1rem;
 }
 .rib {
@@ -191,7 +191,7 @@ async function declareTransfer() {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
 }
 .rib dt {
   color: var(--paper-faint);
@@ -203,13 +203,17 @@ async function declareTransfer() {
 }
 .rib__ref dd {
   color: var(--brass);
-  font-weight: 600;
-  font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-weight: var(--fw-semibold);
+  /* An amount, an edition number or a transfer reference is read, compared
+     and copied out: Inter, with lining tabular figures. The display face
+     serves oldstyle figures, which are unusable here. */
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
+  font-size: var(--fs-md);
 }
 .pay__done {
   color: var(--brass);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   margin: 0;
 }
 .status {
@@ -221,8 +225,8 @@ async function declareTransfer() {
   margin-bottom: 1.5rem;
 }
 .status__label {
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
   margin: 0 0 0.25rem;
@@ -242,7 +246,7 @@ async function declareTransfer() {
 }
 .order__next {
   color: var(--paper-dim);
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
 }
 </style>

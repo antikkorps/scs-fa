@@ -4,9 +4,40 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-02-07",
   devtools: { enabled: true },
 
-  modules: ["@primevue/nuxt-module"],
+  modules: ["@primevue/nuxt-module", "@nuxt/fonts"],
 
-  css: ["~/assets/css/main.css"],
+  // `tokens.css` carries the design tokens (colour, type scale, layout) and
+  // must load first: `main.css` and every `<style scoped>` consume it.
+  css: ["~/assets/css/tokens.css", "~/assets/css/main.css"],
+
+  // Self-hosted fonts (story 10.7). They used to come from Google Fonts: a
+  // render-blocking third-party stylesheet on first paint, and every visitor's
+  // IP handed to Google — a known and avoidable GDPR exposure. @nuxt/fonts
+  // downloads the woff2 at build time and serves them from our own origin,
+  // with `font-display: swap` and preloading of the critical files. No
+  // outbound request is left at runtime.
+  fonts: {
+    defaults: {
+      subsets: ["latin"],
+      styles: ["normal"],
+      // Preload both files. The generated fallback faces are built on the
+      // generic `serif`/`sans-serif`, which carry no measurable metrics, so
+      // they ship `size-adjust: 100%`: on a slow connection the swap re-wrapped
+      // the home page headline and cost 0.036 of CLS (measured, reproducible).
+      // Preloading makes the real faces available at first paint, so there is
+      // no swap to shift anything.
+      preload: true,
+    },
+    families: [
+      // Fraunces replaces Cormorant Garamond: same "gallery" register, but an
+      // x-height that holds down to 14px (cf. tokens.css § 2.1).
+      { name: "Fraunces", provider: "google", weights: [400, 600, 700] },
+      { name: "Inter", provider: "google", weights: [400, 500, 600, 700] },
+    ],
+    // Both families are named only in `--font-display` / `--font-body`:
+    // without this the scanner would not see them anywhere.
+    experimental: { processCSSVariables: true },
+  },
 
   primevue: {
     options: {
@@ -64,14 +95,6 @@ export default defineNuxtConfig({
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "theme-color", content: "#0e0e10" },
         { name: "format-detection", content: "telephone=no" },
-      ],
-      link: [
-        { rel: "preconnect", href: "https://fonts.googleapis.com" },
-        { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
-        {
-          rel: "stylesheet",
-          href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap",
-        },
       ],
     },
   },

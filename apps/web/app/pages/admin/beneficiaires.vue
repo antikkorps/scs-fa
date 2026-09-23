@@ -64,7 +64,7 @@ const columns: AdminColumn[] = [
 <style scoped>
 .link {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .link a {
   color: var(--brass);

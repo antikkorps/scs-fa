@@ -118,9 +118,8 @@ useHead({
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-faint);
   margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
 }
@@ -134,11 +133,11 @@ useHead({
   max-width: 760px;
 }
 .post__title {
-  font-size: clamp(2.2rem, 6vw, 3.6rem);
+  font-size: var(--fs-3xl);
   margin: 0.5rem 0 0.9rem;
 }
 .post__meta {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
   margin: 0;
 }
@@ -158,20 +157,20 @@ useHead({
 }
 .post__body {
   max-width: 720px;
-  font-size: 1.08rem;
-  line-height: 1.8;
+  font-size: var(--fs-md);
+  line-height: var(--lh-relaxed);
   color: var(--paper-dim);
 }
 .post__body :deep(h2) {
   font-family: var(--font-display);
   color: var(--paper);
-  font-size: clamp(1.6rem, 4vw, 2.1rem);
+  font-size: var(--fs-xl);
   margin: 2.2rem 0 0.9rem;
 }
 .post__body :deep(h3) {
   font-family: var(--font-display);
   color: var(--paper);
-  font-size: 1.35rem;
+  font-size: var(--fs-lg);
   margin: 1.8rem 0 0.7rem;
 }
 .post__body :deep(p) {

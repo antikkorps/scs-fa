@@ -6,8 +6,6 @@ const STRIPE_JS = "https://js.stripe.com"
 const STRIPE_API = "https://api.stripe.com"
 const STRIPE_HOOKS = "https://hooks.stripe.com"
 const STRIPE_NETWORK = "https://m.stripe.network"
-const GOOGLE_FONTS_CSS = "https://fonts.googleapis.com"
-const GOOGLE_FONTS_FILES = "https://fonts.gstatic.com"
 
 /** The CSP header value for an HTML response using the given per-request nonce. */
 export function contentSecurityPolicy(nonce: string): string {
@@ -19,8 +17,10 @@ export function contentSecurityPolicy(nonce: string): string {
     // Styles keep 'unsafe-inline': PrimeVue injects <style> at runtime on the
     // client, which a server-side nonce cannot cover. Revisit with PrimeVue's
     // `csp.nonce` option to drop this too.
-    `style-src 'self' 'unsafe-inline' ${GOOGLE_FONTS_CSS}`,
-    `font-src 'self' ${GOOGLE_FONTS_FILES}`,
+    "style-src 'self' 'unsafe-inline'",
+    // Fonts are self-hosted as of story 10.7, so no third-party origin needs
+    // to be allowed here any more.
+    "font-src 'self'",
     "img-src 'self' data: https:",
     // Stripe Elements calls the API + fraud-signal endpoint.
     `connect-src 'self' ${STRIPE_API} ${STRIPE_NETWORK}`,

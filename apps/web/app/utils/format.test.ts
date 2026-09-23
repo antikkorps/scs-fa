@@ -36,9 +36,13 @@ describe("artwork images", () => {
   })
 
   it("prefers the backend image when present, falls back otherwise", () => {
-    expect(artworkImage("https://cdn.example/x.jpg", "slug")).toBe("https://cdn.example/x.jpg")
-    expect(artworkImage(null, "slug", 400, 500)).toBe(fallbackImage("slug", 400, 500))
-    expect(artworkImage("", "slug", 400, 500)).toBe(fallbackImage("slug", 400, 500))
+    expect(artworkImage("https://cdn.example/x.jpg", "slug").src).toBe("https://cdn.example/x.jpg")
+    expect(artworkImage(null, "slug", 400, 500).src).toBe(fallbackImage("slug", 400, 500))
+    expect(artworkImage("", "slug", 400, 500).src).toBe(fallbackImage("slug", 400, 500))
+  })
+
+  it("carries the placeholder even when an image exists — it is needed when that one fails", () => {
+    expect(artworkImage("https://cdn.example/x.jpg", "slug", 400, 500).fallback).toBe(fallbackImage("slug", 400, 500))
   })
 })
 

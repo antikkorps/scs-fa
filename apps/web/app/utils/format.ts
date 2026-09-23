@@ -63,9 +63,39 @@ export function fallbackImage(seed: string, w = 800, h = 1000): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
-/** Artwork image: the backend-provided URL when set, else a deterministic placeholder. */
-export function artworkImage(featuredImageUrl: string | null | undefined, seed: string, w = 1200, h = 1500): string {
-  return featuredImageUrl && featuredImageUrl.length > 0 ? featuredImageUrl : fallbackImage(seed, w, h)
+/**
+ * Absolute URL for an `og:image`, or `undefined` when there is no real image.
+ *
+ * ⚠️ Never pass `artworkImage().src` here. When a piece has no visual that is
+ * the inline SVG placeholder — a `data:` URI, which every crawler ignores, so
+ * the page ships a share card that looks configured and renders as nothing.
+ * Omitting the tag is the honest state. Open Graph also requires an absolute
+ * URL, which `featuredImageUrl` (site-relative) is not on its own.
+ */
+export function ogImageUrl(featuredImageUrl: string | null | undefined, siteUrl: string): string | undefined {
+  if (!featuredImageUrl) return undefined
+  return featuredImageUrl.startsWith("http") ? featuredImageUrl : `${siteUrl}${featuredImageUrl}`
+}
+
+/**
+ * Artwork image: the backend-provided URL when set, else a deterministic
+ * placeholder — plus that placeholder, so a caller can hand it to
+ * `v-img-fallback`.
+ *
+ * ⚠️ An absent URL and a URL that fails to load are two different states, and
+ * only the first one used to be handled. A stored image the storage can no
+ * longer serve (object gone, credentials rotated, provider down) left the
+ * browser rendering the alt text across the grid. Both states must land on the
+ * same placeholder, which is why the fallback travels with the src.
+ */
+export function artworkImage(
+  featuredImageUrl: string | null | undefined,
+  seed: string,
+  w = 1200,
+  h = 1500,
+): { src: string; fallback: string } {
+  const fallback = fallbackImage(seed, w, h)
+  return { src: featuredImageUrl && featuredImageUrl.length > 0 ? featuredImageUrl : fallback, fallback }
 }
 
 /**

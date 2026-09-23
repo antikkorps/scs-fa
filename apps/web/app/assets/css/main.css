@@ -1,29 +1,11 @@
 /* ==========================================================================
    SCS Firearm — Gun Art collection. Premium dark "gallery" identity.
    Mobile-first, system-driven dark canvas, brass accent, serif display.
+
+   Tokens (colour, type scale, layout) live in `tokens.css`, loaded before
+   this file. Here: the HTML baseline and the shared primitives, written
+   **exclusively** against those tokens.
    ========================================================================== */
-
-:root {
-  --ink: #0e0e10; /* canvas */
-  --ink-soft: #16161a; /* raised surfaces */
-  --ink-line: #26262c; /* hairlines */
-  --paper: #f5f2ea; /* primary text */
-  --paper-dim: #b6b2a8; /* secondary text */
-  --paper-faint: #837f76; /* tertiary text */
-  --brass: #c8a35b; /* accent */
-  --brass-deep: #a8843f;
-  --danger: #d98a6a;
-
-  --maxw: 1240px;
-  --gutter: clamp(1.1rem, 4vw, 2.75rem);
-  --radius: 4px;
-
-  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-
-  --shadow: 0 18px 50px -24px rgba(0, 0, 0, 0.75);
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-}
 
 *,
 *::before,
@@ -41,22 +23,59 @@ body {
   background: var(--ink);
   color: var(--paper);
   font-family: var(--font-body);
-  font-size: 16px;
-  line-height: 1.6;
-  font-weight: 400;
-  letter-spacing: 0.01em;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--ls-normal);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
+/* Headings set no size of their own: each context picks its step
+   (--fs-lg … --fs-display). A card's h2 and a hero's h2 do not speak at the
+   same volume, but they share family, weight and rhythm. */
 h1,
 h2,
-h3 {
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
-  font-weight: 600;
-  line-height: 1.08;
-  letter-spacing: 0.005em;
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-display);
   margin: 0;
+}
+
+h4,
+h5,
+h6 {
+  line-height: var(--lh-snug);
+}
+
+/* Lining, tabular figures site-wide (Franck's call, cf. tokens.css § 2.5).
+   The rule is set **once** on `body` rather than copied onto every price,
+   total, quantity and reference: that is what stops the debt coming back, and
+   a new component inherits it for free. Amounts line up in a column, and a
+   transfer reference can be copied without ambiguity.
+
+   One exception: running text. Tabular figures there get too much sidebearing
+   mid-sentence, so articles and rich content return to proportional width. */
+body {
+  font-variant-numeric: var(--nums);
+}
+
+.prose,
+.post__body,
+.rte__content {
+  font-variant-numeric: lining-nums proportional-nums;
+}
+
+/* Isolated case: a numeric fragment inside a display heading, which must drop
+   back to Inter (the display face serves oldstyle figures). */
+.nums {
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
 }
 
 a {
@@ -100,9 +119,9 @@ button {
 
 .eyebrow {
   font-family: var(--font-body);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.32em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
   margin: 0;
@@ -115,10 +134,9 @@ button {
   align-items: center;
   gap: 0.5rem;
   padding: 0.85rem 1.6rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide);
   border-radius: var(--radius);
   border: 1px solid transparent;
   cursor: pointer;
@@ -157,9 +175,9 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   padding: 0.32rem 0.7rem;
   border-radius: 999px;
@@ -197,13 +215,13 @@ button {
   box-shadow: var(--shadow);
 }
 .auth-card__title {
-  font-size: clamp(1.8rem, 5vw, 2.2rem);
+  font-size: var(--fs-xl);
   margin: 0.4rem 0 0.2rem;
 }
 .auth-card__lede {
   color: var(--paper-dim);
   margin: 0 0 1.6rem;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 .auth-field {
   display: block;
@@ -211,8 +229,8 @@ button {
 }
 .auth-field > span {
   display: block;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
   margin-bottom: 0.45rem;
@@ -225,7 +243,7 @@ button {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 .auth-input:focus {
   outline: none;
@@ -241,7 +259,7 @@ button {
   align-items: flex-start;
   gap: 0.6rem;
   margin-bottom: 1.2rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .auth-consent input {
@@ -250,19 +268,19 @@ button {
 }
 .auth-error {
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0 0 1rem;
 }
 .auth-field__error {
   color: var(--danger);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   margin: 0.35rem 0 0;
 }
 .auth-notice {
   color: var(--brass);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   margin: 0 0 1rem;
-  line-height: 1.5;
+  line-height: var(--lh-normal);
 }
 .auth-submit {
   width: 100%;
@@ -274,7 +292,7 @@ button {
 }
 .auth-alt {
   margin: 1.4rem 0 0;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
   text-align: center;
 }

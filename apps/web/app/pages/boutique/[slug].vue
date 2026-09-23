@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductDetail, ProductVariant } from "~/types/product"
 import { availabilityLongLabel, availabilitySchemaUrl, availabilityState, isPurchasable } from "~/utils/availability"
-import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
+import { artworkImage, CARD_GEOMETRY, formatEuros, ogImageUrl } from "~/utils/format"
 import { conditionLabel, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
 
 const route = useRoute()
@@ -101,7 +101,7 @@ useSeoMeta({
   ogDescription: description,
   ogType: "website",
   ogUrl: pageUrl,
-  ogImage: image,
+  ogImage: () => ogImageUrl(product.value?.featuredImageUrl, siteUrl),
 })
 
 useHead({
@@ -160,11 +160,18 @@ useHead({
             :aria-label="`Agrandir l'image : ${product.name}`"
             @click="lightboxOpen = true"
           >
-            <img :src="image" :alt="product.name" :width="CARD_GEOMETRY.width" :height="CARD_GEOMETRY.height" decoding="async" />
+            <img
+              v-img-fallback="image.fallback"
+              :src="image.src"
+              :alt="product.name"
+              :width="CARD_GEOMETRY.width"
+              :height="CARD_GEOMETRY.height"
+              decoding="async"
+            />
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="image" :alt="product.name" />
+        <ImageLightbox v-model="lightboxOpen" :src="image.src" :fallback="image.fallback" :alt="product.name" />
 
         <div class="detail__info">
           <p v-if="product.category.name" class="eyebrow">{{ product.category.name }}</p>
@@ -337,10 +344,9 @@ useHead({
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-faint);
-  text-transform: uppercase;
   margin-bottom: clamp(1.25rem, 4vw, 2.25rem);
 }
 .crumbs a {
@@ -390,7 +396,7 @@ useHead({
   height: 40px;
   display: grid;
   place-items: center;
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--ink-line);
@@ -404,7 +410,7 @@ useHead({
   opacity: 1;
 }
 .detail__title {
-  font-size: clamp(2.2rem, 6vw, 3.2rem);
+  font-size: var(--fs-2xl);
   margin: 0.5rem 0 1rem;
 }
 .detail__tags {
@@ -421,18 +427,22 @@ useHead({
   color: var(--paper-dim);
 }
 .detail__price {
-  font-family: var(--font-display);
-  font-size: 2rem;
+  /* An amount, an edition number or a transfer reference is read, compared
+     and copied out: Inter, with lining tabular figures. The display face
+     serves oldstyle figures, which are unusable here. */
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
+  font-size: var(--fs-2xl);
   margin: 0 0 1.25rem;
 }
 .detail__price span {
   font-family: var(--font-body);
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ls-wide);
 }
 .detail__desc {
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   margin: 0 0 0.75rem;
 }
@@ -448,7 +458,7 @@ useHead({
 }
 .detail__avail-note {
   color: var(--paper-dim);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0 0 1.25rem;
 }
 .detail__news {
@@ -456,7 +466,7 @@ useHead({
 }
 .detail__held {
   color: var(--paper-dim);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0.6rem 0 0;
 }
 .hist {
@@ -466,10 +476,9 @@ useHead({
   padding: 1.5rem;
 }
 .hist__h {
-  font-size: 0.95rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-display);
   margin: 0 0 1rem;
-  text-transform: uppercase;
 }
 .hist__list {
   display: grid;
@@ -481,8 +490,8 @@ useHead({
   gap: 0.15rem;
 }
 .hist__list dt {
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
   opacity: 0.6;
   text-transform: uppercase;
 }
@@ -491,7 +500,7 @@ useHead({
 }
 .hist__unique {
   color: var(--brass);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 1rem 0 0;
 }
 .hist__events {
@@ -507,7 +516,7 @@ useHead({
   background: var(--ink-soft);
 }
 .legal__h {
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   margin: 0 0 1rem;
 }
 .legal__list {
@@ -516,8 +525,8 @@ useHead({
   margin: 0;
 }
 .legal__list dt {
-  font-size: 0.7rem;
-  letter-spacing: 0.16em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
   margin-bottom: 0.2rem;
@@ -533,7 +542,7 @@ useHead({
 }
 .legal__note {
   margin: 1rem 0 0;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .detail__cta {
@@ -549,7 +558,7 @@ useHead({
 }
 .detail__added {
   margin: 0.85rem 0 0;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--brass);
 }
 .detail__added a {
@@ -558,7 +567,7 @@ useHead({
 }
 .detail__error {
   margin: 0.85rem 0 0;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--danger);
 }
 .variants {
@@ -567,8 +576,8 @@ useHead({
   padding: 0;
 }
 .variants__legend {
-  font-size: 0.7rem;
-  letter-spacing: 0.16em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
   margin-bottom: 0.6rem;
@@ -581,7 +590,7 @@ useHead({
 }
 .variants__opt {
   padding: 0.55rem 1rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   background: var(--ink-soft);
   border: 1px solid var(--ink-line);
