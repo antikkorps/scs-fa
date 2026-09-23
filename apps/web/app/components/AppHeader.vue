@@ -32,6 +32,12 @@ function toggleMobileUniverse(key: "armurerie" | "gunart") {
   mobileUniverse.value = mobileUniverse.value === key ? null : key
 }
 
+// The universe label is a link to its landing page, not a toggle (Franck,
+// 2026-09-23). It used to be a button that toggled: the pointer entering opened
+// the panel, and the click that naturally followed closed it again — hovering
+// then clicking the label, which is what anyone does, made the menu vanish.
+// Hover or keyboard focus opens it, leaving or Escape closes it, and the click
+// goes where the label says.
 function openMega(key: "armurerie" | "gunart") {
   searchOpen.value = false
   accountOpen.value = false
@@ -39,9 +45,6 @@ function openMega(key: "armurerie" | "gunart") {
 }
 function closeMega() {
   megaOpen.value = null
-}
-function toggleMega(key: "armurerie" | "gunart") {
-  megaOpen.value = megaOpen.value === key ? null : key
 }
 // Keyboard: close the panel when focus leaves the whole universe item.
 function onItemBlur(e: FocusEvent, key: "armurerie" | "gunart") {
@@ -99,19 +102,18 @@ async function signOut() {
           class="nav__item"
           @pointerenter="openMega('armurerie')"
           @pointerleave="closeMega"
+          @focusin="openMega('armurerie')"
           @focusout="onItemBlur($event, 'armurerie')"
         >
-          <button
-            type="button"
+          <NuxtLink
+            to="/boutique"
             class="nav__link nav__trigger"
             :class="{ 'is-open': megaOpen === 'armurerie' }"
             :aria-expanded="megaOpen === 'armurerie'"
             aria-controls="mega-armurerie"
-            aria-haspopup="true"
-            @click="toggleMega('armurerie')"
           >
             Armurerie
-          </button>
+          </NuxtLink>
           <Transition name="mega">
             <div v-if="megaOpen === 'armurerie'" id="mega-armurerie" class="mega mega--shop">
               <div class="mega__col">
@@ -153,19 +155,18 @@ async function signOut() {
           class="nav__item"
           @pointerenter="openMega('gunart')"
           @pointerleave="closeMega"
+          @focusin="openMega('gunart')"
           @focusout="onItemBlur($event, 'gunart')"
         >
-          <button
-            type="button"
+          <NuxtLink
+            to="/collection"
             class="nav__link nav__trigger"
             :class="{ 'is-open': megaOpen === 'gunart' }"
             :aria-expanded="megaOpen === 'gunart'"
             aria-controls="mega-gunart"
-            aria-haspopup="true"
-            @click="toggleMega('gunart')"
           >
             Gun Art
-          </button>
+          </NuxtLink>
           <Transition name="mega">
             <div v-if="megaOpen === 'gunart'" id="mega-gunart" class="mega mega--art">
               <div class="mega__pitch">
@@ -485,11 +486,6 @@ async function signOut() {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
 }
 .nav__trigger::after {
   content: "";
