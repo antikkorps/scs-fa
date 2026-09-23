@@ -179,10 +179,20 @@ async function signOut() {
                   <li>Certificat d'authenticité</li>
                 </ul>
               </div>
-              <NuxtLink to="/collection" class="mega__cta">
-                <span class="mega__cta-title">Découvrir la collection <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
-                <span class="mega__cta-sub">La galerie Gun Art</span>
-              </NuxtLink>
+              <div class="mega__ctas">
+                <!-- The artist comes first: the house sells someone's work, and
+                     that is the entry point into Gun Art (Franck, 2026-09-23).
+                     `/collection/artiste` routes to the artist when there is
+                     only one, and lists them once there are several. -->
+                <NuxtLink to="/collection/artiste" class="mega__cta">
+                  <span class="mega__cta-title">L'artiste <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
+                  <span class="mega__cta-sub">Celui dont vous accrochez le travail</span>
+                </NuxtLink>
+                <NuxtLink to="/collection" class="mega__cta">
+                  <span class="mega__cta-title">Découvrir la collection <span class="mega__cta-arrow" aria-hidden="true">→</span></span>
+                  <span class="mega__cta-sub">La galerie Gun Art</span>
+                </NuxtLink>
+              </div>
             </div>
           </Transition>
         </div>
@@ -369,6 +379,7 @@ async function signOut() {
                 <div class="msub-wrap" :class="{ 'is-open': mobileUniverse === 'gunart' }">
                   <div class="msub-inner">
                     <ul id="msub-gunart" class="msub" role="list">
+                      <li><NuxtLink to="/collection/artiste" class="msub__link">L'artiste</NuxtLink></li>
                       <li><NuxtLink to="/collection" class="msub__link">Voir la collection</NuxtLink></li>
                       <li class="msub__note">Éditions limitées ≤ 25, signées, numérotées &amp; certifiées</li>
                     </ul>
@@ -587,9 +598,14 @@ async function signOut() {
   left: 0;
   color: var(--brass);
 }
+.mega__ctas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-self: center;
+}
 .mega__cta {
   position: relative;
-  align-self: center;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;

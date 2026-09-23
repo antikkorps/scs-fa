@@ -20,6 +20,7 @@ const year = new Date().getFullYear()
         <NuxtLink to="/boutique">Armurerie</NuxtLink>
         <NuxtLink to="/armes-de-collection">Armes de collection</NuxtLink>
         <NuxtLink to="/collection">Gun Art</NuxtLink>
+        <NuxtLink to="/collection/artiste">L'artiste</NuxtLink>
         <NuxtLink to="/blog">Journal</NuxtLink>
       </nav>
 
