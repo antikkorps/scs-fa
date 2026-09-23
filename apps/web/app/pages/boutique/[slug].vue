@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductDetail, ProductVariant } from "~/types/product"
 import { availabilityLongLabel, availabilitySchemaUrl, availabilityState, isPurchasable } from "~/utils/availability"
-import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
+import { artworkImage, CARD_GEOMETRY, formatEuros, ogImageUrl } from "~/utils/format"
 import { conditionLabel, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
 
 const route = useRoute()
@@ -101,7 +101,7 @@ useSeoMeta({
   ogDescription: description,
   ogType: "website",
   ogUrl: pageUrl,
-  ogImage: image,
+  ogImage: () => ogImageUrl(product.value?.featuredImageUrl, siteUrl),
 })
 
 useHead({
@@ -160,11 +160,18 @@ useHead({
             :aria-label="`Agrandir l'image : ${product.name}`"
             @click="lightboxOpen = true"
           >
-            <img :src="image" :alt="product.name" :width="CARD_GEOMETRY.width" :height="CARD_GEOMETRY.height" decoding="async" />
+            <img
+              v-img-fallback="image.fallback"
+              :src="image.src"
+              :alt="product.name"
+              :width="CARD_GEOMETRY.width"
+              :height="CARD_GEOMETRY.height"
+              decoding="async"
+            />
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="image" :alt="product.name" />
+        <ImageLightbox v-model="lightboxOpen" :src="image.src" :fallback="image.fallback" :alt="product.name" />
 
         <div class="detail__info">
           <p v-if="product.category.name" class="eyebrow">{{ product.category.name }}</p>

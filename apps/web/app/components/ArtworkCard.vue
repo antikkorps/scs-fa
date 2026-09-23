@@ -21,7 +21,8 @@ const img = computed(() =>
     <NuxtLink :to="`/collection/${artwork.slug}`" class="card__link">
       <div class="card__media">
         <ProtectedImage
-          :src="img"
+          v-img-fallback="img.fallback"
+          :src="img.src"
           :alt="`${artwork.title}${artwork.artistName ? ` — ${artwork.artistName}` : ''}`"
           :width="CARD_GEOMETRY.width"
           :height="CARD_GEOMETRY.height"

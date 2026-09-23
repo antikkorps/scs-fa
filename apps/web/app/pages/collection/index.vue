@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtworkListItem, ArtworkSeriesListItem, ArtworkThemeListItem } from "~/types/artwork"
-import { artworkImage } from "~/utils/format"
+import { ogImageUrl } from "~/utils/format"
 
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
@@ -34,8 +34,7 @@ useSeoMeta({
   ogTitle: "La collection Gun Art — SCS Firearm",
   ogDescription: description,
   ogUrl: pageUrl,
-  ogImage: () =>
-    artworks.value[0] ? artworkImage(artworks.value[0].featuredImageUrl, artworks.value[0].slug) : undefined,
+  ogImage: () => ogImageUrl(artworks.value[0]?.featuredImageUrl, siteUrl),
 })
 
 useHead({

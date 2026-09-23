@@ -1,13 +1,30 @@
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  type GetObjectCommandOutput,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { env } from "../env.js"
 import {
   DEFAULT_GET_URL_TTL_SECONDS,
   type GetUrlOptions,
+  ObjectNotFoundError,
   type PutObjectParams,
   type StorageService,
   type StoredObject,
 } from "./types.js"
+
+/**
+ * Does this SDK error mean "no such object", as opposed to any other failure?
+ * S3-compatible providers disagree on the name (`NoSuchKey` on AWS, `NotFound`
+ * on a HEAD), so the HTTP status is the reliable signal.
+ */
+function isNoSuchKey(error: unknown): boolean {
+  const e = error as { name?: string; $metadata?: { httpStatusCode?: number } }
+  return e?.name === "NoSuchKey" || e?.name === "NotFound" || e?.$metadata?.httpStatusCode === 404
+}
 
 // S3-compatible driver. Works against AWS S3, Scaleway Object Storage, MinIO,
 // etc. — the provider is selected purely through env (endpoint, region,
@@ -58,8 +75,17 @@ export class S3StorageService implements StorageService {
   }
 
   async getBytes(key: string): Promise<Buffer> {
-    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }))
-    if (!response.Body) throw new Error(`Object not found: ${key}`)
+    let response: GetObjectCommandOutput
+    try {
+      response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }))
+    } catch (error) {
+      // Only a real miss becomes ObjectNotFoundError. A 403 (wrong or expired
+      // credentials) and a network failure stay what they are, so the caller can
+      // answer "temporarily unavailable" instead of "gone forever".
+      if (isNoSuchKey(error)) throw new ObjectNotFoundError(key)
+      throw error
+    }
+    if (!response.Body) throw new ObjectNotFoundError(key)
     const bytes = await response.Body.transformToByteArray()
     return Buffer.from(bytes)
   }

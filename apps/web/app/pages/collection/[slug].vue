@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtworkDetail } from "~/types/artwork"
-import { artworkGeometry, artworkImage, availabilityLabel, formatEuros } from "~/utils/format"
+import { artworkGeometry, artworkImage, availabilityLabel, formatEuros, ogImageUrl } from "~/utils/format"
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -42,7 +42,7 @@ useSeoMeta({
   ogDescription: description,
   ogType: "article",
   ogUrl: pageUrl,
-  ogImage: hero,
+  ogImage: () => ogImageUrl(art.value?.featuredImageUrl, siteUrl),
 })
 
 useHead({
@@ -112,7 +112,8 @@ useHead({
         <figure class="detail__media" :style="{ aspectRatio: heroGeometry.ratio }">
           <button type="button" class="detail__zoom" :aria-label="`Agrandir l'image : ${art.title}`" @click="lightboxOpen = true">
             <ProtectedImage
-              :src="hero"
+              v-img-fallback="hero.fallback"
+              :src="hero.src"
               :alt="heroAlt"
               :width="heroGeometry.width"
               :height="heroGeometry.height"
@@ -122,7 +123,7 @@ useHead({
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="hero" :alt="heroAlt" protect />
+        <ImageLightbox v-model="lightboxOpen" :src="hero.src" :fallback="hero.fallback" :alt="heroAlt" protect />
 
         <div class="detail__info">
           <NuxtLink v-if="artist" :to="`/collection/artiste/${artist.slug}`" class="eyebrow eyebrow--link">

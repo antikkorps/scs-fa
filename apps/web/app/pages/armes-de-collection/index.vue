@@ -51,6 +51,14 @@ const { data, error, pending } = await useFetch<AncientWeaponListResponse>(`${ap
 })
 
 const weapons = computed(() => data.value?.data ?? [])
+// Resolved once per weapon: the template needs both the src and its placeholder,
+// and rebuilding the placeholder SVG twice per card would be wasted work.
+const cards = computed(() =>
+  weapons.value.map((w) => ({
+    w,
+    img: artworkImage(w.featuredImageUrl, w.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height),
+  })),
+)
 const pagination = computed(() => data.value?.pagination)
 const isEmpty = computed(() => !pending.value && !error.value && weapons.value.length === 0)
 
@@ -159,11 +167,12 @@ useHead({
         </p>
 
         <ul class="grid" role="list">
-          <li v-for="(w, i) in weapons" :key="w.id">
+          <li v-for="({ w, img }, i) in cards" :key="w.id">
             <NuxtLink :to="`/boutique/${w.slug}`" class="card" :class="{ 'card--sold': !w.available }">
               <div class="card__media">
                 <img
-                  :src="artworkImage(w.featuredImageUrl, w.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height)"
+                  v-img-fallback="img.fallback"
+                  :src="img.src"
                   :alt="w.name"
                   :width="CARD_GEOMETRY.width"
                   :height="CARD_GEOMETRY.height"

@@ -16,7 +16,9 @@ import { artworkImage, formatEuros } from "~/utils/format"
 const props = defineProps<{ items: ProductCrossSellItem[]; weaponName: string }>()
 
 const THUMB = { width: 320, height: 240 }
-const image = (item: ProductCrossSellItem) => artworkImage(item.featuredImageUrl, item.slug, THUMB.width, THUMB.height)
+const thumbs = computed(() =>
+  props.items.map((item) => ({ item, img: artworkImage(item.featuredImageUrl, item.slug, THUMB.width, THUMB.height) })),
+)
 const hasItems = computed(() => props.items.length > 0)
 </script>
 
@@ -26,10 +28,11 @@ const hasItems = computed(() => props.items.length > 0)
     <p class="xsell__intro">Les accessoires que nous recommandons avec {{ weaponName }}.</p>
 
     <ul class="xsell__list">
-      <li v-for="item in items" :key="item.id" class="xsell__item">
+      <li v-for="{ item, img } in thumbs" :key="item.id" class="xsell__item">
         <NuxtLink :to="`/boutique/${item.slug}`" class="xsell__link">
           <img
-            :src="image(item)"
+            v-img-fallback="img.fallback"
+            :src="img.src"
             :alt="item.name"
             :width="THUMB.width"
             :height="THUMB.height"

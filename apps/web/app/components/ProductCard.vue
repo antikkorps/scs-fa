@@ -25,7 +25,8 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
     <NuxtLink :to="`/boutique/${product.slug}`" class="card__link">
       <div class="card__media">
         <img
-          :src="img"
+          v-img-fallback="img.fallback"
+          :src="img.src"
           :alt="product.name"
           :width="CARD_GEOMETRY.width"
           :height="CARD_GEOMETRY.height"

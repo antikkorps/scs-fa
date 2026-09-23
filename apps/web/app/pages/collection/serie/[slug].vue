@@ -33,7 +33,7 @@ useSeoMeta({
   ogUrl: pageUrl,
   ogImage: () =>
     series.value.coverImageUrl ??
-    (artworks.value[0] ? artworkImage(artworks.value[0].featuredImageUrl, artworks.value[0].slug) : undefined),
+    (artworks.value[0] ? artworkImage(artworks.value[0].featuredImageUrl, artworks.value[0].slug).src : undefined),
 })
 
 useHead({

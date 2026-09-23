@@ -13,6 +13,7 @@ import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { media } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { replyForStorageReadFailure } from "../storage/http.js"
 import { storage } from "../storage/index.js"
 import {
   deleteRenditions,
@@ -254,8 +255,8 @@ export const adminMediaRoutes: FastifyPluginAsync = async (fastify) => {
     let bytes: Buffer
     try {
       bytes = await storage.getBytes(originalKey(id))
-    } catch {
-      return reply.code(404).send({ error: "NotFound", message: "No original stored for this media" })
+    } catch (error) {
+      return replyForStorageReadFailure(error, request, reply, originalKey(id), "No original stored for this media")
     }
 
     reply.header("content-type", "application/octet-stream")
@@ -280,8 +281,8 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify) => {
     let bytes: Buffer
     try {
       bytes = await storage.getBytes(`media/${id}/${rendition}`)
-    } catch {
-      return reply.code(404).send({ error: "NotFound", message: "Image not found" })
+    } catch (error) {
+      return replyForStorageReadFailure(error, request, reply, `media/${id}/${rendition}`, "Image not found")
     }
 
     reply.header("content-type", "image/webp")

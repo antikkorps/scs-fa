@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ArtworkListItem } from "~/types/artwork"
 import type { ProductListResponse } from "~/types/product"
-import { artworkImage } from "~/utils/format"
+import { artworkImage, ogImageUrl } from "~/utils/format"
 
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
@@ -34,7 +34,7 @@ useSeoMeta({
   ogTitle: "SCS Firearm — Armurerie de précision & Gun Art",
   ogDescription: description,
   ogUrl: siteUrl,
-  ogImage: heroImg,
+  ogImage: () => ogImageUrl(featured.value?.featuredImageUrl, siteUrl),
 })
 
 useHead({
@@ -65,7 +65,8 @@ useHead({
       <img
         v-if="heroImg"
         class="hero__bg"
-        :src="heroImg"
+        v-img-fallback="heroImg.fallback"
+        :src="heroImg.src"
         alt=""
         aria-hidden="true"
         width="1600"
