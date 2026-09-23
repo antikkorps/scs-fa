@@ -551,7 +551,7 @@
   - **Mobile** : **burger plein écran** (overlay pleine page) + **animation** d'ouverture/fermeture.
   - Le lien « Panier » + badge (ajouté en 10.4a) est temporaire en attendant cette refonte.
 
-**Story 10.7** — Typographie & finitions visuelles — 🔜 **À FAIRE** _(audit du 2026-09-13)_
+**Story 10.7** — Typographie & finitions visuelles ✅ _(audit du 2026-09-13, livrée le 2026-09-23)_
 
 > Demande de Franck (2026-09-13) : améliorer le visuel du site, **notamment les typos**. Audit mesuré sur le **rendu réel** (Playwright, 7 pages publiques en desktop 1440 px + mobile 390 px, styles calculés) et sur l'inventaire du CSS — pas sur une impression.
 
@@ -567,16 +567,28 @@
 - Ce qui va bien : les 6 graisses chargées sont exactement celles utilisées (pas de gras synthétique) ; `body` en 16 px / 1,6 ; hiérarchie des grands titres (h1 88 → 51 px) cohérente.
 - Vu en passant (hors typo) : **visuels d'œuvres cassés** sur les captures dev (texte alternatif affiché à la place de l'image, `/collection` et fiche œuvre). Le dev est en `STORAGE_DRIVER=s3` (pas `memory`) : stockage local injoignable ou vrai bug — **à diagnostiquer**.
 
-**⚠️ Décisions à trancher avec Franck avant de coder** (direction artistique, registre « classe / luxe » de la Phase 11) :
+**Décisions tranchées avec Franck (2026-09-23) :**
 
-- **Couple de polices** : garder Cormorant Garamond + Inter, ou remplacer le serif par une display plus robuste aux petites tailles ? (Si on garde Cormorant : **jamais sous ~20 px**.)
-- **Échelle** : 7 à 8 paliers fluides en tokens (`--fs-xs` … `--fs-display`) + interlignages et interlettrages associés ; **plancher de lisibilité** proposé : 12 px absolu, 14 px pour tout texte courant.
-- **Majuscules espacées** : les réserver aux sur-titres (et réduire l'interlettrage), ou les garder comme signature sur boutons et navigation ?
-- **Chiffres** : tous les montants, quantités et références en **Inter, chiffres alignés et tabulaires** ; Cormorant réservé aux titres ?
-- **Auto-hébergement** : `@nuxt/fonts` (nouvelle dépendance → politique de versions) ou fichiers `woff2` versionnés dans le dépôt ?
-- **Périmètre** : site public seul, ou back-office aussi (même dette : 20 `font-size` en dur sur la seule page virements) ?
+- **Couple de polices** : **Fraunces remplace Cormorant Garamond**, Inter reste le corps. Même registre « galerie », mais une hauteur d'x qui tient jusqu'à 14 px — Cormorant servait les titres de section de `/collection` à 11,5 px, le pire cas de l'audit.
+- **Échelle** : 9 paliers fluides en tokens (`--fs-xs` … `--fs-display`), plancher **12 px absolu** et **14 px pour tout texte courant**. `--fs-xs` (12 px) est réservé aux micro-libellés en capitales.
+- **Majuscules espacées** : gardées pour les **sur-titres seulement**, interlettrage ramené de 0,32em à 0,12em. Boutons, navigation, fil d'Ariane et titres de section les perdent.
+- **Chiffres** : tout en Inter, **alignés et tabulaires**. La règle est posée **une fois sur `body`** plutôt que recopiée sur chaque prix — c'est ce qui empêche la dette de revenir, et un composant neuf en hérite. Le texte suivi (articles, contenu riche) repasse en chasse proportionnelle.
+- **Auto-hébergement** : `@nuxt/fonts` épinglé en **0.14.0** (publié le 2026-02-14, donc hors quarantaine 90 jours).
+- **Périmètre** : site public **et** back-office, avec une exigence ajoutée par Franck — que la charte reste **simple à faire évoluer**.
 
-- **Done** : tokens typographiques dans `main.css` et plus aucune taille en dur hors échelle ; polices auto-hébergées ; captures **avant / après** desktop + mobile des pages clés (accueil, boutique, fiche produit, collection, fiche œuvre, compte, RIB) ; Lighthouse accessibilité et performance sans régression.
+**Livré :**
+
+- [x] **`app/assets/css/tokens.css` : la charte en un seul fichier** (couleurs, échelle, graisses, rythme, mise en page). C'est la réponse à l'exigence « facile à faire évoluer » : changer l'identité = changer ce fichier. **455 tailles, 90 interlettrages, 50 interlignages et 62 graisses** répartis dans 66 fichiers ont été ramenés sur les tokens ; il ne reste aucune valeur typographique en dur ailleurs (2 `letter-spacing: normal` délibérés exceptés)
+- [x] **Polices auto-hébergées** : une seule woff2 **variable** par famille (83 Ko au total) servie depuis notre domaine, `font-display: swap`, **préchargement des 2 fichiers critiques** (`defaults.preload`), et polices de repli métriquement compatibles générées par le module
+- [x] ⚠️ **RGPD** : Google Fonts transmettait l'IP de chaque visiteur à un tiers et bloquait le premier affichage avec une feuille de style externe. Les deux origines sont **retirées du CSP** (`style-src`, `font-src`), et **un test les verrouille** — les réautoriser rouvrirait silencieusement l'exposition
+- [x] **Chiffres corrigés là où ça comptait** : référence de virement du RIB (un code que le client recopie dans sa banque), totaux de l'espace compte, prix de fiche produit, numéros de tirage, valeurs des tableaux de bord admin. Le prix de la fiche œuvre n'a plus deux traitements
+- [x] **Captures avant / après** desktop 1440 px + mobile 390 px sur 10 pages (accueil, boutique, fiche produit, collection, fiche œuvre, armes de collection, panier, compte, commandes, admin virements) — 40 images
+- [x] **Mesuré sur le rendu réel, même lentille que l'audit** : **157 → 0** éléments sous 12 px ; **18/16/16/13 → 8/7/7/7** tailles distinctes par page ; **181 → 121** éléments en capitales (le reste : sur-titres, badges et libellés de tableau, conformes à la décision)
+- [x] **Lighthouse sans régression** : accessibilité **100 → 100**, SEO 100 → 100, bonnes pratiques inchangées, performance +1 sur 3 pages. **CLS 0,042 → 0,000 sur `/collection`**
+- [x] ⚠️ **Régression trouvée à la mesure, pas au code** : sans préchargement, le titre de l'accueil se re-répartissait au remplacement de la police (`size-adjust: 100 %` sur le repli générique) — **0,036 de CLS, reproductible**. Corrigé par `defaults.preload`, ramené à 0,000
+- [x] ⚠️ **Deux défauts vus à la capture, pas au code** : « Armes de collection » passait sur deux lignes dans la barre latérale admin (navigation dense redescendue à 14 px) ; « Contrôle légal requis » faisait une troisième série de capitales dans la même carte produit (repassé en casse normale — c'est une phrase, pas un libellé)
+- [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 508 / shared 153 / web 233 = 894** au vert (+1 : verrou CSP)
+- Reste ouvert, hors périmètre : **visuels d'œuvres cassés en dev** (texte alternatif à la place de l'image sur `/collection` et la fiche œuvre) — confirmé sur les captures, le dev est en `STORAGE_DRIVER=s3`. Ce n'est pas un sujet typographique : à diagnostiquer à part
 
 ---
 

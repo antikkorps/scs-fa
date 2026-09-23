@@ -17,7 +17,17 @@ export default defineNuxtConfig({
   // with `font-display: swap` and preloading of the critical files. No
   // outbound request is left at runtime.
   fonts: {
-    defaults: { subsets: ["latin"], styles: ["normal"] },
+    defaults: {
+      subsets: ["latin"],
+      styles: ["normal"],
+      // Preload both files. The generated fallback faces are built on the
+      // generic `serif`/`sans-serif`, which carry no measurable metrics, so
+      // they ship `size-adjust: 100%`: on a slow connection the swap re-wrapped
+      // the home page headline and cost 0.036 of CLS (measured, reproducible).
+      // Preloading makes the real faces available at first paint, so there is
+      // no swap to shift anything.
+      preload: true,
+    },
     families: [
       // Fraunces replaces Cormorant Garamond: same "gallery" register, but an
       // x-height that holds down to 14px (cf. tokens.css § 2.1).

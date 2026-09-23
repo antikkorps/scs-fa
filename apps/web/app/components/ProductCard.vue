@@ -106,9 +106,11 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
   color: var(--brass);
 }
 .card__legalnote {
-  font-size: var(--fs-xs);
-  letter-spacing: var(--ls-wide);
-  text-transform: uppercase;
+  /* A statement, not a label: it sits under an uppercase eyebrow and next to
+     an uppercase badge, and a third run of capitals in the same card is what
+     the audit called tiring. Sentence case keeps it readable. */
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-faint);
   margin: 0 0 0.6rem;
 }

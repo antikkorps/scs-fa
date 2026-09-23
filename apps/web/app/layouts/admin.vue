@@ -125,7 +125,10 @@ async function signOut() {
   padding: 0.7rem 0.8rem;
   border-radius: var(--radius);
   color: var(--paper-dim);
-  font-size: var(--fs-base);
+  /* A dense tool sidebar, not running text: --fs-sm keeps every entry on one
+     line at the fixed rail width ("Armes de collection" wrapped at --fs-base)
+     while staying on the 14px floor. */
+  font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   transition:
     background 0.2s var(--ease),
