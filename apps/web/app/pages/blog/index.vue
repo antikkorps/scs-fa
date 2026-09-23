@@ -87,11 +87,11 @@ useHead({
   max-width: 760px;
 }
 .intro__title {
-  font-size: clamp(2.6rem, 8vw, 4.5rem);
+  font-size: var(--fs-3xl);
   margin: 0.6rem 0 1rem;
 }
 .intro__lede {
-  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  font-size: var(--fs-md);
   color: var(--paper-dim);
   max-width: 56ch;
   margin: 0;

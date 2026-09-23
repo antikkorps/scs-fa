@@ -151,11 +151,11 @@ async function submit() {
 }
 .nl__title {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: var(--fs-md);
   margin: 0 0 0.35rem;
 }
 .nl__desc {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   opacity: 0.75;
   margin: 0 0 0.9rem;
   max-width: 52ch;
@@ -169,8 +169,8 @@ async function submit() {
   gap: 0.4rem;
 }
 .nl__legend {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   opacity: 0.7;
   padding: 0 0 0.35rem;
@@ -180,8 +180,8 @@ async function submit() {
   display: flex;
   align-items: flex-start;
   gap: 0.55rem;
-  font-size: 0.85rem;
-  line-height: 1.45;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
   cursor: pointer;
 }
 .nl__seg input,
@@ -196,8 +196,8 @@ async function submit() {
 }
 .nl__label {
   display: block;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   opacity: 0.7;
   margin-bottom: 0.3rem;
@@ -213,7 +213,7 @@ async function submit() {
 }
 .nl__consent {
   margin: 0.7rem 0 0.4rem;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   opacity: 0.85;
 }
 .nl__submit {
@@ -224,7 +224,7 @@ async function submit() {
   background: var(--brass);
   color: var(--ink, #0e0e10);
   font: inherit;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   cursor: pointer;
 }
 .nl__submit:disabled {
@@ -233,13 +233,13 @@ async function submit() {
 }
 .nl__done {
   margin: 0;
-  font-size: 0.88rem;
-  line-height: 1.5;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
 }
 /* Errors carry their own words, never colour alone. */
 .nl__err {
   color: #ff8a7a;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   margin: 0.25rem 0 0;
 }
 </style>

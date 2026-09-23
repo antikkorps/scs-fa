@@ -138,9 +138,8 @@ useHead({
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-faint);
   margin-bottom: clamp(1.2rem, 4vw, 2rem);
 }
@@ -169,17 +168,17 @@ useHead({
   filter: grayscale(100%);
 }
 .hero__name {
-  font-size: clamp(2.4rem, 7vw, 4rem);
+  font-size: var(--fs-3xl);
   margin: 0.6rem 0 0.6rem;
 }
 .hero__headline {
-  font-size: clamp(1rem, 2.4vw, 1.2rem);
+  font-size: var(--fs-md);
   color: var(--brass);
   margin: 0 0 1.2rem;
 }
 .hero__bio {
   color: var(--paper-dim);
-  line-height: 1.75;
+  line-height: var(--lh-relaxed);
   max-width: 62ch;
   margin: 0 0 1.6rem;
 }
@@ -191,15 +190,14 @@ useHead({
   max-width: 70ch;
 }
 .section__h {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  font-size: var(--fs-lg);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
   margin: 0 0 1rem;
 }
 .journey__text {
   color: var(--paper-dim);
-  line-height: 1.75;
+  line-height: var(--lh-relaxed);
   margin: 0;
 }
 .block {

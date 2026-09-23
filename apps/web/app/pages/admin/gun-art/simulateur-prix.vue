@@ -268,21 +268,21 @@ const formatFactor = (value: number) => (Number.isFinite(value) ? factorFormatte
 }
 .eyebrow {
   margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
 }
 h1 {
   margin: 0.3rem 0 0;
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
 }
 .intro {
   max-width: 72ch;
   margin: 0 0 1.6rem;
   color: var(--paper-dim);
-  line-height: 1.7;
-  font-size: 0.92rem;
+  line-height: var(--lh-relaxed);
+  font-size: var(--fs-base);
 }
 .intro strong {
   color: var(--paper);
@@ -296,11 +296,10 @@ h1 {
 }
 .panel__title {
   margin: 0 0 1.1rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
-  font-weight: 600;
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
+  font-weight: var(--fw-semibold);
 }
 .fields {
   display: grid;
@@ -311,11 +310,11 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .field input {
   padding: 0.6rem 0.8rem;
@@ -324,10 +323,10 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   letter-spacing: normal;
   text-transform: none;
-  font-weight: 400;
+  font-weight: var(--fw-regular);
   width: 100%;
 }
 .field input:focus {
@@ -351,7 +350,7 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper-dim);
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition:
     color 0.2s,
@@ -369,9 +368,9 @@ h1 {
 }
 .note {
   margin: 1.1rem 0 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
 }
 .note strong {
   color: var(--paper-dim);
@@ -399,8 +398,8 @@ h1 {
 }
 .verdict__head {
   margin: 0;
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-base);
 }
 .verdict--ok .verdict__head {
   color: var(--brass);
@@ -411,8 +410,8 @@ h1 {
 .verdict__list {
   margin: 0.7rem 0 0;
   padding-left: 1.1rem;
-  line-height: 1.7;
-  font-size: 0.88rem;
+  line-height: var(--lh-relaxed);
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .verdict__list strong {
@@ -432,12 +431,12 @@ h1 {
   padding: 0.55rem 0.8rem;
   background: var(--ink);
   border-radius: var(--radius);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .band__name em {
   color: var(--paper-faint);
   font-style: normal;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 .band__range {
   font-variant-numeric: tabular-nums;
@@ -448,7 +447,7 @@ h1 {
   align-items: center;
   gap: 0.5rem;
   margin: 0 0 0.9rem;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .chip {
@@ -466,7 +465,7 @@ h1 {
 .grid {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .grid th,
 .grid td {
@@ -477,14 +476,14 @@ h1 {
 }
 .grid thead th {
   color: var(--paper-faint);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
   text-transform: uppercase;
 }
 .grid thead th,
 .grid tbody th {
   text-align: left;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   white-space: nowrap;
 }
 .grid tbody th {
@@ -493,14 +492,14 @@ h1 {
 .cell--bad {
   background: rgba(217, 138, 106, 0.14);
   color: var(--danger);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .cell__ht {
   display: block;
 }
 .cell__ttc {
   display: block;
-  font-size: 0.72rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .cell--bad .cell__ttc {

@@ -233,7 +233,7 @@ function num(v: unknown): number | null {
 .back {
   display: inline-block;
   color: var(--paper-dim);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin-bottom: 1.2rem;
 }
 .back:hover {
@@ -248,12 +248,12 @@ function num(v: unknown): number | null {
   margin-bottom: 1.8rem;
 }
 .head h1 {
-  font-size: clamp(1.7rem, 5vw, 2.4rem);
+  font-size: var(--fs-2xl);
   margin: 0.2rem 0;
 }
 .sub {
   color: var(--paper-faint);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0;
 }
 .tags {
@@ -273,7 +273,7 @@ function num(v: unknown): number | null {
   padding: 1.3rem 1.4rem;
 }
 .panel__title {
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   margin-bottom: 1rem;
 }
 .lines {
@@ -287,11 +287,11 @@ function num(v: unknown): number | null {
 }
 .line-name {
   display: block;
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 .line-sku {
   display: block;
-  font-size: 0.74rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .num {
@@ -308,7 +308,7 @@ function num(v: unknown): number | null {
 }
 .totals dt {
   color: var(--paper-dim);
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .totals dd {
   margin: 0;
@@ -317,36 +317,35 @@ function num(v: unknown): number | null {
   border-top: 1px solid var(--ink-line);
   margin-top: 0.4rem;
   padding-top: 0.6rem;
-  font-weight: 600;
-  font-size: 1.05rem;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-md);
 }
 .kv {
   display: flex;
   gap: 0.6rem;
   margin: 0.35rem 0;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .kv span {
   color: var(--paper-faint);
   min-width: 84px;
 }
 .sub-h {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
   margin: 1.2rem 0 0.6rem;
 }
 .addr {
   font-style: normal;
-  font-size: 0.9rem;
-  line-height: 1.7;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
   color: var(--paper-dim);
 }
 .reject {
   margin-top: 1rem;
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .bucket {
   display: flex;
@@ -360,12 +359,12 @@ function num(v: unknown): number | null {
 }
 .bucket__label {
   min-width: 70px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .bucket__amt {
   flex: 1;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .state {
   color: var(--paper-dim);
@@ -402,7 +401,7 @@ function num(v: unknown): number | null {
   box-shadow: var(--shadow);
 }
 .modal__title {
-  font-size: 1.4rem;
+  font-size: var(--fs-lg);
   margin-bottom: 1.2rem;
 }
 .field {
@@ -411,8 +410,8 @@ function num(v: unknown): number | null {
 }
 .field span {
   display: block;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
   margin-bottom: 0.4rem;
@@ -425,7 +424,7 @@ function num(v: unknown): number | null {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .ctl:focus {
   outline: none;
@@ -433,7 +432,7 @@ function num(v: unknown): number | null {
 }
 .modal__error {
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0 0 1rem;
 }
 .modal__actions {

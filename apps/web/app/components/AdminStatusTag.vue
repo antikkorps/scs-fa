@@ -12,9 +12,9 @@ defineProps<{ label: string; severity: Severity }>()
 .tag {
   display: inline-flex;
   align-items: center;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide);
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
   border: 1px solid var(--ink-line);

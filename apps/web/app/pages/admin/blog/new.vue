@@ -38,7 +38,7 @@ async function submit() {
   margin-bottom: 1.6rem;
 }
 .head h1 {
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
   margin-top: 0.3rem;
 }
 </style>

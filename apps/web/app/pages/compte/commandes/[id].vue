@@ -314,7 +314,7 @@ function toggleUpload(docType: string) {
   padding: 1.5rem 0 4rem;
 }
 .crumbs {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
   display: flex;
   flex-wrap: wrap;
@@ -330,7 +330,7 @@ function toggleUpload(docType: string) {
   margin-bottom: 1.5rem;
 }
 .order__title {
-  font-size: clamp(1.6rem, 4.5vw, 2.2rem);
+  font-size: var(--fs-xl);
   margin: 0 0 0.4rem;
 }
 .order__ref {
@@ -346,8 +346,8 @@ function toggleUpload(docType: string) {
   margin-bottom: 1.25rem;
 }
 .status__label {
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
   margin: 0 0 0.25rem;
@@ -368,7 +368,7 @@ function toggleUpload(docType: string) {
 .cta-pay {
   margin: 0 0 1.5rem;
   padding: 0.9rem 1.1rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   background: var(--ink-soft);
   border: 1px solid var(--ink-line);
@@ -382,18 +382,18 @@ function toggleUpload(docType: string) {
   background: var(--ink-soft);
 }
 .block__h {
-  font-size: 1.15rem;
+  font-size: var(--fs-md);
   margin: 0 0 0.75rem;
 }
 .block__lede {
   margin: 0 0 1.1rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper-dim);
 }
 .banner {
   margin: 0 0 1.1rem;
   padding: 0.7rem 0.9rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   border-radius: var(--radius);
 }
 .banner--neg {
@@ -425,16 +425,16 @@ function toggleUpload(docType: string) {
 }
 .doc__name {
   margin: 0 0 0.25rem;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--paper);
 }
 .doc__status {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .doc__meta {
   margin: 0.25rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .doc__actions {
@@ -443,7 +443,7 @@ function toggleUpload(docType: string) {
 .btn-sm {
   height: 38px;
   padding: 0 0.9rem;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 .parcels {
   list-style: none;
@@ -467,23 +467,23 @@ function toggleUpload(docType: string) {
 }
 .parcel__name {
   margin: 0 0 0.25rem;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--paper);
 }
 .parcel__status {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .parcel__tracking {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-style: italic;
   color: var(--p-text-muted-color);
 }
 
 .parcel__meta {
   margin: 0.25rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .parcel__items {
@@ -493,7 +493,7 @@ function toggleUpload(docType: string) {
   border-top: 1px solid var(--ink-line);
   display: grid;
   gap: 0.3rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .sr-only {
@@ -515,7 +515,7 @@ function toggleUpload(docType: string) {
   display: flex;
   align-items: baseline;
   gap: 0.75rem;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
 }
 .item__name {
   flex: 1;
@@ -537,7 +537,7 @@ function toggleUpload(docType: string) {
 .totals > div {
   display: flex;
   justify-content: space-between;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper-dim);
 }
 .totals dt,
@@ -548,8 +548,8 @@ function toggleUpload(docType: string) {
   color: var(--brass);
 }
 .totals__ttc {
-  font-size: 1.05rem;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
   color: var(--paper);
 }
 .addr-grid {
@@ -558,16 +558,15 @@ function toggleUpload(docType: string) {
   gap: 1.5rem;
 }
 .addr__title {
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-display);
   color: var(--brass);
   margin: 0 0 0.5rem;
 }
 .addr__body {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
   color: var(--paper);
 }
 @media (max-width: 560px) {

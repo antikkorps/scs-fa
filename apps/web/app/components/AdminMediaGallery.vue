@@ -229,16 +229,15 @@ const kb = (bytes: number) => `${Math.round(bytes / 1024)} ko`
 }
 .gallery__title {
   margin: 0 0 1.1rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
 }
 .note {
   margin: 0 0 1rem;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
 }
 .note strong {
   color: var(--paper-dim);
@@ -250,7 +249,7 @@ const kb = (bytes: number) => `${Math.round(bytes / 1024)} ko`
   padding: 0.7rem 1rem;
   border-radius: var(--radius);
   margin: 0 0 1rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .drop {
   border: 1px dashed var(--ink-line);
@@ -266,7 +265,7 @@ const kb = (bytes: number) => `${Math.round(bytes / 1024)} ko`
 .drop__label {
   cursor: pointer;
   color: var(--paper-dim);
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .list {
   list-style: none;
@@ -299,8 +298,8 @@ const kb = (bytes: number) => `${Math.round(bytes / 1024)} ko`
   margin: 0 0 0.5rem;
 }
 .badge {
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
   text-transform: uppercase;
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
@@ -323,7 +322,7 @@ const kb = (bytes: number) => `${Math.round(bytes / 1024)} ko`
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   width: 100%;
 }
 .ctl:focus {
@@ -342,7 +341,7 @@ const kb = (bytes: number) => `${Math.round(bytes / 1024)} ko`
   border-radius: var(--radius);
   color: var(--paper-dim);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .icon:hover:not(:disabled) {
   border-color: var(--brass);

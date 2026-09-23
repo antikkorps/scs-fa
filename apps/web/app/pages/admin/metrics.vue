@@ -132,7 +132,7 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
   margin-bottom: 1.8rem;
 }
 .head h1 {
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
   margin-top: 0.3rem;
 }
 .presets {
@@ -145,7 +145,7 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
   color: var(--paper-dim);
   padding: 0.45rem 0.9rem;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition:
     color 0.2s,
@@ -175,18 +175,22 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
   border-left-color: var(--brass);
 }
 .kpi__value {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1.05;
+  /* An amount, an edition number or a transfer reference is read, compared
+     and copied out: Inter, with lining tabular figures. The display face
+     serves oldstyle figures, which are unusable here. */
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
 }
 .kpi__label {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
   margin-top: 0.3rem;
 }
 .kpi__hint {
-  font-size: 0.74rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .panel {
@@ -205,10 +209,10 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
   margin-bottom: 1.2rem;
 }
 .panel__title {
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
 }
 .panel__total {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .chart {
@@ -237,7 +241,7 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
   transition: height 0.4s var(--ease);
 }
 .bar__day {
-  font-size: 0.62rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .funnel {
@@ -254,11 +258,11 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
 }
 .funnel dt {
   color: var(--paper-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .funnel dd {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .funnel .ok {
   color: var(--brass);

@@ -211,7 +211,7 @@ const addressLine = (a: Address) =>
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
 }
 .checkout__title {
-  font-size: clamp(2.2rem, 6vw, 3.2rem);
+  font-size: var(--fs-2xl);
   margin: 0 0 clamp(1.5rem, 4vw, 2.5rem);
 }
 .state {
@@ -229,7 +229,7 @@ const addressLine = (a: Address) =>
   padding-bottom: 4rem;
 }
 .section__h {
-  font-size: 1.2rem;
+  font-size: var(--fs-lg);
   margin: 0 0 1rem;
 }
 .addr-list {
@@ -247,7 +247,7 @@ const addressLine = (a: Address) =>
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   color: var(--paper-dim);
 }
 .addr strong {
@@ -276,7 +276,7 @@ const addressLine = (a: Address) =>
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 .input:focus {
   outline: none;
@@ -290,19 +290,19 @@ const addressLine = (a: Address) =>
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper-dim);
   margin-top: 0.5rem;
 }
 .split-note {
   margin: 1.75rem 0 0;
   padding: 1rem 1.1rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
   background: var(--ink-soft);
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
-  line-height: 1.5;
+  line-height: var(--lh-normal);
 }
 .summary {
   background: var(--ink-soft);
@@ -332,8 +332,8 @@ const addressLine = (a: Address) =>
   border-top: 1px solid var(--ink-line);
   margin-top: 0.4rem;
   padding-top: 0.8rem !important;
-  font-size: 1.15rem;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
 }
 .summary__cta {
   width: 100%;
@@ -341,7 +341,7 @@ const addressLine = (a: Address) =>
 }
 .err {
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0.6rem 0 0;
 }
 

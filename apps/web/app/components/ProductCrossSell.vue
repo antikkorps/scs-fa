@@ -55,12 +55,12 @@ const hasItems = computed(() => props.items.length > 0)
 }
 .xsell__h {
   margin: 0 0 0.35rem;
-  font-size: clamp(1.15rem, 2.5vw, 1.5rem);
+  font-size: var(--fs-lg);
 }
 .xsell__intro {
   margin: 0 0 1.5rem;
   color: var(--paper-dim);
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
 }
 .xsell__list {
   list-style: none;
@@ -100,8 +100,8 @@ const hasItems = computed(() => props.items.length > 0)
   padding: 0 0.85rem 0.9rem;
 }
 .xsell__name {
-  font-weight: 600;
-  line-height: 1.3;
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-snug);
 }
 .xsell__price {
   color: var(--brass);

@@ -76,13 +76,13 @@ async function submit() {
   box-shadow: var(--shadow);
 }
 .card__title {
-  font-size: 2.2rem;
+  font-size: var(--fs-2xl);
   margin: 0.4rem 0 0.2rem;
 }
 .card__lede {
   color: var(--paper-dim);
   margin: 0 0 1.6rem;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 .field {
   display: block;
@@ -90,8 +90,8 @@ async function submit() {
 }
 .field span {
   display: block;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
   margin-bottom: 0.45rem;
@@ -104,7 +104,7 @@ async function submit() {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 .input:focus {
   outline: none;
@@ -112,7 +112,7 @@ async function submit() {
 }
 .error {
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0 0 1rem;
 }
 .submit {

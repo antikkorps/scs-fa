@@ -40,20 +40,20 @@ defineProps<{ series: Omit<ArtworkSeriesListItem, "artworkCount"> & { artworkCou
 }
 .card__theme {
   margin: 0;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
 }
 .card__title {
   margin: 0.4rem 0 0.6rem;
-  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  font-size: var(--fs-lg);
 }
 .card__intro {
   margin: 0 0 1rem;
   color: var(--paper-dim);
-  font-size: 0.92rem;
-  line-height: 1.65;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   line-clamp: 3;
@@ -65,7 +65,7 @@ defineProps<{ series: Omit<ArtworkSeriesListItem, "artworkCount"> & { artworkCou
   flex-wrap: wrap;
   gap: 0.4rem 1rem;
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 </style>

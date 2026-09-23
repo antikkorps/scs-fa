@@ -64,21 +64,21 @@ useSeoMeta({
 }
 .err__code {
   font-family: var(--font-display);
-  font-weight: 600;
-  line-height: 1;
-  font-size: clamp(6rem, 24vw, 12rem);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  font-size: var(--fs-display);
   color: var(--ink-line);
   margin: 0.4rem 0 0.6rem;
-  letter-spacing: 0.02em;
+  letter-spacing: var(--ls-normal);
   user-select: none;
 }
 .err__title {
-  font-size: clamp(2rem, 6vw, 3.25rem);
+  font-size: var(--fs-2xl);
   margin: 0 0 1.1rem;
 }
 .err__lead {
   color: var(--paper-dim);
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   margin: 0 auto 2.2rem;
   max-width: 46ch;
 }

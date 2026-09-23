@@ -213,7 +213,7 @@ function setStatus(s: typeof status.value) {
   margin-bottom: 1.2rem;
 }
 .head h1 {
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
   margin-top: 0.3rem;
 }
 .tabs {
@@ -228,7 +228,7 @@ function setStatus(s: typeof status.value) {
   color: var(--paper-dim);
   padding: 0.5rem 1rem;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition:
     color 0.2s,
@@ -246,16 +246,16 @@ function setStatus(s: typeof status.value) {
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   min-width: 680px;
 }
 .table th {
   text-align: left;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--ink-line);
   background: var(--ink-soft);
@@ -278,9 +278,9 @@ function setStatus(s: typeof status.value) {
   color: var(--paper-dim);
 }
 .scan {
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--ls-wide);
 }
 .scan--clean {
   color: var(--brass);
@@ -293,12 +293,12 @@ function setStatus(s: typeof status.value) {
 }
 .overdue {
   color: var(--danger);
-  font-weight: 600;
-  font-size: 0.8rem;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
 }
 .muted {
   color: var(--paper-faint);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 .pager {
   display: flex;
@@ -308,7 +308,7 @@ function setStatus(s: typeof status.value) {
   margin-top: 1.4rem;
 }
 .pager__info {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .state {
@@ -344,16 +344,16 @@ function setStatus(s: typeof status.value) {
   background: transparent;
   border: none;
   color: var(--paper-dim);
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   cursor: pointer;
 }
 .drawer__title {
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   margin: 0.3rem 0 0.2rem;
 }
 .drawer__email {
   color: var(--paper-dim);
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   margin: 0 0 1.4rem;
 }
 .meta {
@@ -368,7 +368,7 @@ function setStatus(s: typeof status.value) {
 }
 .meta dt {
   color: var(--paper-faint);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .meta dd {
   margin: 0;
@@ -390,8 +390,8 @@ function setStatus(s: typeof status.value) {
 }
 .field span {
   display: block;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
   margin-bottom: 0.4rem;
@@ -404,7 +404,7 @@ function setStatus(s: typeof status.value) {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .ctl:focus {
   outline: none;
@@ -421,12 +421,12 @@ function setStatus(s: typeof status.value) {
 }
 .error {
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 1rem 0 0;
 }
 .hint {
   color: var(--paper-faint);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   margin-top: 0.8rem;
 }
 </style>

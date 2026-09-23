@@ -98,7 +98,7 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
   padding: 1.1rem 0.15rem 0;
 }
 .card__title {
-  font-size: 1.3rem;
+  font-size: var(--fs-lg);
   margin: 0.5rem 0 0.35rem;
   transition: color 0.3s var(--ease);
 }
@@ -106,20 +106,20 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
   color: var(--brass);
 }
 .card__legalnote {
-  font-size: 0.74rem;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
   text-transform: uppercase;
   color: var(--paper-faint);
   margin: 0 0 0.6rem;
 }
 .card__price {
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   margin: 0;
 }
 .card__vat {
   color: var(--paper-faint);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-wide);
 }
 </style>

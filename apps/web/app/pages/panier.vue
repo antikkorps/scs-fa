@@ -145,7 +145,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
 }
 .cart__title {
-  font-size: clamp(2.2rem, 6vw, 3.2rem);
+  font-size: var(--fs-2xl);
   margin: 0 0 clamp(1.5rem, 4vw, 2.5rem);
 }
 .state {
@@ -177,16 +177,16 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
 }
 .line__name {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
 }
 .line__variant {
   margin: 0.2rem 0 0;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .line__unit {
   margin: 0.2rem 0 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .line__qty {
@@ -212,7 +212,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
 }
 .line__total {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   min-width: 5rem;
   text-align: right;
 }
@@ -221,7 +221,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
   border: none;
   color: var(--paper-faint);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .line__remove:hover {
   color: var(--danger);
@@ -235,8 +235,8 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
 }
 .summary__vip {
   margin: 0 0 1rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
 }
@@ -261,8 +261,8 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
   border-top: 1px solid var(--ink-line);
   margin-top: 0.4rem;
   padding-top: 0.8rem !important;
-  font-size: 1.15rem;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
 }
 .summary__cta {
   width: 100%;
@@ -271,7 +271,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
 .summary__continue {
   display: block;
   margin: 0.85rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
   text-align: center;
   text-decoration: underline;

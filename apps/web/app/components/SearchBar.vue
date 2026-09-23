@@ -76,7 +76,7 @@ function onSubmit() {
   width: 100%;
   height: 40px;
   padding: 0 0.85rem 0 2.3rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   background: var(--ink-soft);
   border: 1px solid var(--ink-line);
@@ -95,7 +95,7 @@ function onSubmit() {
 }
 .search--lg .search__input {
   height: 52px;
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   padding-left: 2.6rem;
 }
 .search--lg .search__icon {

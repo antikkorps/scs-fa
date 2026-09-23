@@ -87,7 +87,7 @@ onBeforeUnmount(() => {
   height: 44px;
   display: grid;
   place-items: center;
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--ink-line);

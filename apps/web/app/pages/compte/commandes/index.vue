@@ -98,7 +98,7 @@ async function goTo(p: number) {
   padding-bottom: 4rem;
 }
 .crumbs {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
   display: flex;
   gap: 0.5rem;
@@ -106,7 +106,7 @@ async function goTo(p: number) {
   margin-bottom: 0.75rem;
 }
 .orders__title {
-  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  font-size: var(--fs-2xl);
   margin: 0 0 1.75rem;
 }
 .link {
@@ -143,12 +143,12 @@ async function goTo(p: number) {
 }
 .card__ref {
   margin: 0 0 0.25rem;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--paper);
 }
 .card__meta {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .card__side {
@@ -156,7 +156,11 @@ async function goTo(p: number) {
 }
 .card__total {
   margin: 0 0 0.4rem;
-  font-family: var(--font-display);
+  /* An amount, an edition number or a transfer reference is read, compared
+     and copied out: Inter, with lining tabular figures. The display face
+     serves oldstyle figures, which are unusable here. */
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
   color: var(--brass);
 }
 .card__tags {
@@ -166,7 +170,7 @@ async function goTo(p: number) {
   justify-content: flex-end;
 }
 .tag {
-  font-size: 0.7rem;
+  font-size: var(--fs-sm);
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
   border: 1px solid var(--ink-line);
@@ -182,8 +186,8 @@ async function goTo(p: number) {
 }
 .card__chev {
   color: var(--brass);
-  font-size: 1.5rem;
-  line-height: 1;
+  font-size: var(--fs-xl);
+  line-height: var(--lh-tight);
 }
 .pager {
   display: flex;
@@ -193,7 +197,7 @@ async function goTo(p: number) {
   margin-top: 2rem;
 }
 .pager__pos {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 @media (max-width: 560px) {

@@ -1,0 +1,104 @@
+/* ==========================================================================
+   DESIGN TOKENS — the single source of truth for the brand.
+
+   The whole site (public AND back-office) is painted from this file. To change
+   the identity, change a value here — never inside a component.
+
+   The rule story 10.7 established: no font size, line height or letter
+   spacing is written literally outside this file. A component writing
+   `font-size: 0.85rem` recreates the debt this story paid off (59 distinct
+   sizes, 15 letter spacings, 11 line heights before the rework).
+
+   Contents:
+     1. Colour    — canvas, text, accent, states
+     2. Type      — families, scale, weights, rhythm, numerals
+     3. Layout    — widths, gutters, radii, shadow, easing
+   ========================================================================== */
+
+:root {
+  /* ----- 1. Colour --------------------------------------------------------
+     "Gallery" identity: dark canvas, paper text, brass accent. */
+
+  --ink: #0e0e10; /* canvas */
+  --ink-soft: #16161a; /* raised surfaces */
+  --ink-line: #26262c; /* hairlines */
+  --paper: #f5f2ea; /* primary text */
+  --paper-dim: #b6b2a8; /* secondary text */
+  --paper-faint: #837f76; /* tertiary text */
+  --brass: #c8a35b; /* accent */
+  --brass-deep: #a8843f;
+  --danger: #d98a6a;
+
+  /* ----- 2. Type ----------------------------------------------------------
+
+     2.1 Families.
+     `--font-display`: Fraunces, a variable serif with a generous x-height that
+     stays legible down to ~14px. It replaces Cormorant Garamond, whose very
+     thin strokes vanished below 20px. Headings only.
+     `--font-body`: Inter for everything else, **including every numeral**
+     (amounts, quantities, references) — see 2.5.
+     Both are self-hosted through @nuxt/fonts: no request to Google Fonts, so
+     no visitor IP handed to a third party (GDPR) and no render-blocking
+     external stylesheet on first paint. */
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* 2.2 Fluid scale, 9 steps.
+     Legibility floor (Franck's call): **12px absolute**, and **14px for any
+     running text**. `--fs-xs` is therefore the smallest step that exists, and
+     its use is restricted to uppercase micro-labels (eyebrows, badges,
+     pills) — never to a sentence.
+     Steps from --fs-lg up are fluid: they tighten on mobile without any page
+     having to write its own clamp(). */
+
+  --fs-xs: 0.75rem; /* 12px — uppercase micro-labels only */
+  --fs-sm: 0.875rem; /* 14px — floor for running text */
+  --fs-base: 1rem; /* 16px — body copy */
+  --fs-md: 1.125rem; /* 18px — lede, emphasised text */
+  --fs-lg: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem); /* 20 → 24px */
+  --fs-xl: clamp(1.5rem, 1.3rem + 1vw, 2rem); /* 24 → 32px */
+  --fs-2xl: clamp(2rem, 1.6rem + 2vw, 3rem); /* 32 → 48px */
+  --fs-3xl: clamp(2.5rem, 1.8rem + 3.5vw, 4.25rem); /* 40 → 68px */
+  --fs-display: clamp(3rem, 2rem + 5vw, 5.5rem); /* 48 → 88px */
+
+  /* 2.3 Weights — exactly the ones loaded, so none is ever synthesised. */
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* 2.4 Vertical rhythm and letter spacing.
+     `--ls-eyebrow` drops from 0.32em to 0.12em: spaced capitals stay the
+     signature of eyebrows, but stop being tiring. Buttons and navigation are
+     no longer uppercase at all (Franck's call). */
+
+  --lh-tight: 1.08; /* display headings */
+  --lh-snug: 1.25; /* mid-level headings */
+  --lh-normal: 1.5; /* labels, UI */
+  --lh-relaxed: 1.65; /* running paragraphs */
+
+  --ls-display: -0.01em; /* Fraunces tightens slightly at large sizes */
+  --ls-normal: 0.01em;
+  --ls-wide: 0.06em;
+  --ls-eyebrow: 0.12em; /* uppercase eyebrows */
+
+  /* 2.5 Numerals (Franck's call).
+     Fraunces, like any display face in this register, ships oldstyle figures
+     with varying heights: unreadable on a transfer reference the customer
+     copies into their bank, and jittery down a column of amounts. Anything
+     numeric therefore renders in Inter with lining, tabular figures — applied
+     site-wide on `body` in main.css, with `.nums` for isolated cases. */
+
+  --nums: lining-nums tabular-nums;
+
+  /* ----- 3. Layout -------------------------------------------------------- */
+
+  --maxw: 1240px;
+  --gutter: clamp(1.1rem, 4vw, 2.75rem);
+  --radius: 4px;
+
+  --shadow: 0 18px 50px -24px rgba(0, 0, 0, 0.75);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}

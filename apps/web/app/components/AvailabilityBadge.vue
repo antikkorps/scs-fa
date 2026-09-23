@@ -32,16 +32,16 @@ const text = computed(() => props.label ?? availabilityBadgeLabel(props.state))
   border: 1px solid transparent;
   border-radius: 2px;
   display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  line-height: 1.2;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
+  line-height: var(--lh-snug);
   padding: 0.35rem 0.65rem;
   text-transform: uppercase;
   white-space: nowrap;
 }
 .avail--sm {
-  font-size: 0.7rem;
+  font-size: var(--fs-sm);
   padding: 0.3rem 0.55rem;
 }
 

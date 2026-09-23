@@ -109,7 +109,7 @@ async function submit() {
 }
 .up__lede {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .up__file {
@@ -128,7 +128,7 @@ async function submit() {
 .up__file-name {
   flex: 1;
   padding: 0.7rem 0.9rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   border: 1px dashed var(--ink-line);
   border-radius: var(--radius);
@@ -149,7 +149,7 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .up__field em {
@@ -165,7 +165,7 @@ async function submit() {
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 .input:focus {
   outline: none;
@@ -173,7 +173,7 @@ async function submit() {
 }
 .err {
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0;
 }
 .btn-primary {

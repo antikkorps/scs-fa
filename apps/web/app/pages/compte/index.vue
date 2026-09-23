@@ -169,7 +169,7 @@ async function save() {
   margin-bottom: 1.75rem;
 }
 .account__title {
-  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  font-size: var(--fs-2xl);
   margin: 0.4rem 0 0.5rem;
 }
 .account__sub {
@@ -178,7 +178,7 @@ async function save() {
 }
 .vip {
   color: var(--brass);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .state {
   color: var(--paper-dim);
@@ -201,13 +201,13 @@ async function save() {
 }
 .quick__title {
   display: block;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--paper);
 }
 .quick__desc {
   display: block;
   margin-top: 0.2rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .quick__chev {
@@ -216,7 +216,7 @@ async function save() {
   top: 50%;
   transform: translateY(-50%);
   color: var(--brass);
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
 }
 .card {
   padding: 1.5rem;
@@ -228,7 +228,7 @@ async function save() {
   gap: 1rem;
 }
 .card__h {
-  font-size: 1.15rem;
+  font-size: var(--fs-md);
   margin: 0;
 }
 .grid2 {
@@ -240,8 +240,8 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-wide);
   color: var(--paper-faint);
 }
 .input {
@@ -253,7 +253,7 @@ async function save() {
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 .input:focus {
   outline: none;
@@ -261,12 +261,12 @@ async function save() {
 }
 .err {
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0;
 }
 .ok {
   color: var(--brass);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   margin: 0;
 }
 .actions {
@@ -276,7 +276,7 @@ async function save() {
   flex-wrap: wrap;
 }
 .since {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 @media (max-width: 560px) {

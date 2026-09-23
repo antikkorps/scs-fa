@@ -286,21 +286,21 @@ const editableFields = computed(() => props.fields.filter((f) => editing.value =
 }
 .eyebrow {
   margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
 }
 h1 {
   margin: 0.3rem 0 0;
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
 }
 .intro {
   max-width: 72ch;
   margin: 0 0 1.5rem;
   color: var(--paper-dim);
-  font-size: 0.9rem;
-  line-height: 1.7;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
 }
 .btn-add {
   padding: 0.55rem 1rem;
@@ -309,7 +309,7 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper-dim);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .btn-add:hover {
@@ -325,10 +325,9 @@ h1 {
 }
 .panel__title {
   margin: 0 0 1.1rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  font-size: var(--fs-md);
+  letter-spacing: var(--ls-display);
+  color: var(--paper);
 }
 .tablewrap {
   overflow-x: auto;
@@ -336,7 +335,7 @@ h1 {
 .grid {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .grid th,
 .grid td {
@@ -346,8 +345,8 @@ h1 {
 }
 .grid thead th {
   color: var(--paper-faint);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -368,7 +367,7 @@ h1 {
   border: 0;
   color: var(--paper-dim);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   padding: 0 0 0 0.8rem;
 }
@@ -385,7 +384,7 @@ h1 {
   padding: 0.7rem 1rem;
   border-radius: var(--radius);
   margin: 0 0 1.2rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .fields {
   display: grid;
@@ -398,14 +397,14 @@ h1 {
   gap: 0.4rem;
 }
 .field__label {
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .field__help {
-  font-size: 0.76rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .ctl {
@@ -415,7 +414,7 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   width: 100%;
 }
 .ctl:focus {
@@ -423,7 +422,7 @@ h1 {
   border-color: var(--brass);
 }
 .ctl--area {
-  line-height: 1.6;
+  line-height: var(--lh-relaxed);
   resize: vertical;
 }
 .check {

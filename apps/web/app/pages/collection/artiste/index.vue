@@ -49,7 +49,7 @@ useHead({ meta: [{ name: "robots", content: "noindex, follow" }] })
   padding-bottom: clamp(2.5rem, 7vw, 5rem);
 }
 .artists__title {
-  font-size: clamp(2.4rem, 7vw, 4rem);
+  font-size: var(--fs-3xl);
   margin: 0.6rem 0 2rem;
 }
 .list {
@@ -74,10 +74,10 @@ useHead({ meta: [{ name: "robots", content: "noindex, follow" }] })
   border-color: var(--brass);
 }
 .row__name {
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
 }
 .row__headline {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .state {

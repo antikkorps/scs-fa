@@ -161,7 +161,7 @@ watch(
   margin-bottom: 1.4rem;
 }
 .head h1 {
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
   margin-top: 0.3rem;
 }
 .filters {
@@ -177,7 +177,7 @@ watch(
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   min-width: 170px;
 }
 .ctl:focus {
@@ -192,16 +192,16 @@ watch(
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   min-width: 780px;
 }
 .table th {
   text-align: left;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--ink-line);
   background: var(--ink-soft);
@@ -225,14 +225,14 @@ watch(
   text-align: right;
 }
 .strong {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .email {
   display: block;
 }
 .name {
   display: block;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .pager {
@@ -244,7 +244,7 @@ watch(
   flex-wrap: wrap;
 }
 .pager__info {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .state {

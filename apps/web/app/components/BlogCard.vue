@@ -68,7 +68,7 @@ const img = computed(() =>
   padding: 1.1rem 0.15rem 0;
 }
 .card__title {
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   margin: 0.5rem 0 0.5rem;
   transition: color 0.3s var(--ease);
 }
@@ -77,7 +77,7 @@ const img = computed(() =>
 }
 .card__excerpt {
   color: var(--paper-dim);
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   margin: 0 0 0.7rem;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -86,7 +86,7 @@ const img = computed(() =>
   overflow: hidden;
 }
 .card__meta {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
   margin: 0;
 }

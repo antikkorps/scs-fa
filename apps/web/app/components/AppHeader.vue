@@ -432,17 +432,17 @@ async function signOut() {
   align-items: baseline;
   gap: 0.5rem;
   font-family: var(--font-display);
-  font-size: 1.5rem;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-xl);
+  letter-spacing: var(--ls-wide);
   flex-shrink: 0;
 }
 .brand__mark {
   color: var(--brass);
-  font-weight: 700;
+  font-weight: var(--fw-bold);
 }
 .brand__word {
   color: var(--paper);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 
 /* Center spine */
@@ -453,10 +453,9 @@ async function signOut() {
   margin: 0 auto;
 }
 .nav__link {
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-wide);
   color: var(--paper-dim);
   transition: color 0.3s var(--ease);
 }
@@ -538,16 +537,16 @@ async function signOut() {
 }
 .mega__label {
   margin: 0 0 0.6rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
 }
 .mega__link {
   padding: 0.4rem 0.5rem;
   margin: 0 -0.5rem;
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   color: var(--paper-dim);
   border-radius: var(--radius);
   transition:
@@ -564,8 +563,8 @@ async function signOut() {
 }
 .mega__lede {
   margin: 0 0 0.9rem;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
   color: var(--paper-dim);
 }
 .mega__points {
@@ -579,7 +578,7 @@ async function signOut() {
 .mega__points li {
   position: relative;
   padding-left: 1.1rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .mega__points li::before {
@@ -611,11 +610,11 @@ async function signOut() {
   align-items: center;
   gap: 0.4rem;
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
 }
 .mega__cta-sub {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .mega__cta-arrow {
@@ -676,8 +675,8 @@ async function signOut() {
   display: grid;
   place-items: center;
   padding: 0 4px;
-  font-size: 0.62rem;
-  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   color: #1a1407;
   background: var(--brass);
   border-radius: 999px;
@@ -704,16 +703,15 @@ async function signOut() {
 .menu__hello {
   padding: 0.5rem 0.7rem;
   margin: 0 0 0.25rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
   color: var(--brass);
   border-bottom: 1px solid var(--ink-line);
 }
 .menu__item {
   text-align: left;
   padding: 0.65rem 0.7rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   background: transparent;
   border: none;
@@ -758,7 +756,7 @@ async function signOut() {
   right: 0;
   width: 40px;
   height: 40px;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   color: var(--paper);
   background: transparent;
   border: 1px solid var(--ink-line);
@@ -835,14 +833,14 @@ async function signOut() {
   align-items: baseline;
   gap: 0.5rem;
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
 }
 .mobile__close {
   width: 44px;
   height: 44px;
   display: grid;
   place-items: center;
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
   color: var(--paper);
   background: transparent;
   border: 1px solid var(--ink-line);
@@ -872,9 +870,9 @@ async function signOut() {
   justify-content: space-between;
   width: 100%;
   padding: 1.15rem 0.25rem;
-  font-size: 1.25rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-normal);
   color: var(--paper);
   border-bottom: 1px solid var(--ink-line);
   transition: color 0.25s var(--ease);
@@ -886,8 +884,8 @@ async function signOut() {
 }
 .mlink__chev {
   color: var(--brass);
-  font-size: 1.4rem;
-  line-height: 1;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
   transition: transform 0.25s var(--ease);
 }
 /* Accordion toggle rows reuse .mlink but are <button>s → reset UA styles. */
@@ -924,7 +922,7 @@ async function signOut() {
 .msub__link {
   display: block;
   padding: 0.6rem 0.25rem 0.6rem 1rem;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   color: var(--paper-dim);
   transition: color 0.2s var(--ease);
 }
@@ -935,7 +933,7 @@ async function signOut() {
 }
 .msub__note {
   padding: 0.5rem 0.25rem 0.5rem 1rem;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 .mobile__foot {
@@ -950,9 +948,8 @@ async function signOut() {
   align-items: center;
   gap: 0.6rem;
   padding: 0.75rem 0.25rem;
-  font-size: 0.95rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: var(--fs-base);
+  letter-spacing: var(--ls-normal);
   color: var(--paper-dim);
   background: transparent;
   border: none;
@@ -972,7 +969,7 @@ async function signOut() {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  font-size: 0.68rem;
+  font-size: var(--fs-sm);
   color: #1a1407;
   background: var(--brass);
   border-radius: 999px;

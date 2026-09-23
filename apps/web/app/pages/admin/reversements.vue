@@ -144,21 +144,21 @@ const totalDue = computed(() => payouts.value.filter((p) => p.status === "due").
 }
 .eyebrow {
   margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
 }
 h1 {
   margin: 0.3rem 0 0;
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
 }
 .btn-add {
   padding: 0.55rem 1rem;
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   color: var(--paper-dim);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   text-decoration: none;
 }
 .btn-add:hover {
@@ -169,8 +169,8 @@ h1 {
   max-width: 78ch;
   margin: 0 0 1.5rem;
   color: var(--paper-dim);
-  font-size: 0.9rem;
-  line-height: 1.7;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
 }
 .intro strong {
   color: var(--paper);
@@ -188,11 +188,11 @@ h1 {
   gap: 0.4rem;
 }
 .field__label {
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--paper-faint);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .ctl {
   padding: 0.5rem 0.7rem;
@@ -201,11 +201,11 @@ h1 {
   border-radius: var(--radius);
   color: var(--paper);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 .total {
   margin: 0 0 0.4rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
 .total strong {
@@ -224,7 +224,7 @@ h1 {
 .grid {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .grid th,
 .grid td {
@@ -234,8 +234,8 @@ h1 {
 }
 .grid thead th {
   color: var(--paper-faint);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -245,19 +245,19 @@ h1 {
 }
 .cell--strong {
   color: var(--paper);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .cell--dim {
   color: var(--paper-faint);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 .cell--actions {
   text-align: right;
   white-space: nowrap;
 }
 .badge {
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
   text-transform: uppercase;
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
@@ -281,7 +281,7 @@ h1 {
   border: 0;
   color: var(--paper-dim);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   padding: 0;
 }
@@ -295,7 +295,7 @@ h1 {
   padding: 0.7rem 1rem;
   border-radius: var(--radius);
   margin: 0 0 1.2rem;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 .state {
   color: var(--paper-dim);

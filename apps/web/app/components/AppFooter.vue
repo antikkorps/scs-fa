@@ -61,12 +61,12 @@ const year = new Date().getFullYear()
 }
 .brand {
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: var(--fs-lg);
   margin: 0 0 0.75rem;
 }
 .brand__mark {
   color: var(--brass);
-  font-weight: 700;
+  font-weight: var(--fw-bold);
 }
 .ft__tag {
   color: var(--paper-dim);
@@ -75,9 +75,9 @@ const year = new Date().getFullYear()
 }
 .ft__h {
   font-family: var(--font-body);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
   margin: 0 0 1rem;
@@ -103,7 +103,7 @@ const year = new Date().getFullYear()
   padding-block: 1.5rem;
   margin-top: 1.5rem;
   border-top: 1px solid var(--ink-line);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-faint);
 }
 

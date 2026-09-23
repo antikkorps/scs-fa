@@ -180,8 +180,8 @@ async function save() {
   border-left: 3px solid var(--ink-line);
   background: var(--ink);
   color: var(--paper-dim);
-  font-size: 0.85rem;
-  line-height: 1.5;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
 }
 .xs__note--off {
   border-left-color: var(--brass);
@@ -219,7 +219,7 @@ async function save() {
 .xs__price {
   color: var(--paper-dim);
   font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .xs__actions {
   display: flex;
@@ -244,7 +244,7 @@ async function save() {
 .xs__empty {
   margin: 0;
   color: var(--paper-faint);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .xs__add {
   display: grid;
@@ -259,11 +259,11 @@ async function save() {
 .xs__ok {
   margin: 0;
   color: var(--brass);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 .xs__err {
   margin: 0;
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 </style>

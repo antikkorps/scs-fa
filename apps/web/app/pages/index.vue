@@ -189,11 +189,11 @@ useHead({
   max-width: 760px;
 }
 .hero__title {
-  font-size: clamp(2.6rem, 9vw, 5.5rem);
+  font-size: var(--fs-display);
   margin: 0.75rem 0 1.25rem;
 }
 .hero__lede {
-  font-size: clamp(1.05rem, 2.6vw, 1.3rem);
+  font-size: var(--fs-lg);
   color: var(--paper-dim);
   max-width: 54ch;
   margin: 0 0 2rem;
@@ -227,12 +227,12 @@ useHead({
   transform: translateY(-3px);
 }
 .universe__title {
-  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-size: var(--fs-2xl);
   margin: 0.4rem 0 0.9rem;
 }
 .universe__text {
-  font-size: 1rem;
-  line-height: 1.65;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
   color: var(--paper-dim);
   margin: 0 0 1.5rem;
   max-width: 46ch;
@@ -249,7 +249,7 @@ useHead({
   margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
 }
 .selection__title {
-  font-size: clamp(2rem, 6vw, 3rem);
+  font-size: var(--fs-2xl);
   margin-top: 0.5rem;
 }
 .grid {
@@ -272,18 +272,18 @@ useHead({
   max-width: 760px;
 }
 .about__title {
-  font-size: clamp(2rem, 6vw, 3rem);
+  font-size: var(--fs-2xl);
   margin: 0.5rem 0 1.25rem;
 }
 .about__text {
-  font-size: clamp(1rem, 2.4vw, 1.12rem);
+  font-size: var(--fs-md);
   color: var(--paper-dim);
-  line-height: 1.7;
+  line-height: var(--lh-relaxed);
   margin: 0 0 1rem;
 }
 .about__text strong {
   color: var(--paper);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .about__link {
   color: var(--brass);
