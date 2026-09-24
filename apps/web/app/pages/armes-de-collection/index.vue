@@ -6,7 +6,6 @@ import { conditionLabel, legalCategoryLabel } from "~/utils/product"
 const PAGE_SIZE = 24
 
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
 const route = useRoute()
@@ -45,7 +44,7 @@ const apiQuery = computed(() => {
   return query
 })
 
-const { data, error, pending } = await useFetch<AncientWeaponListResponse>(`${apiBase}/ancient-weapons`, {
+const { data, error, pending } = await useApiFetch<AncientWeaponListResponse>(`/ancient-weapons`, {
   key: "ancient-weapons",
   query: apiQuery,
 })

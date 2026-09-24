@@ -6,10 +6,9 @@ import type { ArtistListItem } from "~/types/artwork"
 // redirects straight to their page, and only becomes a real index if a second
 // artist is ever published.
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
-const { data } = await useFetch<{ data: ArtistListItem[] }>(`${apiBase}/artists`, { key: "artists" })
+const { data } = await useApiFetch<{ data: ArtistListItem[] }>(`/artists`, { key: "artists" })
 const artists = computed(() => data.value?.data ?? [])
 
 const only = computed(() => (artists.value.length === 1 ? artists.value[0] : null))

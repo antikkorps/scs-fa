@@ -4,15 +4,14 @@ import type { ProductListResponse } from "~/types/product"
 import { artworkImage, ogImageUrl } from "~/utils/format"
 
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
 // Both universes feed the unified home: artworks (Gun Art gallery) and the
 // featured-first armurerie catalogue.
-const { data: artworkData } = await useFetch<{ data: ArtworkListItem[] }>(`${apiBase}/artworks`, {
+const { data: artworkData } = await useApiFetch<{ data: ArtworkListItem[] }>(`/artworks`, {
   key: "home-artworks",
 })
-const { data: productData } = await useFetch<ProductListResponse>(`${apiBase}/products`, {
+const { data: productData } = await useApiFetch<ProductListResponse>(`/products`, {
   key: "home-products",
   query: { limit: 3 },
 })

@@ -6,11 +6,11 @@ const slug = computed(() => String(route.params.slug))
 
 // The category must exist: an unknown slug is a real 404, not an empty grid a
 // crawler would index as a thin page.
-const { categories, ready } = useProductCategories()
+const { categories, ready, error } = useProductCategories()
 await ready
 const category = computed(() => categories.value.find((c) => c.slug === slug.value))
 if (!category.value) {
-  throw createError({ statusCode: 404, statusMessage: "Catégorie introuvable", fatal: true })
+  throw missingPageError(error.value, "Catégorie introuvable")
 }
 
 const name = computed(() => category.value?.name ?? "")

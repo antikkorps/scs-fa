@@ -186,10 +186,22 @@ below is the recommended path.
   Let's Encrypt — simpler than ACME behind a proxy. This swaps Caddy's automatic
   HTTPS for an explicit `tls <cert> <key>` (Caddyfile change). *Decision: Origin
   Cert vs keep LE via DNS-01 challenge — see §J.*
-- **Restore the real client IP.** Behind the proxy, Caddy/Fastify otherwise see
-  Cloudflare IPs — which would poison the **rate-limiter** and **audit logs**:
-  - Caddy: global `servers { trusted_proxies static <cloudflare-ranges> }`.
-  - Fastify: enable `trustProxy` so `req.ip` reads the forwarded client IP.
+- **Real client IP — done in story 9.6, keep it that way.** Behind the proxy,
+  Caddy/Fastify would otherwise see Cloudflare IPs — which would poison the
+  **rate-limiter**, **audit logs** and **newsletter consent proofs**:
+  - Caddy (`Caddyfile`, global `servers`): `trusted_proxies static <cloudflare-ranges>`
+    + `client_ip_headers CF-Connecting-IP`, and each `reverse_proxy` **overwrites**
+    `X-Forwarded-For` with `{client_ip}`. Re-check the ranges against
+    <https://www.cloudflare.com/ips> once a year.
+  - Fastify trusts **one hop, and only a private one** (`src/net/client-ip.ts`) —
+    never `trustProxy: true`, whose left-most `X-Forwarded-For` entry is written
+    by the client and makes the rate limiter trivially bypassable.
+  - The Nuxt server calls the API **over the private network**
+    (`NUXT_API_INTERNAL_BASE`) with the visitor's IP and `INTERNAL_API_SECRET`.
+    Without it, every server-rendered page shares one rate-limit budget: a
+    crawler exhausts it and the catalogue starts answering errors.
+  - ⚠️ Nuxt trusts `X-Forwarded-For` unconditionally. That is sound only because
+    `web` publishes no port — Caddy is its sole client. Never publish it.
 - **Lock the origin to Cloudflare.** Set the Hetzner Cloud Firewall to accept
   80/443 **only from Cloudflare IP ranges** (`https://www.cloudflare.com/ips`),
   so no one can bypass the WAF by hitting the IP directly.

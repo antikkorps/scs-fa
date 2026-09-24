@@ -27,6 +27,7 @@ import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
 import { adminMediaRoutes, mediaRoutes } from "./media/index.js"
 import { adminMetricsRoutes } from "./metrics/admin.js"
+import { isInternalCall, trustDirectPrivatePeer } from "./net/client-ip.js"
 import { newsletterRoutes } from "./newsletter/index.js"
 import { adminOrderRoutes } from "./orders/admin.js"
 import { orderRoutes } from "./orders/index.js"
@@ -47,7 +48,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: buildLoggerOptions(env),
     genReqId: (req) => genReqId(req),
-    trustProxy: env.NODE_ENV === "production",
+    // One hop, and only a private one: see src/net/client-ip.ts.
+    trustProxy: trustDirectPrivatePeer,
   })
 
   // Centralised error handling + throttled admin alerting on 5xx (Story 7.2).
@@ -59,7 +61,10 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   if (env.NODE_ENV !== "test") {
     await fastify.register(fastifyRateLimit, {
-      max: 100,
+      // Keyed on request.ip — the visitor, even when the Nuxt server calls on
+      // their behalf. Those calls get a larger budget: one server-rendered page
+      // fans out into several API requests.
+      max: (request) => (isInternalCall(request, env.INTERNAL_API_SECRET) ? 300 : 100),
       timeWindow: "1 minute",
     })
   }

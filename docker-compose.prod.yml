@@ -104,13 +104,18 @@ services:
     image: scs-web:latest
     restart: unless-stopped
     # Nuxt runtimeConfig.public is overridable at runtime via NUXT_PUBLIC_*.
-    # Single origin → the front talks to the API at https://www.DOMAIN/api.
+    # Single origin → the browser talks to the API at https://www.DOMAIN/api.
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
       NUXT_PUBLIC_API_BASE: https://www.${DOMAIN:?set DOMAIN in .env}/api
       NUXT_PUBLIC_SITE_URL: https://www.${DOMAIN}
+      # Server-side calls stay on the private network instead of going back out
+      # through Cloudflare, and carry the visitor's IP + the shared secret — else
+      # every SSR render shares one rate-limit budget (story 9.6).
+      NUXT_API_INTERNAL_BASE: http://api:8080/api
+      NUXT_INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?set INTERNAL_API_SECRET in .env}
     depends_on:
       - api
     security_opt: ["no-new-privileges:true"]

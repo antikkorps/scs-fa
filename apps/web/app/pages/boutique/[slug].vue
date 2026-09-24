@@ -7,16 +7,15 @@ import { productJsonLd } from "~/utils/structuredData"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<ProductDetail>(`${apiBase}/products/slug/${slug}`, {
+const { data, error } = await useApiFetch<ProductDetail>(`/products/slug/${slug}`, {
   key: `product-${slug}`,
 })
 
 if (error.value || !data.value) {
-  throw createError({ statusCode: 404, statusMessage: "Article introuvable", fatal: true })
+  throw missingPageError(error.value, "Article introuvable")
 }
 
 const product = computed(() => data.value as ProductDetail)

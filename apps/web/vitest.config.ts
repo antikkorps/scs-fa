@@ -6,7 +6,12 @@ import { defineVitestConfig } from "@nuxt/test-utils/config"
 export default defineVitestConfig({
   test: {
     environment: "node",
-    include: ["tests/**/*.{test,spec}.ts", "app/**/*.{test,spec}.ts", "server/**/*.{test,spec}.ts"],
+    include: [
+      "tests/**/*.{test,spec}.ts",
+      "app/**/*.{test,spec}.ts",
+      "server/**/*.{test,spec}.ts",
+      "shared/**/*.{test,spec}.ts",
+    ],
     // ⚠️ Booting the Nuxt runtime is genuinely slow, and 26 files ask for it.
     // Vitest's default 10s hook timeout is a laptop figure: the same suite takes
     // ~7s locally and ~173s on the CI runner, so `setupNuxt()` legitimately

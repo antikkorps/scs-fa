@@ -29,12 +29,12 @@ const EMPTY: SitemapPayload = {
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
-  const apiBase = config.public.apiBase as string
+  const api = apiUpstream(event)
   const siteUrl = config.public.siteUrl as string
 
   // An unreachable API degrades to the static pages rather than failing the
   // whole sitemap — but it is not cached as if it were the real one.
-  const payload = await $fetch<{ data: SitemapPayload }>(`${apiBase}/seo/sitemap`)
+  const payload = await $fetch<{ data: SitemapPayload }>(`${api.base}/seo/sitemap`, { headers: api.headers })
     .then((r) => r.data)
     .catch(() => null)
   const d = payload ?? EMPTY

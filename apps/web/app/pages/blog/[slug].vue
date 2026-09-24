@@ -4,16 +4,15 @@ import { formatDate } from "~/utils/format"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<{ data: BlogArticleDetail }>(`${apiBase}/blog/${slug}`, {
+const { data, error } = await useApiFetch<{ data: BlogArticleDetail }>(`/blog/${slug}`, {
   key: `blog-${slug}`,
 })
 
 if (error.value || !data.value?.data) {
-  throw createError({ statusCode: 404, statusMessage: "Article introuvable", fatal: true })
+  throw missingPageError(error.value, "Article introuvable")
 }
 
 // Safe: we throw a fatal 404 above when data is missing, so this only renders with data.

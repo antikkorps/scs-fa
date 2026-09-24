@@ -2,10 +2,9 @@
 import type { BlogListResponse } from "~/types/blog"
 
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
-const { data, error } = await useFetch<BlogListResponse>(`${apiBase}/blog`, {
+const { data, error } = await useApiFetch<BlogListResponse>(`/blog`, {
   key: "blog-index",
   query: { limit: 24 },
 })

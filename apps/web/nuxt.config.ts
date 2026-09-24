@@ -51,6 +51,12 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // Server-only (story 9.6). The Nuxt server reaches the API over the private
+    // network instead of going back out through Cloudflare, and says on whose
+    // behalf it calls: see server/utils/upstream.ts. Both empty in dev, where
+    // the public apiBase is already local.
+    apiInternalBase: "",
+    internalApiSecret: "",
     public: {
       // Dev API runs on 8081 (see apps/api/.env); override via API_BASE_URL in prod.
       apiBase: process.env.API_BASE_URL ?? "http://localhost:8081/api",

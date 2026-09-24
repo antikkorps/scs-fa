@@ -4,16 +4,15 @@ import { artworkImage } from "~/utils/format"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<{ data: ArtworkSeriesDetail }>(`${apiBase}/artworks/series/${slug}`, {
+const { data, error } = await useApiFetch<{ data: ArtworkSeriesDetail }>(`/artworks/series/${slug}`, {
   key: `series-${slug}`,
 })
 
 if (error.value || !data.value?.data) {
-  throw createError({ statusCode: 404, statusMessage: "Série introuvable", fatal: true })
+  throw missingPageError(error.value, "Série introuvable")
 }
 
 const series = computed(() => data.value?.data as ArtworkSeriesDetail)

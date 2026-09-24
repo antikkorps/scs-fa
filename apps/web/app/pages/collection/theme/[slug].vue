@@ -3,16 +3,15 @@ import type { ArtworkThemeDetail } from "~/types/artwork"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<{ data: ArtworkThemeDetail }>(`${apiBase}/artworks/themes/${slug}`, {
+const { data, error } = await useApiFetch<{ data: ArtworkThemeDetail }>(`/artworks/themes/${slug}`, {
   key: `theme-${slug}`,
 })
 
 if (error.value || !data.value?.data) {
-  throw createError({ statusCode: 404, statusMessage: "Thème introuvable", fatal: true })
+  throw missingPageError(error.value, "Thème introuvable")
 }
 
 const theme = computed(() => data.value?.data as ArtworkThemeDetail)

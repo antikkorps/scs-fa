@@ -72,9 +72,9 @@ export async function refreshSession(event: H3Event): Promise<string | null> {
 // Forwards a call to the upstream auth API and re-throws upstream errors with
 // their original status + payload, so client pages can react to 401/409/423/etc.
 export async function callAuthApi<T>(event: H3Event, path: string, body: Record<string, unknown>): Promise<T> {
-  const apiBase = useRuntimeConfig(event).public.apiBase as string
+  const { base, headers } = apiUpstream(event)
   try {
-    return (await $fetch(`${apiBase}${path}`, { method: "POST", body })) as T
+    return (await $fetch(`${base}${path}`, { method: "POST", body, headers })) as T
   } catch (err) {
     const e = err as { response?: { status?: number }; data?: unknown }
     throw createError({
