@@ -121,7 +121,7 @@ async function signOut() {
                 <NuxtLink
                   v-for="c in categories"
                   :key="c.slug"
-                  :to="`/boutique?category=${c.slug}`"
+                  :to="categoryPath(c.slug)"
                   class="mega__link"
                 >
                   {{ c.name }}
@@ -358,7 +358,7 @@ async function signOut() {
                         </NuxtLink>
                       </li>
                       <li v-for="c in categories" :key="c.slug">
-                        <NuxtLink :to="`/boutique?category=${c.slug}`" class="msub__link">{{ c.name }}</NuxtLink>
+                        <NuxtLink :to="categoryPath(c.slug)" class="msub__link">{{ c.name }}</NuxtLink>
                       </li>
                     </ul>
                   </div>

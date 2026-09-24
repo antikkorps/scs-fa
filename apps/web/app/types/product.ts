@@ -61,6 +61,7 @@ export interface ProductCategoryRef {
   name: string
   category: string
   displayOrder: number | null
+  description: string | null
 }
 
 export interface LegalCategoryRef {

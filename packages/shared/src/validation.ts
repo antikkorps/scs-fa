@@ -220,6 +220,15 @@ export const categorySlugSchema = z
   .max(100)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid category slug")
 
+/**
+ * Static segments under `/boutique/` (story 9.6): a product carrying one of these
+ * slugs would be shadowed by the page of the same name and never reachable.
+ */
+export const RESERVED_PRODUCT_SLUGS: readonly string[] = ["categorie"]
+
+const isFreeProductSlug = (slug: string) => !RESERVED_PRODUCT_SLUGS.includes(slug)
+const RESERVED_PRODUCT_SLUG_MESSAGE = { message: "This slug is reserved by a boutique page" }
+
 // Tag slug (references tags.slug, e.g. "occasion", "avant-1900")
 export const tagSlugSchema = z
   .string()
@@ -290,7 +299,7 @@ const historicalInfoSchema = z.object({
 
 export const createAncientWeaponSchema = z.object({
   sku: z.string().trim().min(1).max(100),
-  slug: categorySlugSchema,
+  slug: categorySlugSchema.refine(isFreeProductSlug, RESERVED_PRODUCT_SLUG_MESSAGE),
   name: z.string().trim().min(1).max(255),
   description: z.string().trim().max(1000).optional(),
   // The client asked for roughly thirty lines telling the weapon's story, so
@@ -644,6 +653,9 @@ export const entitySlugSchema = z
   .max(255)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid slug (lower-case words separated by single dashes)")
 
+/** A product slug: an entity slug that does not collide with a static boutique route. */
+export const productSlugSchema = entitySlugSchema.refine(isFreeProductSlug, RESERVED_PRODUCT_SLUG_MESSAGE)
+
 /** Optional free text that must be either absent or non-empty — never an empty string in the DB. */
 const optionalText = (max: number) =>
   z
@@ -864,7 +876,7 @@ export const productVariantSchema = z
 const productBaseSchema = z
   .object({
     sku: z.string().trim().min(1).max(100),
-    slug: entitySlugSchema,
+    slug: productSlugSchema,
     name: z.string().trim().min(1).max(255),
     description: optionalText(1000),
     longDescription: optionalText(20000),

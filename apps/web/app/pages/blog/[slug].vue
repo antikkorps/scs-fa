@@ -55,8 +55,8 @@ useHead({
           dateModified: article.value.updatedAt ?? article.value.publishedAt ?? undefined,
           author: article.value.authorName
             ? { "@type": "Person", name: article.value.authorName }
-            : { "@type": "Organization", name: "SCS Firearm" },
-          publisher: { "@type": "Organization", name: "SCS Firearm" },
+            : { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearm" },
+          publisher: { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearm" },
           ...(article.value.tags && {
             keywords: article.value.tags,
           }),

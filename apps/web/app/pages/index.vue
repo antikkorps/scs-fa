@@ -39,22 +39,6 @@ useSeoMeta({
 
 useHead({
   link: [{ rel: "canonical", href: siteUrl }],
-  script: [
-    {
-      type: "application/ld+json",
-      innerHTML: serializeJsonLd({
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        name: "SCS Firearm",
-        url: siteUrl,
-        description,
-        department: [
-          { "@type": "Store", name: "Armurerie SCS Firearm", url: `${siteUrl}/boutique` },
-          { "@type": "Store", name: "Gun Art", url: `${siteUrl}/collection` },
-        ],
-      }),
-    },
-  ],
 })
 </script>
 

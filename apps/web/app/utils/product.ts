@@ -56,3 +56,26 @@ export function conditionLabel(condition: string | null | undefined): string {
   if (!condition) return "—"
   return CONDITION_LABELS[condition] ?? condition
 }
+
+/** The page of an armurerie category, or the whole catalogue for "" (story 9.6). */
+export function categoryPath(slug: string): string {
+  return slug ? `/boutique/categorie/${encodeURIComponent(slug)}` : "/boutique"
+}
+
+/**
+ * Canonical URL of a catalogue view. Filters never make a distinct page — a
+ * filtered view canonicalises to the page it filters — but a later page of
+ * results is one, so it keeps its `?page=`.
+ */
+export function catalogueCanonical(siteUrl: string, basePath: string, page: number): string {
+  return page > 1 ? `${siteUrl}${basePath}?page=${page}` : `${siteUrl}${basePath}`
+}
+
+/**
+ * Meta description of a category page: the category's own words when the
+ * catalogue has some, framed so every category page reads distinctly.
+ */
+export function categoryMetaDescription(name: string, description: string | null | undefined): string {
+  const own = description?.trim().replace(/\.$/, "")
+  return `${name} à la boutique armurerie SCS Firearm${own ? ` : ${own}` : ""}. Catégorie légale, prix TTC et stock en temps réel pour chaque article.`
+}

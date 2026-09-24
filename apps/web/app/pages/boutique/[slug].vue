@@ -94,6 +94,16 @@ const description = computed(
   () => product.value.seo.metaDescription || product.value.description || `${product.value.name} — SCS Firearm`,
 )
 
+// Boutique › category › product: the category is the page a visitor (and a
+// crawler) climbs back to.
+const crumbs = computed(() => [
+  { name: "Boutique", to: "/boutique" },
+  ...(product.value.category.slug && product.value.category.name
+    ? [{ name: product.value.category.name, to: categoryPath(product.value.category.slug) }]
+    : []),
+  { name: product.value.name },
+])
+
 useSeoMeta({
   title: () => product.value.seo.metaTitle || product.value.name,
   description,
@@ -128,17 +138,6 @@ useHead({
         }),
       ),
     },
-    {
-      type: "application/ld+json",
-      innerHTML: serializeJsonLd({
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: "Boutique", item: `${siteUrl}/boutique` },
-          { "@type": "ListItem", position: 2, name: product.value.name, item: pageUrl },
-        ],
-      }),
-    },
   ],
 })
 </script>
@@ -146,11 +145,7 @@ useHead({
 <template>
   <article class="detail">
     <div class="container">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/boutique">Boutique</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ product.name }}</span>
-      </nav>
+      <AppBreadcrumbs :items="crumbs" />
 
       <div class="detail__grid">
         <figure class="detail__media">
@@ -339,24 +334,6 @@ useHead({
 <style scoped>
 .detail {
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.25rem, 4vw, 2.25rem);
-}
-.crumbs a {
-  color: var(--paper-dim);
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper);
 }
 .detail__grid {
   display: grid;

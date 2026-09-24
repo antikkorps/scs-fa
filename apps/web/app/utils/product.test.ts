@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { inStock, isRegulated, legalCategoryLabel, stockLabel } from "./product.js"
+import {
+  catalogueCanonical,
+  categoryMetaDescription,
+  categoryPath,
+  inStock,
+  isRegulated,
+  legalCategoryLabel,
+  stockLabel,
+} from "./product.js"
 
 describe("legalCategoryLabel", () => {
   it("labels each prefectural category", () => {
@@ -32,5 +40,37 @@ describe("stock helpers", () => {
     expect(stockLabel(0)).toBe("Rupture de stock")
     expect(stockLabel(2)).toBe("Plus que 2 en stock")
     expect(stockLabel(20)).toBe("En stock")
+  })
+})
+
+describe("categoryPath", () => {
+  it("gives a category its own page, and the whole catalogue for none", () => {
+    expect(categoryPath("arme-poing")).toBe("/boutique/categorie/arme-poing")
+    expect(categoryPath("")).toBe("/boutique")
+  })
+})
+
+describe("catalogueCanonical", () => {
+  const SITE = "https://www.scs-firearms.com"
+  it("points the first page at the bare listing", () => {
+    expect(catalogueCanonical(SITE, "/boutique", 1)).toBe(`${SITE}/boutique`)
+  })
+  it("keeps a later page of results as a page of its own", () => {
+    expect(catalogueCanonical(SITE, "/boutique/categorie/munition", 3)).toBe(
+      `${SITE}/boutique/categorie/munition?page=3`,
+    )
+  })
+})
+
+describe("categoryMetaDescription", () => {
+  it("weaves the category's own description in, without a doubled full stop", () => {
+    expect(categoryMetaDescription("Armes de poing", "Pistolets et revolvers.")).toBe(
+      "Armes de poing à la boutique armurerie SCS Firearm : Pistolets et revolvers. Catégorie légale, prix TTC et stock en temps réel pour chaque article.",
+    )
+  })
+  it("stands on its own when the category has no description", () => {
+    expect(categoryMetaDescription("Munitions", null)).toBe(
+      "Munitions à la boutique armurerie SCS Firearm. Catégorie légale, prix TTC et stock en temps réel pour chaque article.",
+    )
   })
 })

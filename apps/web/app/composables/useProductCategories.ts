@@ -7,11 +7,14 @@ export function useProductCategories() {
   const config = useRuntimeConfig()
   const apiBase = config.public.apiBase as string
 
-  const { data } = useFetch<{ data: ProductCategoryRef[] }>(`${apiBase}/product-categories`, {
+  const request = useFetch<{ data: ProductCategoryRef[] }>(`${apiBase}/product-categories`, {
     key: "product-categories",
     default: () => ({ data: [] }),
   })
 
-  const categories = computed(() => data.value?.data ?? [])
-  return { categories }
+  const categories = computed(() => request.data.value?.data ?? [])
+  // A page that must know the list before rendering (a category page deciding
+  // between itself and a 404) awaits this; the header does not.
+  const ready = Promise.resolve(request).then(() => undefined)
+  return { categories, ready }
 }

@@ -4,9 +4,11 @@ import {
   blogArticleUpdateSchema,
   blogQuerySchema,
   cartItemSchema,
+  createAncientWeaponSchema,
   loginSchema,
   newsletterSubscribeSchema,
   newsletterUnsubscribeSchema,
+  productSlugSchema,
   refreshSchema,
   registerSchema,
   updateProductSchema,
@@ -218,5 +220,19 @@ describe("toPatchSchema (correctif 2026-09-18)", () => {
   /** Conséquence directe : un corps vide n'est plus silencieusement accepté. */
   it("refuse enfin un patch vide", () => {
     expect(updateProductSchema.safeParse({}).success).toBe(false)
+  })
+})
+
+describe("reserved product slugs (story 9.6)", () => {
+  it("refuses a product slug that a static /boutique page would shadow", () => {
+    expect(productSlugSchema.safeParse("categorie").success).toBe(false)
+    expect(productSlugSchema.safeParse("carabine-22lr").success).toBe(true)
+  })
+
+  it("applies to ancient weapons too, which are served under /boutique as well", () => {
+    const base = { sku: "AW-1", name: "Mousqueton", categorySlug: "arme-longue", legalCategory: "D", priceHt: 100 }
+    const reserved = createAncientWeaponSchema.safeParse({ ...base, slug: "categorie" })
+    expect(reserved.success).toBe(false)
+    expect(reserved.error?.issues.some((i) => i.path.join(".") === "slug")).toBe(true)
   })
 })
