@@ -17,12 +17,13 @@ const name = computed(() => category.value?.name ?? "")
 const pageUrl = computed(() => `${siteUrl}${categoryPath(slug.value)}`)
 const description = computed(() => categoryMetaDescription(name.value, category.value?.description))
 
-useSeoMeta({
+usePageSeo({
   title: () => `${name.value} — Boutique armurerie`,
+  socialTitle: () => `${name.value} — SCS Firearm`,
   description,
-  ogTitle: () => `${name.value} — SCS Firearm`,
-  ogDescription: description,
-  ogUrl: pageUrl,
+  path: () => categoryPath(slug.value),
+  // ShopCatalogue states the canonical: it knows the page of results.
+  canonical: false,
 })
 </script>
 

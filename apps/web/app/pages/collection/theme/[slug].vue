@@ -22,16 +22,13 @@ const description = computed(
   () => theme.value.description ?? `Les séries Gun Art réunies autour du thème « ${theme.value.name} ».`,
 )
 
-useSeoMeta({
+usePageSeo({
   title: () => theme.value.name,
   description,
-  ogTitle: () => `${theme.value.name} — SCS Firearm`,
-  ogDescription: description,
-  ogUrl: pageUrl,
+  path: `/collection/theme/${slug}`,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",

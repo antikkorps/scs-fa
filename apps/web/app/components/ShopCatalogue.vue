@@ -143,7 +143,13 @@ const hasFilters = computed(() =>
 )
 
 useHead({
-  link: [{ rel: "canonical", href: computed(() => catalogueCanonical(siteUrl, props.basePath, page.value)) }],
+  link: [
+    {
+      key: "canonical",
+      rel: "canonical",
+      href: computed(() => catalogueCanonical(siteUrl, props.basePath, page.value)),
+    },
+  ],
   script: [
     {
       type: "application/ld+json",

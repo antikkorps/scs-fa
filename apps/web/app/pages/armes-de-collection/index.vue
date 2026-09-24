@@ -88,18 +88,24 @@ function toggleTag(slug: string) {
 
 const pageUrl = `${siteUrl}/armes-de-collection`
 const description =
-  "Armes anciennes et historiques : pièces uniques expertisées, d'avant 1900 aux armes de guerre. Provenance documentée, état détaillé, vente encadrée par la réglementation française."
+  "Armes anciennes et historiques, pièces uniques expertisées : provenance documentée, état détaillé, vente encadrée par la réglementation française."
 
-useSeoMeta({
+usePageSeo({
   title: "Armes de collection & historiques",
   description,
-  ogTitle: "Armes de collection & historiques — SCS Firearm",
-  ogDescription: description,
-  ogUrl: pageUrl,
+  path: "/armes-de-collection",
+  // Later pages of results canonicalise to themselves, below.
+  canonical: false,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: computed(() => catalogueCanonical(siteUrl, "/armes-de-collection", page.value)) }],
+  link: [
+    {
+      key: "canonical",
+      rel: "canonical",
+      href: computed(() => catalogueCanonical(siteUrl, "/armes-de-collection", page.value)),
+    },
+  ],
   script: [
     {
       type: "application/ld+json",

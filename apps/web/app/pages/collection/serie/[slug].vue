@@ -23,20 +23,16 @@ const description = computed(
   () => series.value.intro ?? `${series.value.title}, série d'éditions limitées de la collection Gun Art.`,
 )
 
-useSeoMeta({
+usePageSeo({
   title: () => series.value.title,
   description,
-  ogTitle: () => `${series.value.title} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "article",
-  ogUrl: pageUrl,
-  ogImage: () =>
-    series.value.coverImageUrl ??
-    (artworks.value[0] ? artworkImage(artworks.value[0].featuredImageUrl, artworks.value[0].slug).src : undefined),
+  path: `/collection/serie/${slug}`,
+  // Never the placeholder artworkImage() may return: a stored image, or the brand card.
+  image: () => series.value.coverImageUrl ?? artworks.value[0]?.featuredImageUrl,
+  imageAlt: () => series.value.title,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",

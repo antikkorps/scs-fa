@@ -24,20 +24,21 @@ const description = computed(
   () => article.value.metaDescription ?? article.value.excerpt ?? `${article.value.title} — Le Journal SCS Firearm.`,
 )
 
-useSeoMeta({
+usePageSeo({
   title: () => article.value.metaTitle ?? article.value.title,
+  socialTitle: () => `${article.value.title} — SCS Firearm`,
   description,
-  ogTitle: () => `${article.value.title} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "article",
-  ogUrl: pageUrl,
-  ogImage: hero,
+  path: `/blog/${slug}`,
+  type: "article",
+  image: () => article.value.featuredImageUrl,
+  imageAlt: () => article.value.title,
+})
+useSeoMeta({
   articlePublishedTime: () => article.value.publishedAt ?? undefined,
   articleModifiedTime: () => article.value.updatedAt ?? undefined,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",

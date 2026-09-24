@@ -16,12 +16,12 @@ const pageUrl = `${siteUrl}/boutique`
 const description =
   "La boutique armurerie SCS Firearm : armes de chasse et de tir, munitions, optiques et accessoires. Catégories légales, prix TTC et stock en temps réel."
 
-useSeoMeta({
+usePageSeo({
   title: "Boutique armurerie",
   description,
-  ogTitle: "Boutique armurerie — SCS Firearm",
-  ogDescription: description,
-  ogUrl: pageUrl,
+  path: "/boutique",
+  // ShopCatalogue states the canonical: it knows the page of results.
+  canonical: false,
 })
 </script>
 

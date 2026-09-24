@@ -15,26 +15,28 @@ if (error.value || !data.value?.data) {
 const artist = computed(() => data.value?.data as ArtistDetail)
 
 const pageUrl = `${siteUrl}/collection/artiste/${slug}`
+// A headline alone is a few words; framed with who and where, it describes the page.
 const description = computed(
   () =>
     artist.value.metaDescription ??
-    artist.value.headline ??
-    artist.value.bio ??
-    `${artist.value.name}, artiste Gun Art.`,
+    [
+      `${artist.value.name}${artist.value.headline ? `, ${artist.value.headline.replace(/\.$/, "")}` : ""}.`,
+      "Parcours, séries et tirages d'art en édition limitée de la collection Gun Art de SCS Firearm.",
+      artist.value.bio ?? "",
+    ].join(" "),
 )
 
-useSeoMeta({
-  title: () => artist.value.metaTitle ?? artist.value.name,
+usePageSeo({
+  title: () => artist.value.metaTitle ?? artist.value.name ?? "",
+  socialTitle: () => `${artist.value.name} — SCS Firearm`,
   description,
-  ogTitle: () => `${artist.value.name} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "profile",
-  ogUrl: pageUrl,
-  ogImage: () => artist.value.portraitUrl ?? undefined,
+  path: `/collection/artiste/${slug}`,
+  type: "profile",
+  image: () => artist.value.portraitUrl,
+  imageAlt: () => artist.value.name,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",

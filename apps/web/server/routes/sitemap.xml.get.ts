@@ -67,16 +67,7 @@ export default defineEventHandler(async (event) => {
           },
         ]
       : []),
-    ...(d.artists.length > 0
-      ? [
-          {
-            loc: `${siteUrl}/collection/artiste`,
-            lastmod: latest(d.artists.map(dated)),
-            changefreq: "monthly" as const,
-            priority: 0.6,
-          },
-        ]
-      : []),
+    // (/collection/artiste is deliberately absent: a noindex router page.)
     { loc: `${siteUrl}/blog`, lastmod: latest(d.blogPosts.map(dated)), changefreq: "weekly", priority: 0.7 },
 
     // Armurerie: category pages, then products.

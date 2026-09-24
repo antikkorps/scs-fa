@@ -93,13 +93,18 @@ function isoDate(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
 }
 
-/** robots.txt allowing everything except the noindex search page, with the sitemap pointer. */
+/**
+ * robots.txt: crawl everything but the back-office and the BFF proxy, with the
+ * sitemap pointer. Private pages (search, account, cart…) are NOT disallowed
+ * here: they carry `noindex` (X-Robots-Tag), and a disallowed URL is never
+ * fetched, so its noindex would never be read (story 9.6).
+ */
 export function buildRobots(siteUrl: string): string {
   return [
     "User-agent: *",
     "Allow: /",
-    "Disallow: /recherche",
     "Disallow: /admin",
+    "Disallow: /bff/",
     "",
     `Sitemap: ${siteUrl}/sitemap.xml`,
     "",

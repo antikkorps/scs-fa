@@ -38,17 +38,15 @@ const pageUrl = `${siteUrl}/collection`
 const description =
   "Découvrez la collection Gun Art : des tirages d'art photographiques en édition strictement limitée, signés, numérotés et livrés avec certificat d'authenticité."
 
-useSeoMeta({
+usePageSeo({
   title: "La collection Gun Art",
   description,
-  ogTitle: "La collection Gun Art — SCS Firearm",
-  ogDescription: description,
-  ogUrl: pageUrl,
-  ogImage: () => ogImageUrl(artworks.value[0]?.featuredImageUrl, siteUrl),
+  path: "/collection",
+  image: () => artworks.value[0]?.featuredImageUrl,
+  imageAlt: () => artworks.value[0]?.title,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",

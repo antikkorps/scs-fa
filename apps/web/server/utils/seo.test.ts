@@ -74,11 +74,13 @@ describe("absoluteImageUrl", () => {
 })
 
 describe("buildRobots", () => {
-  it("allows crawling, blocks search/admin, and points to the sitemap", () => {
+  it("allows crawling, blocks the back-office and the BFF, and points to the sitemap", () => {
     const txt = buildRobots(SITE)
     expect(txt).toContain("Allow: /")
-    expect(txt).toContain("Disallow: /recherche")
     expect(txt).toContain("Disallow: /admin")
+    expect(txt).toContain("Disallow: /bff/")
+    // noindex pages must stay crawlable, or their noindex is never read.
+    expect(txt).not.toContain("Disallow: /recherche")
     expect(txt).toContain(`Sitemap: ${SITE}/sitemap.xml`)
   })
 })

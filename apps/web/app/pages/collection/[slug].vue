@@ -42,18 +42,15 @@ const description = computed(
   () => art.value.description ?? `${art.value.title}, tirage d'art en édition limitée signé et numéroté.`,
 )
 
-useSeoMeta({
+usePageSeo({
   title: () => art.value.title,
   description,
-  ogTitle: () => `${art.value.title} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "article",
-  ogUrl: pageUrl,
-  ogImage: () => ogImageUrl(art.value?.featuredImageUrl, siteUrl),
+  path: `/collection/${slug}`,
+  image: () => art.value.featuredImageUrl,
+  imageAlt: heroAlt,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",

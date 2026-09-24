@@ -77,5 +77,5 @@ export function catalogueCanonical(siteUrl: string, basePath: string, page: numb
  */
 export function categoryMetaDescription(name: string, description: string | null | undefined): string {
   const own = description?.trim().replace(/\.$/, "")
-  return `${name} à la boutique armurerie SCS Firearm${own ? ` : ${own}` : ""}. Catégorie légale, prix TTC et stock en temps réel pour chaque article.`
+  return `${name}${own ? ` : ${own}` : ""}. Catégorie légale, prix TTC et stock en temps réel — boutique armurerie SCS Firearm.`
 }

@@ -25,19 +25,15 @@ const heroImg = computed(() =>
 )
 
 const description =
-  "SCS Firearm réunit une armurerie de précision — armes, munitions, optiques et accessoires encadrés par la réglementation française — et Gun Art, des tirages d'art en édition limitée, signés, numérotés et certifiés."
+  "Armurerie en ligne réglementée — armes, munitions, optiques, accessoires — et Gun Art, des tirages d'art en édition limitée, signés et numérotés."
 
-useSeoMeta({
+usePageSeo({
   title: "",
+  socialTitle: "SCS Firearm — Armurerie en ligne & Gun Art",
   description,
-  ogTitle: "SCS Firearm — Armurerie de précision & Gun Art",
-  ogDescription: description,
-  ogUrl: siteUrl,
-  ogImage: () => ogImageUrl(featured.value?.featuredImageUrl, siteUrl),
-})
-
-useHead({
-  link: [{ rel: "canonical", href: siteUrl }],
+  path: "/",
+  image: () => featured.value?.featuredImageUrl,
+  imageAlt: () => featured.value?.title,
 })
 </script>
 

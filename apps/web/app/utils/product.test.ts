@@ -65,12 +65,12 @@ describe("catalogueCanonical", () => {
 describe("categoryMetaDescription", () => {
   it("weaves the category's own description in, without a doubled full stop", () => {
     expect(categoryMetaDescription("Armes de poing", "Pistolets et revolvers.")).toBe(
-      "Armes de poing à la boutique armurerie SCS Firearm : Pistolets et revolvers. Catégorie légale, prix TTC et stock en temps réel pour chaque article.",
+      "Armes de poing : Pistolets et revolvers. Catégorie légale, prix TTC et stock en temps réel — boutique armurerie SCS Firearm.",
     )
   })
   it("stands on its own when the category has no description", () => {
     expect(categoryMetaDescription("Munitions", null)).toBe(
-      "Munitions à la boutique armurerie SCS Firearm. Catégorie légale, prix TTC et stock en temps réel pour chaque article.",
+      "Munitions. Catégorie légale, prix TTC et stock en temps réel — boutique armurerie SCS Firearm.",
     )
   })
 })

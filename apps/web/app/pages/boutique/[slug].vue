@@ -104,14 +104,13 @@ const crumbs = computed(() => [
   { name: product.value.name },
 ])
 
-useSeoMeta({
+usePageSeo({
   title: () => product.value.seo.metaTitle || product.value.name,
+  socialTitle: () => `${product.value.name} — SCS Firearm`,
   description,
-  ogTitle: () => `${product.value.name} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "website",
-  ogUrl: pageUrl,
-  ogImage: () => ogImageUrl(product.value?.featuredImageUrl, siteUrl),
+  path: `/boutique/${slug}`,
+  image: () => product.value.featuredImageUrl,
+  imageAlt: () => product.value.name,
 })
 
 // What search engines are told is about the PRODUCT, not the variant the
@@ -145,7 +144,6 @@ const structuredProduct = computed(() =>
 )
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
