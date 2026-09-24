@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductDetail, ProductVariant } from "~/types/product"
 import { availabilityLongLabel, availabilityState, isPurchasable } from "~/utils/availability"
-import { artworkImage, CARD_GEOMETRY, formatEuros, ogImageUrl } from "~/utils/format"
+import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES, ogImageUrl } from "~/utils/format"
 import { conditionLabel, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
 import { productJsonLd } from "~/utils/structuredData"
 
@@ -166,18 +166,19 @@ useHead({
             :aria-label="`Agrandir l'image : ${product.name}`"
             @click="lightboxOpen = true"
           >
-            <img
-              v-img-fallback="image.fallback"
-              :src="image.src"
+            <ResponsiveImage
+              :image="image"
+              :sizes="IMAGE_SIZES.detail"
               :alt="product.name"
               :width="CARD_GEOMETRY.width"
               :height="CARD_GEOMETRY.height"
-              decoding="async"
+              loading="eager"
+              fetchpriority="high"
             />
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="image.src" :fallback="image.fallback" :alt="product.name" />
+        <ImageLightbox v-model="lightboxOpen" :image="image" :alt="product.name" />
 
         <div class="detail__info">
           <p v-if="product.category.name" class="eyebrow">{{ product.category.name }}</p>

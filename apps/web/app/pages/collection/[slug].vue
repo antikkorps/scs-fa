@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtworkDetail } from "~/types/artwork"
-import { artworkGeometry, artworkImage, availabilityLabel, formatEuros, ogImageUrl } from "~/utils/format"
+import { artworkGeometry, artworkImage, availabilityLabel, formatEuros, IMAGE_SIZES, ogImageUrl } from "~/utils/format"
 import { artworkJsonLd } from "~/utils/structuredData"
 
 const route = useRoute()
@@ -82,9 +82,10 @@ useHead({
       <div class="detail__grid">
         <figure class="detail__media" :style="{ aspectRatio: heroGeometry.ratio }">
           <button type="button" class="detail__zoom" :aria-label="`Agrandir l'image : ${art.title}`" @click="lightboxOpen = true">
-            <ProtectedImage
-              v-img-fallback="hero.fallback"
-              :src="hero.src"
+            <ResponsiveImage
+              protect
+              :image="hero"
+              :sizes="IMAGE_SIZES.detail"
               :alt="heroAlt"
               :width="heroGeometry.width"
               :height="heroGeometry.height"
@@ -94,7 +95,7 @@ useHead({
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="hero.src" :fallback="hero.fallback" :alt="heroAlt" protect />
+        <ImageLightbox v-model="lightboxOpen" :image="hero" :alt="heroAlt" protect />
 
         <div class="detail__info">
           <NuxtLink v-if="artist" :to="`/collection/artiste/${artist.slug}`" class="eyebrow eyebrow--link">

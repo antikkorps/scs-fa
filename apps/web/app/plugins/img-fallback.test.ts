@@ -41,6 +41,28 @@ describe("v-img-fallback", () => {
     expect(img.getAttribute("src")).toBe(placeholder)
   })
 
+  it("drops a responsive image's sources, or the browser would keep picking them (story 9.6)", () => {
+    const placeholder = fallbackImage("piece-test", 400, 500)
+    const Picture = {
+      props: { fallback: String },
+      template: `<picture>
+        <source type="image/avif" srcset="/api/media/x/400.avif 400w" />
+        <img v-img-fallback="fallback" src="/api/media/x/1400.webp" srcset="/api/media/x/400.webp 400w" alt="Œuvre" />
+      </picture>`,
+    }
+    const wrapper = mount(Picture, {
+      props: { fallback: placeholder },
+      global: { directives: { "img-fallback": directive() } },
+    })
+    const img = wrapper.find("img").element as HTMLImageElement
+
+    img.dispatchEvent(new Event("error"))
+
+    expect(wrapper.findAll("source")).toHaveLength(0)
+    expect(img.hasAttribute("srcset")).toBe(false)
+    expect(img.getAttribute("src")).toBe(placeholder)
+  })
+
   it("does not loop if the placeholder itself fails", () => {
     const placeholder = fallbackImage("piece-test", 400, 500)
     const wrapper = mountImg("/api/artworks/images/gone.webp", placeholder)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AncientWeaponListResponse } from "~/types/product"
-import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
+import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES } from "~/utils/format"
 import { conditionLabel, legalCategoryLabel } from "~/utils/product"
 
 const PAGE_SIZE = 24
@@ -171,9 +171,9 @@ useHead({
           <li v-for="({ w, img }, i) in cards" :key="w.id">
             <NuxtLink :to="`/boutique/${w.slug}`" class="card" :class="{ 'card--sold': !w.available }">
               <div class="card__media">
-                <img
-                  v-img-fallback="img.fallback"
-                  :src="img.src"
+                <ResponsiveImage
+                  :image="img"
+                  :sizes="IMAGE_SIZES.card"
                   :alt="w.name"
                   :width="CARD_GEOMETRY.width"
                   :height="CARD_GEOMETRY.height"

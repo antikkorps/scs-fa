@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ArtworkListItem } from "~/types/artwork"
 import type { ProductListResponse } from "~/types/product"
-import { artworkImage, ogImageUrl } from "~/utils/format"
+import { artworkImage, IMAGE_SIZES } from "~/utils/format"
 
 const config = useRuntimeConfig()
 const siteUrl = config.public.siteUrl as string
@@ -41,17 +41,17 @@ usePageSeo({
   <div class="home">
     <!-- Brand hero -->
     <section class="hero">
-      <img
+      <ResponsiveImage
         v-if="heroImg"
         class="hero__bg"
-        v-img-fallback="heroImg.fallback"
-        :src="heroImg.src"
+        :image="heroImg"
+        :sizes="IMAGE_SIZES.full"
         alt=""
         aria-hidden="true"
         width="1600"
         height="1100"
+        loading="eager"
         fetchpriority="high"
-        decoding="async"
       />
       <div class="hero__veil" />
       <div class="container hero__inner">

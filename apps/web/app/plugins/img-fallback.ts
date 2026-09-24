@@ -25,6 +25,12 @@ export default defineNuxtPlugin((nuxtApp) => {
         // data URI, so it cannot actually miss — but the guard is what makes
         // that assumption safe to hold.
         el.removeEventListener("error", swap)
+        // A responsive image would keep picking its <source>/srcset over `src`
+        // (story 9.6): drop them, or the placeholder is never shown.
+        if (el.parentElement?.tagName === "PICTURE") {
+          for (const source of el.parentElement.querySelectorAll("source")) source.remove()
+        }
+        el.removeAttribute("srcset")
         if (el.src !== fallback) el.src = fallback
       }
 
