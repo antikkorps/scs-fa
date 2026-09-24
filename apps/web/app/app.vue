@@ -14,6 +14,13 @@ useSeoMeta({
   twitterCard: "summary_large_image",
 })
 
+// Search Console ownership (story 9.6): the DNS method needs no code, but the
+// HTML tag is the one a client can set up alone from the Search Console UI.
+const googleSiteVerification = config.public.googleSiteVerification as string
+if (googleSiteVerification) {
+  useHead({ meta: [{ name: "google-site-verification", content: googleSiteVerification }] })
+}
+
 // Sitewide structured data (story 9.6): ONE Organization, identified by an
 // `@id` every other node points at (the WebSite, a blog article's publisher),
 // describing both universes as its two online stores. There is no physical

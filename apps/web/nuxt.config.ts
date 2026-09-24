@@ -70,6 +70,10 @@ export default defineNuxtConfig({
       // Umami website id (story 9.6), via NUXT_PUBLIC_UMAMI_WEBSITE_ID. Empty =
       // no measurement at all; set, the tracker still waits for consent.
       umamiWebsiteId: "",
+      // Search Console ownership token (story 9.6), via
+      // NUXT_PUBLIC_GOOGLE_SITE_VERIFICATION — the content of Google's
+      // "HTML tag" method. Empty = no tag.
+      googleSiteVerification: "",
     },
   },
 

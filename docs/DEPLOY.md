@@ -244,7 +244,29 @@ tracker counts `www.<DOMAIN>` only. The `backup` service dumps the app database
 only — analytics are not backed up (acceptable loss; add a second dump if the
 client wants history preserved).
 
+## Search Console (story 9.6)
 
+1. Add the property `https://www.<DOMAIN>` in Search Console **with the client's
+   Google account**. Either verify by DNS (a TXT record at Cloudflare — nothing
+   to deploy), or pick "HTML tag", put its `content` value in
+   `GOOGLE_SITE_VERIFICATION` and `docker compose -f docker-compose.prod.yml up -d web`.
+2. Submit `https://www.<DOMAIN>/sitemap.xml` (it is also declared in
+   `robots.txt`). There is nothing to "ping": Google retired sitemap pings in 2023.
+3. Do the same in Bing Webmaster Tools (it can import the Search Console property).
+4. After go-live, run the Rich Results Test on a product, an artwork and a
+   category page; the markup is produced by `app/utils/structuredData.ts`.
+
+## Responsive images (story 9.6)
+
+Every catalogue image is stored at 400/800/1400 px in AVIF and WebP. Images
+uploaded before story 9.6 only have WebP; give them their AVIF once, after the
+deploy (idempotent — it only fills what is missing):
+
+```sh
+docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/media/backfill-avif-cli.ts
+```
+
+## Gun Art visuals (story 11.5)
 
 - Watermark and public resolution are set through `ARTWORK_WATERMARK_*` / `ARTWORK_PUBLIC_MAX_WIDTH` in `.env` — changing the look is a config change plus a restart, no deploy of code.
 - ⚠️ The watermark is SVG text rendered by sharp: the API image installs `fonts-dejavu-core` for it. If you ever rebuild the image from a different base, **check a published visual actually carries the mark** — a font-less runtime renders it empty, silently.
