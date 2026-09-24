@@ -4,16 +4,15 @@ import { formatDate } from "~/utils/format"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<{ data: BlogArticleDetail }>(`${apiBase}/blog/${slug}`, {
+const { data, error } = await useApiFetch<{ data: BlogArticleDetail }>(`/blog/${slug}`, {
   key: `blog-${slug}`,
 })
 
 if (error.value || !data.value?.data) {
-  throw createError({ statusCode: 404, statusMessage: "Article introuvable", fatal: true })
+  throw missingPageError(error.value, "Article introuvable")
 }
 
 // Safe: we throw a fatal 404 above when data is missing, so this only renders with data.
@@ -25,20 +24,21 @@ const description = computed(
   () => article.value.metaDescription ?? article.value.excerpt ?? `${article.value.title} — Le Journal SCS Firearm.`,
 )
 
-useSeoMeta({
+usePageSeo({
   title: () => article.value.metaTitle ?? article.value.title,
+  socialTitle: () => `${article.value.title} — SCS Firearm`,
   description,
-  ogTitle: () => `${article.value.title} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "article",
-  ogUrl: pageUrl,
-  ogImage: hero,
+  path: `/blog/${slug}`,
+  type: "article",
+  image: () => article.value.featuredImageUrl,
+  imageAlt: () => article.value.title,
+})
+useSeoMeta({
   articlePublishedTime: () => article.value.publishedAt ?? undefined,
   articleModifiedTime: () => article.value.updatedAt ?? undefined,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
@@ -47,7 +47,7 @@ useHead({
           "@context": "https://schema.org",
           "@type": "BlogPosting",
           headline: article.value.title,
-          image: hero.value,
+          image: ogImageUrl(article.value.featuredImageUrl, siteUrl),
           description: description.value,
           url: pageUrl,
           mainEntityOfPage: pageUrl,
@@ -55,24 +55,11 @@ useHead({
           dateModified: article.value.updatedAt ?? article.value.publishedAt ?? undefined,
           author: article.value.authorName
             ? { "@type": "Person", name: article.value.authorName }
-            : { "@type": "Organization", name: "SCS Firearm" },
-          publisher: { "@type": "Organization", name: "SCS Firearm" },
+            : { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearm" },
+          publisher: { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearm" },
           ...(article.value.tags && {
             keywords: article.value.tags,
           }),
-        }),
-      ),
-    },
-    {
-      type: "application/ld+json",
-      innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "BreadcrumbList",
-          itemListElement: [
-            { "@type": "ListItem", position: 1, name: "Le Journal", item: `${siteUrl}/blog` },
-            { "@type": "ListItem", position: 2, name: article.value.title, item: pageUrl },
-          ],
         }),
       ),
     },
@@ -83,11 +70,7 @@ useHead({
 <template>
   <article class="post">
     <div class="container">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/blog">Le Journal</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ article.title }}</span>
-      </nav>
+      <AppBreadcrumbs :items="[{ name: 'Le Journal', to: '/blog' }, { name: article.title }]" />
 
       <header class="post__head">
         <p v-if="article.category" class="eyebrow">{{ article.category }}</p>
@@ -113,21 +96,6 @@ useHead({
 <style scoped>
 .post {
   padding: clamp(1.5rem, 4vw, 2.5rem) 0 clamp(3rem, 8vw, 6rem);
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper-dim);
 }
 .post__head {
   max-width: 760px;

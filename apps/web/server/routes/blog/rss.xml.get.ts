@@ -13,12 +13,15 @@ interface BlogListItem {
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
-  const apiBase = config.public.apiBase as string
+  const api = apiUpstream(event)
   const siteUrl = config.public.siteUrl as string
 
   let items: BlogListItem[] = []
   try {
-    const res = await $fetch<{ data: BlogListItem[] }>(`${apiBase}/blog`, { query: { limit: 50 } })
+    const res = await $fetch<{ data: BlogListItem[] }>(`${api.base}/blog`, {
+      query: { limit: 50 },
+      headers: api.headers,
+    })
     items = res.data
   } catch {
     // Degrade to an empty but valid feed if the API is unreachable.

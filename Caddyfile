@@ -7,6 +7,16 @@
 # Configure via env: DOMAIN (e.g. scs-firearms.com) and ACME_EMAIL.
 {
 	email {$ACME_EMAIL}
+
+	# The real client IP (story 9.6). Cloudflare sits in front: its edges are the
+	# only proxies trusted, and CF-Connecting-IP names the visitor. A request that
+	# does not come from Cloudflare keeps its own address — a header it sends
+	# cannot choose its IP. Ranges: https://www.cloudflare.com/ips (checked
+	# 2026-09-24). {client_ip} is then forwarded to the backends, see below.
+	servers {
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers CF-Connecting-IP
+	}
 	# Uncomment to test against Let's Encrypt staging (avoids rate limits):
 	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 }
@@ -32,15 +42,48 @@ www.{$DOMAIN} {
 		-Server
 	}
 
+	# --- Audience measurement (story 9.6) → self-hosted Umami ---
+	# Only the tracker and its collect endpoint, served from our own origin: no
+	# third party sees the visit, and the rest of Umami is not exposed here.
+	@analytics path /_a/script.js /_a/api/send
+	handle @analytics {
+		uri strip_prefix /_a
+		reverse_proxy umami:3000 {
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
 	# --- API + webhooks + health → the Fastify backend ---
 	@api path /api/* /health
+	# Both backends trust exactly one hop — this proxy — and read the client IP
+	# from X-Forwarded-For. It is OVERWRITTEN with the resolved {client_ip}, never
+	# appended to: a chain would carry whatever the client wrote at its start.
 	handle @api {
-		reverse_proxy api:8080
+		reverse_proxy api:8080 {
+			header_up X-Forwarded-For {client_ip}
+		}
 	}
 
 	# --- Everything else → the Nuxt (Nitro) server ---
 	handle {
-		reverse_proxy web:3000
+		reverse_proxy web:3000 {
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+}
+
+# Umami dashboard (story 9.6), behind Umami's own login. Needs a DNS record for
+# stats.DOMAIN (proxied through Cloudflare like www).
+stats.{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy umami:3000 {
+		header_up X-Forwarded-For {client_ip}
 	}
 }
 

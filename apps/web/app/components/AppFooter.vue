@@ -1,5 +1,7 @@
 <script setup lang="ts">
 const year = new Date().getFullYear()
+// Changing one's mind must be as easy as the first choice (story 9.6).
+const { reopen } = useConsent()
 </script>
 
 <template>
@@ -27,6 +29,7 @@ const year = new Date().getFullYear()
       <nav class="ft__col" aria-label="La maison">
         <h2 class="ft__h">La maison</h2>
         <NuxtLink to="/#about">À propos</NuxtLink>
+        <NuxtLink to="/reglementation">Réglementation</NuxtLink>
         <NuxtLink to="/compte">Mon compte</NuxtLink>
         <NuxtLink to="/panier">Panier</NuxtLink>
       </nav>
@@ -43,12 +46,37 @@ const year = new Date().getFullYear()
 
     <div class="container ft__base">
       <p>© {{ year }} SCS Firearm. Tous droits réservés.</p>
+      <nav class="ft__legal" aria-label="Informations légales">
+        <NuxtLink to="/confidentialite">Confidentialité</NuxtLink>
+        <button type="button" class="ft__linkbtn" @click="reopen">Gestion des cookies</button>
+      </nav>
       <p>Édition limitée · Fabriqué en France</p>
     </div>
   </footer>
 </template>
 
 <style scoped>
+.ft__legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+}
+.ft__legal a,
+.ft__linkbtn {
+  color: inherit;
+  text-decoration: none;
+}
+.ft__legal a:hover,
+.ft__linkbtn:hover {
+  color: var(--brass);
+}
+.ft__linkbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
 .ft {
   border-top: 1px solid var(--ink-line);
   background: var(--ink-soft);

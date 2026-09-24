@@ -3,20 +3,19 @@ import type { ArtistListItem, ArtworkListItem, ArtworkSeriesListItem, ArtworkThe
 import { ogImageUrl } from "~/utils/format"
 
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
-const { data, error } = await useFetch<{ data: ArtworkListItem[] }>(`${apiBase}/artworks`, {
+const { data, error } = await useApiFetch<{ data: ArtworkListItem[] }>(`/artworks`, {
   key: "artworks-collection",
 })
 const artworks = computed(() => data.value?.data ?? [])
 
 // Series and themes are editorial navigation, not the catalogue itself: if
 // either call fails the grid below still stands, it simply loses its entry points.
-const { data: seriesData } = await useFetch<{ data: ArtworkSeriesListItem[] }>(`${apiBase}/artworks/series`, {
+const { data: seriesData } = await useApiFetch<{ data: ArtworkSeriesListItem[] }>(`/artworks/series`, {
   key: "artworks-series",
 })
-const { data: themesData } = await useFetch<{ data: ArtworkThemeListItem[] }>(`${apiBase}/artworks/themes`, {
+const { data: themesData } = await useApiFetch<{ data: ArtworkThemeListItem[] }>(`/artworks/themes`, {
   key: "artworks-themes",
 })
 // A series with nothing published in it, or a theme with no series, would be a
@@ -28,7 +27,7 @@ const themes = computed(() => (themesData.value?.data ?? []).filter((t) => t.ser
 // someone's work, so the page introduces whose before it shows what. Like the
 // series, this is editorial navigation — a failed call costs the entry point,
 // never the grid.
-const { data: artistsData } = await useFetch<{ data: ArtistListItem[] }>(`${apiBase}/artists`, { key: "artists" })
+const { data: artistsData } = await useApiFetch<{ data: ArtistListItem[] }>(`/artists`, { key: "artists" })
 const artists = computed(() => artistsData.value?.data ?? [])
 // One artist reads as a presentation, several as a row. The first is laid out
 // wide with their biography; the rest stay compact.
@@ -39,32 +38,25 @@ const pageUrl = `${siteUrl}/collection`
 const description =
   "Découvrez la collection Gun Art : des tirages d'art photographiques en édition strictement limitée, signés, numérotés et livrés avec certificat d'authenticité."
 
-useSeoMeta({
+usePageSeo({
   title: "La collection Gun Art",
   description,
-  ogTitle: "La collection Gun Art — SCS Firearm",
-  ogDescription: description,
-  ogUrl: pageUrl,
-  ogImage: () => ogImageUrl(artworks.value[0]?.featuredImageUrl, siteUrl),
+  path: "/collection",
+  image: () => artworks.value[0]?.featuredImageUrl,
+  imageAlt: () => artworks.value[0]?.title,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
       innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "ItemList",
-          name: "Collection Gun Art",
-          itemListElement: artworks.value.map((a, i) => ({
-            "@type": "ListItem",
-            position: i + 1,
-            url: `${siteUrl}/collection/${a.slug}`,
-            name: a.title,
-          })),
-        }),
+        serializeJsonLd(
+          itemListJsonLd(
+            "Collection Gun Art",
+            artworks.value.map((a) => ({ url: `${siteUrl}/collection/${a.slug}`, name: a.title })),
+          ),
+        ),
       ),
     },
   ],

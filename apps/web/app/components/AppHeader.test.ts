@@ -66,7 +66,7 @@ describe("AppHeader", () => {
     expect(mega.exists()).toBe(true)
     expect(mega.text()).toContain("Carabines") // category from the mocked list
     expect(mega.text()).toContain("Vente libre") // legal category label
-    expect(mega.find('a[href="/boutique?category=carabines"]').exists()).toBe(true)
+    expect(mega.find('a[href="/boutique/categorie/carabines"]').exists()).toBe(true)
   })
 
   it("opens the Gun Art mega-menu with a link to the collection", async () => {

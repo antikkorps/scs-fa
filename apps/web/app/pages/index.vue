@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import type { ArtworkListItem } from "~/types/artwork"
 import type { ProductListResponse } from "~/types/product"
-import { artworkImage, ogImageUrl } from "~/utils/format"
+import { artworkImage, IMAGE_SIZES } from "~/utils/format"
 
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
 // Both universes feed the unified home: artworks (Gun Art gallery) and the
 // featured-first armurerie catalogue.
-const { data: artworkData } = await useFetch<{ data: ArtworkListItem[] }>(`${apiBase}/artworks`, {
+const { data: artworkData } = await useApiFetch<{ data: ArtworkListItem[] }>(`/artworks`, {
   key: "home-artworks",
 })
-const { data: productData } = await useFetch<ProductListResponse>(`${apiBase}/products`, {
+const { data: productData } = await useApiFetch<ProductListResponse>(`/products`, {
   key: "home-products",
   query: { limit: 3 },
 })
@@ -26,35 +25,15 @@ const heroImg = computed(() =>
 )
 
 const description =
-  "SCS Firearm réunit une armurerie de précision — armes, munitions, optiques et accessoires encadrés par la réglementation française — et Gun Art, des tirages d'art en édition limitée, signés, numérotés et certifiés."
+  "Armurerie en ligne réglementée — armes, munitions, optiques, accessoires — et Gun Art, des tirages d'art en édition limitée, signés et numérotés."
 
-useSeoMeta({
+usePageSeo({
   title: "",
+  socialTitle: "SCS Firearm — Armurerie en ligne & Gun Art",
   description,
-  ogTitle: "SCS Firearm — Armurerie de précision & Gun Art",
-  ogDescription: description,
-  ogUrl: siteUrl,
-  ogImage: () => ogImageUrl(featured.value?.featuredImageUrl, siteUrl),
-})
-
-useHead({
-  link: [{ rel: "canonical", href: siteUrl }],
-  script: [
-    {
-      type: "application/ld+json",
-      innerHTML: serializeJsonLd({
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        name: "SCS Firearm",
-        url: siteUrl,
-        description,
-        department: [
-          { "@type": "Store", name: "Armurerie SCS Firearm", url: `${siteUrl}/boutique` },
-          { "@type": "Store", name: "Gun Art", url: `${siteUrl}/collection` },
-        ],
-      }),
-    },
-  ],
+  path: "/",
+  image: () => featured.value?.featuredImageUrl,
+  imageAlt: () => featured.value?.title,
 })
 </script>
 
@@ -62,17 +41,17 @@ useHead({
   <div class="home">
     <!-- Brand hero -->
     <section class="hero">
-      <img
+      <ResponsiveImage
         v-if="heroImg"
         class="hero__bg"
-        v-img-fallback="heroImg.fallback"
-        :src="heroImg.src"
+        :image="heroImg"
+        :sizes="IMAGE_SIZES.full"
         alt=""
         aria-hidden="true"
         width="1600"
         height="1100"
+        loading="eager"
         fetchpriority="high"
-        decoding="async"
       />
       <div class="hero__veil" />
       <div class="container hero__inner">

@@ -186,10 +186,22 @@ below is the recommended path.
   Let's Encrypt — simpler than ACME behind a proxy. This swaps Caddy's automatic
   HTTPS for an explicit `tls <cert> <key>` (Caddyfile change). *Decision: Origin
   Cert vs keep LE via DNS-01 challenge — see §J.*
-- **Restore the real client IP.** Behind the proxy, Caddy/Fastify otherwise see
-  Cloudflare IPs — which would poison the **rate-limiter** and **audit logs**:
-  - Caddy: global `servers { trusted_proxies static <cloudflare-ranges> }`.
-  - Fastify: enable `trustProxy` so `req.ip` reads the forwarded client IP.
+- **Real client IP — done in story 9.6, keep it that way.** Behind the proxy,
+  Caddy/Fastify would otherwise see Cloudflare IPs — which would poison the
+  **rate-limiter**, **audit logs** and **newsletter consent proofs**:
+  - Caddy (`Caddyfile`, global `servers`): `trusted_proxies static <cloudflare-ranges>`
+    + `client_ip_headers CF-Connecting-IP`, and each `reverse_proxy` **overwrites**
+    `X-Forwarded-For` with `{client_ip}`. Re-check the ranges against
+    <https://www.cloudflare.com/ips> once a year.
+  - Fastify trusts **one hop, and only a private one** (`src/net/client-ip.ts`) —
+    never `trustProxy: true`, whose left-most `X-Forwarded-For` entry is written
+    by the client and makes the rate limiter trivially bypassable.
+  - The Nuxt server calls the API **over the private network**
+    (`NUXT_API_INTERNAL_BASE`) with the visitor's IP and `INTERNAL_API_SECRET`.
+    Without it, every server-rendered page shares one rate-limit budget: a
+    crawler exhausts it and the catalogue starts answering errors.
+  - ⚠️ Nuxt trusts `X-Forwarded-For` unconditionally. That is sound only because
+    `web` publishes no port — Caddy is its sole client. Never publish it.
 - **Lock the origin to Cloudflare.** Set the Hetzner Cloud Firewall to accept
   80/443 **only from Cloudflare IP ranges** (`https://www.cloudflare.com/ips`),
   so no one can bypass the WAF by hitting the IP directly.
@@ -204,6 +216,55 @@ below is the recommended path.
 - [ ] **CSP nonces** to drop `'unsafe-inline'` on script/style (Caddyfile CSP).
 - [ ] **Secret rotation** post-launch (initial secrets were shared during setup).
 - [ ] Container hardening (`cap_drop`, `read_only`) validated in staging.
+
+## Umami — audience measurement (story 9.6)
+
+Self-hosted, in its own database on the existing Postgres. The front loads the
+tracker **only after the visitor accepts** the consent banner (Franck's choice,
+2026-09-24 — even though Umami is cookie-free).
+
+One-time setup:
+
+1. Secrets in `.env`: `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` (`openssl rand -hex 32`).
+2. Database and role (Umami migrates its own schema on start):
+   ```sh
+   docker compose -f docker-compose.prod.yml exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+     -c "CREATE ROLE umami LOGIN PASSWORD '<UMAMI_DB_PASSWORD>';" -c "CREATE DATABASE umami OWNER umami;"
+   docker compose -f docker-compose.prod.yml up -d umami
+   ```
+3. DNS: `stats` record (proxied), like `www`. Log in at `https://stats.<DOMAIN>`
+   with `admin` / `umami` and **change the password at once**; create the
+   client's own user and hand the account over to them.
+4. Add the website (domain `www.<DOMAIN>`), copy its id into `UMAMI_WEBSITE_ID`,
+   then `docker compose -f docker-compose.prod.yml up -d web`.
+
+How it is wired: Caddy exposes only `/_a/script.js` and `/_a/api/send` on the
+public origin (no third party sees the visit, the CSP needs no new source); the
+tracker counts `www.<DOMAIN>` only. The `backup` service dumps the app database
+only — analytics are not backed up (acceptable loss; add a second dump if the
+client wants history preserved).
+
+## Search Console (story 9.6)
+
+1. Add the property `https://www.<DOMAIN>` in Search Console **with the client's
+   Google account**. Either verify by DNS (a TXT record at Cloudflare — nothing
+   to deploy), or pick "HTML tag", put its `content` value in
+   `GOOGLE_SITE_VERIFICATION` and `docker compose -f docker-compose.prod.yml up -d web`.
+2. Submit `https://www.<DOMAIN>/sitemap.xml` (it is also declared in
+   `robots.txt`). There is nothing to "ping": Google retired sitemap pings in 2023.
+3. Do the same in Bing Webmaster Tools (it can import the Search Console property).
+4. After go-live, run the Rich Results Test on a product, an artwork and a
+   category page; the markup is produced by `app/utils/structuredData.ts`.
+
+## Responsive images (story 9.6)
+
+Every catalogue image is stored at 400/800/1400 px in AVIF and WebP. Images
+uploaded before story 9.6 only have WebP; give them their AVIF once, after the
+deploy (idempotent — it only fills what is missing):
+
+```sh
+docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/media/backfill-avif-cli.ts
+```
 
 ## Gun Art visuals (story 11.5)
 

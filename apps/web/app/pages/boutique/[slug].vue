@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import type { ProductDetail, ProductVariant } from "~/types/product"
-import { availabilityLongLabel, availabilitySchemaUrl, availabilityState, isPurchasable } from "~/utils/availability"
-import { artworkImage, CARD_GEOMETRY, formatEuros, ogImageUrl } from "~/utils/format"
+import { availabilityLongLabel, availabilityState, isPurchasable } from "~/utils/availability"
+import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES, ogImageUrl } from "~/utils/format"
 import { conditionLabel, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
+import { productJsonLd } from "~/utils/structuredData"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<ProductDetail>(`${apiBase}/products/slug/${slug}`, {
+const { data, error } = await useApiFetch<ProductDetail>(`/products/slug/${slug}`, {
   key: `product-${slug}`,
 })
 
 if (error.value || !data.value) {
-  throw createError({ statusCode: 404, statusMessage: "Article introuvable", fatal: true })
+  throw missingPageError(error.value, "Article introuvable")
 }
 
 const product = computed(() => data.value as ProductDetail)
@@ -94,50 +94,60 @@ const description = computed(
   () => product.value.seo.metaDescription || product.value.description || `${product.value.name} — SCS Firearm`,
 )
 
-useSeoMeta({
+// Boutique › category › product: the category is the page a visitor (and a
+// crawler) climbs back to.
+const crumbs = computed(() => [
+  { name: "Boutique", to: "/boutique" },
+  ...(product.value.category.slug && product.value.category.name
+    ? [{ name: product.value.category.name, to: categoryPath(product.value.category.slug) }]
+    : []),
+  { name: product.value.name },
+])
+
+usePageSeo({
   title: () => product.value.seo.metaTitle || product.value.name,
+  socialTitle: () => `${product.value.name} — SCS Firearm`,
   description,
-  ogTitle: () => `${product.value.name} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "website",
-  ogUrl: pageUrl,
-  ogImage: () => ogImageUrl(product.value?.featuredImageUrl, siteUrl),
+  path: `/boutique/${slug}`,
+  image: () => product.value.featuredImageUrl,
+  imageAlt: () => product.value.name,
 })
 
+// What search engines are told is about the PRODUCT, not the variant the
+// visitor happens to have selected: it is available if any variant is.
+const productState = computed(() =>
+  availabilityState({
+    stockQty:
+      variants.value.length > 0 ? Math.max(...variants.value.map((v) => v.stockQty ?? 0)) : product.value.stockQty,
+    isUnique: product.value.ancientWeapon?.isUnique ?? false,
+  }),
+)
+const structuredProduct = computed(() =>
+  productJsonLd({
+    siteUrl,
+    pageUrl,
+    name: product.value.name,
+    description: description.value,
+    sku: product.value.sku,
+    image: ogImageUrl(product.value.featuredImageUrl, siteUrl),
+    categoryName: product.value.category.name,
+    legalCategory: legal.value?.category ?? null,
+    state: productState.value,
+    // One price per variant, or the product's own when it has none.
+    pricesTtc: [
+      variants.value[0]?.priceTtc ?? product.value.priceTtc,
+      ...variants.value.slice(1).map((v) => v.priceTtc),
+    ],
+    used: Boolean(product.value.ancientWeapon) || product.value.tags.some((t) => t.slug === "occasion"),
+    makerName: product.value.ancientWeapon?.makerName ?? null,
+  }),
+)
+
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
-      innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "Product",
-          name: product.value.name,
-          description: description.value,
-          image: image.value,
-          sku: product.value.sku,
-          category: product.value.category.name ?? undefined,
-          offers: {
-            "@type": "Offer",
-            priceCurrency: "EUR",
-            price: product.value.priceTtc,
-            availability: availabilitySchemaUrl(state.value),
-            url: pageUrl,
-          },
-        }),
-      ),
-    },
-    {
-      type: "application/ld+json",
-      innerHTML: serializeJsonLd({
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: "Boutique", item: `${siteUrl}/boutique` },
-          { "@type": "ListItem", position: 2, name: product.value.name, item: pageUrl },
-        ],
-      }),
+      innerHTML: computed(() => serializeJsonLd(structuredProduct.value)),
     },
   ],
 })
@@ -146,11 +156,7 @@ useHead({
 <template>
   <article class="detail">
     <div class="container">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/boutique">Boutique</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ product.name }}</span>
-      </nav>
+      <AppBreadcrumbs :items="crumbs" />
 
       <div class="detail__grid">
         <figure class="detail__media">
@@ -160,18 +166,19 @@ useHead({
             :aria-label="`Agrandir l'image : ${product.name}`"
             @click="lightboxOpen = true"
           >
-            <img
-              v-img-fallback="image.fallback"
-              :src="image.src"
+            <ResponsiveImage
+              :image="image"
+              :sizes="IMAGE_SIZES.detail"
               :alt="product.name"
               :width="CARD_GEOMETRY.width"
               :height="CARD_GEOMETRY.height"
-              decoding="async"
+              loading="eager"
+              fetchpriority="high"
             />
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="image.src" :fallback="image.fallback" :alt="product.name" />
+        <ImageLightbox v-model="lightboxOpen" :image="image" :alt="product.name" />
 
         <div class="detail__info">
           <p v-if="product.category.name" class="eyebrow">{{ product.category.name }}</p>
@@ -284,6 +291,7 @@ useHead({
             </dl>
             <p v-if="legal.requiresVerification" class="legal__note">
               La vente est soumise à la vérification de vos documents après la commande.
+              <NuxtLink to="/reglementation" class="legal__more">Comprendre la réglementation</NuxtLink>
             </p>
             <p v-if="product.hasAccessoryRestrictions && product.accessoryRestrictionNotes" class="legal__note">
               {{ product.accessoryRestrictionNotes }}
@@ -339,24 +347,6 @@ useHead({
 <style scoped>
 .detail {
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.25rem, 4vw, 2.25rem);
-}
-.crumbs a {
-  color: var(--paper-dim);
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper);
 }
 .detail__grid {
   display: grid;
@@ -544,6 +534,13 @@ useHead({
   margin: 1rem 0 0;
   font-size: var(--fs-sm);
   color: var(--paper-dim);
+}
+.legal__more {
+  color: var(--brass);
+  white-space: nowrap;
+  /* Colour alone does not tell a link from the sentence around it (WCAG 1.4.1). */
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .detail__cta {
   margin-top: 1.75rem;

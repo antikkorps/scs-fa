@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProductCrossSellItem } from "~/types/product"
-import { artworkImage, formatEuros } from "~/utils/format"
+import { artworkImage, formatEuros, IMAGE_SIZES } from "~/utils/format"
 
 /**
  * Bloc « Fréquemment achetés ensemble » (story 11.8).
@@ -30,14 +30,12 @@ const hasItems = computed(() => props.items.length > 0)
     <ul class="xsell__list">
       <li v-for="{ item, img } in thumbs" :key="item.id" class="xsell__item">
         <NuxtLink :to="`/boutique/${item.slug}`" class="xsell__link">
-          <img
-            v-img-fallback="img.fallback"
-            :src="img.src"
+          <ResponsiveImage
+            :image="img"
+            :sizes="IMAGE_SIZES.thumb"
             :alt="item.name"
             :width="THUMB.width"
             :height="THUMB.height"
-            loading="lazy"
-            decoding="async"
           />
           <span class="xsell__body">
             <span v-if="item.category.name" class="eyebrow">{{ item.category.name }}</span>

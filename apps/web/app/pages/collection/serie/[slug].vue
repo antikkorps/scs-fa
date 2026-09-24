@@ -4,16 +4,15 @@ import { artworkImage } from "~/utils/format"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<{ data: ArtworkSeriesDetail }>(`${apiBase}/artworks/series/${slug}`, {
+const { data, error } = await useApiFetch<{ data: ArtworkSeriesDetail }>(`/artworks/series/${slug}`, {
   key: `series-${slug}`,
 })
 
 if (error.value || !data.value?.data) {
-  throw createError({ statusCode: 404, statusMessage: "Série introuvable", fatal: true })
+  throw missingPageError(error.value, "Série introuvable")
 }
 
 const series = computed(() => data.value?.data as ArtworkSeriesDetail)
@@ -24,20 +23,16 @@ const description = computed(
   () => series.value.intro ?? `${series.value.title}, série d'éditions limitées de la collection Gun Art.`,
 )
 
-useSeoMeta({
+usePageSeo({
   title: () => series.value.title,
   description,
-  ogTitle: () => `${series.value.title} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "article",
-  ogUrl: pageUrl,
-  ogImage: () =>
-    series.value.coverImageUrl ??
-    (artworks.value[0] ? artworkImage(artworks.value[0].featuredImageUrl, artworks.value[0].slug).src : undefined),
+  path: `/collection/serie/${slug}`,
+  // Never the placeholder artworkImage() may return: a stored image, or the brand card.
+  image: () => series.value.coverImageUrl ?? artworks.value[0]?.featuredImageUrl,
+  imageAlt: () => series.value.title,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
@@ -64,19 +59,6 @@ useHead({
         }),
       ),
     },
-    {
-      type: "application/ld+json",
-      innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "BreadcrumbList",
-          itemListElement: [
-            { "@type": "ListItem", position: 1, name: "Collection", item: `${siteUrl}/collection` },
-            { "@type": "ListItem", position: 2, name: series.value.title, item: pageUrl },
-          ],
-        }),
-      ),
-    },
   ],
 })
 </script>
@@ -84,11 +66,7 @@ useHead({
 <template>
   <div class="series">
     <section class="container intro">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/collection">Collection</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ series.title }}</span>
-      </nav>
+      <AppBreadcrumbs :items="[{ name: 'Collection', to: '/collection' }, { name: series.title }]" />
 
       <p class="eyebrow">Série</p>
       <h1 class="intro__title">{{ series.title }}</h1>
@@ -127,25 +105,6 @@ useHead({
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
   padding-bottom: clamp(1.75rem, 5vw, 3rem);
   max-width: 760px;
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.2rem, 4vw, 2rem);
-}
-.crumbs a {
-  color: var(--paper-dim);
-  text-decoration: none;
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper);
 }
 .intro__title {
   font-size: var(--fs-3xl);

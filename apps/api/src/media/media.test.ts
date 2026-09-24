@@ -18,6 +18,8 @@ import {
   products,
   users,
 } from "../db/schema.js"
+import { storage } from "../storage/index.js"
+import { backfillAvifRenditions } from "./service.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
 const ADMIN_EMAIL = "testmedia-admin@testmedia.local"
@@ -191,12 +193,18 @@ describe("catalogue media gallery (story 7.5b)", () => {
     expect(data.srcset).toContain("400w")
     expect(data.srcset).toContain("1400w")
 
-    // Every rendition is really there.
+    // Every rendition is really there — in both formats (story 9.6), each one
+    // a decodable image of the width it claims.
     for (const w of data.widths) {
-      const img = await app.inject({ method: "GET", url: `/api/media/${data.id}/${w}.webp` })
-      expect(img.statusCode).toBe(200)
-      expect(img.headers["content-type"]).toBe("image/webp")
-      expect(img.headers["cache-control"]).toContain("immutable")
+      for (const format of ["webp", "avif"]) {
+        const img = await app.inject({ method: "GET", url: `/api/media/${data.id}/${w}.${format}` })
+        expect(img.statusCode).toBe(200)
+        expect(img.headers["content-type"]).toBe(`image/${format}`)
+        expect(img.headers["cache-control"]).toContain("immutable")
+        const meta = await sharp(img.rawPayload).metadata()
+        expect(meta.format).toBe(format === "avif" ? "heif" : "webp")
+        expect(meta.width).toBe(w)
+      }
     }
   })
 
@@ -220,10 +228,13 @@ describe("catalogue media gallery (story 7.5b)", () => {
     const data = res.json().data
     expect(data.watermarked).toBe(true)
 
-    // Ink is really laid down: a flat background would have ~0 spread.
-    const bytes = (await app.inject({ method: "GET", url: `/api/media/${data.id}/800.webp` })).rawPayload
-    const stats = await sharp(bytes).stats()
-    expect(Math.max(...stats.channels.map((c) => c.stdev))).toBeGreaterThan(1)
+    // Ink is really laid down: a flat background would have ~0 spread — in the
+    // AVIF too, or it would be the unprotected hole (story 9.6).
+    for (const format of ["webp", "avif"]) {
+      const bytes = (await app.inject({ method: "GET", url: `/api/media/${data.id}/800.${format}` })).rawPayload
+      const stats = await sharp(bytes).stats()
+      expect(Math.max(...stats.channels.map((c) => c.stdev))).toBeGreaterThan(1)
+    }
 
     // The print-grade original never travels over a public route.
     expect((await app.inject({ method: "GET", url: `/api/media/${data.id}/original` })).statusCode).toBe(404)
@@ -314,8 +325,9 @@ describe("catalogue media gallery (story 7.5b)", () => {
     const removed = gallery[0]
 
     expect((await asAdmin("DELETE", `${BASE}/${removed.id}`)).statusCode).toBe(204)
-    // The bytes are gone too, not just the row.
+    // The bytes are gone too, not just the row — every format.
     expect((await app.inject({ method: "GET", url: `/api/media/${removed.id}/400.webp` })).statusCode).toBe(404)
+    expect((await app.inject({ method: "GET", url: `/api/media/${removed.id}/400.avif` })).statusCode).toBe(404)
 
     const after = (await asAdmin("GET", `${BASE}?ownerType=artist&ownerId=${artistId}`)).json().data
     expect(after).toHaveLength(1)
@@ -354,6 +366,25 @@ describe("catalogue media gallery (story 7.5b)", () => {
 
     expect(await db.select().from(media).where(eq(media.ownerId, productId))).toHaveLength(0)
     expect((await app.inject({ method: "GET", url: `/api/media/${uploaded.id}/400.webp` })).statusCode).toBe(404)
+  })
+
+  it("backfills the AVIF of an upload made before AVIF existed — once (story 9.6)", async () => {
+    // The artist still exists here (the product was deleted just above).
+    const data = (await upload({ ownerType: "artist", ownerId: artistId })).json().data
+    // Simulate a pre-9.6 upload: WebP only.
+    for (const w of data.widths) await storage.delete(`media/${data.id}/${w}.avif`)
+    expect((await app.inject({ method: "GET", url: `/api/media/${data.id}/800.avif` })).statusCode).toBe(404)
+
+    const first = await backfillAvifRenditions()
+    expect(first.created).toBeGreaterThanOrEqual(data.widths.length)
+    expect(first.failed).toBe(0)
+    const img = await app.inject({ method: "GET", url: `/api/media/${data.id}/800.avif` })
+    expect(img.statusCode).toBe(200)
+    expect((await sharp(img.rawPayload).metadata()).width).toBe(800)
+
+    // Re-running touches nothing.
+    const again = await backfillAvifRenditions()
+    expect(again.created).toBe(0)
   })
 
   it("rejects a traversal attempt on the public route", async () => {

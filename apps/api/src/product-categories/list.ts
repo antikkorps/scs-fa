@@ -14,6 +14,7 @@ export const listProductCategoriesRoute: FastifyPluginAsync = async (fastify) =>
         name: productCategories.name,
         category: productCategories.category,
         displayOrder: productCategories.displayOrder,
+        description: productCategories.description,
       })
       .from(productCategories)
       .where(ne(productCategories.category, "gun_art"))

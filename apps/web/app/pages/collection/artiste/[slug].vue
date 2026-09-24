@@ -3,39 +3,40 @@ import type { ArtistDetail } from "~/types/artwork"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<{ data: ArtistDetail }>(`${apiBase}/artists/${slug}`, { key: `artist-${slug}` })
+const { data, error } = await useApiFetch<{ data: ArtistDetail }>(`/artists/${slug}`, { key: `artist-${slug}` })
 
 if (error.value || !data.value?.data) {
-  throw createError({ statusCode: 404, statusMessage: "Artiste introuvable", fatal: true })
+  throw missingPageError(error.value, "Artiste introuvable")
 }
 
 const artist = computed(() => data.value?.data as ArtistDetail)
 
 const pageUrl = `${siteUrl}/collection/artiste/${slug}`
+// A headline alone is a few words; framed with who and where, it describes the page.
 const description = computed(
   () =>
     artist.value.metaDescription ??
-    artist.value.headline ??
-    artist.value.bio ??
-    `${artist.value.name}, artiste Gun Art.`,
+    [
+      `${artist.value.name}${artist.value.headline ? `, ${artist.value.headline.replace(/\.$/, "")}` : ""}.`,
+      "Parcours, séries et tirages d'art en édition limitée de la collection Gun Art de SCS Firearm.",
+      artist.value.bio ?? "",
+    ].join(" "),
 )
 
-useSeoMeta({
-  title: () => artist.value.metaTitle ?? artist.value.name,
+usePageSeo({
+  title: () => artist.value.metaTitle ?? artist.value.name ?? "",
+  socialTitle: () => `${artist.value.name} — SCS Firearm`,
   description,
-  ogTitle: () => `${artist.value.name} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "profile",
-  ogUrl: pageUrl,
-  ogImage: () => artist.value.portraitUrl ?? undefined,
+  path: `/collection/artiste/${slug}`,
+  type: "profile",
+  image: () => artist.value.portraitUrl,
+  imageAlt: () => artist.value.name,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
@@ -46,7 +47,7 @@ useHead({
           name: artist.value.name,
           description: artist.value.bio ?? description.value,
           url: pageUrl,
-          ...(artist.value.portraitUrl && { image: artist.value.portraitUrl }),
+          ...(artist.value.portraitUrl && { image: ogImageUrl(artist.value.portraitUrl, siteUrl) }),
           ...(artist.value.headline && { jobTitle: artist.value.headline }),
           ...(artist.value.series.length > 0 && {
             // The series are the body of work; naming them here is what ties the
@@ -67,11 +68,7 @@ useHead({
 <template>
   <div class="artist">
     <section class="container intro">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/collection">Collection</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ artist.name }}</span>
-      </nav>
+      <AppBreadcrumbs :items="[{ name: 'Collection', to: '/collection' }, { name: artist.name }]" />
 
       <div class="hero" :class="{ 'hero--portrait': artist.portraitUrl }">
         <img
@@ -133,25 +130,6 @@ useHead({
 <style scoped>
 .intro {
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.2rem, 4vw, 2rem);
-}
-.crumbs a {
-  color: var(--paper-dim);
-  text-decoration: none;
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper);
 }
 .hero {
   display: grid;

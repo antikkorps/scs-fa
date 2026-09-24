@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import type { AncientWeaponListResponse } from "~/types/product"
-import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
+import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES } from "~/utils/format"
 import { conditionLabel, legalCategoryLabel } from "~/utils/product"
 
 const PAGE_SIZE = 24
 
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
 const route = useRoute()
@@ -45,7 +44,7 @@ const apiQuery = computed(() => {
   return query
 })
 
-const { data, error, pending } = await useFetch<AncientWeaponListResponse>(`${apiBase}/ancient-weapons`, {
+const { data, error, pending } = await useApiFetch<AncientWeaponListResponse>(`/ancient-weapons`, {
   key: "ancient-weapons",
   query: apiQuery,
 })
@@ -89,35 +88,37 @@ function toggleTag(slug: string) {
 
 const pageUrl = `${siteUrl}/armes-de-collection`
 const description =
-  "Armes anciennes et historiques : pièces uniques expertisées, d'avant 1900 aux armes de guerre. Provenance documentée, état détaillé, vente encadrée par la réglementation française."
+  "Armes anciennes et historiques, pièces uniques expertisées : provenance documentée, état détaillé, vente encadrée par la réglementation française."
 
-useSeoMeta({
+usePageSeo({
   title: "Armes de collection & historiques",
   description,
-  ogTitle: "Armes de collection & historiques — SCS Firearm",
-  ogDescription: description,
-  ogUrl: pageUrl,
+  path: "/armes-de-collection",
+  // Later pages of results canonicalise to themselves, below.
+  canonical: false,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
+  link: [
+    {
+      key: "canonical",
+      rel: "canonical",
+      href: computed(() => catalogueCanonical(siteUrl, "/armes-de-collection", page.value)),
+    },
+  ],
   script: [
     {
       type: "application/ld+json",
       innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "ItemList",
-          name: "Armes de collection & historiques",
-          itemListElement: weapons.value.map((w, i) => ({
-            "@type": "ListItem",
-            position: i + 1,
+        serializeJsonLd(
+          itemListJsonLd(
+            "Armes de collection & historiques",
             // One canonical URL per weapon: the piece lives in the catalogue,
             // this universe is a curated view onto it.
-            url: `${siteUrl}/boutique/${w.slug}`,
-            name: w.name,
-          })),
-        }),
+            weapons.value.map((w) => ({ url: `${siteUrl}/boutique/${w.slug}`, name: w.name })),
+            (page.value - 1) * PAGE_SIZE,
+          ),
+        ),
       ),
     },
   ],
@@ -170,9 +171,9 @@ useHead({
           <li v-for="({ w, img }, i) in cards" :key="w.id">
             <NuxtLink :to="`/boutique/${w.slug}`" class="card" :class="{ 'card--sold': !w.available }">
               <div class="card__media">
-                <img
-                  v-img-fallback="img.fallback"
-                  :src="img.src"
+                <ResponsiveImage
+                  :image="img"
+                  :sizes="IMAGE_SIZES.card"
                   :alt="w.name"
                   :width="CARD_GEOMETRY.width"
                   :height="CARD_GEOMETRY.height"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtistListItem } from "~/types/artwork"
-import { artworkImage } from "~/utils/format"
+import { artworkImage, IMAGE_SIZES } from "~/utils/format"
 
 // The entry point into Gun Art is the artist, not the print (Franck, 2026-09-23):
 // the house sells someone's work, and a visitor who does not know whose is
@@ -19,15 +19,13 @@ const portrait = computed(() =>
 
 <template>
   <NuxtLink :to="`/collection/artiste/${artist.slug}`" class="artist" :class="{ 'artist--lead': lead }">
-    <img
-      v-img-fallback="portrait.fallback"
+    <ResponsiveImage
       class="artist__portrait"
-      :src="portrait.src"
+      :image="portrait"
+      :sizes="IMAGE_SIZES.portrait"
       :alt="`Portrait de ${artist.name}`"
       :width="PORTRAIT.width"
       :height="PORTRAIT.height"
-      loading="lazy"
-      decoding="async"
     />
     <div class="artist__body">
       <p class="eyebrow">L'artiste</p>

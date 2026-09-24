@@ -495,7 +495,7 @@
 - Périmètre : exposition MCP en lecture **étudiée mais non implémentée** (l'API JSON publique est déjà documentée dans `llms.txt` comme surface agent ; MCP = amélioration future)
 - [x] **Vérifié** : smoke `/sitemap.xml` (12 URLs), `/robots.txt`, `/llms.txt`, `/llms-full.txt`, WebSite/SearchAction en home ; `pnpm -r typecheck` clean, **279 API / 65 shared / 21 web** (8 nouveaux `seo.test.ts`) au vert, Biome clean
 
-**Story 9.6** — SEO avancé « aux petits oignons » — 🔜 **À FAIRE (après)**
+**Story 9.6** — SEO avancé « aux petits oignons » — ✅ **codée le 2026-09-24** (branche `feat/story-9.6-seo`, PR à ouvrir)
 
 > Objectif : passer d'un SEO déjà solide (9.1–9.5) à un niveau **irréprochable** — audit Lighthouse SEO 100 + Rich Results Test / validateur Schema.org verts comme critères de *done*.
 
@@ -508,6 +508,36 @@
 - **Hygiène technique** : canonicals sur vues filtrées/paginées, cohérence trailing-slash + redirections 301, **audit des meta descriptions/titres uniques**, `hreflang` fr, `theme-color`, `manifest`.
 - **Mesure** : Search Console (vérification + soumission sitemap) et **analytics** (GA4 / Plausible — **décision en attente**, cf. `docs/CLARIFICATIONS_A_TRANCHER.md` §I/G2).
 - **Agent-ready** : maintenir `llms.txt` à jour avec les 2 univers ; envisager l'exposition MCP en lecture (étudiée en 9.5, non implémentée).
+
+**Livré (2026-09-24)** — décisions de Franck du jour : images = **variantes sharp côté API** (pas de `@nuxt/image`), analytics = **Umami auto-hébergé + bandeau de consentement quoi qu'il arrive**, **pages de catégorie indexables**, **pas de point de vente physique**, **pages réglementation rédigées par Claude puis relues**, **politique de confidentialité dans la 9.6**, et correction du rate-limit par **appel interne + IP de confiance**.
+
+- [x] **Sitemap complet** via `GET /api/seo/sitemap` (une requête, `updatedAt` + image, mêmes règles de visibilité que les pages) : boutique, **catégories**, **chaque produit**, armes de collection, Gun Art, journal ; `lastmod` partout, **image sitemap**, URL percent-encodées. 🐞 L'espace de noms était `sitemap.org` au lieu de `sitemaps.org`
+- [x] **Pages de catégorie** `/boutique/categorie/[slug]` (title, description, H1, canonical propres) ; `?category=` → **301** ; slug produit `categorie` réservé (schémas partagés) ; composant `ShopCatalogue` partagé ; 🐞 les sélecteurs de catégorie affichaient « toutes » après hydratation
+- [x] **llms.txt / llms-full.txt** réécrits pour les **2 univers** (contraintes légales pour un agent, catalogue armurerie complet par catégorie, prix au format français)
+- [x] **Données structurées** : `Product`/`Offer` complets (vendeur, état neuf/occasion, fabricant, catégorie légale, `AggregateOffer` sur déclinaisons), œuvres en `VisualArtwork` + `Product` tant qu'il reste des tirages, `ItemList` sur les listings, **`AppBreadcrumbs`** unique (fil visible + `BreadcrumbList`, passe par la catégorie / la série), **une seule `Organization`** avec `@id` et deux `OnlineStore`. 🐞 `image` était l'objet `{src, fallback}` (placeholder `data:`) sur produits et œuvres, et relative sur le journal
+- [x] **Social cards** partout (`usePageSeo`) : OG + Twitter complets, **carte de marque** 1200×630 par défaut, descriptions bornées à 160 car. ; favicon, icônes, manifest (**monogramme provisoire** en attendant un logo)
+- [x] **Hygiène** : slash final et majuscules → **301** ; **`X-Robots-Tag: noindex`** sur compte/panier/commande/auth/newsletter/recherche ; `robots.txt` ne bloque plus `/recherche` (son noindex n'était jamais lu) ; `hreflang` jugé inutile (site monolingue)
+- [x] **Images responsives** : AVIF + WebP à 400/800/1400 px (le filigrane aussi en AVIF), `<picture>` + `sizes` par mise en page, **backfill** `media:backfill-avif`. Mesuré : une carte desktop charge 47 Ko (`400.avif`) au lieu d'environ 255 Ko
+- [x] **Consentement + Umami** (3.2.0, base dédiée, script servi depuis `/_a/`, tableau de bord sur `stats.`) ; **politique de confidentialité** `/confidentialite` ; **guide réglementation** `/reglementation` + `FAQPage` (pas de `HowTo` : abandonné par Google en 2023)
+- [x] **Search Console** : balise de vérification par variable d'env, procédure dans `docs/DEPLOY.md`
+- [x] 🔐 **Sécurité (trouvé en audit)** : tout le SSR partageait **un seul quota de rate-limit** (IP du serveur Nuxt) — un robot suffisait à faire tomber le catalogue ; `trustProxy: true` rendait le rate-limit **contournable** (XFF choisi par le client) ; les fiches répondaient **404 sur toute erreur API** (désindexation). Corrigé : appel interne + IP visiteur + secret, confiance limitée au pair privé, Caddy écrase XFF, **503** hors vrai 404
+- [x] ⚡ **Perf** : le module PrimeVue injectait **~470 Ko de CSS** et sérialisait le thème (~125 Ko) dans **chaque page publique** → HTML 645 Ko → **76 Ko**
+- [x] **Mesuré (Lighthouse mobile, build de prod derrière compression)** : **SEO 100 sur les 8 pages types**, CLS 0, accessibilité 95-100, performance 83-89, **LCP 3,2-3,9 s**
+
+**Reste ouvert :**
+
+- ⚠️ **Relecture de Fred et Steph** : `/confidentialite` et `/reglementation` sont en **noindex** et hors sitemap tant que `reviewed` n'est pas basculé dans `apps/web/shared/utils/editorialPages.ts`. La politique attend : **raison sociale, SIRET, adresse, e-mail de contact**, **durées de conservation** (compte, pièces justificatives, journal d'audit, statistiques), prestataire SMTP
+- ⚠️ **Données de seed à corriger après validation** : la catégorie D est décrite « libres de **port**/détention » (faux : port et transport interdits sans motif légitime) ; la catégorie C n'accepte que le permis de chasser comme pièce (la **licence de tir** devrait l'être aussi)
+- **LCP mobile 3,2-3,9 s** (objectif 2,5 s). Pistes mesurées : **retirer PrimeVue**, installé mais **aucun composant n'est utilisé** (bundle d'entrée 397 → 209 Ko, LCP accueil 3,3 → 3,0 s) — **décision de dépendance pour Franck** ; ensuite police de titre en sous-ensemble, CSS critique
+- **Droits RGPD** : pas de **suppression de compte** ni d'**export des données** en libre-service (la politique renvoie vers l'e-mail) ; pas de purge des comptes supprimés (`deletedAt` jamais utilisé)
+- Alerte « Content security policy » dans les bonnes pratiques Lighthouse (déjà présente avant la story, sans détail) — à creuser
+- Images OG **générées** par produit sans visuel (aujourd'hui : carte de marque) ; exposition **MCP** en lecture (non faite) ; logo définitif
+- Mise en ligne : créer la base Umami, `INTERNAL_API_SECRET`, enregistrement DNS `stats`, backfill AVIF (`docs/DEPLOY.md`)
+
+**Story 12.x** — Mentions légales & CGV — 🔜 **À FAIRE** _(créée le 2026-09-24, sortie de la 9.6)_
+
+- Pages **mentions légales** (éditeur, hébergeur, directeur de publication) et **CGV** (vente à distance, droit de rétractation et ses exceptions, spécificités des armes réglementées, livraison, garanties), rédigées puis **relues par un juriste** ; même mécanisme de relecture que `/confidentialite`
+- Liens dans le pied de page et au tunnel d'achat (acceptation des CGV à la commande)
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 

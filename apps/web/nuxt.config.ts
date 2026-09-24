@@ -1,4 +1,7 @@
-import Aura from "@primevue/themes/aura"
+import { fileURLToPath } from "node:url"
+
+// Keeps a page out of search indexes while letting crawlers follow its links.
+const NOINDEX = { "x-robots-tag": "noindex, follow" }
 
 export default defineNuxtConfig({
   compatibilityDate: "2026-02-07",
@@ -40,17 +43,26 @@ export default defineNuxtConfig({
   },
 
   primevue: {
-    options: {
-      theme: {
-        preset: Aura,
-        options: {
-          darkModeSelector: "system",
-        },
-      },
-    },
+    // Story 9.6: never inline PrimeVue's CSS into server-rendered pages. By
+    // default the module pushes the styles of EVERY component it registers
+    // (datatable, datepicker, treetable…) into the <head> of every page —
+    // ~470 KB on each public page, which uses none of them, and the cause of a
+    // 7 s mobile LCP (measured). PrimeVue only serves the back-office, rendered
+    // client-side (`ssr: false` below), where each component injects its own
+    // styles as it mounts.
+    loadStyles: false,
+    // The theme is imported, not passed as an option: an option is copied into
+    // the public runtime config, i.e. into every page (see app/primevue-theme.ts).
+    importTheme: { as: "ScsPrimeVueTheme", from: fileURLToPath(new URL("./app/primevue-theme.ts", import.meta.url)) },
   },
 
   runtimeConfig: {
+    // Server-only (story 9.6). The Nuxt server reaches the API over the private
+    // network instead of going back out through Cloudflare, and says on whose
+    // behalf it calls: see server/utils/upstream.ts. Both empty in dev, where
+    // the public apiBase is already local.
+    apiInternalBase: "",
+    internalApiSecret: "",
     public: {
       // Dev API runs on 8081 (see apps/api/.env); override via API_BASE_URL in prod.
       apiBase: process.env.API_BASE_URL ?? "http://localhost:8081/api",
@@ -58,6 +70,13 @@ export default defineNuxtConfig({
       // Stripe publishable key (public by design). Set via
       // NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in apps/web/.env.
       stripePublishableKey: "",
+      // Umami website id (story 9.6), via NUXT_PUBLIC_UMAMI_WEBSITE_ID. Empty =
+      // no measurement at all; set, the tracker still waits for consent.
+      umamiWebsiteId: "",
+      // Search Console ownership token (story 9.6), via
+      // NUXT_PUBLIC_GOOGLE_SITE_VERIFICATION — the content of Google's
+      // "HTML tag" method. Empty = no tag.
+      googleSiteVerification: "",
     },
   },
 
@@ -69,8 +88,27 @@ export default defineNuxtConfig({
   // shell alone removes the mismatch at its root, and spares the server the work.
   // `/admin/**` does not match `/admin` itself — the dashboard needs its own rule.
   routeRules: {
-    "/admin": { ssr: false },
-    "/admin/**": { ssr: false },
+    "/admin": { ssr: false, headers: NOINDEX },
+    "/admin/**": { ssr: false, headers: NOINDEX },
+    // Private or transactional pages (story 9.6): never in an index. A header
+    // rather than a meta tag, so it also covers the redirects protected pages
+    // answer, and a page that forgets its own tag. Not in robots.txt on purpose:
+    // a disallowed URL is never fetched, so its noindex is never read.
+    ...Object.fromEntries(
+      [
+        "/connexion",
+        "/inscription",
+        "/mot-de-passe-oublie",
+        "/reset-password",
+        "/panier",
+        "/compte",
+        "/compte/**",
+        "/commande",
+        "/commande/**",
+        "/newsletter/**",
+        "/recherche",
+      ].map((path) => [path, { headers: NOINDEX }]),
+    ),
   },
 
   // Dev only: relative `/api/**` (e.g. blog image URLs embedded in articles)
@@ -95,6 +133,13 @@ export default defineNuxtConfig({
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "theme-color", content: "#0e0e10" },
         { name: "format-detection", content: "telephone=no" },
+      ],
+      // Provisional monogram (story 9.6) until a real logo exists — files in public/.
+      link: [
+        { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+        { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
+        { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+        { rel: "manifest", href: "/site.webmanifest" },
       ],
     },
   },

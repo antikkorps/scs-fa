@@ -27,6 +27,7 @@ import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
 import { adminMediaRoutes, mediaRoutes } from "./media/index.js"
 import { adminMetricsRoutes } from "./metrics/admin.js"
+import { isInternalCall, trustDirectPrivatePeer } from "./net/client-ip.js"
 import { newsletterRoutes } from "./newsletter/index.js"
 import { adminOrderRoutes } from "./orders/admin.js"
 import { orderRoutes } from "./orders/index.js"
@@ -37,6 +38,7 @@ import { productCategoryRoutes } from "./product-categories/index.js"
 import { adminProductRoutes } from "./products/admin.js"
 import { productRoutes } from "./products/index.js"
 import { searchRoutes } from "./search/index.js"
+import { seoRoutes } from "./seo/index.js"
 import { adminShipmentRoutes } from "./shipments/admin.js"
 import { startShipmentTrackingScheduler } from "./shipments/tracking/sync.js"
 import { adminTagRoutes } from "./tags/admin.js"
@@ -46,7 +48,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: buildLoggerOptions(env),
     genReqId: (req) => genReqId(req),
-    trustProxy: env.NODE_ENV === "production",
+    // One hop, and only a private one: see src/net/client-ip.ts.
+    trustProxy: trustDirectPrivatePeer,
   })
 
   // Centralised error handling + throttled admin alerting on 5xx (Story 7.2).
@@ -58,7 +61,10 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   if (env.NODE_ENV !== "test") {
     await fastify.register(fastifyRateLimit, {
-      max: 100,
+      // Keyed on request.ip — the visitor, even when the Nuxt server calls on
+      // their behalf. Those calls get a larger budget: one server-rendered page
+      // fans out into several API requests.
+      max: (request) => (isInternalCall(request, env.INTERNAL_API_SECRET) ? 300 : 100),
       timeWindow: "1 minute",
     })
   }
@@ -102,6 +108,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(blogImageRoutes, { prefix: "/api/blog/images" })
   await fastify.register(newsletterRoutes, { prefix: "/api/newsletter" })
   await fastify.register(searchRoutes, { prefix: "/api/search" })
+  await fastify.register(seoRoutes, { prefix: "/api/seo" })
   await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
   await fastify.register(addressRoutes, { prefix: "/api/addresses" })

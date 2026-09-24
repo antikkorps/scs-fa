@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import type { ArtworkDetail } from "~/types/artwork"
-import { artworkGeometry, artworkImage, availabilityLabel, formatEuros, ogImageUrl } from "~/utils/format"
+import { artworkGeometry, artworkImage, availabilityLabel, formatEuros, IMAGE_SIZES, ogImageUrl } from "~/utils/format"
+import { artworkJsonLd } from "~/utils/structuredData"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<{ data: ArtworkDetail }>(`${apiBase}/artworks/${slug}`, {
+const { data, error } = await useApiFetch<{ data: ArtworkDetail }>(`/artworks/${slug}`, {
   key: `artwork-${slug}`,
 })
 
 if (error.value || !data.value?.data) {
-  throw createError({ statusCode: 404, statusMessage: "Œuvre introuvable", fatal: true })
+  throw missingPageError(error.value, "Œuvre introuvable")
 }
 
 // Safe: we throw a fatal 404 above when data is missing, so this only renders with data.
@@ -31,69 +31,44 @@ const availablePrints = computed(() => art.value.prints.filter((p) => p.status =
 const soldOut = computed(() => availablePrints.value.length === 0)
 
 const pageUrl = `${siteUrl}/collection/${slug}`
+
+// Collection › series (when published) › artwork.
+const crumbs = computed(() => [
+  { name: "Collection", to: "/collection" },
+  ...(series.value?.title ? [{ name: series.value.title, to: `/collection/serie/${series.value.slug}` }] : []),
+  { name: art.value.title },
+])
 const description = computed(
   () => art.value.description ?? `${art.value.title}, tirage d'art en édition limitée signé et numéroté.`,
 )
 
-useSeoMeta({
+usePageSeo({
   title: () => art.value.title,
   description,
-  ogTitle: () => `${art.value.title} — SCS Firearm`,
-  ogDescription: description,
-  ogType: "article",
-  ogUrl: pageUrl,
-  ogImage: () => ogImageUrl(art.value?.featuredImageUrl, siteUrl),
+  path: `/collection/${slug}`,
+  image: () => art.value.featuredImageUrl,
+  imageAlt: heroAlt,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
       innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "VisualArtwork",
-          name: art.value.title,
-          image: hero.value,
-          artform: "Photographie",
-          artMedium: "Tirage pigmentaire",
-          creator: artist.value
-            ? { "@type": "Person", name: artist.value.name, url: `${siteUrl}/collection/artiste/${artist.value.slug}` }
-            : undefined,
-          // The series is the editorial unit: saying which one this print belongs
-          // to is what lets a search engine read the collection as a body of work.
-          isPartOf: series.value
-            ? {
-                "@type": "CreativeWorkSeries",
-                name: series.value.title,
-                url: `${siteUrl}/collection/serie/${series.value.slug}`,
-              }
-            : undefined,
-          description: description.value,
-          url: pageUrl,
-          ...(art.value.priceFromTtc !== null && {
-            offers: {
-              "@type": "Offer",
-              priceCurrency: "EUR",
-              price: art.value.priceFromTtc,
-              availability: soldOut.value ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
-              url: pageUrl,
-            },
+        serializeJsonLd(
+          artworkJsonLd({
+            siteUrl,
+            pageUrl,
+            title: art.value.title,
+            description: description.value,
+            image: ogImageUrl(art.value.featuredImageUrl, siteUrl),
+            artist: artist.value,
+            series: series.value,
+            priceFromTtc: art.value.priceFromTtc,
+            availablePrints: availablePrints.value.length,
           }),
-        }),
+        ),
       ),
-    },
-    {
-      type: "application/ld+json",
-      innerHTML: serializeJsonLd({
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: "Collection", item: `${siteUrl}/collection` },
-          { "@type": "ListItem", position: 2, name: art.value.title, item: pageUrl },
-        ],
-      }),
     },
   ],
 })
@@ -102,18 +77,15 @@ useHead({
 <template>
   <article class="detail">
     <div class="container">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/collection">Collection</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ art.title }}</span>
-      </nav>
+      <AppBreadcrumbs :items="crumbs" />
 
       <div class="detail__grid">
         <figure class="detail__media" :style="{ aspectRatio: heroGeometry.ratio }">
           <button type="button" class="detail__zoom" :aria-label="`Agrandir l'image : ${art.title}`" @click="lightboxOpen = true">
-            <ProtectedImage
-              v-img-fallback="hero.fallback"
-              :src="hero.src"
+            <ResponsiveImage
+              protect
+              :image="hero"
+              :sizes="IMAGE_SIZES.detail"
               :alt="heroAlt"
               :width="heroGeometry.width"
               :height="heroGeometry.height"
@@ -123,7 +95,7 @@ useHead({
             <span class="detail__zoomhint" aria-hidden="true">⤢</span>
           </button>
         </figure>
-        <ImageLightbox v-model="lightboxOpen" :src="hero.src" :fallback="hero.fallback" :alt="heroAlt" protect />
+        <ImageLightbox v-model="lightboxOpen" :image="hero" :alt="heroAlt" protect />
 
         <div class="detail__info">
           <NuxtLink v-if="artist" :to="`/collection/artiste/${artist.slug}`" class="eyebrow eyebrow--link">
@@ -211,24 +183,6 @@ useHead({
 }
 .detail {
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.25rem, 4vw, 2.25rem);
-}
-.crumbs a {
-  color: var(--paper-dim);
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper);
 }
 .detail__grid {
   display: grid;

@@ -141,6 +141,12 @@ const envSchema = z.object({
   // Canonical public front URL. Used for the CORS origin in production and for
   // the links embedded in transactional emails. Override per environment.
   WEB_BASE_URL: z.string().url().default("https://www.scs-firearms.com"),
+
+  // Shared with the Nuxt server (story 9.6). A call carrying it comes from the
+  // front's own server — SSR, BFF proxy — on behalf of a visitor whose IP it
+  // forwards; it gets a larger rate-limit budget, since one page render fans out
+  // into several API calls. Unset, those calls are simply limited like any other.
+  INTERNAL_API_SECRET: z.string().min(32).optional(),
 })
 
 export const env = envSchema.parse(process.env)

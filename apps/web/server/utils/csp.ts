@@ -40,6 +40,13 @@ export function contentSecurityPolicy(nonce: string): string {
  * them too is harmless and keeps the rule simple. Idempotent: a tag that
  * already carries a nonce is left untouched.
  */
-export function withScriptNonce(fragments: string[], nonce: string): string[] {
-  return fragments.map((f) => f.replace(/<script(?![^>]*\snonce=)/gi, `<script nonce="${nonce}"`))
+export function withScriptNonce(fragments: unknown[], nonce: string): string[] {
+  // Modules do not all push strings: with `loadStyles: false` the PrimeVue
+  // module pushes empty ARRAYS into the head (story 9.6), which crashed every
+  // page in production. Flattened and non-strings dropped — exactly what
+  // Nitro's own join would have made of them, minus the crash.
+  return fragments
+    .flat(Number.POSITIVE_INFINITY)
+    .filter((f): f is string => typeof f === "string")
+    .map((f) => f.replace(/<script(?![^>]*\snonce=)/gi, `<script nonce="${nonce}"`))
 }

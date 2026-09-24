@@ -1,6 +1,6 @@
 // Pure presentation helpers — unit-tested in format.test.ts.
 
-import type { ArtworkOrientation } from "@armurier/shared"
+import { type ArtworkOrientation, mediaSrcset } from "@armurier/shared"
 
 const EUROS = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" })
 
@@ -93,9 +93,24 @@ export function artworkImage(
   seed: string,
   w = 1200,
   h = 1500,
-): { src: string; fallback: string } {
+): ImageSource {
   const fallback = fallbackImage(seed, w, h)
-  return { src: featuredImageUrl && featuredImageUrl.length > 0 ? featuredImageUrl : fallback, fallback }
+  const src = featuredImageUrl && featuredImageUrl.length > 0 ? featuredImageUrl : fallback
+  // Story 9.6: every width the upload produced, in AVIF and WebP, so the
+  // browser fetches the file the layout needs — not the 1400px one on a phone.
+  return { src, fallback, avifSrcset: mediaSrcset(src, "avif"), webpSrcset: mediaSrcset(src, "webp") }
+}
+
+/**
+ * What an image component needs: the default `src`, the placeholder for when
+ * it fails, and — for a catalogue rendition — one `srcset` per format (null for
+ * a placeholder, a legacy upload or an external URL, which have none).
+ */
+export interface ImageSource {
+  src: string
+  fallback: string
+  avifSrcset: string | null
+  webpSrcset: string | null
 }
 
 /**
@@ -126,6 +141,20 @@ export function artworkGeometry(orientation: ArtworkOrientation): {
  * piece's true orientation via {@link artworkGeometry}.
  */
 export const CARD_GEOMETRY = { ratio: "4 / 5", width: 800, height: 1000 } as const
+
+/**
+ * `sizes` of the layouts that show catalogue images (story 9.6), so the browser
+ * fetches the width it will actually display. Cards: one column on a phone, two
+ * from 560px, three from 960px in a container capped near 1150px. Detail media:
+ * full width, then one of two columns from 960px.
+ */
+export const IMAGE_SIZES = {
+  card: "(min-width: 960px) 370px, (min-width: 560px) 50vw, 100vw",
+  detail: "(min-width: 960px) 50vw, 100vw",
+  thumb: "(min-width: 760px) 240px, 50vw",
+  portrait: "(min-width: 760px) 300px, 100vw",
+  full: "100vw",
+} as const
 
 /** Human availability label for a limited edition. */
 export function availabilityLabel(availableCount: number, editionLimit: number): string {
