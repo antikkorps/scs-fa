@@ -1,4 +1,4 @@
-import sharp from "sharp"
+import sharp, { type Sharp } from "sharp"
 
 // Server-side watermarking for Gun Art visuals (story 11.5).
 //
@@ -133,7 +133,7 @@ export async function renderProtectedImage(
 export async function protectedPipeline(
   input: Buffer,
   options: Omit<ProtectedImageOptions, "quality">,
-): Promise<{ image: sharp.Sharp; width: number; height: number }> {
+): Promise<{ image: Sharp; width: number; height: number }> {
   const resized = await sharp(input)
     .rotate()
     .resize({ width: options.maxWidth, withoutEnlargement: true })
