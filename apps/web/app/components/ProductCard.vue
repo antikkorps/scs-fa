@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductCardItem } from "~/types/product"
 import { availabilityState, isPurchasable } from "~/utils/availability"
-import { artworkImage, CARD_GEOMETRY, formatEuros } from "~/utils/format"
+import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES } from "~/utils/format"
 import { isRegulated, legalCategoryLabel } from "~/utils/product"
 
 const props = defineProps<{
@@ -24,15 +24,14 @@ const regulated = computed(() => isRegulated(props.product.legalCategory))
   <article class="card" :class="{ 'is-out': !available }">
     <NuxtLink :to="`/boutique/${product.slug}`" class="card__link">
       <div class="card__media">
-        <img
-          v-img-fallback="img.fallback"
-          :src="img.src"
+        <ResponsiveImage
+          :image="img"
+          :sizes="IMAGE_SIZES.card"
           :alt="product.name"
           :width="CARD_GEOMETRY.width"
           :height="CARD_GEOMETRY.height"
           :loading="priority ? 'eager' : 'lazy'"
           :fetchpriority="priority ? 'high' : 'auto'"
-          decoding="async"
         />
         <span class="card__badge badge" :class="regulated ? 'badge-legal' : 'badge-free'">
           {{ legalCategoryLabel(product.legalCategory) }}

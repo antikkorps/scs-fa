@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArtworkListItem } from "~/types/artwork"
-import { artworkImage, availabilityLabel, CARD_GEOMETRY, formatEuros } from "~/utils/format"
+import { artworkImage, availabilityLabel, CARD_GEOMETRY, formatEuros, IMAGE_SIZES } from "~/utils/format"
 
 const props = defineProps<{
   artwork: ArtworkListItem
@@ -20,9 +20,10 @@ const img = computed(() =>
   <article class="card" :class="{ 'is-soldout': soldOut }">
     <NuxtLink :to="`/collection/${artwork.slug}`" class="card__link">
       <div class="card__media">
-        <ProtectedImage
-          v-img-fallback="img.fallback"
-          :src="img.src"
+        <ResponsiveImage
+          protect
+          :image="img"
+          :sizes="IMAGE_SIZES.card"
           :alt="`${artwork.title}${artwork.artistName ? ` — ${artwork.artistName}` : ''}`"
           :width="CARD_GEOMETRY.width"
           :height="CARD_GEOMETRY.height"

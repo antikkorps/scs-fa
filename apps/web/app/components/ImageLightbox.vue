@@ -1,17 +1,15 @@
 <script setup lang="ts">
 // Accessible, dependency-free full-size image overlay. Controlled with v-model:
-//   <ImageLightbox v-model="open" :src="url" :alt="title" />
+//   <ImageLightbox v-model="open" :image="artworkImage(…)" :alt="title" />
 // Closes on Escape, on backdrop click, and on the close button; locks body
 // scroll and moves focus to the close button while open.
+import { IMAGE_SIZES, type ImageSource } from "~/utils/format"
+
 const open = defineModel<boolean>({ default: false })
 defineProps<{
-  src: string
+  /** From `artworkImage()`: every width and format, plus the placeholder if it fails. */
+  image: ImageSource
   alt: string
-  /**
-   * Placeholder to show if `src` fails to load, from `artworkImage()`. Optional
-   * so a caller with nothing to fall back to still behaves as before.
-   */
-  fallback?: string
   /**
    * Gun Art only (story 11.5): block the right-click and drag gestures. Opt-in
    * because this same overlay serves the boutique, where the visuals carry no
@@ -57,15 +55,14 @@ onBeforeUnmount(() => {
         <button ref="closeBtn" type="button" class="lb__close" aria-label="Fermer" @click="close">
           <span aria-hidden="true">✕</span>
         </button>
-        <ProtectedImage
-          v-if="protect"
-          v-img-fallback="fallback"
+        <ResponsiveImage
           class="lb__img"
-          :src="src"
+          :image="image"
+          :sizes="IMAGE_SIZES.full"
           :alt="alt"
+          :protect="protect"
           loading="eager"
         />
-        <img v-else v-img-fallback="fallback" class="lb__img" :src="src" :alt="alt" />
       </div>
     </Transition>
   </Teleport>

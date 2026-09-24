@@ -120,6 +120,20 @@ export async function renderProtectedImage(
   input: Buffer,
   options: ProtectedImageOptions,
 ): Promise<{ buffer: Buffer; width: number; height: number }> {
+  const { image, width, height } = await protectedPipeline(input, options)
+  const buffer = await image.webp({ quality: options.quality }).toBuffer()
+  return { buffer, width, height }
+}
+
+/**
+ * The watermarked image, resized and composited but NOT yet encoded (story
+ * 9.6): encoding each output format from the same pixels, rather than one
+ * lossy format from another, keeps every format at its best quality.
+ */
+export async function protectedPipeline(
+  input: Buffer,
+  options: Omit<ProtectedImageOptions, "quality">,
+): Promise<{ image: sharp.Sharp; width: number; height: number }> {
   const resized = await sharp(input)
     .rotate()
     .resize({ width: options.maxWidth, withoutEnlargement: true })
@@ -127,10 +141,5 @@ export async function renderProtectedImage(
 
   const { width, height } = resized.info
   const overlay = Buffer.from(watermarkSvg(width, height, options))
-  const buffer = await sharp(resized.data)
-    .composite([{ input: overlay, top: 0, left: 0 }])
-    .webp({ quality: options.quality })
-    .toBuffer()
-
-  return { buffer, width, height }
+  return { image: sharp(resized.data).composite([{ input: overlay, top: 0, left: 0 }]), width, height }
 }

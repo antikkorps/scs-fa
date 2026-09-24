@@ -11,3 +11,20 @@ export function serializeJsonLd(data: unknown): string {
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029")
 }
+
+/**
+ * A `BreadcrumbList` from the crumbs a page shows. The current page — the last
+ * crumb — carries no URL, as Google's guidelines allow for the final item.
+ */
+export function breadcrumbJsonLd(siteUrl: string, items: { name: string; to?: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: item.name,
+      ...(item.to && i < items.length - 1 ? { item: `${siteUrl}${item.to}` } : {}),
+    })),
+  }
+}

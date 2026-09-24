@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto"
+import { MEDIA_FORMATS, MEDIA_WIDTHS, type MediaFormat, mediaRenditionUrl } from "@armurier/shared"
 import { and, asc, eq } from "drizzle-orm"
 import sharp from "sharp"
-import { renderProtectedImage } from "../artworks/watermark.js"
+import { protectedPipeline } from "../artworks/watermark.js"
 import { db } from "../db/client.js"
 import { artists, artworkSeries, artworks, media, products } from "../db/schema.js"
 import { env } from "../env.js"
 import { storage } from "../storage/index.js"
+import { ObjectNotFoundError } from "../storage/types.js"
 
 export const MEDIA_OWNER_TYPES = ["product", "artwork", "artwork_series", "artist"] as const
 export type MediaOwnerType = (typeof MEDIA_OWNER_TYPES)[number]
@@ -15,20 +17,36 @@ type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof d
 const KEY_PREFIX = "media"
 const ORIGINAL_PREFIX = "media/originals"
 const WEBP_QUALITY = 82
+/**
+ * AVIF at 50 weighs 66–72 % of WebP at 82 on photographs, at a visually
+ * equivalent quality (measured 2026-09-24). Effort 3 keeps a 1400px encode
+ * under half a second — paid once, at upload, by the admin.
+ */
+const AVIF_QUALITY = 50
+const AVIF_EFFORT = 3
 
 /**
- * The widths pre-generated at upload.
- *
- * Generated here rather than resized at the edge, because the project's storage
- * has to stay provider-agnostic: the same files work locally, on Scaleway and
- * behind any CDN. Small images are never upscaled, so a row records the widths
- * it actually has — the front cannot guess them.
+ * The widths are pre-generated at upload (MEDIA_WIDTHS, shared with the front),
+ * in both formats — generated here rather than resized at the edge, because the
+ * project's storage has to stay provider-agnostic: the same files work locally,
+ * on Scaleway and behind any CDN.
  */
-export const MEDIA_WIDTHS = [400, 800, 1400] as const
+export { MEDIA_WIDTHS }
 
-/** Public URL of one rendition. Relative on purpose: no host is ever baked in. */
+/** Public URL of one WebP rendition — the one stored on the owner row. */
 export function mediaUrl(id: string, width: number): string {
-  return `/api/media/${id}/${width}.webp`
+  return mediaRenditionUrl(id, width, "webp")
+}
+
+function encode(image: sharp.Sharp, format: MediaFormat): Promise<Buffer> {
+  return format === "avif"
+    ? image.avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT }).toBuffer()
+    : image.webp({ quality: WEBP_QUALITY }).toBuffer()
+}
+
+/** Storage key of one rendition. */
+export function renditionKey(id: string, width: number, format: MediaFormat): string {
+  return `${KEY_PREFIX}/${id}/${width}.${format}`
 }
 
 /**
@@ -89,28 +107,34 @@ export async function renderRenditions(id: string, input: Buffer, ownerType: Med
   let sizeBytes = 0
   let largestHeight = sourceHeight
   for (const width of widths) {
-    let buffer: Buffer
+    // One set of pixels per width — watermarked for a protected visual — then
+    // each format encoded from it.
+    let image: sharp.Sharp
+    let height: number
     if (watermarked) {
-      const rendered = await renderProtectedImage(upright, {
+      const rendered = await protectedPipeline(upright, {
         text: env.ARTWORK_WATERMARK_TEXT,
         position: env.ARTWORK_WATERMARK_POSITION,
         opacity: env.ARTWORK_WATERMARK_OPACITY,
         scale: env.ARTWORK_WATERMARK_SCALE,
         maxWidth: width,
-        quality: WEBP_QUALITY,
       })
-      buffer = rendered.buffer
-      if (width === widths[widths.length - 1]) largestHeight = rendered.height
+      image = rendered.image
+      height = rendered.height
     } else {
-      const out = await sharp(upright)
+      const resized = await sharp(upright)
         .resize({ width, withoutEnlargement: true })
-        .webp({ quality: WEBP_QUALITY })
         .toBuffer({ resolveWithObject: true })
-      buffer = out.data
-      if (width === widths[widths.length - 1]) largestHeight = out.info.height
+      image = sharp(resized.data)
+      height = resized.info.height
     }
-    sizeBytes += buffer.length
-    await storage.put({ key: `${KEY_PREFIX}/${id}/${width}.webp`, body: buffer, contentType: "image/webp" })
+    if (width === widths[widths.length - 1]) largestHeight = height
+
+    for (const format of MEDIA_FORMATS) {
+      const buffer = await encode(image.clone(), format)
+      sizeBytes += buffer.length
+      await storage.put({ key: renditionKey(id, width, format), body: buffer, contentType: `image/${format}` })
+    }
   }
 
   const largest = widths[widths.length - 1] as number
@@ -122,7 +146,9 @@ export class UnusableImageError extends Error {}
 /** Remove every stored rendition of one media row (and its private original). */
 export async function deleteRenditions(id: string, widths: number[], watermarked: boolean) {
   for (const width of widths) {
-    await storage.delete(`${KEY_PREFIX}/${id}/${width}.webp`).catch(() => {})
+    for (const format of MEDIA_FORMATS) {
+      await storage.delete(renditionKey(id, width, format)).catch(() => {})
+    }
   }
   if (watermarked) await storage.delete(`${ORIGINAL_PREFIX}/${id}`).catch(() => {})
 }
@@ -197,4 +223,41 @@ export async function ownerExists(ownerType: MediaOwnerType, ownerId: string): P
   const table = { product: products, artwork: artworks, artwork_series: artworkSeries, artist: artists }[ownerType]
   const [row] = await db.select({ id: table.id }).from(table).where(eq(table.id, ownerId)).limit(1)
   return Boolean(row)
+}
+
+/**
+ * Give every existing media row its AVIF renditions (story 9.6) — the uploads
+ * made before AVIF was generated. Idempotent: a width whose AVIF is already
+ * stored is left alone, so the command can be re-run after an interruption.
+ *
+ * Encoded from the WebP of the same width: an ordinary product keeps no
+ * original, and a protected visual's AVIF must carry the watermark the WebP
+ * already has. A second lossy generation, at a quality where it does not show.
+ */
+export async function backfillAvifRenditions(): Promise<{ created: number; skipped: number; failed: number }> {
+  const rows = await db.select({ id: media.id, widths: media.widths }).from(media)
+  const tally = { created: 0, skipped: 0, failed: 0 }
+
+  for (const row of rows) {
+    for (const width of row.widths) {
+      const avifKey = renditionKey(row.id, width, "avif")
+      try {
+        await storage.getBytes(avifKey)
+        tally.skipped++
+        continue
+      } catch (error) {
+        if (!(error instanceof ObjectNotFoundError)) throw error
+      }
+      try {
+        const webp = await storage.getBytes(renditionKey(row.id, width, "webp"))
+        const buffer = await encode(sharp(webp), "avif")
+        await storage.put({ key: avifKey, body: buffer, contentType: "image/avif" })
+        tally.created++
+      } catch {
+        // A row whose WebP is itself missing cannot be helped here: reported, not fatal.
+        tally.failed++
+      }
+    }
+  }
+  return tally
 }

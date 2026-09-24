@@ -2,10 +2,9 @@
 import type { BlogListResponse } from "~/types/blog"
 
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
-const { data, error } = await useFetch<BlogListResponse>(`${apiBase}/blog`, {
+const { data, error } = await useApiFetch<BlogListResponse>(`/blog`, {
   key: "blog-index",
   query: { limit: 24 },
 })
@@ -15,17 +14,14 @@ const pageUrl = `${siteUrl}/blog`
 const description =
   "Le journal SCS Firearm : histoire de l'armurerie de collection, regards d'artistes et coulisses des éditions Gun Art."
 
-useSeoMeta({
+usePageSeo({
   title: "Le Journal",
   description,
-  ogTitle: "Le Journal — SCS Firearm",
-  ogDescription: description,
-  ogUrl: pageUrl,
+  path: "/blog",
 })
 
 useHead({
   link: [
-    { rel: "canonical", href: pageUrl },
     {
       rel: "alternate",
       type: "application/rss+xml",

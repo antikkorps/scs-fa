@@ -6,10 +6,9 @@ import type { ArtistListItem } from "~/types/artwork"
 // redirects straight to their page, and only becomes a real index if a second
 // artist is ever published.
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 
-const { data } = await useFetch<{ data: ArtistListItem[] }>(`${apiBase}/artists`, { key: "artists" })
+const { data } = await useApiFetch<{ data: ArtistListItem[] }>(`/artists`, { key: "artists" })
 const artists = computed(() => data.value?.data ?? [])
 
 const only = computed(() => (artists.value.length === 1 ? artists.value[0] : null))
@@ -17,13 +16,14 @@ if (only.value) {
   await navigateTo(`/collection/artiste/${only.value.slug}`, { redirectCode: 302 })
 }
 
-useSeoMeta({
-  title: "Les artistes",
-  description: "Les artistes de la collection Gun Art.",
-  ogUrl: `${siteUrl}/collection/artiste`,
-})
 // Never indexed: this page is a router, its content lives on the artist pages.
-useHead({ meta: [{ name: "robots", content: "noindex, follow" }] })
+usePageSeo({
+  title: "Les artistes",
+  description:
+    "Les artistes de la collection Gun Art de SCS Firearm : leur parcours, leurs séries et leurs tirages en édition limitée.",
+  path: "/collection/artiste",
+  noindex: true,
+})
 </script>
 
 <template>

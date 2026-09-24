@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { SearchResponse } from "~/types/artwork"
 
-const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
+const { $apiFetch } = useNuxtApp()
 
 const route = useRoute()
 const router = useRouter()
@@ -31,7 +30,7 @@ const { data, error, pending } = await useAsyncData<SearchResponse | null>(
   () => {
     const q = debounced.value
     if (q.length === 0) return Promise.resolve(null)
-    return $fetch<SearchResponse>(`${apiBase}/search`, { query: { q } })
+    return $apiFetch<SearchResponse>("/search", { query: { q } })
   },
   { watch: [debounced] },
 )

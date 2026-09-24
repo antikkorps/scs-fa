@@ -3,16 +3,15 @@ import type { ArtworkThemeDetail } from "~/types/artwork"
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const apiBase = config.public.apiBase as string
 const siteUrl = config.public.siteUrl as string
 const slug = route.params.slug as string
 
-const { data, error } = await useFetch<{ data: ArtworkThemeDetail }>(`${apiBase}/artworks/themes/${slug}`, {
+const { data, error } = await useApiFetch<{ data: ArtworkThemeDetail }>(`/artworks/themes/${slug}`, {
   key: `theme-${slug}`,
 })
 
 if (error.value || !data.value?.data) {
-  throw createError({ statusCode: 404, statusMessage: "Thème introuvable", fatal: true })
+  throw missingPageError(error.value, "Thème introuvable")
 }
 
 const theme = computed(() => data.value?.data as ArtworkThemeDetail)
@@ -23,16 +22,13 @@ const description = computed(
   () => theme.value.description ?? `Les séries Gun Art réunies autour du thème « ${theme.value.name} ».`,
 )
 
-useSeoMeta({
+usePageSeo({
   title: () => theme.value.name,
   description,
-  ogTitle: () => `${theme.value.name} — SCS Firearm`,
-  ogDescription: description,
-  ogUrl: pageUrl,
+  path: `/collection/theme/${slug}`,
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
@@ -58,11 +54,7 @@ useHead({
 <template>
   <div class="theme">
     <section class="container intro">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/collection">Collection</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ theme.name }}</span>
-      </nav>
+      <AppBreadcrumbs :items="[{ name: 'Collection', to: '/collection' }, { name: theme.name }]" />
 
       <p class="eyebrow">Thème</p>
       <h1 class="intro__title">{{ theme.name }}</h1>
@@ -85,25 +77,6 @@ useHead({
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
   padding-bottom: clamp(1.75rem, 5vw, 3rem);
   max-width: 760px;
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.2rem, 4vw, 2rem);
-}
-.crumbs a {
-  color: var(--paper-dim);
-  text-decoration: none;
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper);
 }
 .intro__title {
   font-size: var(--fs-3xl);

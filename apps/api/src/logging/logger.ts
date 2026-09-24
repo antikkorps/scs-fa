@@ -12,6 +12,7 @@ export const REDACT_PATHS = [
   "req.headers.authorization",
   "req.headers.cookie",
   'req.headers["stripe-signature"]',
+  'req.headers["x-internal-auth"]',
   'res.headers["set-cookie"]',
   // Defensive: if any handler logs a body/object carrying these, hide them too.
   "*.password",

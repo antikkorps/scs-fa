@@ -22,12 +22,8 @@ export function tagFacetLabel(facet: TagFacet): string {
  * nothing under it.
  */
 export function useTags() {
-  const config = useRuntimeConfig()
-  const apiBase = config.public.apiBase as string
-
-  const { data } = useFetch<{ data: TagFacetGroup[] }>(`${apiBase}/tags`, {
+  const { data } = useApiFetch<{ data: TagFacetGroup[] }>(`/tags`, {
     key: "tags",
-    default: () => ({ data: [] }),
   })
 
   const facets = computed(() => (data.value?.data ?? []).filter((group) => group.tags.length > 0))

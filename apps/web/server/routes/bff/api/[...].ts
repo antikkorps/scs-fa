@@ -6,8 +6,8 @@
 // buffered and forwarded as-is, so JSON and multipart uploads both pass through.
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, "_") ?? ""
-  const apiBase = useRuntimeConfig(event).public.apiBase as string
-  const target = `${apiBase}/${slug}`
+  const upstream = apiUpstream(event)
+  const target = `${upstream.base}/${slug}`
 
   const method = event.method
   const query = getQuery(event)
@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
       query,
       body,
       headers: {
+        ...upstream.headers,
         ...(token ? { authorization: `Bearer ${token}` } : {}),
         ...(contentType ? { "content-type": contentType } : {}),
       },
