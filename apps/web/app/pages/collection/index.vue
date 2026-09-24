@@ -54,17 +54,12 @@ useHead({
     {
       type: "application/ld+json",
       innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "ItemList",
-          name: "Collection Gun Art",
-          itemListElement: artworks.value.map((a, i) => ({
-            "@type": "ListItem",
-            position: i + 1,
-            url: `${siteUrl}/collection/${a.slug}`,
-            name: a.title,
-          })),
-        }),
+        serializeJsonLd(
+          itemListJsonLd(
+            "Collection Gun Art",
+            artworks.value.map((a) => ({ url: `${siteUrl}/collection/${a.slug}`, name: a.title })),
+          ),
+        ),
       ),
     },
   ],

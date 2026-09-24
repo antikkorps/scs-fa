@@ -39,9 +39,7 @@ async function goTo(p: number) {
 <template>
   <div class="orders">
     <section class="container orders__inner">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/compte" class="link">Mon compte</NuxtLink> <span aria-hidden="true">/</span> Mes commandes
-      </nav>
+      <AppBreadcrumbs :structured="false" :items="[{ name: 'Mon compte', to: '/compte' }, { name: 'Mes commandes' }]" />
       <h1 class="orders__title">Mes commandes</h1>
 
       <p v-if="pending" class="state">Chargement…</p>
@@ -96,14 +94,6 @@ async function goTo(p: number) {
 .orders__inner {
   max-width: 820px;
   padding-bottom: 4rem;
-}
-.crumbs {
-  font-size: var(--fs-sm);
-  color: var(--paper-dim);
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.75rem;
 }
 .orders__title {
   font-size: var(--fs-2xl);

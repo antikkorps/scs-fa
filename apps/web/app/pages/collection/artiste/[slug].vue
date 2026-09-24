@@ -46,7 +46,7 @@ useHead({
           name: artist.value.name,
           description: artist.value.bio ?? description.value,
           url: pageUrl,
-          ...(artist.value.portraitUrl && { image: artist.value.portraitUrl }),
+          ...(artist.value.portraitUrl && { image: ogImageUrl(artist.value.portraitUrl, siteUrl) }),
           ...(artist.value.headline && { jobTitle: artist.value.headline }),
           ...(artist.value.series.length > 0 && {
             // The series are the body of work; naming them here is what ties the
@@ -67,11 +67,7 @@ useHead({
 <template>
   <div class="artist">
     <section class="container intro">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/collection">Collection</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ artist.name }}</span>
-      </nav>
+      <AppBreadcrumbs :items="[{ name: 'Collection', to: '/collection' }, { name: artist.name }]" />
 
       <div class="hero" :class="{ 'hero--portrait': artist.portraitUrl }">
         <img
@@ -133,25 +129,6 @@ useHead({
 <style scoped>
 .intro {
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.2rem, 4vw, 2rem);
-}
-.crumbs a {
-  color: var(--paper-dim);
-  text-decoration: none;
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper);
 }
 .hero {
   display: grid;

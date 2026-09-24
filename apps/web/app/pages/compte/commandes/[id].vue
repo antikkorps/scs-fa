@@ -108,11 +108,14 @@ function toggleUpload(docType: string) {
       <p v-else-if="notFound" class="state">Commande introuvable.</p>
 
       <template v-else-if="order">
-        <nav class="crumbs" aria-label="Fil d'Ariane">
-          <NuxtLink to="/compte" class="link">Mon compte</NuxtLink> <span aria-hidden="true">/</span>
-          <NuxtLink to="/compte/commandes" class="link">Mes commandes</NuxtLink> <span aria-hidden="true">/</span>
-          {{ order.id.slice(0, 8).toUpperCase() }}
-        </nav>
+        <AppBreadcrumbs
+          :structured="false"
+          :items="[
+            { name: 'Mon compte', to: '/compte' },
+            { name: 'Mes commandes', to: '/compte/commandes' },
+            { name: order.id.slice(0, 8).toUpperCase() },
+          ]"
+        />
 
         <header class="order__head">
           <h1 class="order__title">Commande {{ order.id.slice(0, 8).toUpperCase() }}</h1>
@@ -312,15 +315,6 @@ function toggleUpload(docType: string) {
 .state {
   color: var(--paper-dim);
   padding: 1.5rem 0 4rem;
-}
-.crumbs {
-  font-size: var(--fs-sm);
-  color: var(--paper-dim);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.75rem;
 }
 .link {
   color: var(--brass);

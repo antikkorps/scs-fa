@@ -100,24 +100,20 @@ useSeoMeta({
 })
 
 useHead({
-  link: [{ rel: "canonical", href: pageUrl }],
+  link: [{ rel: "canonical", href: computed(() => catalogueCanonical(siteUrl, "/armes-de-collection", page.value)) }],
   script: [
     {
       type: "application/ld+json",
       innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "ItemList",
-          name: "Armes de collection & historiques",
-          itemListElement: weapons.value.map((w, i) => ({
-            "@type": "ListItem",
-            position: i + 1,
+        serializeJsonLd(
+          itemListJsonLd(
+            "Armes de collection & historiques",
             // One canonical URL per weapon: the piece lives in the catalogue,
             // this universe is a curated view onto it.
-            url: `${siteUrl}/boutique/${w.slug}`,
-            name: w.name,
-          })),
-        }),
+            weapons.value.map((w) => ({ url: `${siteUrl}/boutique/${w.slug}`, name: w.name })),
+            (page.value - 1) * PAGE_SIZE,
+          ),
+        ),
       ),
     },
   ],

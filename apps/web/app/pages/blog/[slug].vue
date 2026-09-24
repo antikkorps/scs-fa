@@ -47,7 +47,7 @@ useHead({
           "@context": "https://schema.org",
           "@type": "BlogPosting",
           headline: article.value.title,
-          image: hero.value,
+          image: ogImageUrl(article.value.featuredImageUrl, siteUrl),
           description: description.value,
           url: pageUrl,
           mainEntityOfPage: pageUrl,
@@ -63,19 +63,6 @@ useHead({
         }),
       ),
     },
-    {
-      type: "application/ld+json",
-      innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "BreadcrumbList",
-          itemListElement: [
-            { "@type": "ListItem", position: 1, name: "Le Journal", item: `${siteUrl}/blog` },
-            { "@type": "ListItem", position: 2, name: article.value.title, item: pageUrl },
-          ],
-        }),
-      ),
-    },
   ],
 })
 </script>
@@ -83,11 +70,7 @@ useHead({
 <template>
   <article class="post">
     <div class="container">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/blog">Le Journal</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ article.title }}</span>
-      </nav>
+      <AppBreadcrumbs :items="[{ name: 'Le Journal', to: '/blog' }, { name: article.title }]" />
 
       <header class="post__head">
         <p v-if="article.category" class="eyebrow">{{ article.category }}</p>
@@ -113,21 +96,6 @@ useHead({
 <style scoped>
 .post {
   padding: clamp(1.5rem, 4vw, 2.5rem) 0 clamp(3rem, 8vw, 6rem);
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper-dim);
 }
 .post__head {
   max-width: 760px;

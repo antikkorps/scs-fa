@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ProductDetail, ProductVariant } from "~/types/product"
-import { availabilityLongLabel, availabilitySchemaUrl, availabilityState, isPurchasable } from "~/utils/availability"
+import { availabilityLongLabel, availabilityState, isPurchasable } from "~/utils/availability"
 import { artworkImage, CARD_GEOMETRY, formatEuros, ogImageUrl } from "~/utils/format"
 import { conditionLabel, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
+import { productJsonLd } from "~/utils/structuredData"
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -114,29 +115,42 @@ useSeoMeta({
   ogImage: () => ogImageUrl(product.value?.featuredImageUrl, siteUrl),
 })
 
+// What search engines are told is about the PRODUCT, not the variant the
+// visitor happens to have selected: it is available if any variant is.
+const productState = computed(() =>
+  availabilityState({
+    stockQty:
+      variants.value.length > 0 ? Math.max(...variants.value.map((v) => v.stockQty ?? 0)) : product.value.stockQty,
+    isUnique: product.value.ancientWeapon?.isUnique ?? false,
+  }),
+)
+const structuredProduct = computed(() =>
+  productJsonLd({
+    siteUrl,
+    pageUrl,
+    name: product.value.name,
+    description: description.value,
+    sku: product.value.sku,
+    image: ogImageUrl(product.value.featuredImageUrl, siteUrl),
+    categoryName: product.value.category.name,
+    legalCategory: legal.value?.category ?? null,
+    state: productState.value,
+    // One price per variant, or the product's own when it has none.
+    pricesTtc: [
+      variants.value[0]?.priceTtc ?? product.value.priceTtc,
+      ...variants.value.slice(1).map((v) => v.priceTtc),
+    ],
+    used: Boolean(product.value.ancientWeapon) || product.value.tags.some((t) => t.slug === "occasion"),
+    makerName: product.value.ancientWeapon?.makerName ?? null,
+  }),
+)
+
 useHead({
   link: [{ rel: "canonical", href: pageUrl }],
   script: [
     {
       type: "application/ld+json",
-      innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "Product",
-          name: product.value.name,
-          description: description.value,
-          image: image.value,
-          sku: product.value.sku,
-          category: product.value.category.name ?? undefined,
-          offers: {
-            "@type": "Offer",
-            priceCurrency: "EUR",
-            price: product.value.priceTtc,
-            availability: availabilitySchemaUrl(state.value),
-            url: pageUrl,
-          },
-        }),
-      ),
+      innerHTML: computed(() => serializeJsonLd(structuredProduct.value)),
     },
   ],
 })

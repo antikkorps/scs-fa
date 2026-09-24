@@ -149,17 +149,13 @@ useHead({
     {
       type: "application/ld+json",
       innerHTML: computed(() =>
-        serializeJsonLd({
-          "@context": "https://schema.org",
-          "@type": "ItemList",
-          name: props.listName,
-          itemListElement: products.value.map((p, i) => ({
-            "@type": "ListItem",
-            position: (page.value - 1) * PAGE_SIZE + i + 1,
-            url: `${siteUrl}/boutique/${p.slug}`,
-            name: p.name,
-          })),
-        }),
+        serializeJsonLd(
+          itemListJsonLd(
+            props.listName,
+            products.value.map((p) => ({ url: `${siteUrl}/boutique/${p.slug}`, name: p.name })),
+            (page.value - 1) * PAGE_SIZE,
+          ),
+        ),
       ),
     },
   ],

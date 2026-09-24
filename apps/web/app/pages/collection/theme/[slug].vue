@@ -58,11 +58,7 @@ useHead({
 <template>
   <div class="theme">
     <section class="container intro">
-      <nav class="crumbs" aria-label="Fil d'Ariane">
-        <NuxtLink to="/collection">Collection</NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="crumbs__current">{{ theme.name }}</span>
-      </nav>
+      <AppBreadcrumbs :items="[{ name: 'Collection', to: '/collection' }, { name: theme.name }]" />
 
       <p class="eyebrow">Thème</p>
       <h1 class="intro__title">{{ theme.name }}</h1>
@@ -85,25 +81,6 @@ useHead({
   padding-top: clamp(1.5rem, 4vw, 2.5rem);
   padding-bottom: clamp(1.75rem, 5vw, 3rem);
   max-width: 760px;
-}
-.crumbs {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  font-size: var(--fs-sm);
-  letter-spacing: var(--ls-normal);
-  color: var(--paper-faint);
-  margin-bottom: clamp(1.2rem, 4vw, 2rem);
-}
-.crumbs a {
-  color: var(--paper-dim);
-  text-decoration: none;
-}
-.crumbs a:hover {
-  color: var(--brass);
-}
-.crumbs__current {
-  color: var(--paper);
 }
 .intro__title {
   font-size: var(--fs-3xl);
