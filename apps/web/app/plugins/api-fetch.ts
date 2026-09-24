@@ -1,4 +1,5 @@
 import { getRequestIP } from "h3"
+import { upstreamHeaders } from "#shared/utils/upstream"
 
 /**
  * `$apiFetch`: the fetcher for public API reads (story 9.6), behind

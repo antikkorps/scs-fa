@@ -299,3 +299,72 @@ button {
 .auth-alt a {
   color: var(--brass);
 }
+
+/* Long-form reference pages — privacy policy, regulation guides (story 9.6).
+   Same reading rhythm as a journal article, plus tables. */
+.prose {
+  max-width: 720px;
+  font-size: var(--fs-md);
+  line-height: var(--lh-relaxed);
+  color: var(--paper-dim);
+}
+.prose h2 {
+  font-family: var(--font-display);
+  color: var(--paper);
+  font-size: var(--fs-xl);
+  margin: 2.6rem 0 0.9rem;
+}
+.prose h3 {
+  font-family: var(--font-display);
+  color: var(--paper);
+  font-size: var(--fs-lg);
+  margin: 1.8rem 0 0.7rem;
+}
+.prose p {
+  margin: 0 0 1.1rem;
+}
+.prose a {
+  color: var(--brass);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose ul,
+.prose ol {
+  margin: 0 0 1.2rem;
+  padding-left: 1.4rem;
+}
+.prose li {
+  margin: 0.35rem 0;
+}
+.prose strong {
+  color: var(--paper);
+}
+.prose .table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1.4rem;
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+.prose th,
+.prose td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--ink-line);
+}
+.prose th {
+  color: var(--paper);
+  font-weight: var(--fw-semibold);
+}
+
+/* A passage the client still has to supply (legal identity, retention periods…). */
+mark.todo {
+  background: rgb(200 163 91 / 0.22);
+  color: var(--paper);
+  padding: 0 0.25em;
+  border-radius: 2px;
+}

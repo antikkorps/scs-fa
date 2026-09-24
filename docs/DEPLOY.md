@@ -217,7 +217,34 @@ below is the recommended path.
 - [ ] **Secret rotation** post-launch (initial secrets were shared during setup).
 - [ ] Container hardening (`cap_drop`, `read_only`) validated in staging.
 
-## Gun Art visuals (story 11.5)
+## Umami — audience measurement (story 9.6)
+
+Self-hosted, in its own database on the existing Postgres. The front loads the
+tracker **only after the visitor accepts** the consent banner (Franck's choice,
+2026-09-24 — even though Umami is cookie-free).
+
+One-time setup:
+
+1. Secrets in `.env`: `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` (`openssl rand -hex 32`).
+2. Database and role (Umami migrates its own schema on start):
+   ```sh
+   docker compose -f docker-compose.prod.yml exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+     -c "CREATE ROLE umami LOGIN PASSWORD '<UMAMI_DB_PASSWORD>';" -c "CREATE DATABASE umami OWNER umami;"
+   docker compose -f docker-compose.prod.yml up -d umami
+   ```
+3. DNS: `stats` record (proxied), like `www`. Log in at `https://stats.<DOMAIN>`
+   with `admin` / `umami` and **change the password at once**; create the
+   client's own user and hand the account over to them.
+4. Add the website (domain `www.<DOMAIN>`), copy its id into `UMAMI_WEBSITE_ID`,
+   then `docker compose -f docker-compose.prod.yml up -d web`.
+
+How it is wired: Caddy exposes only `/_a/script.js` and `/_a/api/send` on the
+public origin (no third party sees the visit, the CSP needs no new source); the
+tracker counts `www.<DOMAIN>` only. The `backup` service dumps the app database
+only — analytics are not backed up (acceptable loss; add a second dump if the
+client wants history preserved).
+
+
 
 - Watermark and public resolution are set through `ARTWORK_WATERMARK_*` / `ARTWORK_PUBLIC_MAX_WIDTH` in `.env` — changing the look is a config change plus a restart, no deploy of code.
 - ⚠️ The watermark is SVG text rendered by sharp: the API image installs `fonts-dejavu-core` for it. If you ever rebuild the image from a different base, **check a published visual actually carries the mark** — a font-less runtime renders it empty, silently.

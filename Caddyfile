@@ -42,6 +42,17 @@ www.{$DOMAIN} {
 		-Server
 	}
 
+	# --- Audience measurement (story 9.6) → self-hosted Umami ---
+	# Only the tracker and its collect endpoint, served from our own origin: no
+	# third party sees the visit, and the rest of Umami is not exposed here.
+	@analytics path /_a/script.js /_a/api/send
+	handle @analytics {
+		uri strip_prefix /_a
+		reverse_proxy umami:3000 {
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
 	# --- API + webhooks + health → the Fastify backend ---
 	@api path /api/* /health
 	# Both backends trust exactly one hop — this proxy — and read the client IP
@@ -58,6 +69,21 @@ www.{$DOMAIN} {
 		reverse_proxy web:3000 {
 			header_up X-Forwarded-For {client_ip}
 		}
+	}
+}
+
+# Umami dashboard (story 9.6), behind Umami's own login. Needs a DNS record for
+# stats.DOMAIN (proxied through Cloudflare like www).
+stats.{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy umami:3000 {
+		header_up X-Forwarded-For {client_ip}
 	}
 }
 

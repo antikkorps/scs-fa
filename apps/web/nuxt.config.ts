@@ -67,6 +67,9 @@ export default defineNuxtConfig({
       // Stripe publishable key (public by design). Set via
       // NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in apps/web/.env.
       stripePublishableKey: "",
+      // Umami website id (story 9.6), via NUXT_PUBLIC_UMAMI_WEBSITE_ID. Empty =
+      // no measurement at all; set, the tracker still waits for consent.
+      umamiWebsiteId: "",
     },
   },
 

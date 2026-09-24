@@ -1,3 +1,4 @@
+import { reviewedEditorialPaths } from "#shared/utils/editorialPages"
 import { absoluteImageUrl, buildSitemap, latest, type SitemapUrl } from "../utils/seo"
 
 interface Entry {
@@ -69,6 +70,12 @@ export default defineEventHandler(async (event) => {
       : []),
     // (/collection/artiste is deliberately absent: a noindex router page.)
     { loc: `${siteUrl}/blog`, lastmod: latest(d.blogPosts.map(dated)), changefreq: "weekly", priority: 0.7 },
+    // Reference pages, once the client has validated them (shared/utils/editorialPages.ts).
+    ...reviewedEditorialPaths().map((path) => ({
+      loc: `${siteUrl}${path}`,
+      changefreq: "yearly" as const,
+      priority: 0.3,
+    })),
 
     // Armurerie: category pages, then products.
     ...d.productCategories.map((c) => ({

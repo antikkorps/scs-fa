@@ -116,8 +116,38 @@ services:
       # every SSR render shares one rate-limit budget (story 9.6).
       NUXT_API_INTERNAL_BASE: http://api:8080/api
       NUXT_INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?set INTERNAL_API_SECRET in .env}
+      # Created in the Umami dashboard once (docs/DEPLOY.md § Umami). Empty = no
+      # measurement; set, the tracker still waits for the visitor's consent.
+      NUXT_PUBLIC_UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
     depends_on:
       - api
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+
+  # Audience measurement (story 9.6): self-hosted Umami, in its own database on
+  # the same Postgres (one-time setup: docs/DEPLOY.md § Umami). Visitors only
+  # reach its tracker and collect endpoint, through Caddy under /_a/; the
+  # dashboard is served on stats.DOMAIN behind Umami's own login. The front
+  # loads the tracker only after consent.
+  # Pinned: 3.2.0 is the newest release past the 90-day dependency quarantine.
+  umami:
+    image: ghcr.io/umami-software/umami:3.2.0
+    restart: unless-stopped
+    init: true
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:?set UMAMI_DB_PASSWORD in .env}@postgres:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?set UMAMI_APP_SECRET in .env}
+      # No phoning home: no telemetry to Umami's servers, no update checks.
+      DISABLE_TELEMETRY: "1"
+      DISABLE_UPDATES: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
     security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
@@ -168,6 +198,7 @@ services:
     depends_on:
       - api
       - web
+      - umami
     security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
