@@ -29,6 +29,7 @@ const { reopen } = useConsent()
       <nav class="ft__col" aria-label="La maison">
         <h2 class="ft__h">La maison</h2>
         <NuxtLink to="/#about">À propos</NuxtLink>
+        <NuxtLink to="/reglementation">Réglementation</NuxtLink>
         <NuxtLink to="/compte">Mon compte</NuxtLink>
         <NuxtLink to="/panier">Panier</NuxtLink>
       </nav>

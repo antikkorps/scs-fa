@@ -8,6 +8,7 @@
  */
 export const EDITORIAL_PAGES = {
   confidentialite: { path: "/confidentialite", reviewed: false },
+  reglementation: { path: "/reglementation", reviewed: false },
 } as const satisfies Record<string, { path: string; reviewed: boolean }>
 
 export type EditorialPageKey = keyof typeof EDITORIAL_PAGES

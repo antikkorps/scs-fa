@@ -290,6 +290,7 @@ useHead({
             </dl>
             <p v-if="legal.requiresVerification" class="legal__note">
               La vente est soumise à la vérification de vos documents après la commande.
+              <NuxtLink to="/reglementation" class="legal__more">Comprendre la réglementation</NuxtLink>
             </p>
             <p v-if="product.hasAccessoryRestrictions && product.accessoryRestrictionNotes" class="legal__note">
               {{ product.accessoryRestrictionNotes }}
@@ -532,6 +533,10 @@ useHead({
   margin: 1rem 0 0;
   font-size: var(--fs-sm);
   color: var(--paper-dim);
+}
+.legal__more {
+  color: var(--brass);
+  white-space: nowrap;
 }
 .detail__cta {
   margin-top: 1.75rem;
