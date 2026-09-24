@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { MEDIA_FORMATS, MEDIA_WIDTHS, type MediaFormat, mediaRenditionUrl } from "@armurier/shared"
 import { and, asc, eq } from "drizzle-orm"
-import sharp from "sharp"
+import sharp, { type Sharp } from "sharp"
 import { protectedPipeline } from "../artworks/watermark.js"
 import { db } from "../db/client.js"
 import { artists, artworkSeries, artworks, media, products } from "../db/schema.js"
@@ -38,7 +38,7 @@ export function mediaUrl(id: string, width: number): string {
   return mediaRenditionUrl(id, width, "webp")
 }
 
-function encode(image: sharp.Sharp, format: MediaFormat): Promise<Buffer> {
+function encode(image: Sharp, format: MediaFormat): Promise<Buffer> {
   return format === "avif"
     ? image.avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT }).toBuffer()
     : image.webp({ quality: WEBP_QUALITY }).toBuffer()
@@ -109,7 +109,7 @@ export async function renderRenditions(id: string, input: Buffer, ownerType: Med
   for (const width of widths) {
     // One set of pixels per width — watermarked for a protected visual — then
     // each format encoded from it.
-    let image: sharp.Sharp
+    let image: Sharp
     let height: number
     if (watermarked) {
       const rendered = await protectedPipeline(upright, {
