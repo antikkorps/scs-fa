@@ -56,6 +56,9 @@ const { bannerVisible, accept, refuse } = useConsent()
 .consent__link {
   color: var(--brass);
   white-space: nowrap;
+  /* Colour alone does not tell a link from the sentence around it (WCAG 1.4.1). */
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .consent__actions {
   display: grid;

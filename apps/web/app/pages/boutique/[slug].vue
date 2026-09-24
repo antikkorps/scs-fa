@@ -538,6 +538,9 @@ useHead({
 .legal__more {
   color: var(--brass);
   white-space: nowrap;
+  /* Colour alone does not tell a link from the sentence around it (WCAG 1.4.1). */
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .detail__cta {
   margin-top: 1.75rem;

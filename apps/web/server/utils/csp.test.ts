@@ -59,4 +59,12 @@ describe("withScriptNonce", () => {
       "<link rel=stylesheet>",
     ])
   })
+
+  it("survives a module pushing arrays instead of strings into the head (story 9.6)", () => {
+    // PrimeVue's module with `loadStyles: false` pushes [] — every page 500'd.
+    expect(withScriptNonce(["<script>a</script>", [], ["<script>b</script>"]], "Q")).toEqual([
+      '<script nonce="Q">a</script>',
+      '<script nonce="Q">b</script>',
+    ])
+  })
 })
