@@ -62,6 +62,11 @@ describe("safeGet", () => {
       } else if (req.url === "/to-file") {
         res.writeHead(302, { location: "file:///etc/passwd" })
         res.end()
+      } else if (req.url === "/drip") {
+        // Sends a byte every 50 ms forever: never idle, never done.
+        res.writeHead(200, { "content-type": "image/jpeg" })
+        const timer = setInterval(() => res.write("x"), 50)
+        res.on("close", () => clearInterval(timer))
       } else if (req.url === "/slow") {
         // Never answers.
       } else {
@@ -114,6 +119,10 @@ describe("safeGet", () => {
 
   it("fails on an HTTP error status", async () => {
     await expect(safeGet(`${base}/missing`, allowLoopback)).rejects.toThrow(/404/)
+  })
+
+  it("times out a server that drips bytes without ever going idle", async () => {
+    await expect(safeGet(`${base}/drip`, { ...allowLoopback, timeoutMs: 300 })).rejects.toThrow(/time/i)
   })
 
   it("times out", async () => {

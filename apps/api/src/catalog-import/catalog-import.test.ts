@@ -275,24 +275,67 @@ describe("admin catalogue import (story 12.2)", () => {
     expect(preview.rows[1].errors.join()).toMatch(/SKU déjà utilisé/)
   })
 
+  it("overwrite keeps what a blank cell does not give, and re-derives the parcel count", async () => {
+    const rifle = await productByRef("RIFLE-1")
+    await db
+      .update(products)
+      .set({ stockQty: 7, vatPct: "5.50" })
+      .where(eq(products.id, rifle?.product.id as string))
+    const { res } = await importFile(
+      sheet([
+        row({
+          supplierSku: "RIFLE-1",
+          name: "Testcatimp Carabine",
+          category: "arme-longue",
+          legalCategory: "C",
+          imageUrls: "",
+        }),
+      ]),
+      true,
+    )
+    expect(res.statusCode).toBe(201)
+    const after = await productByRef("RIFLE-1")
+    // Blank Stock / TVA cells mean "not given": the stock is not wiped.
+    expect(after?.product).toMatchObject({ stockQty: 7, vatPct: "5.50", parcelCount: 1 })
+    expect(after?.legal).toBe("C")
+  })
+
   describe("image queue", () => {
     const png = () =>
       sharp({ create: { width: 64, height: 48, channels: 3, background: "#884422" } })
         .png()
         .toBuffer()
+    const pending = () => db.select().from(catalogImportImages).where(eq(catalogImportImages.status, "pending"))
+    // Stands in for time passing: every lease and scheduled retry is due now.
+    const expireLeases = () => db.update(catalogImportImages).set({ lockedUntil: new Date(Date.now() - 1000) })
+    const ok = (body: Buffer) => async (url: string) => ({ body, contentType: "image/png", finalUrl: url })
 
-    it("downloads queued images into the gallery, in the sheet's order", async () => {
-      const seen: string[] = []
+    it("keeps the sheet's order even when the first image fails for a while", async () => {
       const body = await png()
-      const result = await processCatalogImageBatch({
-        concurrency: 1,
+      const seen: string[] = []
+      // Batch 1: only the FIRST image of the product is claimable — and it fails.
+      const first = await processCatalogImageBatch({
         fetcher: async (url) => {
           seen.push(url)
-          return { body, contentType: "image/png", finalUrl: url }
+          throw new SafeFetchError("socket hang up")
         },
       })
-      expect(result).toMatchObject({ claimed: 2, done: 2, failed: 0 })
-      expect(seen).toEqual(["https://images.example.com/1.jpg", "https://images.example.com/2.jpg"])
+      expect(first).toMatchObject({ claimed: 1, failed: 1 })
+      // The retry is scheduled later, and image 2 must wait behind image 1.
+      expect(await processCatalogImageBatch({ fetcher: ok(body) })).toMatchObject({ claimed: 0 })
+
+      await expireLeases()
+      const fetcher = async (url: string) => {
+        seen.push(url)
+        return ok(body)(url)
+      }
+      expect(await processCatalogImageBatch({ fetcher })).toMatchObject({ claimed: 1, done: 1 })
+      expect(await processCatalogImageBatch({ fetcher })).toMatchObject({ claimed: 1, done: 1 })
+      expect(seen).toEqual([
+        "https://images.example.com/1.jpg",
+        "https://images.example.com/1.jpg",
+        "https://images.example.com/2.jpg",
+      ])
 
       const redDot = await productByRef("RED-DOT-1")
       const gallery = await db
@@ -302,12 +345,41 @@ describe("admin catalogue import (story 12.2)", () => {
       expect(gallery.map((m) => m.position).sort()).toEqual([0, 1])
       expect(gallery.every((m) => m.alt === redDot?.product.name)).toBe(true)
       expect(redDot?.product.featuredImageUrl).toBeTruthy()
-
       const queue = await db
         .select()
         .from(catalogImportImages)
         .where(eq(catalogImportImages.productId, redDot?.product.id as string))
-      expect(queue.every((q) => q.status === "done" && q.mediaId)).toBe(true)
+      const firstImage = queue.find((q) => q.position === 0)
+      // The sheet's first photo is the first in the gallery, hence the main one.
+      expect(gallery.find((m) => m.id === firstImage?.mediaId)?.position).toBe(0)
+    })
+
+    it("never lets two drains take the same image", async () => {
+      await importFile(
+        sheet([
+          row({
+            supplierSku: "LEASED",
+            name: "Testcatimp Bail",
+            imageUrls: "https://images.example.com/leased.jpg",
+          }),
+        ]),
+      )
+      const body = await png()
+      let release: () => void = () => {}
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      const slow = processCatalogImageBatch({
+        fetcher: async (url) => {
+          await held
+          return ok(body)(url)
+        },
+      })
+      // While the first drain is still downloading, a second one finds nothing.
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(await processCatalogImageBatch({ fetcher: ok(body) })).toMatchObject({ claimed: 0 })
+      release()
+      expect(await slow).toMatchObject({ claimed: 1, done: 1 })
     })
 
     it("fails a 404 at once, and lets an admin requeue it", async () => {
@@ -340,22 +412,49 @@ describe("admin catalogue import (story 12.2)", () => {
       expect(queued).toMatchObject({ status: "pending", attempts: 0, error: null })
     })
 
-    it("retries a transient failure, then gives up after the last attempt", async () => {
-      const flaky = async () => {
-        throw new SafeFetchError("socket hang up")
+    it("treats 429 as 'later', retries with a delay, then gives up after the last attempt", async () => {
+      const limited = async () => {
+        throw new SafeFetchError("HTTP 429")
       }
-      const first = await processCatalogImageBatch({ fetcher: flaky })
-      expect(first.failed).toBe(1)
-      const [still] = await db.select().from(catalogImportImages).where(eq(catalogImportImages.status, "pending"))
+      expect(await processCatalogImageBatch({ fetcher: limited })).toMatchObject({ claimed: 1, failed: 1 })
+      const [still] = await pending()
       expect(still?.attempts).toBe(1)
-      await processCatalogImageBatch({ fetcher: flaky })
-      await processCatalogImageBatch({ fetcher: flaky })
-      expect(await processCatalogImageBatch({ fetcher: flaky })).toMatchObject({ claimed: 0 })
+      expect(still?.lockedUntil?.getTime()).toBeGreaterThan(Date.now())
+
+      await expireLeases()
+      await processCatalogImageBatch({ fetcher: limited })
+      await expireLeases()
+      await processCatalogImageBatch({ fetcher: limited })
+      await expireLeases()
+      expect(await processCatalogImageBatch({ fetcher: limited })).toMatchObject({ claimed: 0 })
       const [gaveUp] = await db
         .select()
         .from(catalogImportImages)
         .where(eq(catalogImportImages.id, still?.id as string))
-      expect(gaveUp?.status).toBe("failed")
+      expect(gaveUp).toMatchObject({ status: "failed", attempts: 3 })
+    })
+
+    it("marks failed an image whose worker died on its last attempt", async () => {
+      const { res } = await importFile(
+        sheet([
+          row({
+            supplierSku: "ORPHAN-IMG",
+            name: "Testcatimp Orpheline",
+            imageUrls: "https://images.example.com/o.jpg",
+          }),
+        ]),
+      )
+      const importId = res.json().data.importId as string
+      // What a crash mid-download leaves behind: pending, out of attempts, lease expired.
+      await db
+        .update(catalogImportImages)
+        .set({ attempts: 3, lockedUntil: new Date(Date.now() - 1000) })
+        .where(eq(catalogImportImages.importId, importId))
+      await processCatalogImageBatch({
+        fetcher: async () => ({ body: Buffer.alloc(0), contentType: null, finalUrl: "" }),
+      })
+      const [row0] = await db.select().from(catalogImportImages).where(eq(catalogImportImages.importId, importId))
+      expect(row0).toMatchObject({ status: "failed", error: "Interrupted during download" })
     })
   })
 })

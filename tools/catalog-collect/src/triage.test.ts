@@ -78,7 +78,8 @@ describe("buildTriageModel", () => {
   })
 
   it("falls back to plain text when the HTML would exceed the import limit", () => {
-    const long = product({ longDescription: `<p>${"mot ".repeat(6000)}</p>`, specs: {} })
+    // Ampersands and line breaks grow when escaped and wrapped: still within the limit.
+    const long = product({ longDescription: `<p>${"a & b<br>".repeat(4000)}</p>`, specs: {} })
     const [row] = buildTriageModel([batch({ products: [long] })], categories).rows
     expect(String(row?.longDescription).length).toBeLessThanOrEqual(20000)
   })

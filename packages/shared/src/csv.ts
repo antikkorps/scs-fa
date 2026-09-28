@@ -35,7 +35,8 @@ function detectDelimiter(text: string): CsvDelimiter {
  * - quoted fields may hold the delimiter, doubled quotes and **line breaks**
  *   (a product description routinely spans several lines);
  * - a UTF-8 BOM is dropped, CRLF / LF / CR are all accepted;
- * - blank lines are skipped, but empty cells are kept so columns stay aligned.
+ * - blank lines are kept as empty rows (line numbers stay true), trailing ones
+ *   dropped; empty cells are kept so columns stay aligned.
  */
 export function parseCsv(input: string, options: { delimiter?: CsvDelimiter } = {}): string[][] {
   const text = input.startsWith("﻿") ? input.slice(1) : input
@@ -50,7 +51,9 @@ export function parseCsv(input: string, options: { delimiter?: CsvDelimiter } = 
     row.push(field)
     field = ""
     const cells = row.map((f) => f.trim())
-    if (cells.some((c) => c.length > 0)) rows.push(cells)
+    // A blank line stays (as []) so a row's index is its line in the file —
+    // the number an import report points the human at.
+    rows.push(cells.some((c) => c.length > 0) ? cells : [])
     row = []
   }
 
@@ -72,6 +75,7 @@ export function parseCsv(input: string, options: { delimiter?: CsvDelimiter } = 
     } else field += c
   }
   if (field.length > 0 || row.length > 0) endRow()
+  while (rows.length > 0 && rows.at(-1)?.length === 0) rows.pop()
   return rows
 }
 

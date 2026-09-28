@@ -240,8 +240,9 @@ describe("parseCatalogImportTable", () => {
       legalCategory: "none",
       priceHt: 429.99,
       costPriceHt: 300,
-      vatPct: 20,
-      stockQty: 0,
+      // Blank cells stay blank: the API applies the defaults on creation only.
+      vatPct: null,
+      stockQty: null,
       sku: "BGM-WINFIELD-AP200",
       slug: "aimpoint-micro-t-2-ap-200",
       imageUrls: [],
@@ -273,6 +274,11 @@ describe("parseCatalogImportTable", () => {
     expect(rows[0]?.errors.length).toBeGreaterThanOrEqual(4)
   })
 
+  it("refuses a VAT rate the column cannot hold", () => {
+    const { rows } = parseCatalogImportTable([header, line({ ...valid, vatPct: "100" })])
+    expect(rows[0]?.status).toBe("invalid")
+  })
+
   it("refuses a zero selling price", () => {
     const { rows } = parseCatalogImportTable([header, line({ ...valid, priceHt: "0" })])
     expect(rows[0]?.status).toBe("invalid")
@@ -297,6 +303,11 @@ describe("parseCatalogImportTable", () => {
     const { missingColumns, rows } = parseCatalogImportTable([loose, line(valid)])
     expect(missingColumns).toEqual([])
     expect(rows[0]?.status).toBe("valid")
+  })
+
+  it("reports the true line of a row, blank lines above it included", () => {
+    const { rows } = parseCatalogImportTable([[], header, [], line(valid)])
+    expect(rows[0]?.line).toBe(4)
   })
 
   it("lists the required columns that are missing", () => {

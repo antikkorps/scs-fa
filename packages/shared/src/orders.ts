@@ -150,7 +150,7 @@ const CSV_HEADER_ALIASES: Record<keyof Omit<BankTransaction, never>, string[]> =
  * skipped. Throws when no usable header is found so the caller can 400.
  */
 export function parseBankStatementCsv(csv: string): BankTransaction[] {
-  const table = parseCsv(csv)
+  const table = parseCsv(csv).filter((row) => row.length > 0)
   if (table.length < 2) return []
   const headers = (table[0] ?? []).map(normaliseHeader)
 

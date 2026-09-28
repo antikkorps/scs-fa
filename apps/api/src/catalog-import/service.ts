@@ -319,8 +319,8 @@ export async function commitCatalogImport(
             ean: data.ean,
             sourceUrl: data.sourceUrl,
             priceHt: data.priceHt.toFixed(2),
-            vatPct: data.vatPct.toFixed(2),
-            stockQty: data.stockQty,
+            vatPct: (data.vatPct ?? 20).toFixed(2),
+            stockQty: data.stockQty ?? 0,
             // Derived, never read from the sheet: a category B firearm needs
             // paperwork whatever a cell says.
             requiresLegalVerification: data.legalCategory !== "none",
@@ -353,9 +353,12 @@ export async function commitCatalogImport(
                   categoryId: row.categoryId,
                   legalCategoryId: lid,
                   requiresLegalVerification: data.legalCategory !== "none",
+                  // Derived from the category pair, as on creation.
+                  parcelCount: defaultParcelCount(data.legalCategory, row.categorySlug),
                   priceHt: data.priceHt.toFixed(2),
-                  vatPct: data.vatPct.toFixed(2),
-                  stockQty: data.stockQty,
+                  // A blank cell means "not given", never 20 % or zero stock.
+                  ...(data.vatPct === null ? {} : { vatPct: data.vatPct.toFixed(2) }),
+                  ...(data.stockQty === null ? {} : { stockQty: data.stockQty }),
                 }
               : {}),
             updatedAt: new Date(),

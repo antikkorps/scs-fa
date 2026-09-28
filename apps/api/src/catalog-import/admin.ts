@@ -156,7 +156,8 @@ export const adminCatalogImportRoutes: FastifyPluginAsync = async (fastify) => {
   /** GET / — import history, most recent first, with each import's image queue. */
   fastify.get("/", async (_request, reply) => {
     const rows = await db.select().from(catalogImports).orderBy(desc(catalogImports.createdAt)).limit(50)
-    const data = await Promise.all(rows.map(async (r) => ({ ...r, images: await imageQueueStats(r.id) })))
+    const stats = await imageQueueStats(rows.map((r) => r.id))
+    const data = rows.map((r) => ({ ...r, images: stats.get(r.id) ?? { pending: 0, done: 0, failed: 0 } }))
     return reply.send({ data })
   })
 

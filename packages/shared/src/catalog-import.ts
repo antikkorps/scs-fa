@@ -300,8 +300,10 @@ export interface CatalogImportRow {
   legalCategory: LegalCategory
   costPriceHt: number | null
   priceHt: number
-  vatPct: number
-  stockQty: number
+  /** Null when the cell is blank: a new product then gets 20 %, an existing one keeps its rate. */
+  vatPct: number | null
+  /** Null when the cell is blank: a new product then starts at 0, an existing one keeps its stock. */
+  stockQty: number | null
   description: string | null
   longDescription: string | null
   imageUrls: string[]
@@ -417,9 +419,10 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
   if (priceHt === null && !get("priceHt")) errors.push("« Prix de vente HT » est vide")
   else if (priceHt === 0) errors.push("Prix de vente HT nul")
   const costPriceHt = number("costPriceHt", "Prix d'achat HT", null, 0, 10_000_000)
-  const vatPct = number("vatPct", "TVA %", 20, 0, 100) ?? 20
-  const stockQty = number("stockQty", "Stock", 0, 0, 1_000_000) ?? 0
-  if (!Number.isInteger(stockQty)) errors.push(`Stock non entier : « ${get("stockQty")} »`)
+  // `products.vat_pct` is decimal(4,2): 100 would overflow and abort the whole batch.
+  const vatPct = number("vatPct", "TVA %", null, 0, 99.99)
+  const stockQty = number("stockQty", "Stock", null, 0, 1_000_000)
+  if (stockQty !== null && !Number.isInteger(stockQty)) errors.push(`Stock non entier : « ${get("stockQty")} »`)
 
   const imageUrls = get("imageUrls")
     .split(/[\s|]+/)
@@ -471,7 +474,12 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
  * appear once: the second occurrence is refused, pointing at the first.
  */
 export function parseCatalogImportTable(table: string[][]): { rows: ParsedImportRow[]; missingColumns: string[] } {
-  const headers = (table[0] ?? []).map(normaliseHeader)
+  // The header is the first non-blank row; blank rows are kept so line numbers stay true.
+  const headerIndex = Math.max(
+    0,
+    table.findIndex((r) => r.some((c) => c.trim() !== "")),
+  )
+  const headers = (table[headerIndex] ?? []).map(normaliseHeader)
   const index = new Map<CatalogImportColumnKey, number>()
   for (const col of CATALOG_IMPORT_COLUMNS) {
     const i = headers.findIndex((h) => h === normaliseHeader(col.header) || h === normaliseHeader(col.key))
@@ -482,7 +490,7 @@ export function parseCatalogImportTable(table: string[][]): { rows: ParsedImport
 
   const seen = new Map<string, number>()
   const rows: ParsedImportRow[] = []
-  for (let i = 1; i < table.length; i++) {
+  for (let i = headerIndex + 1; i < table.length; i++) {
     const cells = table[i] ?? []
     if (cells.every((c) => c.trim() === "")) continue
     const get = (key: CatalogImportColumnKey) => {

@@ -7,6 +7,7 @@ CREATE TABLE "catalog_import_images" (
 	"position" integer NOT NULL,
 	"status" "catalog_image_status" DEFAULT 'pending' NOT NULL,
 	"attempts" integer DEFAULT 0 NOT NULL,
+	"locked_until" timestamp,
 	"error" text,
 	"media_id" uuid,
 	"created_at" timestamp DEFAULT now() NOT NULL,

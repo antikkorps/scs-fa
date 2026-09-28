@@ -2127,6 +2127,9 @@ export const catalogImportImages = pgTable(
     position: integer("position").notNull(),
     status: catalogImageStatusEnum("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
+    // Bail d'un travailleur : tant qu'il court, personne d'autre ne prend la
+    // ligne. Sert aussi de date de nouvelle tentative après un échec passager.
+    lockedUntil: timestamp("locked_until"),
     error: text("error"),
     mediaId: uuid("media_id"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

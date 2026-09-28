@@ -53,11 +53,8 @@ describe("parseCsv", () => {
     ])
   })
 
-  it("drops blank lines and trims fields", () => {
-    expect(parseCsv("a;b\n\n  1 ; 2 \n\n")).toEqual([
-      ["a", "b"],
-      ["1", "2"],
-    ])
+  it("keeps inner blank lines as empty rows so line numbers stay true, and trims fields", () => {
+    expect(parseCsv("a;b\n\n  1 ; 2 \n\n")).toEqual([["a", "b"], [], ["1", "2"]])
   })
 
   it("keeps empty trailing fields so columns stay aligned", () => {

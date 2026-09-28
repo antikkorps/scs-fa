@@ -112,8 +112,16 @@ function longDescription(product: CollectedProduct): string | null {
   if (!full) return null
   if (full.length <= MAX_LONG) return full
   // Too long as HTML: fall back to plain text rather than cutting a tag in half.
-  const text = truncate(htmlToText(full), MAX_LONG - 50)
-  return text ? `<p>${escapeHtml(text).replace(/\n/g, "</p><p>")}</p>` : null
+  // Escaping and paragraph tags lengthen the text, so shrink until it fits.
+  const plain = htmlToText(full) ?? ""
+  for (let budget = MAX_LONG; budget > 0; ) {
+    const text = truncate(plain, budget)
+    if (!text) return null
+    const html = `<p>${escapeHtml(text).replace(/\n/g, "</p><p>")}</p>`
+    if (html.length <= MAX_LONG) return html
+    budget -= html.length - MAX_LONG + 1
+  }
+  return null
 }
 
 function applyRules(product: CollectedProduct, rules: SupplierConfig["rules"], categories: Category[]) {

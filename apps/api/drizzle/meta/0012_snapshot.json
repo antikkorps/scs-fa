@@ -1,5 +1,5 @@
 {
-  "id": "d044d7ba-5f99-4311-874c-b80804cf43cb",
+  "id": "3e73b726-fbe7-4e27-bbcf-bbc1d1ee0869",
   "prevId": "a5fa6494-3d63-4d02-92a8-f1d529dd96ca",
   "version": "7",
   "dialect": "postgresql",
@@ -2269,6 +2269,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         },
         "error": {
           "name": "error",

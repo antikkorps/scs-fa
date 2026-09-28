@@ -76,7 +76,9 @@ export async function renderRenditions(id: string, input: Buffer, ownerType: Med
   // sharp's decode is the real content check — far stronger than a declared
   // Content-Type, and it rejects mislabeled or polyglot files.
   const probe = sharp(input)
-  const meta = await probe.metadata()
+  const meta = await probe.metadata().catch(() => {
+    throw new UnusableImageError("Image could not be processed")
+  })
   if (!meta.format || !["jpeg", "png", "webp", "tiff"].includes(meta.format)) {
     throw new UnusableImageError("Unrecognised image content")
   }
@@ -89,7 +91,12 @@ export async function renderRenditions(id: string, input: Buffer, ownerType: Med
 
   // `.rotate()` honours EXIF orientation BEFORE the metadata is dropped;
   // re-encoding to WebP is what actually strips it (EXIF GPS is a data leak).
-  const upright = await sharp(input).rotate().toBuffer()
+  const upright = await sharp(input)
+    .rotate()
+    .toBuffer()
+    .catch(() => {
+      throw new UnusableImageError("Image could not be processed")
+    })
   const uprightMeta = await sharp(upright).metadata()
   const sourceWidth = uprightMeta.width ?? 0
   const sourceHeight = uprightMeta.height ?? 0
@@ -206,13 +213,9 @@ export async function syncOwnerFeaturedImage(ownerType: MediaOwnerType, ownerId:
  */
 export async function appendOwnerMedia(ownerType: MediaOwnerType, ownerId: string, alt: string, input: Buffer) {
   const id = newMediaId()
-  let rendered: RenditionSet
-  try {
-    rendered = await renderRenditions(id, input, ownerType)
-  } catch (err) {
-    if (err instanceof UnusableImageError) throw err
-    throw new UnusableImageError("Image could not be processed")
-  }
+  // Bad bytes surface as UnusableImageError; a storage outage stays what it is,
+  // so the import queue retries it instead of failing the image for good.
+  const rendered = await renderRenditions(id, input, ownerType)
 
   const [{ next } = { next: 0 }] = await db
     .select({ next: sql<number>`coalesce(max(${media.position}) + 1, 0)::int` })

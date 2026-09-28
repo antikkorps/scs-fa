@@ -153,6 +153,10 @@ function getOnce(url: URL, opts: Required<Omit<SafeGetOptions, "isAllowedAddress
           res.on("error", reject)
         },
       )
+      // `timeout` only fires on an idle socket: a server dripping a byte at a
+      // time would never trip it. The deadline bounds the whole exchange.
+      const deadline = setTimeout(() => req.destroy(new SafeFetchError("Request timed out")), opts.timeoutMs)
+      req.on("close", () => clearTimeout(deadline))
       req.on("timeout", () => req.destroy(new SafeFetchError("Request timed out")))
       req.on("error", (err) => reject(err instanceof SafeFetchError ? err : new SafeFetchError(err.message)))
     },

@@ -574,6 +574,16 @@
 - [x] Tests : **shared** 220, **API** +43 (import : 11 d'intégration, anti-SSRF : 32), **web** +3, **outil de collecte** 79 (fixtures réduites des vraies pages, zéro accès réseau ; exclues de Biome, ce sont des pages fournisseurs telles quelles)
 - [x] **Validé en réel** (2026-09-28) : essai limité à 2-3 articles par site sur les **6 fournisseurs collectables** → fichier de tri → aperçu → import contre l'API locale → **11/11 images téléchargées**, prix de vente conformes à la marge, produits hors ligne ; ré-import du même fichier = 3 mises à jour, 0 doublon ; données de test nettoyées ensuite
 
+**Revue de code avant merge (2026-09-28) — 10 défauts corrigés :**
+
+- [x] **File d'images** : le `FOR UPDATE SKIP LOCKED` ne réservait rien au-delà de l'instruction (deux vidanges pouvaient télécharger la même image → doublons dans la galerie) → **bail `locked_until`** (colonne ajoutée à la 0012, jamais déployée) ; une image dont le travailleur meurt à la dernière tentative restait `pending` à vie → **marquée `failed`** (« Interrupted during download ») ; 408/429 étaient traités comme définitifs → **réessayés** ; nouvelle tentative **différée** (30 s puis 2 min) au lieu du lot suivant ; ordre de la galerie non garanti après un échec passager → seule la **première image en attente de chaque produit** est réclamable ; une vidange qui se terminait pouvait ignorer un import arrivé à cet instant → **relance** ; la reprise CLI suit la même boucle
+- [x] **Écrasement** : un Stock / une TVA vides devenaient 0 / 20 % et **effaçaient le stock réel** → vide = « non fourni » (défaut à la création seulement) ; le **nombre de colis** est recalculé quand la catégorie légale change
+- [x] TVA 100 acceptée alors que la colonne plafonne à 99,99 → toute la transaction tombait → refusée à la ligne
+- [x] Une panne de stockage pendant le rendu d'une image passait pour « image inutilisable » (échec définitif) → seules les erreurs de **décodage** le sont
+- [x] Repli texte des très longues descriptions : l'échappement faisait dépasser les 20 000 caractères → ajusté jusqu'à tenir
+- [x] En plus : `safeGet` a une **échéance globale** (un serveur qui distille un octet à la fois n'est plus jamais « inactif ») ; numéros de ligne CSV **exacts** malgré les lignes vides ; historique des imports en **une requête** (au lieu d'une par import)
+- Tests après corrections : **shared 222, API 573, web 299, outil 79**
+
 **Reste ouvert :**
 
 - ⚠️ **Attendu du client** : un **tarif Excel par fournisseur** (pour caler les colonnes dans `work/config.json`) et le **périmètre** (catalogue complet ou familles : Agora-Tec annonce 4 464 articles dont de la cuisine, BGM 6 079, Toro ~12 300, Humbert plusieurs milliers d'articles avec toutes les déclinaisons)
@@ -582,6 +592,7 @@
 - **Armurerie de Paris** : hors collecte (`robots.txt` interdit tout, pas de catalogue en ligne) → saisie manuelle ou via l'import
 - **Variantes** : une ligne = un produit (chaque déclinaison a sa propre référence chez ces fournisseurs) ; regroupement en `product_variants` non fait
 - **EAN** : aucun des sites visités ne l'expose — il ne viendra que des tarifs qui le portent
+- Non traité (mineur) : l'aperçu charge tous les produits des fournisseurs connus, la confirmation écrit ligne par ligne (acceptable pour quelques milliers d'articles) ; une cellule Excel contenant un lien rend l'adresse du lien plutôt que le texte affiché
 - Lecture `.xlsx` sans garde contre une **bombe zip** au-delà du plafond de 15 Mo du fichier déposé (route réservée aux admins)
 - Pas d'**écran fournisseurs** (création implicite à l'import ; marge par défaut modifiable seulement en base pour l'instant)
 
