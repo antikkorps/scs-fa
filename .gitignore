@@ -23,3 +23,7 @@ apps/api/drizzle/.drizzle/
 # IDE
 .vscode/
 .idea/
+
+# Catalogue collection (story 12.2): supplier content, price lists and local
+# config never enter the repo — they are the client's business data.
+tools/catalog-collect/work/

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+<url>
+<loc><![CDATA[https://www.toro-distribution.com/]]></loc>
+
+<changefreq>daily</changefreq>
+<priority>1.0</priority>
+</url>
+<url>
+<loc><![CDATA[https://www.toro-distribution.com/index.php?controller=module-ps_shoppingcart-ajax]]></loc>
+
+<changefreq>daily</changefreq>
+<priority>0.1</priority>
+</url>
+<url>
+<loc><![CDATA[https://www.toro-distribution.com/cms/4-qui-sommes-nous]]></loc>
+
+<changefreq>daily</changefreq>
+<priority>0.7</priority>
+</url>
+<url>
+<loc><![CDATA[https://www.toro-distribution.com/634-arme-de-paintball-toro-distribution]]></loc>
+<lastmod>2025-05-16T09:21:01+02:00</lastmod>
+<changefreq>daily</changefreq>
+<priority>0.8</priority>
+<image:image>
+<image:loc><![CDATA[https://www.toro-distribution.com/c/634-category_default/arme-de-paintball-toro-distribution.jpg]]></image:loc>
+<image:caption><![CDATA[Équipements de Paintball de Qualité chez TORO DistributionTORO Distribution vous propose un vaste choix d&amp;#039;équipements spécialisés pour le paintball, provenant des marques les plus reconnues, et tout cela au meilleur prix. Dans notre paintball shop en ligne, vous trouverez tout le matériel nécessaire pour faire fonctionner votre fusil :Fusil]]></image:caption>
+<image:title><![CDATA[Paintball]]></image:title>
+</image:image>
+</url>
+<url>
+<loc><![CDATA[https://www.toro-distribution.com/4398-autour-du-scenario]]></loc>
+<lastmod>2026-05-09T10:31:26+02:00</lastmod>
+<changefreq>daily</changefreq>
+<priority>0.8</priority>
+<image:image>
+<image:loc><![CDATA[https://www.toro-distribution.com/c/636-category_default/accessoires-scenario-paintball.jpg]]></image:loc>
+<image:caption><![CDATA[REDIRECTION VERS AUTOUR DU SCENARIO MULTI UNIVERS]]></image:caption>
+<image:title><![CDATA[Autour du scénario]]></image:title>
+</image:image>
+</url>
+<url>
+<loc><![CDATA[https://www.toro-distribution.com/13877-pack-fusil-g36-slv36-porte-cible-cibles-billes-asg.html]]></loc>
+<lastmod>2026-08-23T01:06:02+02:00</lastmod>
+<changefreq>daily</changefreq>
+<priority>0.9</priority>
+<image:image>
+<image:loc><![CDATA[https://www.toro-distribution.com/37503-large_default/pack-fusil-g36-slv36-porte-cible-cibles-billes-asg.jpg]]></image:loc>
+<image:caption><![CDATA[]]></image:caption>
+<image:title><![CDATA[Pack Fusil G36 SLV36 + PORTE CIBLE + CIBLES + BILLES ASG]]></image:title>
+</image:image>
+</url>
+<url>
+<loc><![CDATA[https://www.toro-distribution.com/16220-pistolet-walther-ppq-umarex-spring.html]]></loc>
+<lastmod>2026-06-05T12:00:00+02:00</lastmod>
+<changefreq>daily</changefreq>
+<priority>0.9</priority>
+<image:image>
+<image:loc><![CDATA[https://www.toro-distribution.com/18980-large_default/pistolet-walther-ppq-umarex-spring.jpg]]></image:loc>
+<image:caption><![CDATA[]]></image:caption>
+<image:title><![CDATA[Pistolet WALTHER PPQ UMAREX SPRING]]></image:title>
+</image:image>
+<image:image>
+<image:loc><![CDATA[https://www.toro-distribution.com/18981-large_default/pistolet-walther-ppq-umarex-spring.jpg]]></image:loc>
+<image:caption><![CDATA[]]></image:caption>
+<image:title><![CDATA[Pistolet WALTHER PPQ UMAREX SPRING]]></image:title>
+</image:image>
+<image:image>
+<image:loc><![CDATA[https://www.toro-distribution.com/18982-large_default/pistolet-walther-ppq-umarex-spring.jpg]]></image:loc>
+<image:caption><![CDATA[]]></image:caption>
+<image:title><![CDATA[Pistolet WALTHER PPQ UMAREX SPRING]]></image:title>
+</image:image>
+</url>
+<url>
+<loc><![CDATA[https://www.toro-distribution.com/module/giftcard/choicegiftcard?id_product=21837]]></loc>
+<lastmod>2026-06-05T12:00:00+02:00</lastmod>
+<changefreq>daily</changefreq>
+<priority>0.9</priority>
+<image:image>
+<image:loc><![CDATA[https://www.toro-distribution.com/29228-large_default/carte-cadeau-valeur-50.jpg]]></image:loc>
+<image:caption><![CDATA[Carte cadeau VALEUR 50€]]></image:caption>
+<image:title><![CDATA[Carte cadeau VALEUR 50€]]></image:title>
+</image:image>
+</url>
+</urlset>

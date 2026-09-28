@@ -138,6 +138,8 @@ throwaway prototyping only.
 ├── packages/
 │   └── shared/               # Shared types, constants, Zod schemas
 │       └── src/{constants,types,validation}.ts
+├── tools/
+│   └── catalog-collect/      # Supplier catalogue collection (story 12.2), local only
 ├── docs/
 │   ├── ADR/                  # Architecture Decision Records
 │   └── ...
@@ -266,6 +268,25 @@ Parcels can be marked delivered automatically, by asking the carrier. **Both pro
 - ⚠️ **An unanswered question is not an answer**: a carrier that is down, rate-limiting us or refusing our key leaves the parcel exactly as it is. Nothing is dated, nothing is marked, and the next pass asks again.
 - Automatic deliveries are audited as **`system`**, never as an admin: nobody clicked, and the trail has to say what closed the parcel.
 - **Scheduling**: in-process every `TRACKING_POLL_INTERVAL_MINUTES` (180 by default, 0 disables, always off under test), or `pnpm --filter @armurier/api tracking:sync` from an external cron — the same pattern as the legal-document SLA check. An admin who will not wait for the next pass has a **"Rafraîchir le suivi"** button; when no carrier can be asked, it says so rather than doing nothing.
+
+## Supplier catalogue import (story 12.2)
+
+The goal is a one-off bulk load of the suppliers' catalogues, with an import path that stays in place for each new supplier. It is **not** a synchronisation.
+
+- **Collection** runs locally, never in production. `tools/catalog-collect` reads the suppliers' public product sheets politely: it honours `robots.txt`, throttles its requests and caches every page. It reconciles them with each supplier's price list and writes a **triage `.xlsx`**. See its [README](tools/catalog-collect/README.md).
+- **Import** happens at `/admin/imports`, from an `.xlsx` or `.csv` file:
+  - **Dry-run preview**: shows, row by row, what will be created, updated or refused, and why.
+  - **Commit**: accepted only for the exact file that was previewed (SHA-256), and applied in one transaction.
+- ⚠️ **The legal category is never inferred.** A row kept without one is refused. `requiresLegalVerification` and the parcel count are derived server-side, as in the product form.
+- **Idempotent.** The key is (supplier, supplier reference). Re-importing a row updates the product instead of duplicating it:
+  - fields a human may have edited are filled only if empty, unless "overwrite" is ticked;
+  - the supplier's price always follows the new file.
+- **New products arrive unpublished.**
+- **Images** are queued (`catalog_import_images`) and downloaded after the response:
+  - they go through the admin upload pipeline (sharp decoding, metadata stripped, every width rendered);
+  - `safeGet` refuses private, loopback and metadata addresses at connect time and on every redirect;
+  - `pnpm --filter @armurier/api catalog:images` resumes the queue after a restart;
+  - failed images can be retried from the import history.
 
 ## E-mails in development
 

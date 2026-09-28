@@ -18,3 +18,5 @@
 **/.env
 **/.env.*
 !**/.env.example
+# Supplier catalogues collected locally (story 12.2) — business data, never shipped.
+tools/catalog-collect/work

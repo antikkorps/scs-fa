@@ -17,6 +17,7 @@
       "!**/drizzle",
       "!**/coverage",
       "!docs",
+      "!tools/catalog-collect/src/adapters/fixtures",
       "!apps/api/src/db/schema.ts",
       "!apps/api/src/db/seeds.ts"
     ]
