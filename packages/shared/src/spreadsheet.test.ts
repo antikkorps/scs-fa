@@ -84,6 +84,12 @@ describe("readSpreadsheet — csv", () => {
     expect(await readSpreadsheet(file)).toEqual([["réf", "prix"]])
   })
 
+  it("decodes the Windows-1252 punctuation too — the apostrophe of « d’origine », the euro sign", async () => {
+    // "d’o;5€" in Windows-1252: ’ = 0x92, € = 0x80.
+    const file = new Uint8Array([0x64, 0x92, 0x6f, 0x3b, 0x35, 0x80])
+    expect(await readSpreadsheet(file)).toEqual([["d’o", "5€"]])
+  })
+
   it("refuses a binary file that is neither", async () => {
     await expect(readSpreadsheet(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x00, 0x01]))).rejects.toBeInstanceOf(
       SpreadsheetError,

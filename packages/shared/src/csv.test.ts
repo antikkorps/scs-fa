@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { normaliseHeader, parseCsv } from "./csv.js"
+import { fixC1, normaliseHeader, parseCsv } from "./csv.js"
 
 describe("parseCsv", () => {
   it("detects a semicolon delimiter (French Excel export)", () => {
@@ -86,5 +86,11 @@ describe("normaliseHeader", () => {
 
   it("keeps digits so numbered columns stay distinct", () => {
     expect(normaliseHeader("Image 2")).toBe("image2")
+  })
+})
+
+describe("fixC1", () => {
+  it("repairs curly quotes stored as C1 control characters", () => {
+    expect(fixC1("d\u0092autonomie \u0093ok\u0094 \u0080")).toBe("d’autonomie “ok” €")
   })
 })

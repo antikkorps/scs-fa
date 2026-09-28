@@ -86,3 +86,17 @@ export function normaliseHeader(h: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
 }
+
+// Windows-1252 glyphs for bytes 0x80–0x9F (U+FFFD where 1252 has none). Spelled
+// out: Node's TextDecoder treats "windows-1252" as Latin-1 for this range.
+const CP1252_C1 =
+  "\u20ac\ufffd\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\ufffd\u017d\ufffd\ufffd\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\ufffd\u017e\u0178"
+
+/**
+ * Repair text whose curly quotes were stored as C1 control characters
+ * (U+0080–U+009F) — Windows-1252 bytes pasted into a UTF-8 page. U+0092 is
+ * the ’ of « d’autonomie ».
+ */
+export function fixC1(text: string): string {
+  return text.replace(/[\u0080-\u009f]/g, (c) => CP1252_C1[c.charCodeAt(0) - 0x80] ?? c)
+}

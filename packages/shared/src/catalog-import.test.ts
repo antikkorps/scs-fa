@@ -259,6 +259,11 @@ describe("parseCatalogImportTable", () => {
     expect(rows[0]?.errors.join(" ")).toMatch(/catégorie légale/i)
   })
 
+  it("keeps what a refused row says it is, so a human can find it", () => {
+    const { rows } = parseCatalogImportTable([header, line({ ...valid, legalCategory: "" })])
+    expect(rows[0]?.label).toEqual({ supplier: "BGM Winfield", supplierSku: "AP-200", name: "Aimpoint Micro T-2" })
+  })
+
   it("reports every problem of a row at once", () => {
     const { rows } = parseCatalogImportTable([
       header,

@@ -38,6 +38,12 @@ export const collectedProductSchema = z.object({
   specs: z.record(z.string(), z.string()).default({}),
   imageUrls: z.array(httpUrl).max(50).default([]),
   sourceCategory: z.string().trim().max(255).optional(),
+  /**
+   * The legal classification the SUPPLIER announces (Humbert: "C1b", "B2abis").
+   * Shown next to the legal category in the triage sheet to help the human —
+   * never copied into it.
+   */
+  supplierLegalClass: z.string().trim().max(50).optional(),
   sourceUrl: httpUrl,
 })
 
@@ -244,6 +250,8 @@ export const CATALOG_IMPORT_COLUMNS = [
   { key: "brand", header: "Marque", required: false },
   { key: "category", header: "Catégorie", required: true },
   { key: "legalCategory", header: "Catégorie légale", required: true },
+  // Informational only: the import ignores it.
+  { key: "supplierLegalClass", header: "Classement fournisseur", required: false },
   { key: "costPriceHt", header: "Prix d'achat HT", required: false },
   { key: "priceHt", header: "Prix de vente HT", required: true },
   { key: "vatPct", header: "TVA %", required: false },
@@ -309,6 +317,8 @@ export interface ParsedImportRow {
   status: "valid" | "invalid" | "skipped"
   errors: string[]
   data: CatalogImportRow | null
+  /** What the row says it is, as typed — so even a refused row can be found by a human. */
+  label: { supplier: string | null; supplierSku: string | null; name: string | null }
 }
 
 export const MAX_IMPORT_IMAGES_PER_ROW = 20
@@ -345,30 +355,35 @@ function isHttpUrl(value: string): boolean {
 }
 
 function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): ParsedImportRow {
+  const label = {
+    supplier: get("supplier") || null,
+    supplierSku: get("supplierSku") || null,
+    name: get("name").slice(0, 255) || null,
+  }
   const importCell = normaliseHeader(get("import"))
-  if (!importCell || NO.has(importCell)) return { line, status: "skipped", errors: [], data: null }
+  if (!importCell || NO.has(importCell)) return { line, status: "skipped", errors: [], data: null, label }
 
   const errors: string[] = []
   if (!YES.has(importCell)) errors.push(`« Importer » doit valoir oui ou non (lu : « ${get("import")} »)`)
 
-  const text = (key: keyof typeof TEXT_LIMITS, label: string, required: boolean): string | null => {
+  const text = (key: keyof typeof TEXT_LIMITS, column: string, required: boolean): string | null => {
     const value = get(key)
     if (!value) {
-      if (required) errors.push(`${label} manquant(e)`)
+      if (required) errors.push(`« ${column} » est vide`)
       return null
     }
     // A cell that starts with `=` is a formula that was never evaluated: storing
     // its source as a product name is never what the human meant.
-    if (value.startsWith("=")) errors.push(`${label} : formule non évaluée « ${value.slice(0, 40)} »`)
-    if (value.length > TEXT_LIMITS[key]) errors.push(`${label} : ${TEXT_LIMITS[key]} caractères au plus`)
+    if (value.startsWith("=")) errors.push(`${column} : formule non évaluée « ${value.slice(0, 40)} »`)
+    if (value.length > TEXT_LIMITS[key]) errors.push(`${column} : ${TEXT_LIMITS[key]} caractères au plus`)
     return value
   }
-  const number = (key: CatalogImportColumnKey, label: string, fallback: number | null, min: number, max: number) => {
+  const number = (key: CatalogImportColumnKey, column: string, fallback: number | null, min: number, max: number) => {
     const raw = get(key)
     if (!raw) return fallback
     const n = parseBankAmount(raw)
     if (Number.isNaN(n) || n < min || n > max) {
-      errors.push(`${label} illisible ou hors bornes : « ${raw} »`)
+      errors.push(`${column} illisible ou hors bornes : « ${raw} »`)
       return fallback
     }
     return n
@@ -399,7 +414,7 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
   if (rawEan && !ean) errors.push(`EAN invalide : « ${rawEan} »`)
 
   const priceHt = number("priceHt", "Prix de vente HT", null, 0, 10_000_000)
-  if (priceHt === null && !get("priceHt")) errors.push("Prix de vente HT manquant")
+  if (priceHt === null && !get("priceHt")) errors.push("« Prix de vente HT » est vide")
   else if (priceHt === 0) errors.push("Prix de vente HT nul")
   const costPriceHt = number("costPriceHt", "Prix d'achat HT", null, 0, 10_000_000)
   const vatPct = number("vatPct", "TVA %", 20, 0, 100) ?? 20
@@ -419,10 +434,11 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
   }
 
   if (errors.length > 0 || !supplier || !supplierSku || !name || !category || !legalCategory || priceHt === null) {
-    return { line, status: "invalid", errors, data: null }
+    return { line, status: "invalid", errors, data: null, label }
   }
   return {
     line,
+    label,
     status: "valid",
     errors: [],
     data: {

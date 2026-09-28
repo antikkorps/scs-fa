@@ -6,7 +6,7 @@
 // bundle must never carry.
 
 import ExcelJS from "exceljs"
-import { parseCsv } from "./csv.js"
+import { fixC1, parseCsv } from "./csv.js"
 
 export class SpreadsheetError extends Error {}
 
@@ -69,8 +69,9 @@ function decodeText(bytes: Uint8Array): string {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes)
   } catch {
-    // A CSV saved by a French Excel is Windows-1252, not UTF-8.
-    return new TextDecoder("windows-1252").decode(bytes)
+    // A CSV saved by a French Excel is Windows-1252, not UTF-8 — and Node
+    // decodes its 0x80–0x9F range (’, €, œ…) as control characters.
+    return fixC1(new TextDecoder("windows-1252").decode(bytes))
   }
 }
 
