@@ -539,6 +539,61 @@
 - Pages **mentions légales** (éditeur, hébergeur, directeur de publication) et **CGV** (vente à distance, droit de rétractation et ses exceptions, spécificités des armes réglementées, livraison, garanties), rédigées puis **relues par un juriste** ; même mécanisme de relecture que `/confidentialite`
 - Liens dans le pied de page et au tunnel d'achat (acceptation des CGV à la commande)
 
+**Story 12.2** — Import des catalogues fournisseurs (collecte → tri `.xlsx` → import admin) — 🔜 **À FAIRE** _(créée le 2026-09-28, demande client)_
+
+> Besoin : récupérer les catalogues de 7 fournisseurs, les agréger dans **un fichier de tri** où le client coche ce qu'il reprend, puis **tout importer en une fois**. C'est un **import ponctuel, pas une synchronisation**. Le moteur d'import, lui, est **pérenne** : il resservira à chaque nouveau fournisseur.
+>
+> Le client a un **compte pro** chez chaque fournisseur et un **tarif Excel** par fournisseur. Ce qui lui manque, ce sont les **fiches détaillées** (descriptions, caractéristiques, photos) : c'est la vraie valeur de la collecte.
+
+**Repérage des sources (2026-09-28, pages d'accueil/catégories seulement) :**
+
+| Fournisseur | Nature | Prix publics | Notes |
+|---|---|---|---|
+| Agora-Tec | grossiste pro | non | coutellerie/outdoor, ~2 000 réf., catalogues PDF |
+| Cor Caroli | grossiste pro | non | armes/optiques/munitions, catalogue Heyzine |
+| BGM Winfield | espace B2B, PrestaShop | non | optoélectronique : 185 réf. |
+| ESP France | détail, PrestaShop | TTC public | tir longue distance, rechargement |
+| Toro Distribution | mixte, PrestaShop | HT/TTC public | airsoft, paintball, loisir, défense |
+| Humbert | grossiste pro | non | portail `b2b.humbert.com` |
+| Armurerie de Paris | import-export sur RDV | non | **`robots.txt` = `Disallow: /`**, pas de catalogue en ligne → **hors collecte automatique** (saisie manuelle ou via l'import) |
+
+**Architecture — trois briques indépendantes :**
+
+1. **Collecteurs** (un adaptateur par fournisseur) — outil **lancé à la main** depuis un poste, **jamais déployé** en prod. Chacun produit le même **format pivot** (réf. fournisseur, EAN, nom, marque, descriptions, caractéristiques, URL des images, famille source, URL source). Politesse : débit limité, `User-Agent` identifié, cache disque (un re-run ne re-télécharge pas), reprise sur interruption
+2. **Agrégation → fichier de tri `.xlsx`** — fusionne les collectes avec le **tarif Excel** de chaque fournisseur, **rapproché sur la référence fournisseur normalisée** (majuscules, sans espaces/tirets/points, zéros de tête préservés) puis sur l'**EAN** en repli. Un petit mapping par fournisseur indique les colonnes réf./prix de son tarif. Le fichier contient :
+   - onglet **« À trier »** : une ligne par référence, statut de rapprochement, prix d'achat HT, **prix de vente HT proposé** (achat + `defaultMarginPct` du fournisseur, modifiable), catégorie produit et **catégorie légale proposées**, colonne **« Importer » (oui/non)**
+   - onglets **« Fiches sans prix »** et **« Prix sans fiche »** : rien ne se perd en silence
+   - **listes déroulantes** (catégories produit, catégories légales, oui/non) pour éviter les fautes de frappe
+3. **Import admin** (pérenne) — `/admin/imports` : dépôt d'un **`.xlsx` ou `.csv`** (`;` ou `,` détecté, UTF-8 avec ou sans BOM), **aperçu à blanc** avec rapport ligne par ligne (à créer / à mettre à jour / erreur + motif), **puis confirmation**. Chaque ligne passe par **la même validation que le formulaire produit** (`createProductSchema`) : pas de seconde règle métier
+
+**Décisions validées avec Franck :**
+
+- [x] Rapprochement fiches ↔ tarifs **outillé** (pas de RECHERCHEV à la main)
+- [x] Fichier de tri en **`.xlsx`** ; l'import accepte **`.xlsx` et `.csv`**
+- [x] Stratégie mixte : fiches depuis les **pages publiques** ; prix depuis les **tarifs Excel** du client
+
+**Garde-fous (critères d'acceptation) :**
+
+- **Catégorie légale jamais devinée en silence** : le collecteur peut *proposer*, mais **l'import refuse toute ligne sans catégorie légale explicite**. `requiresLegalVerification` reste dérivé côté serveur, comme dans le formulaire
+- Produits importés **non publiés** : la mise en ligne reste un geste humain
+- **Idempotent** : clé = (fournisseur, réf. fournisseur) ; ré-importer met à jour, ne duplique pas. Les champs retouchés à la main dans l'admin ne sont **pas écrasés** sans option explicite
+- **Images copiées chez nous** (pipeline média existant : Scaleway, largeurs pré-générées, AVIF), jamais liées au site du fournisseur ; téléchargement **asynchrone** avec contrôle de signature de fichier, une image en échec ne bloque pas la ligne
+- Fichier déposé traité comme **non fiable** : taille et nombre de lignes plafonnés, pas d'évaluation de formules, neutralisation des cellules commençant par `=`, `+`, `-`, `@` à l'export (**injection de formules**), HTML des descriptions passé par `sanitizeRichTextHtml`
+- **Identifiants pro jamais dans le repo** : variables d'environnement locales, uniquement si un collecteur en a besoin
+
+**À valider avant de coder (décisions structurantes) :**
+
+- ⚠️ **Schéma** : contrainte **unique (`supplier_id`, `supplier_sku`)** sur `products` + colonnes `ean` et `source_url` → migration Drizzle
+- ⚠️ **Dépendances** : lecture/écriture `.xlsx` avec listes déroulantes, parsing CSV, parsing HTML pour les collecteurs (et navigateur headless seulement si un site l'exige)
+- ⚠️ **Emplacement des collecteurs** : paquet d'outillage du monorepo, hors build de prod
+- **Variantes** (finition/calibre/couleur) : regroupées sous un produit (`product_variants`) quand la source les expose comme telles, une ligne = un produit sinon
+- **Droits sur les photos et textes** des fournisseurs : à confirmer par le client pour chacun
+
+**Attendu du client :**
+
+- Un **tarif Excel par fournisseur** (même ancien) pour caler les mappings de colonnes
+- Le **périmètre** : catalogue complet ou certaines familles par fournisseur ? Les liens fournis visent parfois une seule catégorie (BGM → optoélectronique, Toro → packs répliques longues)
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
