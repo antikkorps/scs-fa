@@ -19,6 +19,7 @@ import { adminBlogRoutes } from "./blog/admin.js"
 import { adminBlogImageRoutes, blogImageRoutes } from "./blog/images.js"
 import { blogRoutes } from "./blog/index.js"
 import { cartRoutes } from "./cart/index.js"
+import { adminCatalogImportRoutes } from "./catalog-import/admin.js"
 import { env } from "./env.js"
 import { legalCategoryRoutes } from "./legal-categories/index.js"
 import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
@@ -132,6 +133,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminTagRoutes, { prefix: "/api/admin/tags" })
   await fastify.register(adminMediaRoutes, { prefix: "/api/admin/media" })
   await fastify.register(adminPayoutRoutes, { prefix: "/api/admin/finance" })
+  await fastify.register(adminCatalogImportRoutes, { prefix: "/api/admin/catalog-imports" })
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)

@@ -1,0 +1,24 @@
+{
+  "apiBaseUrl": "http://localhost:8081",
+  "suppliers": {
+    "bgm-winfield": {
+      "marginPct": 30,
+      "priceList": {
+        "file": "price-lists/bgm-winfield.xlsx",
+        "mapping": { "ref": "Référence", "price": "Prix net HT", "ean": "EAN" }
+      },
+      "rules": [
+        { "match": "points rouges|lunettes|prismes|lpvo|magnifiers", "category": "aide-visee" },
+        { "match": "munitions", "category": "munition" }
+      ]
+    },
+    "agora-tec": {
+      "marginPct": 35,
+      "priceList": {
+        "file": "price-lists/agora-tec.csv",
+        "mapping": { "ref": "Code article", "price": "Prix HT" }
+      },
+      "rules": [{ "match": "torches|frontales", "category": "accessoire-autre", "legalCategory": "none" }]
+    }
+  }
+}

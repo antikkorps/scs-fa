@@ -1,0 +1,26 @@
+{
+  "name": "@armurier/catalog-collect",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Story 12.2 — one-off supplier catalogue collection and triage workbook builder. Run locally, never deployed.",
+  "type": "module",
+  "scripts": {
+    "collect": "tsx src/cli.ts collect",
+    "triage": "tsx src/cli.ts triage",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@armurier/shared": "workspace:*",
+    "cheerio": "1.2.0",
+    "exceljs": "4.4.0",
+    "tsx": "4.22.4",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.0"
+  }
+}

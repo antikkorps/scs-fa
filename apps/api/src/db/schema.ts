@@ -489,17 +489,21 @@ export const legalCategoriesRelations = relations(legalCategories, ({ many }) =>
 // 3. PRODUITS & VARIANTES
 // ============================================================================
 
-export const suppliers = pgTable("suppliers", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 255 }).notNull(),
-  contactEmail: varchar("contact_email", { length: 255 }),
-  contactPhone: varchar("contact_phone", { length: 20 }),
-  defaultMarginPct: decimal("default_margin_pct", { precision: 5, scale: 2 }).default(
-    "30",
-  ),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-})
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(),
+    contactEmail: varchar("contact_email", { length: 255 }),
+    contactPhone: varchar("contact_phone", { length: 20 }),
+    defaultMarginPct: decimal("default_margin_pct", { precision: 5, scale: 2 }).default("30"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  // L'import de catalogue (story 12.2) désigne un fournisseur par son nom :
+  // « BGM Winfield » et « bgm winfield » doivent être le même, jamais deux.
+  (t) => [uniqueIndex("uq_suppliers_name_ci").on(sql`lower(${t.name})`)],
+)
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
   products: many(products),
@@ -560,6 +564,11 @@ export const products = pgTable(
     supplierId: uuid("supplier_id"),
     supplierSku: varchar("supplier_sku", { length: 100 }),
     supplierPrice: decimal("supplier_price_ht", { precision: 10, scale: 2 }),
+    // Import de catalogue (story 12.2) : ce que la fiche du fournisseur apporte
+    // et que le formulaire produit ne portait pas.
+    brand: varchar("brand", { length: 100 }),
+    ean: varchar("ean", { length: 14 }),
+    sourceUrl: varchar("source_url", { length: 1024 }),
 
     // Pricing
     priceHt: decimal("price_ht", { precision: 10, scale: 2 }).notNull(),
@@ -627,6 +636,11 @@ export const products = pgTable(
       t.requiresLegalVerification,
     ),
      index("idx_products_search").using("gin", t.searchVector),
+     // Clé de l'import de catalogue (story 12.2) : ré-importer une référence
+     // met la fiche à jour au lieu de la dupliquer. Les produits sans
+     // fournisseur (NULL) ne se gênent pas : NULL n'est jamais égal à NULL.
+     uniqueIndex("uq_products_supplier_sku").on(t.supplierId, t.supplierSku),
+     index("idx_products_ean").on(t.ean),
      check("chk_products_parcel_count", sql`parcel_count BETWEEN 1 AND 5`),
      // Un bénéficiaire supprimé ne doit pas laisser de référence morte sur un
      // article : le lien se vide, l'article reste vendable.
@@ -2073,3 +2087,61 @@ export const newsletterTokensRelations = relations(newsletterTokens, ({ one }) =
     references: [newsletterContacts.id],
   }),
 }))
+
+// ============================================================================
+// IMPORT DE CATALOGUES FOURNISSEURS (story 12.2)
+// ============================================================================
+// Un import est un lot relu puis confirmé par un admin : on garde qui l'a
+// lancé, quel fichier (empreinte), et ce qu'il a fait. Les images, elles, sont
+// téléchargées APRÈS la confirmation, en tâche de fond : une file persistée
+// survit à un redémarrage et se reprend en ligne de commande.
+export const catalogImports = pgTable(
+  "catalog_imports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fileName: varchar("file_name", { length: 255 }).notNull(),
+    fileSha256: varchar("file_sha256", { length: 64 }).notNull(),
+    overwrite: boolean("overwrite").notNull().default(false),
+    createdCount: integer("created_count").notNull().default(0),
+    updatedCount: integer("updated_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    suppliersCreated: integer("suppliers_created").notNull().default(0),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_catalog_imports_created_at").on(t.createdAt),
+    foreignKey({ columns: [t.createdBy], foreignColumns: [users.id] }).onDelete("set null"),
+  ],
+)
+
+export const catalogImageStatusEnum = pgEnum("catalog_image_status", ["pending", "done", "failed"])
+
+export const catalogImportImages = pgTable(
+  "catalog_import_images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    importId: uuid("import_id").notNull(),
+    productId: uuid("product_id").notNull(),
+    url: varchar("url", { length: 1024 }).notNull(),
+    position: integer("position").notNull(),
+    status: catalogImageStatusEnum("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    // Bail d'un travailleur : tant qu'il court, personne d'autre ne prend la
+    // ligne. Sert aussi de date de nouvelle tentative après un échec passager.
+    lockedUntil: timestamp("locked_until"),
+    error: text("error"),
+    mediaId: uuid("media_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // Une même image n'est mise en file qu'une fois par produit, même si
+    // l'import est rejoué.
+    uniqueIndex("uq_catalog_import_images_product_url").on(t.productId, t.url),
+    index("idx_catalog_import_images_status").on(t.status),
+    foreignKey({ columns: [t.importId], foreignColumns: [catalogImports.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.productId], foreignColumns: [products.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.mediaId], foreignColumns: [media.id] }).onDelete("set null"),
+  ],
+)

@@ -1,0 +1,191 @@
+<!doctype html><html><head><meta charset="utf-8"><title>fixture</title></head><body>
+<div id="slider_une_marque">
+        <ul>
+        	
+					<li>
+						<a href="https://www.agora-tec.fr/data/synchro/agoratec/local2web/articles/images/REFE001-1-z.jpg" class="zoom" title="Couteau exemple B - Lame 82mm - Manche Polyamide - Clip réversible">
+							<span><img src="https://www.agora-tec.fr/data/synchro/agoratec/local2web/articles/images/REFE001-1.jpg" alt="Couteau exemple B" /></span>
+						</a>
+					</li>
+				
+          
+        </ul>
+      </div>
+
+      <div id="nom_produit">
+        <h2>Couteau exemple B - Marque Epsilon 
+        </h2>
+      
+        <div class="stock dispo" title="disponible immédiatement"></div>
+      
+      </div>
+
+      
+<div id="descriptif">
+      <span>Référence : REFE001</span>
+      
+          	<a href='javascript:MajPanier("REFE001", "maj", "1", "slider");' class="ajout_panier" id="btn_panier_slider_REFE001"><p>Ajouter à ma sélection</p><span>+</span></a>
+       </div></div></section><section id="contenu"><div>
+
+     <div id="ariane"><div itemscope itemtype='http://data-vocabulary.org/Breadcrumb'>
+        <a href='/' itemprop='url'><span itemprop='title'>Accueil</span></a>
+      </div> &gt;
+      <div itemscope itemtype='http://data-vocabulary.org/Breadcrumb'>
+        <a href='/marques/les-marques.htm' itemprop='url'><span itemprop='title'>Les marques</span></a>
+      </div> &gt;
+      <div itemscope itemtype='http://data-vocabulary.org/Breadcrumb'>
+        <a href='marques/marquee.htm-reset' itemprop='url'><span itemprop='title'>Marque Epsilon</span></a>
+      </div> &gt;
+      <div itemscope itemtype='http://data-vocabulary.org/Breadcrumb'>
+        <a href='/article.php-REFE001' itemprop='url'><span itemprop='title'>REFE001 - Couteau exemple B</span></a>
+      </div>
+      </div>
+
+
+     
+<div id="description" class="texte">
+
+       <div class="description">
+         <h2>Marque Epsilon - REFE001 - Couteau exemple B</h2>
+         <h3>Couteau exemple B - Lame 82mm - Manche Polyamide - Clip réversible</h3>
+       </div>
+       <div id="logo_marque"><img src='https://www.agora-tec.fr/data/synchro/agoratec/local2web/marques/images/MARQUEE.gif' alt='Marque Epsilon'/>
+      </div>
+     </div>
+
+
+     
+<div id="caracteristiques" class="texte">
+     <![CDATA[
+       <h2>Caractéristiques</h2>
+       <ul>
+                <li><b>Acier</b> : CPM S30V </li>
+            
+                <li><b>Longueur lame (mm)</b> : 82 </li>
+            
+                <li><b>Longueur totale (mm)</b> : 190 </li>
+            
+                <li><b>Manche (Finition)</b> : Polyamide </li>
+            
+                <li><b>Couleur lame</b> : Blanche </li>
+            
+                <li><b>Profil de lame</b> : Drop Point </li>
+            
+                <li><b>Couleur manche</b> : Bleu </li>
+            
+                <li><b>Tranchant</b> : Lisse </li>
+            
+                <li><b>Ouverture Sécurité</b> : Verrou exemple </li>
+            
+                <li><b>Port</b> : Clip réversible </li>
+            
+       </ul>
+
+				<p>/</p>
+        <div id="liens_utiles">
+        <h2>Liens utiles</h2>
+      
+          <a href='http://www.example.com/535.html' target='_blank'>http://www.example.com/535.html</a><br/>
+        
+        </div>
+      
+     </div>
+     <div class="liste_articles">
+       <h2>Produits complémentaires et accessoires de cet article</h2>
+       <ul class="articles_complementaires"><li class="grid-sizer"></li>
+				<div class="calque_quantite" id="calque_panier_liste">
+        	<h3>Veuillez indiquer la quantité souhaitée : </h3>
+					<input type="text" name="nQuantitePanierManuel_PM" id="nQuantitePanierManuel" class="quantite" value="1" />
+					<input type="hidden" name="szQuantitePanierManuelReference_PM" id="szQuantitePanierManuelReference" />
+          <a class="ajouter" href='javascript:MajPanier( "", "maj", "", "liste", true );' id="btn_panier_liste"><p>&gt; Ajouter à ma sélection</p></a>
+			  </div>
+        <script>
+					$(document).ready(function() {
+		        $( "#calque_panier_liste" ).dialog({
+							autoOpen: false,
+							modal: true,
+							width: "300px"
+						});
+						$( ".ouvre_panier_manuel" ).click(function() {
+							var szId = $(this).attr("id");
+//console.log(szId);
+							var aId = szId.split("_");
+
+							if (aId.length == 4) {
+								var szReference = aId[3];
+							}
+							else if (aId.length == 5) {
+								var szReference = aId[3]+"_"+aId[4];
+							}
+              else if (aId.length == 6) {
+                var szReference = aId[3]+"_"+aId[4]+"_"+aId[5];
+              }
+
+							var szTitre = $(this).attr("title");
+
+							$("#szQuantitePanierManuelReference").val(szReference);
+
+							$("#nQuantitePanierManuel").val(1);
+							$( "#calque_panier_liste" ).dialog( "open" );
+							$( "#calque_panier_liste" ).dialog("option", "title", szTitre);
+							return false;
+						});
+						$( "#calque_panier_liste .ajouter").click(function() {
+							$( "#calque_panier_liste" ).dialog( "close" );
+						});
+		      });
+				</script>
+			
+       </ul>
+     </div>
+     <div class="liste_articles">
+       <h2>Vous aimerez aussi....</h2>
+       <ul>
+				<div class="calque_quantite" id="calque_panier_liste">
+        	<h3>Veuillez indiquer la quantité souhaitée : </h3>
+					<input type="text" name="nQuantitePanierManuel_PM" id="nQuantitePanierManuel" class="quantite" value="1" />
+					<input type="hidden" name="szQuantitePanierManuelReference_PM" id="szQuantitePanierManuelReference" />
+          <a class="ajouter" href='javascript:MajPanier( "", "maj", "", "liste", true );' id="btn_panier_liste"><p>&gt; Ajouter à ma sélection</p></a>
+			  </div>
+        <script>
+					$(document).ready(function() {
+		        $( "#calque_panier_liste" ).dialog({
+							autoOpen: false,
+							modal: true,
+							width: "300px"
+						});
+						$( ".ouvre_panier_manuel" ).click(function() {
+							var szId = $(this).attr("id");
+//console.log(szId);
+							var aId = szId.split("_");
+
+							if (aId.length == 4) {
+								var szReference = aId[3];
+							}
+							else if (aId.length == 5) {
+								var szReference = aId[3]+"_"+aId[4];
+							}
+              else if (aId.length == 6) {
+                var szReference = aId[3]+"_"+aId[4]+"_"+aId[5];
+              }
+
+							var szTitre = $(this).attr("title");
+
+							$("#szQuantitePanierManuelReference").val(szReference);
+
+							$("#nQuantitePanierManuel").val(1);
+							$( "#calque_panier_liste" ).dialog( "open" );
+							$( "#calque_panier_liste" ).dialog("option", "title", szTitre);
+							return false;
+						});
+						$( "#calque_panier_liste .ajouter").click(function() {
+							$( "#calque_panier_liste" ).dialog( "close" );
+						});
+		      });
+				</script>
+			
+       </ul>
+     </div>
+
+   </div>
+</body></html>

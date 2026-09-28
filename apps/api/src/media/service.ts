@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { MEDIA_FORMATS, MEDIA_WIDTHS, type MediaFormat, mediaRenditionUrl } from "@armurier/shared"
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, sql } from "drizzle-orm"
 import sharp, { type Sharp } from "sharp"
 import { protectedPipeline } from "../artworks/watermark.js"
 import { db } from "../db/client.js"
@@ -76,7 +76,9 @@ export async function renderRenditions(id: string, input: Buffer, ownerType: Med
   // sharp's decode is the real content check — far stronger than a declared
   // Content-Type, and it rejects mislabeled or polyglot files.
   const probe = sharp(input)
-  const meta = await probe.metadata()
+  const meta = await probe.metadata().catch(() => {
+    throw new UnusableImageError("Image could not be processed")
+  })
   if (!meta.format || !["jpeg", "png", "webp", "tiff"].includes(meta.format)) {
     throw new UnusableImageError("Unrecognised image content")
   }
@@ -89,7 +91,12 @@ export async function renderRenditions(id: string, input: Buffer, ownerType: Med
 
   // `.rotate()` honours EXIF orientation BEFORE the metadata is dropped;
   // re-encoding to WebP is what actually strips it (EXIF GPS is a data leak).
-  const upright = await sharp(input).rotate().toBuffer()
+  const upright = await sharp(input)
+    .rotate()
+    .toBuffer()
+    .catch(() => {
+      throw new UnusableImageError("Image could not be processed")
+    })
   const uprightMeta = await sharp(upright).metadata()
   const sourceWidth = uprightMeta.width ?? 0
   const sourceHeight = uprightMeta.height ?? 0
@@ -196,6 +203,44 @@ export async function syncOwnerFeaturedImage(ownerType: MediaOwnerType, ownerId:
       await tx.update(artists).set({ portraitUrl: url, updatedAt: new Date() }).where(eq(artists.id, ownerId))
       break
   }
+}
+
+/**
+ * Render an image and append it to the END of an owner's gallery — an upload
+ * never silently changes which visual is the main one, except for an owner
+ * that had none. Shared by the admin upload and the catalogue import.
+ * Throws `UnusableImageError` for bytes that are not a usable image.
+ */
+export async function appendOwnerMedia(ownerType: MediaOwnerType, ownerId: string, alt: string, input: Buffer) {
+  const id = newMediaId()
+  // Bad bytes surface as UnusableImageError; a storage outage stays what it is,
+  // so the import queue retries it instead of failing the image for good.
+  const rendered = await renderRenditions(id, input, ownerType)
+
+  const [{ next } = { next: 0 }] = await db
+    .select({ next: sql<number>`coalesce(max(${media.position}) + 1, 0)::int` })
+    .from(media)
+    .where(and(eq(media.ownerType, ownerType), eq(media.ownerId, ownerId)))
+
+  const [row] = await db
+    .insert(media)
+    .values({
+      id,
+      ownerType,
+      ownerId,
+      position: next,
+      alt,
+      widths: rendered.widths,
+      width: rendered.width,
+      height: rendered.height,
+      sizeBytes: rendered.sizeBytes,
+      watermarked: rendered.watermarked,
+    })
+    .returning()
+  if (!row) throw new Error("Media insert returned no row")
+
+  await syncOwnerFeaturedImage(ownerType, ownerId)
+  return row
 }
 
 /**
