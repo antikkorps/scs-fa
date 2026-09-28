@@ -289,3 +289,60 @@ export interface BlogFormValues {
   published: boolean
   featured: boolean
 }
+
+// --- Import de catalogues fournisseurs (story 12.2) ---------------------------
+
+export type CatalogImportAction = "create" | "update" | "invalid" | "skipped"
+
+export interface CatalogImportPreviewRow {
+  line: number
+  action: CatalogImportAction
+  errors: string[]
+  warnings: string[]
+  supplier: string | null
+  supplierSku: string | null
+  name: string | null
+  sku: string | null
+  images: number
+}
+
+export interface CatalogImportPreview {
+  fileName: string
+  fileSha256: string
+  overwrite: boolean
+  summary: { create: number; update: number; invalid: number; skipped: number; images: number }
+  suppliersToCreate: string[]
+  rows: CatalogImportPreviewRow[]
+}
+
+export interface CatalogImportResult {
+  importId: string
+  created: number
+  updated: number
+  skipped: number
+  invalid: number
+  suppliersCreated: number
+  imagesQueued: number
+}
+
+export interface CatalogImportHistoryRow {
+  id: string
+  fileName: string
+  overwrite: boolean
+  createdCount: number
+  updatedCount: number
+  skippedCount: number
+  suppliersCreated: number
+  createdAt: string
+  images: { pending: number; done: number; failed: number }
+}
+
+export interface CatalogFailedImage {
+  id: string
+  url: string
+  error: string | null
+  attempts: number
+  productId: string
+  productName: string
+  productSku: string
+}
