@@ -76,24 +76,24 @@ describe("ESP France", () => {
   it("reads a product: reference, heading, brand, legal hint, breadcrumb, original image", () => {
     const p = parseEspProduct(fixture("product-34481.html"), productUrl(34481), undefined)
     expect(p).toMatchObject({
-      supplierSku: "NIG-O-V960",
-      name: 'Pare Soleil Nightforce 3" - 52mm (COMPETITION)',
-      brand: "Nightforce",
+      supplierSku: "REF-O-V001",
+      name: 'Pare Soleil Marque Mu 3" - 52mm (SERIE A)',
+      brand: "Marque Mu",
       supplierLegalClass: "Vente Libre",
       sourceCategory: "Optiques > Accessoires > Pare Soleil & Anti-reflets",
       imageUrls: [`${ESP}/img/p/34481-11479.jpg`],
       specs: {},
     })
     // The Google Translate widget around the description is gone, its text kept.
-    expect(p?.longDescription).toMatch(/^<p><span[^>]*>Pare-soleil Nightforce de 3 pouces/)
+    expect(p?.longDescription).toMatch(/^<p><span[^>]*>Pare-soleil Marque Mu de 3 pouces/)
     expect(p?.longDescription).not.toMatch(/tw-/)
     expect(collectedProductSchema.safeParse({ ...p, supplier: "ESP France" }).success).toBe(true)
   })
 
   it("keeps every image of the gallery, as originals", () => {
     const p = parseEspProduct(fixture("product-34074.html"), productUrl(34074), undefined)
-    expect(p?.supplierSku).toBe("28009")
-    expect(p?.name).toBe("Sightron SIII PLR 8-32x56mm Side Focus Réticule MOA-2")
+    expect(p?.supplierSku).toBe("10001")
+    expect(p?.name).toBe("Marque Nu Lunette exemple 8-32x56mm Réticule A-2")
     expect(p?.imageUrls).toHaveLength(7)
     expect(p?.imageUrls.every((u) => /^https:\/\/www\.espfrance\.com\/img\/p\/34074-\d+\.jpg$/.test(u))).toBe(true)
     expect(p?.longDescription).toContain("Cette lunette est livrée avec les accessoires suivants")
@@ -103,9 +103,9 @@ describe("ESP France", () => {
   it("reads a firearm's legal hint without the footnote star", () => {
     const p = parseEspProduct(fixture("product-26585-firearm.html"), productUrl(26585), undefined)
     expect(p).toMatchObject({
-      supplierSku: "CA-J-1",
-      name: "Cav 15 Cal. .223 Rem.",
-      brand: "Cavalry Arms",
+      supplierSku: "REF-J-1",
+      name: "Carabine exemple Cal. .223 Rem.",
+      brand: "Marque Xi",
       supplierLegalClass: "Arme Réglementée",
       sourceCategory: "Armes et Accessoires > Armes d'Epaule Semi Automatiques > AR15 - AR10",
     })
@@ -115,7 +115,7 @@ describe("ESP France", () => {
 
   it("falls back on the inline script for the reference", () => {
     const html = fixture("product-34481.html").replace(/<p id="product_reference">[\s\S]*?<\/p>/, "")
-    expect(parseEspProduct(html, productUrl(34481), undefined)?.supplierSku).toBe("NIG-O-V960")
+    expect(parseEspProduct(html, productUrl(34481), undefined)?.supplierSku).toBe("REF-O-V001")
   })
 
   it("returns null for a page that is not a product", () => {

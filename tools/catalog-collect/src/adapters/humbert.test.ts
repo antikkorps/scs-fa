@@ -24,46 +24,46 @@ describe("Humbert", () => {
   })
 
   it("reads an article: reference, specs, supplier legal class, images, siblings", () => {
-    const url = "https://www.humbert.com/fr/produit/cara-ruger-10-22"
-    const p = parseHumbertProduct(fixture("product-ruger-1022.html"), url, "Carabines")
+    const url = "https://www.humbert.com/fr/produit/carabine-exemple-a"
+    const p = parseHumbertProduct(fixture("product-carabine-a.html"), url, "Carabines")
     expect(p).toMatchObject({
-      supplierSku: "32301698",
-      name: 'CARA RUGER 10/22 CARBINE 22LR 16.4" 42CM 10CPS STD SYNTH SATIN NOIRE (1C)1/2"-28',
-      brand: "Ruger",
+      supplierSku: "11110001",
+      name: 'CARA MARQUE-THETA EXEMPLE 22LR 16.4" 42CM 10CPS STD SYNTH SATIN NOIRE (1C)1/2"-28',
+      brand: "Marque Theta",
       sourceCategory: "Carabines > Percussion Annulaire",
       supplierLegalClass: "B2abis",
     })
     expect(p?.specs).toMatchObject({
       Calibre: "22 LR",
-      "Réf. RGA": "CK784",
+      "Réf. RGA": "XX001",
       Chargeur: "10",
-      Gamme: "SEMI-AUTOMATIQUES 10/22",
+      Gamme: "SEMI-AUTOMATIQUES EXEMPLE",
     })
     // Neither the price nor the legal class leak into the specifications.
     expect(Object.keys(p?.specs ?? {}).some((k) => /prix|catégorie/i.test(k))).toBe(false)
     expect(p?.imageUrls).toHaveLength(1)
     expect(p?.imageUrls[0]).toContain(
-      "humbert.contenthub.fi/NiboWEB/humbert/getPublicFile.do?uuid=25016447&inline=false",
+      "humbert.contenthub.fi/NiboWEB/humbert/getPublicFile.do?uuid=10000001&inline=false",
     )
     expect(p?.longDescription).toBeUndefined()
     expect(collectedProductSchema.safeParse({ ...p, supplier: "Humbert" }).success).toBe(true)
 
-    expect(parseSiblings(fixture("product-ruger-1022.html")).length).toBeGreaterThan(0)
+    expect(parseSiblings(fixture("product-carabine-a.html")).length).toBeGreaterThan(0)
   })
 
   it("keeps the description when there is one, and every image of the gallery", () => {
-    const tikka = parseHumbertProduct(
-      fixture("product-tikka-t3x.html"),
+    const withDescription = parseHumbertProduct(
+      fixture("product-carabine-b.html"),
       "https://www.humbert.com/fr/produit/t",
       undefined,
     )
-    expect(tikka?.longDescription).toContain("La T3x Lite combine")
-    const sako = parseHumbertProduct(
-      fixture("product-sako-100.html"),
+    expect(withDescription?.longDescription).toContain("La carabine exemple combine")
+    const withGallery = parseHumbertProduct(
+      fixture("product-carabine-c.html"),
       "https://www.humbert.com/fr/produit/s",
       undefined,
     )
-    expect(sako?.imageUrls).toHaveLength(7)
+    expect(withGallery?.imageUrls).toHaveLength(7)
   })
 
   it("returns null for a page that is not an article", () => {
@@ -84,7 +84,7 @@ describe("Humbert", () => {
       "https://www.humbert.com/fr/famille/carabines": listing,
       "https://www.humbert.com/fr/famille/3/page/1/2": fixture("listing-carabines-page1.json"),
       "https://www.humbert.com/fr/famille/3/page/2/5": fixture("listing-carabines-page2.json"),
-      [firstModel as string]: fixture("product-ruger-1022.html"),
+      [firstModel as string]: fixture("product-carabine-a.html"),
     }
     const requested: string[] = []
     const client = new PoliteClient({
@@ -101,7 +101,7 @@ describe("Humbert", () => {
     for await (const url of humbert.discover(client, { filters: ["^carabines$"] })) urls.push(url)
 
     expect(new Set(urls).size).toBe(urls.length)
-    const siblings = parseSiblings(fixture("product-ruger-1022.html"))
+    const siblings = parseSiblings(fixture("product-carabine-a.html"))
     // 5 models over three batches, plus the siblings listed on the first one.
     expect(urls.length).toBe(5 + siblings.filter((s) => s !== firstModel).length)
     expect(requested.some((u) => u.includes("/famille/optiques"))).toBe(false)

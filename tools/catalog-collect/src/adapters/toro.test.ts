@@ -40,7 +40,7 @@ describe("Toro Distribution", () => {
   it("reads a leaf listing's products, and a parent listing's subcategories", () => {
     const leaf = parseToroListing(fixture("category-1012.html"))
     expect(leaf.productUrls).toHaveLength(4)
-    expect(leaf.productUrls[0]).toBe(`${TORO}/13877-pack-fusil-g36-slv36-porte-cible-cibles-billes-asg.html`)
+    expect(leaf.productUrls[0]).toBe(`${TORO}/13877-pack-fusil-modele-b-porte-cible-cibles-billes-marque-omicron.html`)
     expect(leaf.hasNext).toBe(false)
 
     const parent = parseToroListing(fixture("category-975.html"))
@@ -54,18 +54,18 @@ describe("Toro Distribution", () => {
   })
 
   it("reads a product from its data-product JSON: reference, brand, features, original images", () => {
-    const url = `${TORO}/16220-pistolet-walther-ppq-umarex-spring.html`
+    const url = `${TORO}/16220-pistolet-marque-rho-modele-a-marque-pi-spring.html`
     const p = parseToroProduct(fixture("product-16220.html"), url, undefined)
     expect(p).toMatchObject({
-      supplierSku: "SOFPOWA01-BK",
-      name: "Pistolet WALTHER PPQ UMAREX SPRING",
-      brand: "UMAREX",
-      description: "Pistolet WALTHER PPQ à ressort de chez UMAREX",
-      sourceCategory: "Airsoft > Répliques > Répliques de Poing > Pistolets WALTHER",
+      supplierSku: "REF-P001-BK",
+      name: "Pistolet MARQUE-RHO MODELE-A MARQUE-PI SPRING",
+      brand: "MARQUE-PI",
+      description: "Pistolet MARQUE-RHO MODELE-A à ressort de chez MARQUE-PI",
+      sourceCategory: "Airsoft > Répliques > Répliques de Poing > Pistolets MARQUE-RHO",
       sourceUrl: url,
     })
     expect(p?.ean).toBeUndefined()
-    expect(p?.longDescription).toContain("<strong> WALTHER PPQ</strong>")
+    expect(p?.longDescription).toContain("<strong> MARQUE-RHO MODELE-A</strong>")
     expect(p?.specs).toMatchObject({
       Calibre: "Billes plastique 6 mm",
       Propulsion: "SPRING (ressort)",
@@ -87,14 +87,18 @@ describe("Toro Distribution", () => {
     // The fixture does carry both traps.
     expect(html).toContain("wholesale_price")
     expect(html).toContain('class="product-reference"')
-    const p = parseToroProduct(html, `${TORO}/13877-pack-fusil-g36-slv36-porte-cible-cibles-billes-asg.html`, undefined)
+    const p = parseToroProduct(
+      html,
+      `${TORO}/13877-pack-fusil-modele-b-porte-cible-cibles-billes-marque-omicron.html`,
+      undefined,
+    )
     expect(p).toMatchObject({
-      supplierSku: "SOFFUHKG3603-PACK",
-      brand: "ASG",
+      supplierSku: "REF-O001-PACK",
+      brand: "MARQUE-OMICRON",
       sourceCategory: "Airsoft > Répliques > PACKS répliques longues",
       imageUrls: [`${TORO}/img/p/3/7/5/0/3/37503.jpg`],
     })
-    expect(p?.description).toContain("Ce pack inclut :\n- 1 fusil HK G36 SLV36")
+    expect(p?.description).toContain("Ce pack inclut :\n- 1 fusil MODELE-B")
     expect(Object.keys(p?.specs ?? {})).toHaveLength(23)
     expect(JSON.stringify(p)).not.toMatch(/88\.67|wholesale/)
     expect(collectedProductSchema.safeParse({ ...p, supplier: "Toro Distribution" }).success).toBe(true)
@@ -103,10 +107,10 @@ describe("Toro Distribution", () => {
   it("sums combinations up in one spec, and ignores their placeholder EAN", () => {
     const p = parseToroProduct(
       fixture("product-8776-variants.html"),
-      `${TORO}/8776-chaussures-magnum-lynx-80-montantes-black.html`,
+      `${TORO}/8776-chaussures-marque-upsilon-modele-e-montantes-black.html`,
       undefined,
     )
-    expect(p?.supplierSku).toBe("CHAMA03-BK")
+    expect(p?.supplierSku).toBe("REF-T001-BK")
     expect(p?.specs.Déclinaisons).toMatch(/^Pointure : 35, Pointure : 36, .*Pointure : 48$/)
     expect(p?.specs.Déclinaisons?.split(", ")).toHaveLength(14)
     expect(p?.ean).toBeUndefined()
@@ -141,8 +145,8 @@ describe("Toro Distribution", () => {
     const urls: string[] = []
     for await (const url of toro.discover(client, { filters: [] })) urls.push(url)
     expect(urls).toEqual([
-      `${TORO}/13877-pack-fusil-g36-slv36-porte-cible-cibles-billes-asg.html`,
-      `${TORO}/16220-pistolet-walther-ppq-umarex-spring.html`,
+      `${TORO}/13877-pack-fusil-modele-b-porte-cible-cibles-billes-marque-omicron.html`,
+      `${TORO}/16220-pistolet-marque-rho-modele-a-marque-pi-spring.html`,
     ])
     expect(urls.every(isToroProductUrl)).toBe(true)
     expect(requested.some((u) => u === `${TORO}/`)).toBe(false)

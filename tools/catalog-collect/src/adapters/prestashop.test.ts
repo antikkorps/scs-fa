@@ -8,16 +8,18 @@ describe("PrestaShop helpers", () => {
   })
 
   it("reads the image id of a friendly image URL", () => {
-    expect(imageIdFromUrl("https://bgmwinfield.fr/14183-product_main_2x/swampfox-kingslayer.jpg")).toBe("14183")
+    expect(imageIdFromUrl("https://bgmwinfield.fr/14183-product_main_2x/marque-alpha-point-rouge-exemple.jpg")).toBe(
+      "14183",
+    )
     expect(imageIdFromUrl("https://bgmwinfield.fr/img/logo.jpg")).toBeUndefined()
   })
 
   it("unescapes JSON-LD strings", () => {
-    expect(unescapeHtml("B&amp;T 14.5&#039;")).toBe("B&T 14.5'")
+    expect(unescapeHtml("A&amp;B 14.5&#039;")).toBe("A&B 14.5'")
   })
 
   it("keeps the inner breadcrumb only", () => {
-    expect(breadcrumbPath(["Accueil", "Airsoft", "Répliques", "Pack G36"])).toBe("Airsoft > Répliques")
+    expect(breadcrumbPath(["Accueil", "Airsoft", "Répliques", "Pack exemple"])).toBe("Airsoft > Répliques")
     expect(breadcrumbPath(["Accueil", "Produit"])).toBeUndefined()
   })
 })
