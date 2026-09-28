@@ -4,6 +4,10 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
+    // URL and TextDecoder are used by the import engine and the spreadsheet
+    // reader. Declared explicitly: a hoisted @types/node at the repo root made
+    // them resolve locally while CI had none.
+    "types": ["node"],
     "strict": true,
     // Match the consumers' strictness (the Nuxt app enables this): shared source
     // is type-checked under web's config, so catch unsafe indexed access here too.
