@@ -6,7 +6,7 @@ import {
   updateMediaSchema,
   uuidParamSchema,
 } from "@armurier/shared"
-import { and, asc, eq, sql } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
@@ -16,13 +16,12 @@ import { validationError } from "../http.js"
 import { replyForStorageReadFailure } from "../storage/http.js"
 import { storage } from "../storage/index.js"
 import {
+  appendOwnerMedia,
   deleteRenditions,
   type MediaOwnerType,
   mediaUrl,
-  newMediaId,
   originalKey,
   ownerExists,
-  renderRenditions,
   syncOwnerFeaturedImage,
   UnusableImageError,
 } from "./service.js"
@@ -126,40 +125,15 @@ export const adminMediaRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: "NotFound", message: `No ${ownerType} with id ${ownerId}` })
     }
 
-    const id = newMediaId()
-    let rendered: Awaited<ReturnType<typeof renderRenditions>>
+    let row: typeof media.$inferSelect
     try {
-      rendered = await renderRenditions(id, file.buffer, ownerType)
+      row = await appendOwnerMedia(ownerType, ownerId, alt, file.buffer)
     } catch (err) {
       if (err instanceof UnusableImageError) {
         return reply.code(400).send({ error: "UnsupportedMediaType", message: err.message })
       }
-      return reply.code(400).send({ error: "UnsupportedMediaType", message: "Image could not be processed" })
+      throw err
     }
-
-    const [{ next } = { next: 0 }] = await db
-      .select({ next: sql<number>`coalesce(max(${media.position}) + 1, 0)::int` })
-      .from(media)
-      .where(and(eq(media.ownerType, ownerType), eq(media.ownerId, ownerId)))
-
-    const [row] = await db
-      .insert(media)
-      .values({
-        id,
-        ownerType,
-        ownerId,
-        position: next,
-        alt,
-        widths: rendered.widths,
-        width: rendered.width,
-        height: rendered.height,
-        sizeBytes: rendered.sizeBytes,
-        watermarked: rendered.watermarked,
-      })
-      .returning()
-    if (!row) throw new Error("Media insert returned no row")
-
-    await syncOwnerFeaturedImage(ownerType, ownerId)
     return reply.code(201).send({ data: toDto(row) })
   })
 

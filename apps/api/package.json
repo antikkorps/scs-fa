@@ -20,7 +20,8 @@
     "db:seed": "tsx src/db/seed-cli.ts",
     "media:backfill-avif": "tsx src/media/backfill-avif-cli.ts",
     "sla:check": "tsx src/legal-documents/sla-cli.ts",
-    "tracking:sync": "tsx src/shipments/tracking/tracking-cli.ts"
+    "tracking:sync": "tsx src/shipments/tracking/tracking-cli.ts",
+    "catalog:images": "tsx src/catalog-import/images-cli.ts"
   },
   "dependencies": {
     "@armurier/shared": "workspace:*",

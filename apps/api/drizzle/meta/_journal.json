@@ -85,6 +85,13 @@
       "when": 1789760861181,
       "tag": "0011_story_11_8_cross_sell",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790625138255,
+      "tag": "0012_story_12_2_catalog_import",
+      "breakpoints": true
     }
   ]
 }

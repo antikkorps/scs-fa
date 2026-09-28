@@ -313,6 +313,9 @@ export interface ParsedImportRow {
 
 export const MAX_IMPORT_IMAGES_PER_ROW = 20
 
+/** Upload cap of a triage file: ~20 000 rows of text fit well under it. */
+export const MAX_CATALOG_IMPORT_FILE_BYTES = 15 * 1024 * 1024
+
 /** Limits mirror the columns they end up in (see `products`). */
 const TEXT_LIMITS = {
   supplier: 255,
