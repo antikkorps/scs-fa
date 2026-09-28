@@ -1,3 +1,4 @@
+import { normaliseHeader, parseCsv } from "./csv.js"
 import { round2 } from "./pricing.js"
 
 // How an order must be paid, depending on what it contains.
@@ -139,45 +140,6 @@ const CSV_HEADER_ALIASES: Record<keyof Omit<BankTransaction, never>, string[]> =
   counterpartyIban: ["iban", "ibanemetteur", "contrepartie", "counterparty", "compteemetteur"],
 }
 
-function normaliseHeader(h: string): string {
-  return h
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z]/g, "")
-}
-
-/** Split one CSV record on `delimiter`, honouring double-quoted fields. */
-function splitCsvLine(line: string, delimiter: string): string[] {
-  const out: string[] = []
-  let field = ""
-  let quoted = false
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i]
-    if (quoted) {
-      if (c === '"') {
-        if (line[i + 1] === '"') {
-          field += '"'
-          i++
-        } else {
-          quoted = false
-        }
-      } else {
-        field += c
-      }
-    } else if (c === '"') {
-      quoted = true
-    } else if (c === delimiter) {
-      out.push(field)
-      field = ""
-    } else {
-      field += c
-    }
-  }
-  out.push(field)
-  return out.map((f) => f.trim())
-}
-
 /**
  * Parse a bank statement CSV export into structured transactions.
  *
@@ -188,17 +150,9 @@ function splitCsvLine(line: string, delimiter: string): string[] {
  * skipped. Throws when no usable header is found so the caller can 400.
  */
 export function parseBankStatementCsv(csv: string): BankTransaction[] {
-  const lines = csv
-    .split(/\r\n|\r|\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0)
-  if (lines.length < 2) return []
-
-  // Guarded by the length check above; bind to a non-optional local so the
-  // header parsing stays clean under noUncheckedIndexedAccess.
-  const headerLine = lines[0] ?? ""
-  const delimiter = (headerLine.match(/;/g)?.length ?? 0) >= (headerLine.match(/,/g)?.length ?? 0) ? ";" : ","
-  const headers = splitCsvLine(headerLine, delimiter).map(normaliseHeader)
+  const table = parseCsv(csv)
+  if (table.length < 2) return []
+  const headers = (table[0] ?? []).map(normaliseHeader)
 
   const indexFor = (key: keyof BankTransaction): number => {
     const aliases = CSV_HEADER_ALIASES[key]
@@ -213,8 +167,7 @@ export function parseBankStatementCsv(csv: string): BankTransaction[] {
   }
 
   const transactions: BankTransaction[] = []
-  for (let i = 1; i < lines.length; i++) {
-    const cols = splitCsvLine(lines[i] ?? "", delimiter)
+  for (const cols of table.slice(1)) {
     const amount = parseBankAmount(cols[amountIdx] ?? "")
     if (Number.isNaN(amount)) continue
     transactions.push({
