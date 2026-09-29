@@ -47,6 +47,8 @@ const { reopen } = useConsent()
     <div class="container ft__base">
       <p>© {{ year }} SCS Firearm. Tous droits réservés.</p>
       <nav class="ft__legal" aria-label="Informations légales">
+        <NuxtLink to="/mentions-legales">Mentions légales</NuxtLink>
+        <NuxtLink to="/cgv">CGV</NuxtLink>
         <NuxtLink to="/confidentialite">Confidentialité</NuxtLink>
         <button type="button" class="ft__linkbtn" @click="reopen">Gestion des cookies</button>
       </nav>

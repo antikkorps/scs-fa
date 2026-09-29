@@ -3,6 +3,7 @@ import {
   amountsMatchToCent,
   calculateOrderPaymentSplit,
   extractTransferReference,
+  orderReference,
   PAYMENT_SPLIT,
   parseBankAmount,
   parseBankStatementCsv,
@@ -163,5 +164,11 @@ describe("calculateOrderPaymentSplit", () => {
     expect(split.splitType).toBe(PAYMENT_SPLIT.MIXED)
     expect(split.virement.amountTtc).toBe(1200)
     expect(split.carte.amountTtc).toBe(180)
+  })
+})
+
+describe("orderReference", () => {
+  it("is the first eight characters of the id, upper-cased", () => {
+    expect(orderReference("0b7d1f3e-8a51-4c1e-9d0a-2f6b1c3e4d5f")).toBe("0B7D1F3E")
   })
 })

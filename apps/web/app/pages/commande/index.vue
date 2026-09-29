@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { CURRENT_TERMS_VERSION } from "@armurier/shared"
 import type { CartView } from "~/types/cart"
 import type { Address, NewAddress } from "~/types/checkout"
-import { formatEuros } from "~/utils/format"
+import { formatDate, formatEuros } from "~/utils/format"
 
 definePageMeta({ middleware: "auth" })
 useHead({ title: "Commande — SCS Firearm" })
@@ -32,6 +33,11 @@ const form = reactive<NewAddress>({
 })
 const formError = ref("")
 const savingAddress = ref(false)
+
+// CGV acceptance (story 12.1): explicit, never pre-ticked, and the version
+// shown here is the one sent — and stored — with the order.
+const termsAccepted = ref(false)
+const termsVersionLabel = formatDate(CURRENT_TERMS_VERSION)
 
 const placing = ref(false)
 const placeError = ref("")
@@ -82,16 +88,29 @@ async function placeOrder() {
     placeError.value = "Choisissez une adresse de livraison."
     return
   }
+  if (!termsAccepted.value) {
+    placeError.value = "Acceptez les conditions générales de vente pour commander."
+    return
+  }
   placing.value = true
   try {
     const billing = billingDifferent.value && billingId.value ? billingId.value : undefined
-    const order = await createOrder(shippingId.value, billing)
+    const order = await createOrder({
+      shippingAddressId: shippingId.value,
+      ...(billing ? { billingAddressId: billing } : {}),
+      acceptedTermsVersion: CURRENT_TERMS_VERSION,
+    })
     // The order consumes the cart server-side — clear the header badge.
     cartCount.value = 0
     await router.push(`/commande/${order.id}`)
   } catch (err) {
+    const status = authErrorStatus(err)
     placeError.value =
-      authErrorStatus(err) === 400 ? "Votre panier est vide ou invalide." : "Impossible de créer la commande."
+      status === 409 && apiErrorCode(err) === "TermsOutdated"
+        ? "Nos conditions générales de vente ont changé depuis l'ouverture de cette page. Rechargez la page pour lire la nouvelle version."
+        : status === 400
+          ? "Votre panier est vide ou invalide."
+          : "Impossible de créer la commande."
     placing.value = false
   }
 }
@@ -196,8 +215,18 @@ const addressLine = (a: Address) =>
               <dd>{{ formatEuros(cart.summary.totalTtc) }}</dd>
             </div>
           </dl>
+          <label class="terms">
+            <input v-model="termsAccepted" type="checkbox" name="terms" required />
+            <span>
+              J'ai lu et j'accepte les
+              <NuxtLink to="/cgv" target="_blank" rel="noopener" class="link">conditions générales de vente</NuxtLink>
+              (version du {{ termsVersionLabel }}).
+            </span>
+          </label>
+          <!-- Wording required by art. L221-14 of the Code de la consommation: the
+               button must say that ordering creates an obligation to pay. -->
           <button type="button" class="btn btn-primary summary__cta" :disabled="placing" @click="placeOrder">
-            {{ placing ? "Création…" : "Valider la commande" }}
+            {{ placing ? "Création…" : "Commander avec obligation de paiement" }}
           </button>
           <p v-if="placeError" class="err" role="alert">{{ placeError }}</p>
         </aside>
@@ -334,6 +363,20 @@ const addressLine = (a: Address) =>
   padding-top: 0.8rem !important;
   font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
+}
+.terms {
+  display: flex;
+  gap: 0.6rem;
+  align-items: start;
+  margin: 0 0 1rem;
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
+  line-height: var(--lh-normal);
+  cursor: pointer;
+}
+.terms input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
 }
 .summary__cta {
   width: 100%;

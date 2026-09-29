@@ -54,6 +54,11 @@ const envSchema = z.object({
   // disabled in tests regardless). External cron can call the sla CLI instead.
   SLA_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
 
+  // Order confirmation retry (story 12.1): every N minutes, re-send the
+  // confirmations the provider refused at checkout (0 disables; disabled in
+  // tests regardless). External cron can call the orders:confirmations CLI instead.
+  ORDER_CONFIRMATION_RETRY_MINUTES: z.coerce.number().int().min(0).default(15),
+
   // Automatic carrier tracking (Story 11.9b). Both providers are OPTIONAL: with
   // no credentials the sync simply does nothing and "delivered" stays a manual
   // admin action, exactly as before — a laptop, CI and a launch without carrier

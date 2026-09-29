@@ -1,8 +1,8 @@
-import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, CURRENT_TERMS_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import {
@@ -19,6 +19,13 @@ import {
   users,
 } from "../db/schema.js"
 import { recomputeVipStatus } from "./service.js"
+
+// The confirmation e-mail is sent in the background of every order (story 12.1):
+// keep it off the network and observable.
+vi.mock("../email.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../email.js")>()),
+  sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
+}))
 
 const PREFIX = "TEST34-"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -176,7 +183,12 @@ describe("VIP (story 3.4)", () => {
     return app.inject({ method: "POST", url: "/api/cart/items", headers: headers(), payload: { variantId, qty } })
   }
   function createOrder() {
-    return app.inject({ method: "POST", url: "/api/orders", headers: headers(), payload: { shippingAddressId } })
+    return app.inject({
+      method: "POST",
+      url: "/api/orders",
+      headers: headers(),
+      payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+    })
   }
   function setVip(active: boolean) {
     return db

@@ -92,6 +92,20 @@
       "when": 1790629470711,
       "tag": "0012_story_12_2_catalog_import",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790699714004,
+      "tag": "0013_story_12_1_terms_acceptance",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790701947562,
+      "tag": "0014_order_confirmation_sent",
+      "breakpoints": true
     }
   ]
 }

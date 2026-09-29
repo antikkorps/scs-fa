@@ -1,4 +1,4 @@
-import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, CURRENT_TERMS_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
@@ -33,6 +33,13 @@ vi.mock("./stripe.js", () => ({
 
 import { recomputeVipStatus } from "../vip/service.js"
 import { constructWebhookEvent, createPaymentIntent, createRefund, retrievePaymentIntent } from "./stripe.js"
+
+// The confirmation e-mail is sent in the background of every order (story 12.1):
+// keep it off the network and observable.
+vi.mock("../email.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../email.js")>()),
+  sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
+}))
 
 const PREFIX = "TESTPAY-"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -295,7 +302,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         method: "POST",
         url: "/api/orders",
         headers: { authorization: `Bearer ${token}` },
-        payload: { shippingAddressId },
+        payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
       })
       expect(res.statusCode).toBe(201)
       const { data } = res.json()
@@ -548,7 +555,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
           method: "POST",
           url: "/api/orders",
           headers: { authorization: `Bearer ${token}` },
-          payload: { shippingAddressId },
+          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
         })
         expect(res.statusCode).toBe(201)
         const { data } = res.json()
@@ -582,7 +589,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
           method: "POST",
           url: "/api/orders",
           headers: { authorization: `Bearer ${token}` },
-          payload: { shippingAddressId },
+          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
         })
         expect(firstRes.statusCode).toBe(201)
         const first = firstRes.json().data
@@ -601,7 +608,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
           method: "POST",
           url: "/api/orders",
           headers: { authorization: `Bearer ${token}` },
-          payload: { shippingAddressId },
+          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
         })
         const second = secondRes.json().data
         const [v2] = await db.select().from(paymentVirement).where(eq(paymentVirement.orderId, second.id))
@@ -1096,7 +1103,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
             method: "POST",
             url: "/api/orders",
             headers: adminAuth(token),
-            payload: { shippingAddressId },
+            payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
           })
         ).json().data
         const [afterOrder] = await db

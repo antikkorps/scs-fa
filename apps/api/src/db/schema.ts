@@ -1313,6 +1313,14 @@ export const orders = pgTable(
     // Paiement
     paymentStatus: paymentStatusEnum("payment_status").notNull().default("pending"),
 
+    // CGV acceptées à la commande (story 12.1) : quelle version, et quand.
+    // Nulles sur les commandes antérieures à la story, jamais réécrites ensuite.
+    termsVersion: varchar("terms_version", { length: 32 }),
+    termsAcceptedAt: timestamp("terms_accepted_at"),
+    // Confirmation de commande envoyée (L221-13). Posée AVANT l'envoi (réclamation)
+    // et remise à null en cas d'échec : la relance reprend les commandes restées nulles.
+    confirmationSentAt: timestamp("confirmation_sent_at"),
+
     // Snapshot items (immuable)
     itemsJson: jsonb("items_json")
       .$type<

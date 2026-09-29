@@ -1,4 +1,14 @@
-import { type LegalDocRejectionReason, type LegalDocType, NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS } from "@armurier/shared"
+import {
+  escapeHtml,
+  type LegalDocRejectionReason,
+  type LegalDocType,
+  NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
+  renderInlinesHtml,
+  renderInlinesText,
+  renderTermsHtml,
+  renderTermsText,
+  type TermsInline,
+} from "@armurier/shared"
 import { createTransport } from "nodemailer"
 import { env } from "./env.js"
 
@@ -22,16 +32,6 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
       <p>If you did not request this, ignore this email.</p>
     `,
   })
-}
-
-/** Escape free-text values interpolated into HTML email bodies. */
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;")
 }
 
 const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
@@ -256,5 +256,113 @@ export async function sendNewsletterConfirmationEmail(
       `(lien valable ${NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS} heures)</p>` +
       `<p>Sans confirmation de votre part, aucune adresse n'est conservée et vous ne recevrez rien.</p>` +
       `<p><a href="${unsubscribeUrl}">Se désabonner</a> à tout moment.</p>`,
+  })
+}
+
+export type OrderConfirmationEmail = {
+  orderId: string
+  orderRef: string
+  placedAt: Date
+  firstName: string | null
+  lines: Array<{ name: string; qty: number }>
+  subtotalHt: number
+  vipDiscount: number
+  vat: number
+  totalTtc: number
+  /** Card-payable part (0 when none). */
+  cardTtc: number
+  /** Bank-transfer part (0 when none), with the reference the transfer must carry. */
+  transferTtc: number
+  transferReference: string | null
+  requiresLegalVerification: boolean
+  /** Delivery address, one line per entry. */
+  shippingAddress: string[]
+  /** CGV version accepted with the order (ISO date). */
+  termsVersion: string
+}
+
+const EUROS = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" })
+const PARIS_DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Europe/Paris" })
+const PARIS_DATETIME = new Intl.DateTimeFormat("fr-FR", {
+  dateStyle: "long",
+  timeStyle: "short",
+  timeZone: "Europe/Paris",
+})
+
+const SELLER: TermsInline[] = [
+  "Vendeur : ",
+  { fact: "companyName", label: "raison sociale" },
+  ", ",
+  { fact: "address", label: "adresse postale" },
+  " — ",
+  { fact: "email", label: "adresse e-mail de contact" },
+]
+
+/**
+ * Order confirmation (story 12.1) — the confirmation on a durable medium that
+ * art. L221-13 of the Code de la consommation requires: what was ordered, what
+ * happens next, who the seller is, and the FULL text of the CGV the customer
+ * accepted, with the withdrawal form. A link to /cgv would not do: a web page
+ * the seller can change is not a durable medium.
+ *
+ * Idempotence and retries are the caller's job (orders/confirmation.ts).
+ */
+export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmationEmail): Promise<void> {
+  const site = { siteUrl: env.WEB_BASE_URL }
+  const orderUrl = `${env.WEB_BASE_URL}/commande/${o.orderId}`
+  const hello = o.firstName ? `Bonjour ${o.firstName},` : "Bonjour,"
+  const placed = PARIS_DATETIME.format(o.placedAt)
+  const termsDate = PARIS_DATE.format(new Date(o.termsVersion))
+
+  const totals: Array<[string, string]> = [
+    ["Sous-total HT", EUROS.format(o.subtotalHt)],
+    ...(o.vipDiscount > 0 ? ([["Remise VIP", `− ${EUROS.format(o.vipDiscount)}`]] as Array<[string, string]>) : []),
+    ["TVA", EUROS.format(o.vat)],
+    ["Total TTC", EUROS.format(o.totalTtc)],
+  ]
+
+  const steps: string[] = []
+  if (o.cardTtc > 0)
+    steps.push(`Réglez ${EUROS.format(o.cardTtc)} par carte bancaire depuis la page de votre commande.`)
+  if (o.transferTtc > 0) {
+    steps.push(
+      `Réglez ${EUROS.format(o.transferTtc)} par virement${o.transferReference ? `, en indiquant la référence ${o.transferReference}` : ""} : les coordonnées bancaires figurent sur la page de votre commande.`,
+    )
+  }
+  if (o.requiresLegalVerification) {
+    steps.push(
+      "Déposez les pièces justificatives demandées depuis votre espace client : la commande est expédiée une fois toutes les pièces validées.",
+    )
+  }
+
+  const withdrawal =
+    "Vous disposez de 14 jours à compter de la réception de vos articles pour exercer votre droit de rétractation, dans les conditions de l'article 8 des conditions générales ci-dessous. Un formulaire de rétractation figure à la fin de cet e-mail."
+  const termsIntro = `Vous avez accepté nos conditions générales de vente (version du ${termsDate}) en passant commande. Leur texte intégral figure ci-dessous : conservez cet e-mail.`
+
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: `Confirmation de votre commande ${o.orderRef} — SCS Firearm`,
+    text:
+      `${hello}\n\nNous avons bien reçu votre commande ${o.orderRef} du ${placed}.\n\n` +
+      `Articles :\n${o.lines.map((l) => `- ${l.name}${l.qty > 1 ? ` × ${l.qty}` : ""}`).join("\n")}\n\n` +
+      `${totals.map(([k, v]) => `${k} : ${v}`).join("\n")}\n\n` +
+      (steps.length ? `Prochaines étapes :\n${steps.map((s) => `- ${s}`).join("\n")}\n\n` : "") +
+      `Livraison à :\n${o.shippingAddress.join("\n")}\n\n` +
+      `Suivre votre commande : ${orderUrl}\n\n` +
+      `${withdrawal}\n\n${renderInlinesText(SELLER, site)}\n\n` +
+      `----------------------------------------\nCONDITIONS GÉNÉRALES DE VENTE\n\n${termsIntro}\n\n${renderTermsText(site)}\n`,
+    html:
+      `<p>${escapeHtml(hello)}</p>` +
+      `<p>Nous avons bien reçu votre commande <strong>${escapeHtml(o.orderRef)}</strong> du ${escapeHtml(placed)}.</p>` +
+      `<p>Articles :</p><ul>${o.lines.map((l) => `<li>${escapeHtml(l.name)}${l.qty > 1 ? ` × ${l.qty}` : ""}</li>`).join("")}</ul>` +
+      `<table role="presentation">${totals.map(([k, v]) => `<tr><td>${k}</td><td style="text-align:right;padding-left:1.5em">${v}</td></tr>`).join("")}</table>` +
+      (steps.length
+        ? `<p>Prochaines étapes :</p><ul>${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>`
+        : "") +
+      `<p>Livraison à :<br>${o.shippingAddress.map(escapeHtml).join("<br>")}</p>` +
+      `<p><a href="${orderUrl}">Suivre ma commande</a></p>` +
+      `<p>${escapeHtml(withdrawal)}</p><p>${renderInlinesHtml(SELLER, site)}</p>` +
+      `<hr><h2>Conditions générales de vente</h2><p>${escapeHtml(termsIntro)}</p>${renderTermsHtml(site)}`,
   })
 }

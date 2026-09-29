@@ -164,11 +164,15 @@ export const updateAddressSchema = z
 export type CreateAddressInput = z.infer<typeof createAddressSchema>
 export type UpdateAddressInput = z.infer<typeof updateAddressSchema>
 
-// Order is built from the server-side cart; the body only carries address references
+// Order is built from the server-side cart; the body only carries address
+// references and the CGV version the customer ticked (story 12.1). Any string
+// is accepted here: the API compares it to CURRENT_TERMS_VERSION and answers 409 on a
+// stale one, so the checkout can tell "the terms changed" from a bad request.
 export const createOrderSchema = z
   .object({
     shippingAddressId: z.string().uuid(),
     billingAddressId: z.string().uuid().optional(),
+    acceptedTermsVersion: z.string().min(1).max(32),
   })
   .strict()
 

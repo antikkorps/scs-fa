@@ -1,4 +1,4 @@
-import type { ClaimVirementInput } from "@armurier/shared"
+import type { ClaimVirementInput, CreateOrderInput } from "@armurier/shared"
 import type { OrderSummary, Paginated } from "~/types/account"
 import type { CreatedOrder, OrderDetail, VirementInstructions } from "~/types/checkout"
 
@@ -6,11 +6,9 @@ import type { CreatedOrder, OrderDetail, VirementInstructions } from "~/types/ch
 export function useOrders() {
   const api = useApi()
 
-  function create(shippingAddressId: string, billingAddressId?: string): Promise<CreatedOrder> {
-    return api<{ data: CreatedOrder }>("/orders", {
-      method: "POST",
-      body: { shippingAddressId, ...(billingAddressId ? { billingAddressId } : {}) },
-    }).then((r) => r.data)
+  // `acceptedTermsVersion` is the CGV version the customer ticked (story 12.1).
+  function create(input: CreateOrderInput): Promise<CreatedOrder> {
+    return api<{ data: CreatedOrder }>("/orders", { method: "POST", body: input }).then((r) => r.data)
   }
 
   // The authenticated user's orders, newest first (account area).
@@ -31,7 +29,7 @@ export function useOrders() {
       return res.data
     } catch (err) {
       const status = authErrorStatus(err)
-      const code = (err as { data?: { error?: string } })?.data?.error
+      const code = apiErrorCode(err)
       if (status === 404 || (status === 400 && code === "NoBankTransfer")) return null
       throw err
     }

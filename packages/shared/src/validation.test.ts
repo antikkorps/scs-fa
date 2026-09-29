@@ -5,6 +5,7 @@ import {
   blogQuerySchema,
   cartItemSchema,
   createAncientWeaponSchema,
+  createOrderSchema,
   loginSchema,
   newsletterSubscribeSchema,
   newsletterUnsubscribeSchema,
@@ -234,5 +235,19 @@ describe("reserved product slugs (story 9.6)", () => {
     const reserved = createAncientWeaponSchema.safeParse({ ...base, slug: "categorie" })
     expect(reserved.success).toBe(false)
     expect(reserved.error?.issues.some((i) => i.path.join(".") === "slug")).toBe(true)
+  })
+})
+
+describe("createOrderSchema (story 12.1)", () => {
+  const base = { shippingAddressId: "0b7d1f3e-8a51-4c1e-9d0a-2f6b1c3e4d5f", acceptedTermsVersion: "2026-09-29" }
+
+  it("accepts an order that carries the accepted CGV version", () => {
+    expect(createOrderSchema.safeParse(base).success).toBe(true)
+  })
+
+  it("refuses an order that does not say which CGV were accepted", () => {
+    const { acceptedTermsVersion: _, ...withoutTerms } = base
+    expect(createOrderSchema.safeParse(withoutTerms).success).toBe(false)
+    expect(createOrderSchema.safeParse({ ...base, acceptedTermsVersion: "" }).success).toBe(false)
   })
 })

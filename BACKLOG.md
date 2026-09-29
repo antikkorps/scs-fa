@@ -534,10 +534,32 @@
 - Images OG **générées** par produit sans visuel (aujourd'hui : carte de marque) ; exposition **MCP** en lecture (non faite) ; logo définitif
 - Mise en ligne : créer la base Umami, `INTERNAL_API_SECRET`, enregistrement DNS `stats`, backfill AVIF (`docs/DEPLOY.md`)
 
-**Story 12.x** — Mentions légales & CGV — 🔜 **À FAIRE** _(créée le 2026-09-24, sortie de la 9.6)_
+**Story 12.1** — Mentions légales & CGV — 🚧 **CODÉE, TEXTES EN ATTENTE DU CLIENT ET D'UN JURISTE** _(créée le 2026-09-24, sortie de la 9.6 ; codée le 2026-09-29)_
 
 - Pages **mentions légales** (éditeur, hébergeur, directeur de publication) et **CGV** (vente à distance, droit de rétractation et ses exceptions, spécificités des armes réglementées, livraison, garanties), rédigées puis **relues par un juriste** ; même mécanisme de relecture que `/confidentialite`
 - Liens dans le pied de page et au tunnel d'achat (acceptation des CGV à la commande)
+
+**Décisions validées avec Franck (2026-09-29) :**
+
+- [x] Acceptation des CGV **versionnée et enregistrée** : `orders.terms_version` + `terms_accepted_at` (migration `0013`)
+- [x] **Une seule CGV** pour les deux univers : tronc commun + article 12 (articles réglementés) + article 13 (tirages Gun Art)
+- [x] Identité légale en **champs à compléter** (le client ne l'a pas encore fournie) ; hébergeur pré-rempli (Hetzner)
+
+**Livré :**
+
+- [x] **`CURRENT_TERMS_VERSION`** (`packages/shared/src/terms.ts`, date ISO du texte) : la case du tunnel l'envoie, l'API **refuse en 409 `TermsOutdated`** une autre version (texte modifié depuis l'ouverture de la page) et la stocke avec l'heure d'acceptation — preuve du texte sous lequel chaque commande a été passée. ⚠️ **Toute modification du texte de `/cgv` doit incrémenter cette version**
+- [x] **Tunnel** : case jamais pré-cochée + lien vers `/cgv` (nouvel onglet), bouton renommé **« Commander avec obligation de paiement »** (art. L221-14 C. conso. : « Valider la commande » n'était pas conforme)
+- [x] **`/mentions-legales`** et **`/cgv`** (avec le **formulaire type de rétractation**, annexe à l'art. R221-1), en brouillon `noindex` hors sitemap via `EDITORIAL_PAGES` ; liens dans le pied de page
+- [x] **Identité légale écrite une seule fois** (`apps/web/shared/utils/legalIdentity.ts`) et reprise par les trois pages (confidentialité comprise) via `<LegalFact>` ; **un test interdit de basculer `reviewed`** sur l'une d'elles tant qu'un champ manque
+- [x] **E-mail de confirmation de commande** (art. L221-13, trouvé manquant pendant la story) — décisions Franck : **texte intégral des CGV dans l'e-mail** (un lien vers une page modifiable n'est pas un support durable) et **colonne + relance**. Le texte des CGV devient des **données partagées** (`packages/shared/src/terms-content.ts`) que la page `/cgv` et l'e-mail rendent tous deux ; l'identité légale passe dans `shared`. Envoi **en tâche de fond** après la commande, **au plus une fois** (`orders.confirmation_sent_at` réclamé avant l'envoi, libéré en cas d'échec, migration `0014`) ; relance toutes les `ORDER_CONFIRMATION_RETRY_MINUTES` (15) ou `orders:confirmations` en cron. Contenu : récapitulatif, prochaines étapes (carte, virement + référence, pièces à déposer), adresse, rétractation, vendeur, **CGV acceptées + formulaire de rétractation**. `orderReference()` factorise la référence recopiée dans 5 fichiers
+- [x] Cadre commun **`<LegalPage>`** pour les quatre pages éditoriales (les deux pages 9.6 y sont passées) ; `apiErrorCode()` factorise la lecture du code d'erreur API ; `UNIQUE_PIECE_HOLD_MINUTES` déplacé dans `shared` (les CGV l'affichent)
+
+**Reste ouvert :**
+
+- ⚠️ **À fournir par le client** (`legalIdentity.ts`) : raison sociale, forme, capital, RCS, SIRET, TVA, adresse, téléphone, e-mails (contact + données personnelles), directeur de la publication, **autorisation préfectorale de commerce d'armes**, **médiateur de la consommation** (adhésion obligatoire, art. L612-1)
+- ⚠️ **Points des CGV à trancher** (surlignés sur la page) : zone de livraison, grille de frais de port (**le récapitulatif du tunnel n'en affiche aucun**), délai de paiement du virement, délai d'expédition, délai laissé pour fournir les pièces, remise contre signature, articles personnalisés vendus ou non, garantie d'occasion des armes de collection
+- ⚠️ **Relecture par un juriste** : texte complet, **encadré réglementaire des garanties légales** (décret 2022-946), qualification du mandat de vente Gun Art
+- La plateforme européenne de règlement en ligne des litiges (RLL) a fermé le 20 juillet 2025 : ne pas la réintroduire
 
 **Story 12.2** — Import des catalogues fournisseurs (collecte → tri `.xlsx` → import admin) — 🚧 **MOTEUR LIVRÉ, COLLECTE COMPLÈTE EN ATTENTE DU CLIENT** _(créée le 2026-09-28, demande client)_
 

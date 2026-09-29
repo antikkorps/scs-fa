@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto"
 import {
+  CURRENT_TERMS_VERSION,
   calculateOrderPaymentSplit,
   createOrderSchema,
   paginationSchema,
@@ -29,6 +30,7 @@ import { env } from "../env.js"
 import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
 import { customerShipments } from "../shipments/service.js"
+import { sendOrderConfirmation } from "./confirmation.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 
 class OrderError extends Error {
@@ -86,7 +88,18 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) {
       return reply.code(400).send(validationError(parsed.error.issues))
     }
-    const { shippingAddressId, billingAddressId } = parsed.data
+    const { shippingAddressId, billingAddressId, acceptedTermsVersion } = parsed.data
+
+    // The customer must have ticked the CGV in force (story 12.1). A stale
+    // version means the text changed after their checkout page loaded: they
+    // must re-read it, so the order is refused rather than silently upgraded.
+    if (acceptedTermsVersion !== CURRENT_TERMS_VERSION) {
+      return reply.code(409).send({
+        error: "TermsOutdated",
+        message: "The terms of sale have changed; review and accept the current version",
+        currentVersion: CURRENT_TERMS_VERSION,
+      })
+    }
 
     const cart = await loadCart(userId)
     if (cart.summary.itemCount === 0) {
@@ -168,6 +181,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
             userId,
             legalVerificationStatus: legalStatus,
             paymentStatus: "pending",
+            termsVersion: acceptedTermsVersion,
+            termsAcceptedAt: new Date(),
             itemsJson,
             subtotalHt: cart.summary.subtotalHt.toFixed(2),
             vatAmount: cart.summary.vatAmount.toFixed(2),
@@ -285,10 +300,15 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       entityType: "order",
       entityId: orderId,
       action: "order.created",
-      newValue: { totalTtc: cart.summary.totalTtc, splitType: split.splitType },
+      newValue: { totalTtc: cart.summary.totalTtc, splitType: split.splitType, termsVersion: acceptedTermsVersion },
       ipAddress: request.ip,
       userAgent: request.headers["user-agent"] ?? null,
     })
+
+    // Confirmation on a durable medium (story 12.1). Not awaited: the customer
+    // must not wait on the mail provider, and a failure is retried later
+    // (sendOrderConfirmation never throws).
+    void sendOrderConfirmation(orderId, request.log)
 
     return reply.code(201).send({
       data: {

@@ -1,8 +1,8 @@
-import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, CURRENT_TERMS_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import {
@@ -19,6 +19,15 @@ import {
   productVariants,
   users,
 } from "../db/schema.js"
+import { sendOrderConfirmationEmail } from "../email.js"
+import { resendPendingConfirmations, sendOrderConfirmation } from "./confirmation.js"
+
+// The confirmation e-mail is sent in the background of every order (story 12.1):
+// keep it off the network and observable.
+vi.mock("../email.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../email.js")>()),
+  sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
+}))
 
 const PREFIX = "TEST32-"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -261,12 +270,18 @@ describe("orders (POST /api/orders)", () => {
   function addToCart(t: string, payload: Record<string, unknown>) {
     return app.inject({ method: "POST", url: "/api/cart/items", headers: authHeaders(t), payload })
   }
-  function createOrder(payload: Record<string, unknown> = { shippingAddressId }) {
+  function createOrder(
+    payload: Record<string, unknown> = { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+  ) {
     return app.inject({ method: "POST", url: "/api/orders", headers: authHeaders(token), payload })
   }
 
   it("requires authentication", async () => {
-    const res = await app.inject({ method: "POST", url: "/api/orders", payload: { shippingAddressId } })
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/orders",
+      payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+    })
     expect(res.statusCode).toBe(401)
   })
 
@@ -277,6 +292,103 @@ describe("orders (POST /api/orders)", () => {
     expect(res.json().error).toBe("ValidationError")
   })
 
+  it("returns 400 when the CGV were not accepted (story 12.1)", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const res = await createOrder({ shippingAddressId })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toBe("ValidationError")
+  })
+
+  it("returns 409 and creates nothing when the accepted CGV are not the current ones", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const before = await db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))
+    const res = await createOrder({ shippingAddressId, acceptedTermsVersion: "2000-01-01" })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: "TermsOutdated", currentVersion: CURRENT_TERMS_VERSION })
+    const after = await db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))
+    expect(after).toHaveLength(before.length)
+  })
+
+  it("stores which CGV version was accepted, and when", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const startedAt = Date.now()
+    const res = await createOrder()
+    expect(res.statusCode).toBe(201)
+    const [order] = await db
+      .select({ termsVersion: orders.termsVersion, termsAcceptedAt: orders.termsAcceptedAt })
+      .from(orders)
+      .where(eq(orders.id, res.json().data.id))
+    expect(order?.termsVersion).toBe(CURRENT_TERMS_VERSION)
+    expect(order?.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(startedAt - 1000)
+  })
+
+  describe("order confirmation e-mail (story 12.1)", () => {
+    const mail = vi.mocked(sendOrderConfirmationEmail)
+    const log = { warn: vi.fn(), error: vi.fn() }
+
+    async function placeOrder(): Promise<string> {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      const res = await createOrder()
+      expect(res.statusCode).toBe(201)
+      return res.json().data.id
+    }
+    async function sentAt(id: string) {
+      const [o] = await db.select({ at: orders.confirmationSentAt }).from(orders).where(eq(orders.id, id))
+      return o?.at ?? null
+    }
+
+    beforeEach(() => {
+      mail.mockReset().mockResolvedValue(undefined)
+    })
+
+    it("confirms the order once, with its lines and the accepted CGV version", async () => {
+      const id = await placeOrder()
+      await vi.waitFor(() => expect(mail).toHaveBeenCalledTimes(1))
+      const [to, payload] = mail.mock.calls[0] ?? []
+      expect(to).toBe(EMAIL)
+      expect(payload).toMatchObject({ orderId: id, termsVersion: CURRENT_TERMS_VERSION, cardTtc: expect.any(Number) })
+      expect(payload?.lines).toHaveLength(1)
+      await vi.waitFor(async () => expect(await sentAt(id)).not.toBeNull())
+
+      // A second attempt (retry pass, double submit) never mails again.
+      expect(await sendOrderConfirmation(id, log)).toBe(false)
+      expect(mail).toHaveBeenCalledTimes(1)
+    })
+
+    it("keeps the order when the provider fails, and releases it for the retry pass", async () => {
+      mail.mockRejectedValue(new Error("SMTP down"))
+      const id = await placeOrder()
+      await vi.waitFor(() => expect(mail).toHaveBeenCalledTimes(1))
+      await vi.waitFor(async () => expect(await sentAt(id)).toBeNull())
+
+      // Not picked up while it is recent: the checkout's own send may be in flight.
+      mail.mockReset().mockResolvedValue(undefined)
+      await resendPendingConfirmations(log)
+      expect(mail).not.toHaveBeenCalledWith(EMAIL, expect.objectContaining({ orderId: id }))
+
+      await db
+        .update(orders)
+        .set({ createdAt: new Date(Date.now() - 10 * 60 * 1000) })
+        .where(eq(orders.id, id))
+      await resendPendingConfirmations(log)
+      expect(mail).toHaveBeenCalledWith(EMAIL, expect.objectContaining({ orderId: id }))
+      expect(await sentAt(id)).not.toBeNull()
+    })
+
+    it("never confirms an order placed before the CGV were recorded", async () => {
+      mail.mockRejectedValue(new Error("SMTP down"))
+      const id = await placeOrder()
+      await vi.waitFor(async () => expect(await sentAt(id)).toBeNull())
+      mail.mockReset().mockResolvedValue(undefined)
+      await db
+        .update(orders)
+        .set({ termsVersion: null, createdAt: new Date(Date.now() - 10 * 60 * 1000) })
+        .where(eq(orders.id, id))
+      await resendPendingConfirmations(log)
+      expect(mail).not.toHaveBeenCalled()
+    })
+  })
+
   it("returns 400 when the cart is empty", async () => {
     const res = await createOrder()
     expect(res.statusCode).toBe(400)
@@ -285,7 +397,10 @@ describe("orders (POST /api/orders)", () => {
 
   it("returns 404 when the shipping address belongs to another user", async () => {
     await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
-    const res = await createOrder({ shippingAddressId: otherUserAddressId })
+    const res = await createOrder({
+      shippingAddressId: otherUserAddressId,
+      acceptedTermsVersion: CURRENT_TERMS_VERSION,
+    })
     expect(res.statusCode).toBe(404)
   })
 
