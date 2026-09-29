@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { orderReference } from "@armurier/shared"
 import type { OrderAddressSnapshot, OrderLegal, OrderLineItem, RequiredDoc } from "~/types/account"
 import type { OrderDetail } from "~/types/checkout"
 import { formatDate, formatDateTime, formatEuros } from "~/utils/format"
@@ -113,12 +114,12 @@ function toggleUpload(docType: string) {
           :items="[
             { name: 'Mon compte', to: '/compte' },
             { name: 'Mes commandes', to: '/compte/commandes' },
-            { name: order.id.slice(0, 8).toUpperCase() },
+            { name: orderReference(order.id) },
           ]"
         />
 
         <header class="order__head">
-          <h1 class="order__title">Commande {{ order.id.slice(0, 8).toUpperCase() }}</h1>
+          <h1 class="order__title">Commande {{ orderReference(order.id) }}</h1>
           <p class="order__ref">
             Passée le {{ formatDate(order.createdAt) }} · Total {{ formatEuros(order.totalTtc) }} TTC
           </p>

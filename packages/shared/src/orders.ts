@@ -243,3 +243,11 @@ export function calculateOrderPaymentSplit(items: PaymentSplitItem[]): PaymentSp
     },
   }
 }
+
+/**
+ * The short reference shown to the customer (order pages, e-mails): the first
+ * eight characters of the order id, upper-cased.
+ */
+export function orderReference(orderId: string): string {
+  return orderId.slice(0, 8).toUpperCase()
+}

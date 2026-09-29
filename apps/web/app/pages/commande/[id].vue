@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { orderReference } from "@armurier/shared"
 import type { OrderDetail } from "~/types/checkout"
 import { formatEuros } from "~/utils/format"
 import { legalStatusLabel, paymentStatusLabel, statusTone } from "~/utils/order"
@@ -80,7 +81,7 @@ async function declareTransfer() {
         <header class="order__head">
           <p class="eyebrow">Commande confirmée</p>
           <h1 class="order__title">Merci pour votre commande</h1>
-          <p class="order__ref">Référence&nbsp;: {{ order.id.slice(0, 8).toUpperCase() }} · Total {{ formatEuros(order.totalTtc) }} TTC</p>
+          <p class="order__ref">Référence&nbsp;: {{ orderReference(order.id) }} · Total {{ formatEuros(order.totalTtc) }} TTC</p>
         </header>
 
         <!-- Virement bucket -->

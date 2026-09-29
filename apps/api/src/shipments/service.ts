@@ -3,6 +3,7 @@ import {
   canShipOrder,
   carrierLabel,
   type OrderShippingStatus,
+  orderReference,
   type ShipmentItemRef,
   suggestShipmentSplit,
   trackingUrlFor,
@@ -204,7 +205,7 @@ export async function notifyShipmentShipped(shipmentId: string, log: Logger): Pr
 
     await sendShipmentShippedEmail(owner.email, {
       orderId: claimed.orderId,
-      orderRef: claimed.orderId.slice(0, 8).toUpperCase(),
+      orderRef: orderReference(claimed.orderId),
       position: index + 1,
       total: list.length,
       carrierLabel: carrierLabel(parcel.carrier),

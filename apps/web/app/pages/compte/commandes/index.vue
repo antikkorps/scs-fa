@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { orderReference } from "@armurier/shared"
 import type { OrderSummary, Pagination } from "~/types/account"
 import { formatDate, formatEuros } from "~/utils/format"
 import { legalStatusLabel, paymentStatusLabel, statusTone } from "~/utils/order"
@@ -54,7 +55,7 @@ async function goTo(p: number) {
           <li v-for="o in orders" :key="o.id">
             <NuxtLink :to="`/compte/commandes/${o.id}`" class="card">
               <div class="card__main">
-                <p class="card__ref">Commande {{ o.id.slice(0, 8).toUpperCase() }}</p>
+                <p class="card__ref">Commande {{ orderReference(o.id) }}</p>
                 <p class="card__meta">
                   {{ formatDate(o.createdAt) }} · {{ o.itemCount }} article{{ o.itemCount > 1 ? "s" : "" }}
                 </p>
