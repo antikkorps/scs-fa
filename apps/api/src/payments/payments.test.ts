@@ -34,6 +34,13 @@ vi.mock("./stripe.js", () => ({
 import { recomputeVipStatus } from "../vip/service.js"
 import { constructWebhookEvent, createPaymentIntent, createRefund, retrievePaymentIntent } from "./stripe.js"
 
+// The confirmation e-mail is sent in the background of every order (story 12.1):
+// keep it off the network and observable.
+vi.mock("../email.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../email.js")>()),
+  sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
+}))
+
 const PREFIX = "TESTPAY-"
 const PASSWORD = "MotDePasseTresLong123!"
 const EMAIL = "pay-test61@pay-test.local"

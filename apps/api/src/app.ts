@@ -31,6 +31,7 @@ import { adminMetricsRoutes } from "./metrics/admin.js"
 import { isInternalCall, trustDirectPrivatePeer } from "./net/client-ip.js"
 import { newsletterRoutes } from "./newsletter/index.js"
 import { adminOrderRoutes } from "./orders/admin.js"
+import { startOrderConfirmationScheduler } from "./orders/confirmation.js"
 import { orderRoutes } from "./orders/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
@@ -137,6 +138,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)
+  startOrderConfirmationScheduler(fastify)
   startShipmentTrackingScheduler(fastify)
 
   return fastify

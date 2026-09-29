@@ -288,6 +288,13 @@ The goal is a one-off bulk load of the suppliers' catalogues, with an import pat
   - `pnpm --filter @armurier/api catalog:images` resumes the queue after a restart;
   - failed images can be retried from the import history.
 
+## CGV and order confirmation (story 12.1)
+
+- The CGV text lives **once**, as data, in `packages/shared/src/terms-content.ts`: `/cgv` renders it, and so does the order confirmation e-mail — the law wants the accepted terms on a **durable medium** (Code conso. L221-13), which a link to a changeable page is not.
+- ⚠️ **Any change to the wording bumps `CURRENT_TERMS_VERSION`** (`packages/shared/src/terms.ts`). The checkout sends the version the customer ticked; the API refuses any other (409 `TermsOutdated`) and stores it on the order (`terms_version`, `terms_accepted_at`).
+- The seller's legal identity (`packages/shared/src/legal-identity.ts`) feeds the legal notice, the CGV, the privacy policy and the e-mail; a missing fact shows as a highlighted placeholder, and a test refuses to mark those pages reviewed while one is missing.
+- **Confirmation e-mail**: sent in the background after the order commits, at most once (`orders.confirmation_sent_at` is claimed before sending, released on failure). A retry pass re-sends what the provider refused: in-process every `ORDER_CONFIRMATION_RETRY_MINUTES` (15 by default, 0 disables, off under test), or `pnpm --filter @armurier/api orders:confirmations` from an external cron.
+
 ## E-mails in development
 
 `docker-compose.dev.yml` runs **Mailpit**, and `apps/api/.env.example` points at it by default (SMTP on **1025**, web UI on **<http://localhost:8025>**). Read what the app sent there. ⚠️ Reaching the real OVH relay is a deliberate `.env` edit — never the default — so a smoke test that ships a parcel cannot mail a real customer.

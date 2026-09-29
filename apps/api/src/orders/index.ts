@@ -30,6 +30,7 @@ import { env } from "../env.js"
 import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
 import { customerShipments } from "../shipments/service.js"
+import { sendOrderConfirmation } from "./confirmation.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 
 class OrderError extends Error {
@@ -303,6 +304,11 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       ipAddress: request.ip,
       userAgent: request.headers["user-agent"] ?? null,
     })
+
+    // Confirmation on a durable medium (story 12.1). Not awaited: the customer
+    // must not wait on the mail provider, and a failure is retried later
+    // (sendOrderConfirmation never throws).
+    void sendOrderConfirmation(orderId, request.log)
 
     return reply.code(201).send({
       data: {
