@@ -26,6 +26,14 @@ export type PaymentStatus = (typeof PAYMENT_STATUS)[number]
 // SLA validation admin docs légaux (heures)
 export const LEGAL_DOC_REVIEW_SLA_HOURS = 48
 
+/**
+ * How long a unique piece stays held for the shopper who put it in their cart.
+ * Long enough to gather identity documents and pick an address, short enough
+ * that an abandoned cart doesn't take a one-off item off the market for a day.
+ * Shared because the CGV state it (story 12.1).
+ */
+export const UNIQUE_PIECE_HOLD_MINUTES = 30
+
 // Standardized rejection reasons for legal documents (admin review).
 // "other" requires a free-text note explaining the decision.
 export const LEGAL_DOC_REJECTION_REASONS = [
