@@ -618,6 +618,22 @@
 - Lecture `.xlsx` sans garde contre une **bombe zip** au-delà du plafond de 15 Mo du fichier déposé (route réservée aux admins)
 - Pas d'**écran fournisseurs** (création implicite à l'import ; marge par défaut modifiable seulement en base pour l'instant)
 
+**Story 12.3** — Frais de port au tunnel d'achat — 🔜 **À FAIRE** _(créée le 2026-09-29, trouvé en 12.1 ; prévue le 2026-09-30)_
+
+> Constat : `orders.shipping_cost` vaut **toujours 0** et le récapitulatif du tunnel n'affiche **aucun frais de port** — chaque envoi serait à la charge de la boutique, et le client doit connaître le **prix total livraison comprise avant de commander** (C. conso. L221-5, L112-1). Bloquant pour la mise en ligne.
+
+**Décisions à trancher avec Franck AVANT de coder :**
+
+- [ ] **Modèle de calcul** : forfait par colis, par tranche de montant, au poids (⚠️ **aucun poids en base** : il faudrait le saisir pour tout le catalogue, les imports fournisseurs ne le fournissent pas), ou par type d'article (arme / munitions / accessoire / tirage Gun Art)
+- [ ] Prise en compte des **colis multiples** (une arme de cat. B part en 2 colis — `defaultParcelCount`) et d'éventuels **suppléments** (envoi assuré / contre signature pour les armes, emballage des tirages)
+- [ ] **Seuil de gratuité** ? Remise VIP appliquée aux frais de port ou non ?
+- [ ] **Choix du transporteur** par le client (Colissimo / Chronopost / Mondial Relay point relais) ou imposé
+- [ ] **Zone de livraison** (France métropolitaine seulement ? — rejoint un point ouvert des CGV)
+- [ ] Où vit la grille : **écran admin** (recommandé : modifiable sans déploiement) ou configuration
+- [ ] TVA sur les frais de port (suit le taux des articles, au prorata en cas de taux mixtes)
+
+**Ensuite (quand le modèle est tranché)** : calcul partagé (`packages/shared`) testé, affichage au panier et au tunnel, montant figé sur la commande et intégré au partage carte / virement, facture et e-mail de confirmation, grille par défaut à remplacer par celle du client.
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
