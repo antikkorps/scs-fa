@@ -1,11 +1,12 @@
 /**
  * Who SCS Firearm is, legally (story 12.1) — the facts the legal notice, the
- * CGV and the privacy policy all state. Written once here so the three pages
- * can never disagree.
+ * CGV, the privacy policy and the order confirmation e-mail all state.
+ * Written once here so they can never disagree.
  *
- * `null` = not supplied yet by the client: `<LegalFact>` shows it as a
- * highlighted placeholder, and a test refuses to mark any of those pages
- * `reviewed` (editorialPages.ts) while a fact is still missing.
+ * `null` = not supplied yet by the client: it renders as a highlighted
+ * placeholder (`<LegalFact>` on the site, "[label]" in e-mails), and a test
+ * refuses to mark any of the legal pages `reviewed`
+ * (apps/web/shared/utils/editorialPages.ts) while a fact is still missing.
  */
 export interface LegalIdentity {
   /** Raison sociale. */

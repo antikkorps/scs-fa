@@ -1,6 +1,6 @@
+import { LEGAL_IDENTITY, missingLegalFacts } from "@armurier/shared"
 import { describe, expect, it } from "vitest"
 import { EDITORIAL_PAGES, IDENTITY_PAGES, reviewedEditorialPaths } from "./editorialPages"
-import { LEGAL_IDENTITY, missingLegalFacts } from "./legalIdentity"
 
 describe("editorial pages (story 9.6)", () => {
   it("keeps a page the client has not validated out of the sitemap", () => {

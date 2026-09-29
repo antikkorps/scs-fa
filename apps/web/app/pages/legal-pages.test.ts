@@ -1,9 +1,8 @@
 // @vitest-environment nuxt
 
-import { CURRENT_TERMS_VERSION } from "@armurier/shared"
+import { CURRENT_TERMS_VERSION, SITE_HOST } from "@armurier/shared"
 import { mountSuspended } from "@nuxt/test-utils/runtime"
 import { describe, expect, it } from "vitest"
-import { SITE_HOST } from "#shared/utils/legalIdentity"
 import { formatDate } from "~/utils/format"
 import Cgv from "./cgv.vue"
 import MentionsLegales from "./mentions-legales.vue"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { LEGAL_IDENTITY } from "@armurier/shared"
 import { EDITORIAL_PAGES } from "#shared/utils/editorialPages"
-import { LEGAL_IDENTITY } from "#shared/utils/legalIdentity"
 
 /**
  * Privacy policy (story 9.6). Written from what the code actually does

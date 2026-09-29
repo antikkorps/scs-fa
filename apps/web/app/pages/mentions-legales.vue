@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { LEGAL_IDENTITY, SITE_HOST } from "@armurier/shared"
 import { EDITORIAL_PAGES } from "#shared/utils/editorialPages"
-import { LEGAL_IDENTITY, SITE_HOST } from "#shared/utils/legalIdentity"
 
 /**
  * Legal notice (story 12.1) — what the LCEN (loi n° 2004-575, art. 6 III)
