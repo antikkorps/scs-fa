@@ -42,7 +42,7 @@ function validate(f: File): boolean {
 // Maps the API's error envelope to French copy for the customer.
 function messageFor(err: unknown): string {
   const status = authErrorStatus(err)
-  const code = (err as { data?: { error?: string } })?.data?.error
+  const code = apiErrorCode(err)
   if (status === 413) return `Fichier trop volumineux (max ${formatFileSize(MAX_LEGAL_DOC_SIZE_BYTES)}).`
   if (code === "UnsupportedMediaType") return "Format de fichier non accepté ou contenu non conforme."
   if (status === 400) return "Document invalide. Vérifiez le fichier et les informations saisies."

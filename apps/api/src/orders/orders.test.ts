@@ -1,4 +1,4 @@
-import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, CURRENT_TERMS_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
@@ -261,12 +261,18 @@ describe("orders (POST /api/orders)", () => {
   function addToCart(t: string, payload: Record<string, unknown>) {
     return app.inject({ method: "POST", url: "/api/cart/items", headers: authHeaders(t), payload })
   }
-  function createOrder(payload: Record<string, unknown> = { shippingAddressId }) {
+  function createOrder(
+    payload: Record<string, unknown> = { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+  ) {
     return app.inject({ method: "POST", url: "/api/orders", headers: authHeaders(token), payload })
   }
 
   it("requires authentication", async () => {
-    const res = await app.inject({ method: "POST", url: "/api/orders", payload: { shippingAddressId } })
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/orders",
+      payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+    })
     expect(res.statusCode).toBe(401)
   })
 
@@ -277,6 +283,36 @@ describe("orders (POST /api/orders)", () => {
     expect(res.json().error).toBe("ValidationError")
   })
 
+  it("returns 400 when the CGV were not accepted (story 12.1)", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const res = await createOrder({ shippingAddressId })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toBe("ValidationError")
+  })
+
+  it("returns 409 and creates nothing when the accepted CGV are not the current ones", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const before = await db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))
+    const res = await createOrder({ shippingAddressId, acceptedTermsVersion: "2000-01-01" })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: "TermsOutdated", currentVersion: CURRENT_TERMS_VERSION })
+    const after = await db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))
+    expect(after).toHaveLength(before.length)
+  })
+
+  it("stores which CGV version was accepted, and when", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const startedAt = Date.now()
+    const res = await createOrder()
+    expect(res.statusCode).toBe(201)
+    const [order] = await db
+      .select({ termsVersion: orders.termsVersion, termsAcceptedAt: orders.termsAcceptedAt })
+      .from(orders)
+      .where(eq(orders.id, res.json().data.id))
+    expect(order?.termsVersion).toBe(CURRENT_TERMS_VERSION)
+    expect(order?.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(startedAt - 1000)
+  })
+
   it("returns 400 when the cart is empty", async () => {
     const res = await createOrder()
     expect(res.statusCode).toBe(400)
@@ -285,7 +321,10 @@ describe("orders (POST /api/orders)", () => {
 
   it("returns 404 when the shipping address belongs to another user", async () => {
     await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
-    const res = await createOrder({ shippingAddressId: otherUserAddressId })
+    const res = await createOrder({
+      shippingAddressId: otherUserAddressId,
+      acceptedTermsVersion: CURRENT_TERMS_VERSION,
+    })
     expect(res.statusCode).toBe(404)
   })
 

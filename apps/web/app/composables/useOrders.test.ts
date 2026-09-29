@@ -12,21 +12,24 @@ beforeEach(() => {
 })
 
 describe("useOrders", () => {
-  it("creates an order with the shipping address", async () => {
+  it("creates an order with the shipping address and the accepted CGV version", async () => {
     apiMock.mockResolvedValue({ data: { id: "ord-1", paymentSplit: { splitType: "carte_only" } } })
     const orders = useOrders()
-    const res = await orders.create("addr-1")
-    expect(apiMock).toHaveBeenCalledWith("/orders", { method: "POST", body: { shippingAddressId: "addr-1" } })
+    const res = await orders.create({ shippingAddressId: "addr-1", acceptedTermsVersion: "2026-09-29" })
+    expect(apiMock).toHaveBeenCalledWith("/orders", {
+      method: "POST",
+      body: { shippingAddressId: "addr-1", acceptedTermsVersion: "2026-09-29" },
+    })
     expect(res.id).toBe("ord-1")
   })
 
   it("includes the billing address when provided", async () => {
     apiMock.mockResolvedValue({ data: { id: "ord-2", paymentSplit: {} } })
     const orders = useOrders()
-    await orders.create("addr-1", "addr-2")
+    await orders.create({ shippingAddressId: "addr-1", billingAddressId: "addr-2", acceptedTermsVersion: "2026-09-29" })
     expect(apiMock).toHaveBeenCalledWith("/orders", {
       method: "POST",
-      body: { shippingAddressId: "addr-1", billingAddressId: "addr-2" },
+      body: { shippingAddressId: "addr-1", billingAddressId: "addr-2", acceptedTermsVersion: "2026-09-29" },
     })
   })
 

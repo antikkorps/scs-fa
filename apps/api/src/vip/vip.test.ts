@@ -1,4 +1,4 @@
-import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, CURRENT_TERMS_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
@@ -176,7 +176,12 @@ describe("VIP (story 3.4)", () => {
     return app.inject({ method: "POST", url: "/api/cart/items", headers: headers(), payload: { variantId, qty } })
   }
   function createOrder() {
-    return app.inject({ method: "POST", url: "/api/orders", headers: headers(), payload: { shippingAddressId } })
+    return app.inject({
+      method: "POST",
+      url: "/api/orders",
+      headers: headers(),
+      payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+    })
   }
   function setVip(active: boolean) {
     return db

@@ -1,6 +1,6 @@
 import { loginSchema, registerSchema } from "@armurier/shared"
 import { describe, expect, it } from "vitest"
-import { authErrorStatus, zodFieldErrors } from "./formErrors"
+import { apiErrorCode, authErrorStatus, zodFieldErrors } from "./formErrors"
 
 describe("zodFieldErrors", () => {
   it("maps failing fields to French messages", () => {
@@ -41,5 +41,16 @@ describe("authErrorStatus", () => {
   it("returns undefined when there is no response", () => {
     expect(authErrorStatus(new Error("boom"))).toBeUndefined()
     expect(authErrorStatus(null)).toBeUndefined()
+  })
+})
+
+describe("apiErrorCode", () => {
+  it("reads the API error code carried by a fetch error", () => {
+    expect(apiErrorCode({ data: { error: "TermsOutdated" } })).toBe("TermsOutdated")
+  })
+
+  it("returns undefined for anything else", () => {
+    expect(apiErrorCode(new Error("boom"))).toBeUndefined()
+    expect(apiErrorCode(null)).toBeUndefined()
   })
 })

@@ -32,3 +32,9 @@ export function zodFieldErrors(error: ZodLikeError): Record<string, string> {
 export function authErrorStatus(err: unknown): number | undefined {
   return (err as { response?: { status?: number } })?.response?.status
 }
+
+// Extracts the API's machine-readable error code (`{ error: "TermsOutdated" }`)
+// from an upstream/BFF fetch error (FetchError shape).
+export function apiErrorCode(err: unknown): string | undefined {
+  return (err as { data?: { error?: string } } | null)?.data?.error
+}
