@@ -1,5 +1,3 @@
-import { fileURLToPath } from "node:url"
-
 // Keeps a page out of search indexes while letting crawlers follow its links.
 const NOINDEX = { "x-robots-tag": "noindex, follow" }
 
@@ -7,7 +5,7 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-02-07",
   devtools: { enabled: true },
 
-  modules: ["@primevue/nuxt-module", "@nuxt/fonts"],
+  modules: ["@nuxt/fonts"],
 
   // `tokens.css` carries the design tokens (colour, type scale, layout) and
   // must load first: `main.css` and every `<style scoped>` consume it.
@@ -40,20 +38,6 @@ export default defineNuxtConfig({
     // Both families are named only in `--font-display` / `--font-body`:
     // without this the scanner would not see them anywhere.
     experimental: { processCSSVariables: true },
-  },
-
-  primevue: {
-    // Story 9.6: never inline PrimeVue's CSS into server-rendered pages. By
-    // default the module pushes the styles of EVERY component it registers
-    // (datatable, datepicker, treetable…) into the <head> of every page —
-    // ~470 KB on each public page, which uses none of them, and the cause of a
-    // 7 s mobile LCP (measured). PrimeVue only serves the back-office, rendered
-    // client-side (`ssr: false` below), where each component injects its own
-    // styles as it mounts.
-    loadStyles: false,
-    // The theme is imported, not passed as an option: an option is copied into
-    // the public runtime config, i.e. into every page (see app/primevue-theme.ts).
-    importTheme: { as: "ScsPrimeVueTheme", from: fileURLToPath(new URL("./app/primevue-theme.ts", import.meta.url)) },
   },
 
   runtimeConfig: {

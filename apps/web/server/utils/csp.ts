@@ -14,9 +14,9 @@ export function contentSecurityPolicy(nonce: string): string {
     // Inline scripts are allowed only via the per-request nonce (no
     // 'unsafe-inline'); Stripe.js loads from its own origin.
     `script-src 'self' 'nonce-${nonce}' ${STRIPE_JS}`,
-    // Styles keep 'unsafe-inline': PrimeVue injects <style> at runtime on the
-    // client, which a server-side nonce cannot cover. Revisit with PrimeVue's
-    // `csp.nonce` option to drop this too.
+    // Styles keep 'unsafe-inline': Nuxt inlines component CSS into <style>
+    // blocks of the SSR document, and Vue `:style` bindings render `style`
+    // attributes — which a nonce cannot cover at all.
     "style-src 'self' 'unsafe-inline'",
     // Fonts are self-hosted as of story 10.7, so no third-party origin needs
     // to be allowed here any more.
@@ -41,10 +41,10 @@ export function contentSecurityPolicy(nonce: string): string {
  * already carries a nonce is left untouched.
  */
 export function withScriptNonce(fragments: unknown[], nonce: string): string[] {
-  // Modules do not all push strings: with `loadStyles: false` the PrimeVue
-  // module pushes empty ARRAYS into the head (story 9.6), which crashed every
-  // page in production. Flattened and non-strings dropped — exactly what
-  // Nitro's own join would have made of them, minus the crash.
+  // Modules do not all push strings: the PrimeVue module (since removed) pushed
+  // empty ARRAYS into the head (story 9.6), which crashed every page in
+  // production. Flattened and non-strings dropped — exactly what Nitro's own
+  // join would have made of them, minus the crash — whatever module comes next.
   return fragments
     .flat(Number.POSITIVE_INFINITY)
     .filter((f): f is string => typeof f === "string")

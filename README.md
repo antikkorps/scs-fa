@@ -4,7 +4,7 @@ Nuxt 4 + Fastify + Drizzle + Postgres monorepo for a firearms e-commerce platfor
 
 ## Stack
 
-- **Frontend**: Nuxt 4, Vue 3, PrimeVue (Aura theme)
+- **Frontend**: Nuxt 4, Vue 3 — hand-written components on the design tokens of `apps/web/app/assets/css/tokens.css` (no UI kit)
 - **Backend**: Fastify 5 (ESM), Drizzle ORM 0.45, PostgreSQL 17
 - **Shared**: Zod (validation), shared types & constants
 - **Tooling**: pnpm workspaces, Biome (lint + format), Vitest, strict TypeScript
