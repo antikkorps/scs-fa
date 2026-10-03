@@ -27,8 +27,13 @@ import { cleanText, htmlToText, truncate } from "./extract.js"
 const ruleSchema = z.object({
   /** Case-insensitive regular expression. */
   match: z.string().min(1),
-  /** Where to look: the supplier's own category path (default) or the product name. */
-  field: z.enum(["sourceCategory", "name"]).default("sourceCategory"),
+  /**
+   * Where to look: the supplier's own category path (default), the product name,
+   * or the supplier's legal classification (e.g. Humbert's "C1a", "B2e", "NR").
+   * A rule on that classification is how a human maps it to a legal category
+   * once for the whole catalogue — the tool itself never derives one.
+   */
+  field: z.enum(["sourceCategory", "name", "supplierLegalClass"]).default("sourceCategory"),
   category: z.string().min(1).optional(),
   legalCategory: z.enum(["A", "B", "C", "D", "none"]).optional(),
 })
@@ -42,7 +47,11 @@ export const supplierConfigSchema = z.object({
       mapping: z.object({ ref: z.string().min(1), price: z.string().min(1), ean: z.string().optional() }),
     })
     .optional(),
-  /** First matching rule wins. */
+  /**
+   * For each proposed field (category, legal category), the first matching rule
+   * that sets it wins — so a rule on the supplier's category path and a rule on
+   * its legal classification can both apply to the same article.
+   */
   rules: z.array(ruleSchema).default([]),
 })
 
@@ -124,14 +133,24 @@ function longDescription(product: CollectedProduct): string | null {
   return null
 }
 
+function ruleHaystack(product: CollectedProduct, field: SupplierConfig["rules"][number]["field"]): string {
+  if (field === "name") return product.name
+  if (field === "supplierLegalClass") return product.supplierLegalClass ?? ""
+  return product.sourceCategory ?? ""
+}
+
 function applyRules(product: CollectedProduct, rules: SupplierConfig["rules"], categories: Category[]) {
+  let category: string | null = null
+  let legalCategory: LegalCategory | null = null
   for (const rule of rules) {
-    const haystack = rule.field === "name" ? product.name : (product.sourceCategory ?? "")
-    if (!new RegExp(rule.match, "i").test(haystack)) continue
-    const category = categories.find((c) => c.slug === rule.category || c.name === rule.category)
-    return { category: category?.name ?? rule.category ?? null, legalCategory: rule.legalCategory ?? null }
+    if (category !== null && legalCategory !== null) break
+    if (!new RegExp(rule.match, "i").test(ruleHaystack(product, rule.field))) continue
+    if (category === null && rule.category) {
+      category = categories.find((c) => c.slug === rule.category || c.name === rule.category)?.name ?? rule.category
+    }
+    if (legalCategory === null && rule.legalCategory) legalCategory = rule.legalCategory
   }
-  return { category: null, legalCategory: null }
+  return { category, legalCategory }
 }
 
 const legalLabel = (l: LegalCategory | null) => (l === null ? null : l === "none" ? "Aucune" : l)
@@ -209,7 +228,8 @@ const README = [
   "1. Onglet « À trier » : une ligne par article. Mettez « oui » dans la colonne Importer pour chaque article à reprendre.",
   "2. Pour chaque ligne retenue, vérifiez la Catégorie et renseignez la Catégorie légale (A, B, C, D ou Aucune).",
   "   La colonne « Classement fournisseur » rappelle le classement annoncé par le fournisseur, quand il en donne un.",
-  "   ⚠️ La catégorie légale n'est JAMAIS déduite : une ligne retenue sans elle sera refusée à l'import.",
+  "   ⚠️ La catégorie légale n'est JAMAIS déduite par l'outil : elle n'est pré-remplie que par une règle écrite à la main",
+  "   (par exemple « classement fournisseur commençant par B → B »). Vérifiez-la ; une ligne retenue sans elle sera refusée à l'import.",
   "3. Le prix de vente HT est proposé à partir du prix d'achat et de la marge du fournisseur : ajustez-le librement.",
   "4. Les lignes « Sans prix » n'ont pas été trouvées dans le tarif : saisissez un prix de vente pour les importer.",
   "5. L'onglet « Prix sans fiche » liste les références du tarif dont aucune fiche n'a été récupérée.",
