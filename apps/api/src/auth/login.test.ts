@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, refreshTokens, users } from "../db/schema.js"
-import { LOCKOUT_DURATION_MS, MAX_FAILED_ATTEMPTS } from "./login.js"
+import { FAILED_ATTEMPTS_WINDOW_MS, LOCKOUT_DURATION_MS, MAX_FAILED_ATTEMPTS } from "./login.js"
 import { hashRefreshToken } from "./tokens.js"
 
 const TEST_EMAIL_SUFFIX = "@login-test.local"
@@ -132,6 +132,66 @@ describe("auth/login + refresh + logout", () => {
       })
       expect(blocked.statusCode).toBe(423)
       expect(blocked.json().error).toBe("AccountLocked")
+    })
+
+    it("forgets failures older than the counting window", async () => {
+      // Four typos weeks ago: they must not leave the account one try from a lock.
+      await db
+        .update(users)
+        .set({ failedLoginAttempts: MAX_FAILED_ATTEMPTS - 1, lastFailedLoginAt: new Date("2026-08-01T10:00:00Z") })
+        .where(eq(users.email, email))
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { email, password: "WrongPasswordButLong" },
+      })
+      expect(res.statusCode).toBe(401)
+      const [row] = await db.select().from(users).where(eq(users.email, email))
+      expect(row.failedLoginAttempts).toBe(1)
+      expect(row.lockedUntil).toBeNull()
+      expect(row.lastFailedLoginAt).toBeInstanceOf(Date)
+    })
+
+    it("still locks on failures that fall within the window", async () => {
+      await db
+        .update(users)
+        .set({
+          failedLoginAttempts: MAX_FAILED_ATTEMPTS - 1,
+          lastFailedLoginAt: new Date(Date.now() - FAILED_ATTEMPTS_WINDOW_MS / 2),
+        })
+        .where(eq(users.email, email))
+      await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: "WrongPasswordButLong" } })
+      const [row] = await db.select().from(users).where(eq(users.email, email))
+      expect(row.lockedUntil).toBeInstanceOf(Date)
+    })
+
+    it("journals each failure and the lockout, never the password tried", async () => {
+      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) {
+        await app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { email, password: "WrongPasswordButLong" },
+        })
+      }
+      const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email))
+      const logs = await db
+        .select({ action: auditLogs.action, newValue: auditLogs.newValue })
+        .from(auditLogs)
+        .where(eq(auditLogs.userId, user.id))
+        .orderBy(auditLogs.createdAt)
+      expect(logs.map((l) => l.action)).toEqual([
+        ...Array(MAX_FAILED_ATTEMPTS - 1).fill("user.login_failed"),
+        "user.login_locked",
+      ])
+      expect(logs.at(-1)?.newValue).toEqual({ attempts: MAX_FAILED_ATTEMPTS })
+      expect(JSON.stringify(logs)).not.toContain("WrongPasswordButLong")
+    })
+
+    it("clears the failure trail on success", async () => {
+      await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: "WrongPasswordButLong" } })
+      await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PLAINTEXT_PASSWORD } })
+      const [row] = await db.select().from(users).where(eq(users.email, email))
+      expect(row).toMatchObject({ failedLoginAttempts: 0, lastFailedLoginAt: null })
     })
 
     it("auto-unlocks after lock expiry and resets counter on success", async () => {

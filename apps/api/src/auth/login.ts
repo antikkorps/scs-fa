@@ -1,6 +1,6 @@
 import { loginSchema } from "@armurier/shared"
 import { hash, verify } from "@node-rs/argon2"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { auditLogs, users } from "../db/schema.js"
@@ -8,6 +8,12 @@ import { issueTokens } from "./tokens.js"
 
 export const MAX_FAILED_ATTEMPTS = 5
 export const LOCKOUT_DURATION_MS = 15 * 60 * 1000
+/**
+ * Only failures this recent count towards the lockout. Without a window the
+ * counter never decayed: typos from weeks ago plus two today locked the
+ * account (seen on the dev admin, 2026-10-03).
+ */
+export const FAILED_ATTEMPTS_WINDOW_MS = 15 * 60 * 1000
 
 // Pre-computed argon2id hash of a random string. Used to keep response time
 // roughly constant when the email does not exist, mitigating user enumeration.
@@ -47,15 +53,40 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
 
     if (!user || !passwordOk) {
       if (user) {
-        const nextAttempts = user.failedLoginAttempts + 1
-        const reachedThreshold = nextAttempts >= MAX_FAILED_ATTEMPTS
-        await db
+        // Counted in SQL, in one statement: a failure outside the window starts
+        // a new count, and concurrent attempts cannot overwrite each other.
+        const windowStart = new Date(Date.now() - FAILED_ATTEMPTS_WINDOW_MS)
+        const [counted] = await db
           .update(users)
           .set({
-            failedLoginAttempts: reachedThreshold ? 0 : nextAttempts,
-            lockedUntil: reachedThreshold ? new Date(Date.now() + LOCKOUT_DURATION_MS) : null,
+            // The bound is encoded like the column itself (UTC, no zone): a raw
+            // Date would carry the session's offset and skew the comparison.
+            failedLoginAttempts: sql`case when ${users.lastFailedLoginAt} > ${sql.param(windowStart, users.lastFailedLoginAt)} then ${users.failedLoginAttempts} + 1 else 1 end`,
+            lastFailedLoginAt: new Date(),
           })
           .where(eq(users.id, user.id))
+          .returning({ attempts: users.failedLoginAttempts })
+        const attempts = counted?.attempts ?? 1
+        const locked = attempts >= MAX_FAILED_ATTEMPTS
+        if (locked) {
+          await db
+            .update(users)
+            .set({ failedLoginAttempts: 0, lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) })
+            .where(eq(users.id, user.id))
+        }
+        // Journaled so a lockout can be explained afterwards. Never the
+        // password tried; an unknown e-mail is not journaled at all (it would
+        // store whatever an attacker typed, against no account).
+        await db.insert(auditLogs).values({
+          userId: user.id,
+          userRole: user.role,
+          entityType: "user",
+          entityId: user.id,
+          action: locked ? "user.login_locked" : "user.login_failed",
+          newValue: { attempts },
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        })
       }
       return reply.code(401).send({
         error: "InvalidCredentials",
@@ -68,6 +99,7 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
       .set({
         failedLoginAttempts: 0,
         lockedUntil: null,
+        lastFailedLoginAt: null,
         lastLoginAt: new Date(),
       })
       .where(eq(users.id, user.id))

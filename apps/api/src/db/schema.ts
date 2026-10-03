@@ -169,6 +169,9 @@ export const users = pgTable(
     // Brute-force protection
     failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
     lockedUntil: timestamp("locked_until"),
+    // Last failed login: failures older than the counting window no longer
+    // count towards the lockout (the counter used to accumulate forever).
+    lastFailedLoginAt: timestamp("last_failed_login_at"),
 
     // RGPD consent (recorded at registration; version tracks ToS revision)
     rgpdConsentAt: timestamp("rgpd_consent_at"),

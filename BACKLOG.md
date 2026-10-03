@@ -50,6 +50,7 @@
 
 - [x] Critères : JWT access 1h + refresh 7d (opaque, sha256-hashé), rotation à chaque /refresh, rate limit 5/min login & 10/min refresh, multi-device (table `refresh_tokens`)
 - [x] Lockout : 5 échecs → 15 min (auto-unlock), colonnes `failed_login_attempts` + `locked_until` sur `users`
+- [x] 🐞 **Correctif 2026-10-03** : le compteur d'échecs **n'expirait jamais** (remis à zéro seulement par un succès ou un verrouillage) → des fautes de frappe d'il y a des semaines + 2 essais le jour même verrouillaient le compte (constaté sur l'admin de dev). Fenêtre glissante de **15 min** (`last_failed_login_at`, migration **0016**, comptage atomique en SQL) ; chaque échec et le verrouillage sont **journalisés** (`user.login_failed` / `user.login_locked`, nombre de tentatives — jamais le mot de passe tenté ; un e-mail inconnu n'est pas journalisé)
 - [x] Tests : succès, mauvais password (timing-safe via DUMMY_HASH partagé), email inconnu (même 401, anti-énumération), lockout après 5 échecs (423), auto-unlock, refresh rotation + invalidation de l'ancien, refresh expiré (401), logout révoque, logout 204 même token inconnu
 - [x] Endpoints : `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`
 - [x] Audit logs : `user.login`, `user.token_refreshed`
