@@ -8,7 +8,7 @@ describe("contentSecurityPolicy", () => {
     expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/)
   })
 
-  it("keeps 'unsafe-inline' for styles (PrimeVue runtime injection)", () => {
+  it("keeps 'unsafe-inline' for styles (SSR-inlined component CSS and style bindings)", () => {
     expect(contentSecurityPolicy("n")).toContain("style-src 'self' 'unsafe-inline'")
   })
 
@@ -61,7 +61,7 @@ describe("withScriptNonce", () => {
   })
 
   it("survives a module pushing arrays instead of strings into the head (story 9.6)", () => {
-    // PrimeVue's module with `loadStyles: false` pushes [] — every page 500'd.
+    // The PrimeVue module (since removed) pushed [] — every page 500'd.
     expect(withScriptNonce(["<script>a</script>", [], ["<script>b</script>"]], "Q")).toEqual([
       '<script nonce="Q">a</script>',
       '<script nonce="Q">b</script>',

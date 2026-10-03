@@ -385,6 +385,10 @@ describe("orders (POST /api/orders)", () => {
     it("never confirms an order placed before the CGV were recorded", async () => {
       mail.mockRejectedValue(new Error("SMTP down"))
       const id = await placeOrder()
+      // Wait for the checkout's own (failing) send to have run and released the
+      // claim. `sentAt` alone is null BEFORE that send starts too: on a slow
+      // runner the send then landed after the mock was swapped to succeed.
+      await vi.waitFor(() => expect(mail).toHaveBeenCalledTimes(1))
       await vi.waitFor(async () => expect(await sentAt(id)).toBeNull())
       mail.mockReset().mockResolvedValue(undefined)
       await db

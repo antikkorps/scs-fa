@@ -66,6 +66,54 @@ describe("buildTriageModel", () => {
     })
   })
 
+  it("maps the supplier's legal classification only through a hand-written rule", () => {
+    const humbert = (sku: string, supplierLegalClass: string | undefined) =>
+      product({ supplier: "Humbert", supplierSku: sku, sourceCategory: "Carabines > Verrou", supplierLegalClass })
+    const rules = [
+      { match: "^carabines", category: "arme-longue" },
+      { match: "^B", field: "supplierLegalClass", legalCategory: "B" },
+      { match: "^C", field: "supplierLegalClass", legalCategory: "C" },
+    ]
+    const model = buildTriageModel(
+      [
+        batch({
+          supplier: "Humbert",
+          prices: null,
+          products: [humbert("H-1", "C1a"), humbert("H-2", "B2e"), humbert("H-3", "NR"), humbert("H-4", undefined)],
+          config: supplierConfigSchema.parse({ rules }),
+        }),
+      ],
+      categories,
+    )
+    // The category rule and the classification rule both apply to the same article.
+    expect(model.rows.map((r) => [r.supplierSku, r.category, r.legalCategory, r.supplierLegalClass])).toEqual([
+      ["H-1", "Armes longues", "C", "C1a"],
+      ["H-2", "Armes longues", "B", "B2e"],
+      // No rule covers "NR", and an article without a classification gets none: left blank.
+      ["H-3", "Armes longues", null, "NR"],
+      ["H-4", "Armes longues", null, null],
+    ])
+  })
+
+  it("keeps the first rule that sets each field", () => {
+    const model = buildTriageModel(
+      [
+        batch({
+          prices: null,
+          products: [product({})],
+          config: supplierConfigSchema.parse({
+            rules: [
+              { match: "points rouges", category: "aide-visee" },
+              { match: "optoélectronique", category: "arme-longue", legalCategory: "none" },
+            ],
+          }),
+        }),
+      ],
+      categories,
+    )
+    expect(model.rows[0]).toMatchObject({ category: "Aides à la visée", legalCategory: "Aucune" })
+  })
+
   it("lists the price lines no product claimed", () => {
     expect(buildTriageModel([batch()], categories).orphans).toEqual([
       { supplier: "BGM Winfield", ref: "ORPHAN", ean: "4006381333931", price: 12, line: 4 },

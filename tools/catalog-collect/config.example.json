@@ -5,20 +5,65 @@
       "marginPct": 30,
       "priceList": {
         "file": "price-lists/bgm-winfield.xlsx",
-        "mapping": { "ref": "Référence", "price": "Prix net HT", "ean": "EAN" }
+        "mapping": {
+          "ref": "Référence",
+          "price": "Prix net HT",
+          "ean": "EAN"
+        }
       },
       "rules": [
-        { "match": "points rouges|lunettes|prismes|lpvo|magnifiers", "category": "aide-visee" },
-        { "match": "munitions", "category": "munition" }
+        {
+          "match": "points rouges|lunettes|prismes|lpvo|magnifiers",
+          "category": "aide-visee"
+        },
+        {
+          "match": "munitions",
+          "category": "munition"
+        }
       ]
     },
     "agora-tec": {
       "marginPct": 35,
       "priceList": {
         "file": "price-lists/agora-tec.csv",
-        "mapping": { "ref": "Code article", "price": "Prix HT" }
+        "mapping": {
+          "ref": "Code article",
+          "price": "Prix HT"
+        }
       },
-      "rules": [{ "match": "torches|frontales", "category": "accessoire-autre", "legalCategory": "none" }]
+      "rules": [
+        {
+          "match": "torches|frontales",
+          "category": "accessoire-autre",
+          "legalCategory": "none"
+        }
+      ]
+    },
+    "humbert": {
+      "marginPct": 30,
+      "priceList": {
+        "file": "price-lists/humbert.xlsx",
+        "mapping": {
+          "ref": "Référence",
+          "price": "Prix net HT"
+        }
+      },
+      "rules": [
+        {
+          "match": "^fusils de chasse|^fusils de tir|^carabines",
+          "category": "arme-longue"
+        },
+        {
+          "match": "^B",
+          "field": "supplierLegalClass",
+          "legalCategory": "B"
+        },
+        {
+          "match": "^C",
+          "field": "supplierLegalClass",
+          "legalCategory": "C"
+        }
+      ]
     }
   }
 }
