@@ -1103,3 +1103,17 @@ export type UpdateShipmentInput = z.infer<typeof updateShipmentSchema>
 export type CreateBeneficiaryInput = z.infer<typeof createBeneficiarySchema>
 export type UpdateBeneficiaryInput = z.infer<typeof updateBeneficiarySchema>
 export type UpdatePayoutInput = z.infer<typeof updatePayoutSchema>
+
+// Story 12.3 — the shipping rate grid. Replaced whole (PUT), never patched: the
+// four amounts form one tariff and are reviewed together.
+const shippingRateSchema = z.coerce.number().min(0).max(1000).multipleOf(0.01)
+
+export const shippingRatesSchema = z
+  .object({
+    firearmParcelTtc: shippingRateSchema,
+    smallParcelTtc: shippingRateSchema,
+    // null = small parcels are never free.
+    smallParcelFreeFromTtc: z.coerce.number().min(0).max(100_000).multipleOf(0.01).nullable(),
+    printTtc: shippingRateSchema,
+  })
+  .strict()

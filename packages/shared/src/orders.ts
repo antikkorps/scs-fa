@@ -188,6 +188,12 @@ export function amountsMatchToCent(a: number, b: number): boolean {
 export interface PaymentSplitItem {
   priceHt: number
   vatPct: number
+  /**
+   * The VAT already settled for this item, when it was derived from a TTC amount
+   * (a shipping slice, story 12.3): recomputing it from the rounded HT could
+   * drift a cent away from the price the customer was shown.
+   */
+  vatAmount?: number
   requiresPaymentVirement: boolean
 }
 
@@ -205,7 +211,7 @@ export function calculateOrderPaymentSplit(items: PaymentSplitItem[]): PaymentSp
   let carteVat = 0
 
   for (const item of items) {
-    const itemVat = item.priceHt * (item.vatPct / 100)
+    const itemVat = item.vatAmount ?? item.priceHt * (item.vatPct / 100)
     if (item.requiresPaymentVirement) {
       virementHt += item.priceHt
       virementVat += itemVat
