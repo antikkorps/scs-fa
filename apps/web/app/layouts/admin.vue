@@ -1,26 +1,52 @@
 <script setup lang="ts">
 const { user, logout } = useAuth()
 
-const nav = [
-  { to: "/admin", label: "Tableau de bord", icon: "▤", exact: true },
-  { to: "/admin/orders", label: "Commandes", icon: "▦" },
-  { to: "/admin/blog", label: "Journal", icon: "✎" },
-  { to: "/admin/legal-docs", label: "Documents", icon: "▣" },
-  { to: "/admin/payments/virements", label: "Virements", icon: "▤" },
-  { to: "/admin/produits", label: "Produits", icon: "▧" },
-  { to: "/admin/imports", label: "Import catalogues", icon: "⇪" },
-  { to: "/admin/livraison", label: "Frais de port", icon: "⇶" },
-  { to: "/admin/armes-anciennes", label: "Armes de collection", icon: "⚑" },
-  { to: "/admin/gun-art/oeuvres", label: "Œuvres Gun Art", icon: "◈" },
-  { to: "/admin/gun-art/series", label: "Séries", icon: "❋" },
-  { to: "/admin/gun-art/themes", label: "Thèmes", icon: "◇" },
-  { to: "/admin/gun-art/artistes", label: "Artistes", icon: "✦" },
-  { to: "/admin/tags", label: "Tags", icon: "⌗" },
-  { to: "/admin/gun-art/simulateur-prix", label: "Simulateur de prix", icon: "≋" },
-  { to: "/admin/reversements", label: "Reversements", icon: "⇄" },
-  { to: "/admin/beneficiaires", label: "Bénéficiaires", icon: "☗" },
-  { to: "/admin/metrics", label: "Métriques", icon: "▥" },
+// Grouped by job, so the rail stays scannable as the back-office grows. The
+// dashboard stands alone at the top; every other screen belongs to one group.
+const home = { to: "/admin", label: "Tableau de bord", icon: "▤", exact: true }
+
+const groups = [
+  {
+    label: "Ventes",
+    items: [
+      { to: "/admin/orders", label: "Commandes", icon: "▦" },
+      { to: "/admin/payments/virements", label: "Virements", icon: "▤" },
+      { to: "/admin/legal-docs", label: "Documents", icon: "▣" },
+      { to: "/admin/livraison", label: "Frais de port", icon: "⇶" },
+    ],
+  },
+  {
+    label: "Catalogue",
+    items: [
+      { to: "/admin/produits", label: "Produits", icon: "▧" },
+      { to: "/admin/imports", label: "Import catalogues", icon: "⇪" },
+      { to: "/admin/armes-anciennes", label: "Armes de collection", icon: "⚑" },
+      { to: "/admin/tags", label: "Tags", icon: "⌗" },
+    ],
+  },
+  {
+    label: "Gun Art",
+    items: [
+      { to: "/admin/gun-art/oeuvres", label: "Œuvres", icon: "◈" },
+      { to: "/admin/gun-art/series", label: "Séries", icon: "❋" },
+      { to: "/admin/gun-art/themes", label: "Thèmes", icon: "◇" },
+      { to: "/admin/gun-art/artistes", label: "Artistes", icon: "✦" },
+      { to: "/admin/gun-art/simulateur-prix", label: "Simulateur de prix", icon: "≋" },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { to: "/admin/reversements", label: "Reversements", icon: "⇄" },
+      { to: "/admin/beneficiaires", label: "Bénéficiaires", icon: "☗" },
+      { to: "/admin/metrics", label: "Métriques", icon: "▥" },
+    ],
+  },
+  { label: "Contenu", items: [{ to: "/admin/blog", label: "Journal", icon: "✎" }] },
 ]
+
+const isActive = (item: { to: string; exact?: boolean }) =>
+  item.exact ? route.path === item.to : route.path.startsWith(item.to)
 
 const mobileOpen = ref(false)
 const route = useRoute()
@@ -44,17 +70,24 @@ async function signOut() {
         <span class="brand__mark">SCS</span>
         <span class="brand__sub">Administration</span>
       </div>
-      <nav class="nav">
-        <NuxtLink
-          v-for="item in nav"
-          :key="item.to"
-          :to="item.to"
-          class="nav__link"
-          :class="{ 'nav__link--active': item.exact ? route.path === item.to : route.path.startsWith(item.to) }"
-        >
-          <span class="nav__icon" aria-hidden="true">{{ item.icon }}</span>
-          {{ item.label }}
+      <nav class="nav" aria-label="Administration">
+        <NuxtLink :to="home.to" class="nav__link" :class="{ 'nav__link--active': isActive(home) }">
+          <span class="nav__icon" aria-hidden="true">{{ home.icon }}</span>
+          {{ home.label }}
         </NuxtLink>
+        <section v-for="group in groups" :key="group.label" class="nav__group" :aria-labelledby="`nav-${group.label}`">
+          <h2 :id="`nav-${group.label}`" class="nav__heading">{{ group.label }}</h2>
+          <NuxtLink
+            v-for="item in group.items"
+            :key="item.to"
+            :to="item.to"
+            class="nav__link"
+            :class="{ 'nav__link--active': isActive(item) }"
+          >
+            <span class="nav__icon" aria-hidden="true">{{ item.icon }}</span>
+            {{ item.label }}
+          </NuxtLink>
+        </section>
       </nav>
     </aside>
 
@@ -91,6 +124,10 @@ async function signOut() {
   border-right: 1px solid var(--ink-line);
   padding: 1.5rem 1rem;
   z-index: 40;
+  /* The rail always spans the full height and scrolls on its own when the
+     entries outgrow a short screen — on mobile the last ones were unreachable. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .admin--open .sidebar {
   transform: translateX(0);
@@ -118,13 +155,29 @@ async function signOut() {
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.1rem;
+}
+.nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: 1rem;
+}
+.nav__heading {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-body);
+  padding: 0 0.8rem;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--paper-faint);
 }
 .nav__link {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  padding: 0.7rem 0.8rem;
+  padding: 0.5rem 0.8rem;
   border-radius: var(--radius);
   color: var(--paper-dim);
   /* A dense tool sidebar, not running text: --fs-sm keeps every entry on one
@@ -224,6 +277,7 @@ async function signOut() {
     position: sticky;
     top: 0;
     height: 100vh;
+    height: 100dvh;
     transform: none;
   }
   .burger {
