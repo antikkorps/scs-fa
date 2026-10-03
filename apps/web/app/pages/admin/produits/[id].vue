@@ -325,7 +325,7 @@ async function save() {
           >
           <span class="field__help">
             Une arme de catégorie B se livre en 2 colis (arme et éléments séparés). Sert à proposer le découpage à
-            l'expédition.
+            l'expédition et, pour une arme, à calculer les frais de port (un forfait par colis).
           </span>
         </label>
       </div>

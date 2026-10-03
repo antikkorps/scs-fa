@@ -18,6 +18,7 @@ import {
   tags,
   users,
 } from "../db/schema.js"
+import { pinShippingRates } from "../test/shipping-rates.js"
 import { recomputeVipStatus } from "./service.js"
 
 // The confirmation e-mail is sent in the background of every order (story 12.1):
@@ -83,10 +84,14 @@ describe("VIP (story 3.4)", () => {
     await db.delete(users).where(like(users.email, "vip-test34%"))
   }
 
+  // Delivery priced at TEST_SHIPPING_RATES: one firearm parcel = 25 TTC (story 12.3).
+  let restoreShippingRates: () => Promise<void>
+
   beforeAll(async () => {
     app = await buildApp()
     await app.ready()
     await cleanup()
+    restoreShippingRates = await pinShippingRates()
 
     const passwordHash = await hash(PASSWORD, { memoryCost: 19_456, timeCost: 2, parallelism: 1 })
     const [u] = await db
@@ -159,6 +164,7 @@ describe("VIP (story 3.4)", () => {
   })
 
   afterAll(async () => {
+    await restoreShippingRates()
     await cleanup()
     await app.close()
   })
@@ -248,7 +254,9 @@ describe("VIP (story 3.4)", () => {
     expect(data.isVip).toBe(true)
     // margin 30% → 15% discount; 1000 HT → 150 off, TTC on 850 = 1020
     expect(data.items[0]).toMatchObject({ discountPct: 15, discountAmount: 150, lineHt: 1000, lineTtc: 1020 })
-    expect(data.summary).toMatchObject({ subtotalHt: 1000, vipDiscountAmount: 150, totalTtc: 1020 })
+    // + one firearm parcel at 25 TTC: the VIP discount never touches delivery.
+    expect(data.summary).toMatchObject({ subtotalHt: 1000, vipDiscountAmount: 150, totalTtc: 1045 })
+    expect(data.summary.shipping.totalTtc).toBe(25)
   })
 
   it("does not discount ammunition even for a VIP", async () => {
@@ -269,13 +277,15 @@ describe("VIP (story 3.4)", () => {
     await addToCart(newFirearmVariantId, 1)
     const created = (await createOrder()).json().data
     expect(created.totals.vipDiscountAmount).toBe(150)
-    expect(created.totals.totalTtc).toBe(1020)
+    expect(created.totals.totalTtc).toBe(1045)
+    expect(created.totals.shipping.totalTtc).toBe(25)
 
     const detail = (await app.inject({ method: "GET", url: `/api/orders/${created.id}`, headers: headers() })).json()
       .data
     expect(detail.vipDiscountAmount).toBe(150)
     expect(detail.vipDiscountAppliedPct).toBe(15)
-    expect(detail.totalTtc).toBe(1020)
+    expect(detail.totalTtc).toBe(1045)
+    expect(detail.shippingCost).toBe(25)
   })
 
   // --- Exposure ---

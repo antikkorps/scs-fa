@@ -73,8 +73,8 @@ export const TERMS_SECTIONS: TermsSection[] = [
       ),
       p(
         "Les ventes sont réservées aux livraisons en ",
-        todo("À compléter : zone de livraison — France métropolitaine ? Corse, outre-mer ?"),
-        ".",
+        b("France métropolitaine, Corse comprise"),
+        ". Les départements, régions et collectivités d'outre-mer ne sont pas desservis.",
       ),
     ],
   },
@@ -92,8 +92,12 @@ export const TERMS_SECTIONS: TermsSection[] = [
     title: "4. Prix",
     blocks: [
       p(
-        "Les prix sont indiqués en euros, toutes taxes comprises. Les éventuelles remises (remise fidélité réservée aux clients qui en bénéficient, par exemple) apparaissent dans le récapitulatif avant la commande. Les frais de livraison sont indiqués avant la validation de la commande. ",
-        todo("À confirmer : grille des frais de port — le récapitulatif de commande n'en affiche pas aujourd'hui."),
+        "Les prix sont indiqués en euros, toutes taxes comprises. Les éventuelles remises (remise fidélité réservée aux clients qui en bénéficient, par exemple) apparaissent dans le récapitulatif avant la commande.",
+      ),
+      p(
+        "Les ",
+        b("frais de livraison"),
+        " s'ajoutent au prix des articles ; leur montant et le prix total sont indiqués dans le récapitulatif, avant la validation de la commande. Ils sont forfaitaires : par colis pour une arme (envoi assuré, remis contre signature ; une arme de catégorie B est livrée en deux colis), un forfait unique par commande pour les munitions et accessoires — offert à partir du montant indiqué au panier —, et par tirage pour les œuvres Gun Art. La remise fidélité ne s'applique pas aux frais de livraison.",
       ),
       p(
         `Le prix appliqué est celui affiché au moment de la commande. Une pièce unique de l'armurerie placée dans le panier est réservée au client pendant ${UNIQUE_PIECE_HOLD_MINUTES} minutes, puis remise en vente ; un tirage Gun Art reste réservé tant qu'il est dans le panier.`,
@@ -136,7 +140,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     title: "7. Livraison",
     blocks: [
       p(
-        "Les articles sont expédiés en colis suivi, par un transporteur (Colissimo ou Chronopost), à l'adresse indiquée lors de la commande. Le numéro de suivi est communiqué dès l'expédition, depuis l'espace client. La commande est expédiée sous ",
+        "Les articles sont expédiés en colis suivi, par un transporteur choisi par nos soins (Colissimo ou Chronopost), à l'adresse indiquée lors de la commande, en France métropolitaine, Corse comprise. Le numéro de suivi est communiqué dès l'expédition, depuis l'espace client. La commande est expédiée sous ",
         todo("À compléter : délai d'expédition après paiement et, le cas échéant, validation des pièces"),
         " ; à défaut de délai indiqué, la livraison intervient au plus tard 30 jours après la commande (article L216-1 du Code de la consommation).",
       ),

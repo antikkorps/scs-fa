@@ -60,6 +60,7 @@ export async function sendOrderConfirmation(orderId: string, log: Logger): Promi
       lines: order.itemsJson.map((l) => ({ name: l.name, qty: l.qty })),
       subtotalHt: Number(order.subtotalHt),
       vipDiscount: Number(order.vipDiscountAmount ?? 0),
+      shippingHt: Number(order.shippingHt),
       vat: Number(order.vatAmount),
       totalTtc: Number(order.totalTtc),
       cardTtc: Number(row.cardTtc ?? 0),

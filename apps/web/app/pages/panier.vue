@@ -111,24 +111,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
 
         <aside class="summary">
           <p v-if="cart.isVip" class="summary__vip">Avantage VIP appliqué</p>
-          <dl class="summary__rows">
-            <div>
-              <dt>Sous-total HT</dt>
-              <dd>{{ formatEuros(cart.summary.subtotalHt) }}</dd>
-            </div>
-            <div v-if="cart.summary.vipDiscountAmount > 0" class="summary__discount">
-              <dt>Remise VIP</dt>
-              <dd>− {{ formatEuros(cart.summary.vipDiscountAmount) }}</dd>
-            </div>
-            <div>
-              <dt>TVA</dt>
-              <dd>{{ formatEuros(cart.summary.vatAmount) }}</dd>
-            </div>
-            <div class="summary__total">
-              <dt>Total TTC</dt>
-              <dd>{{ formatEuros(cart.summary.totalTtc) }}</dd>
-            </div>
-          </dl>
+          <CartTotals :summary="cart.summary" />
 
           <button type="button" class="btn btn-primary summary__cta" @click="$router.push('/commande')">
             Passer commande
@@ -239,30 +222,6 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
   letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--brass);
-}
-.summary__rows {
-  margin: 0 0 1.25rem;
-}
-.summary__rows > div {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.4rem 0;
-}
-.summary__rows dt {
-  color: var(--paper-dim);
-}
-.summary__rows dd {
-  margin: 0;
-}
-.summary__discount dd {
-  color: var(--brass);
-}
-.summary__total {
-  border-top: 1px solid var(--ink-line);
-  margin-top: 0.4rem;
-  padding-top: 0.8rem !important;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
 }
 .summary__cta {
   width: 100%;

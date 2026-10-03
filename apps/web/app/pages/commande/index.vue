@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CURRENT_TERMS_VERSION } from "@armurier/shared"
+import { CURRENT_TERMS_VERSION, isDeliverableAddress } from "@armurier/shared"
 import type { CartView } from "~/types/cart"
 import type { Address, NewAddress } from "~/types/checkout"
 import { formatDate, formatEuros } from "~/utils/format"
@@ -82,10 +82,22 @@ async function saveAddress() {
   }
 }
 
+// Delivery: metropolitan France, Corsica included (story 12.3). The API refuses
+// anything else; saying so here spares the customer a failed order.
+const UNDELIVERABLE = "Nous livrons uniquement en France métropolitaine, Corse comprise."
+const shippingAddress = computed(() => addresses.value.find((a) => a.id === shippingId.value) ?? null)
+const shippingUndeliverable = computed(
+  () => shippingAddress.value !== null && !isDeliverableAddress(shippingAddress.value),
+)
+
 async function placeOrder() {
   placeError.value = ""
   if (!shippingId.value) {
     placeError.value = "Choisissez une adresse de livraison."
+    return
+  }
+  if (shippingUndeliverable.value) {
+    placeError.value = UNDELIVERABLE
     return
   }
   if (!termsAccepted.value) {
@@ -108,9 +120,11 @@ async function placeOrder() {
     placeError.value =
       status === 409 && apiErrorCode(err) === "TermsOutdated"
         ? "Nos conditions générales de vente ont changé depuis l'ouverture de cette page. Rechargez la page pour lire la nouvelle version."
-        : status === 400
-          ? "Votre panier est vide ou invalide."
-          : "Impossible de créer la commande."
+        : status === 422 && apiErrorCode(err) === "UndeliverableAddress"
+          ? UNDELIVERABLE
+          : status === 400
+            ? "Votre panier est vide ou invalide."
+            : "Impossible de créer la commande."
     placing.value = false
   }
 }
@@ -134,6 +148,7 @@ const addressLine = (a: Address) =>
         <div class="checkout__main">
           <section aria-labelledby="addr-h">
             <h2 id="addr-h" class="section__h">Adresse de livraison</h2>
+            <p class="addr-zone">Livraison en France métropolitaine, Corse comprise.</p>
 
             <ul v-if="addresses.length > 0" class="addr-list" role="list">
               <li v-for="a in addresses" :key="a.id">
@@ -146,6 +161,7 @@ const addressLine = (a: Address) =>
                 </label>
               </li>
             </ul>
+            <p v-if="shippingUndeliverable" class="err" role="alert">{{ UNDELIVERABLE }} Choisissez ou ajoutez une autre adresse.</p>
 
             <button v-if="!showAddressForm" type="button" class="btn btn-ghost add-btn" @click="showAddressForm = true">
               Ajouter une adresse
@@ -197,24 +213,7 @@ const addressLine = (a: Address) =>
 
         <aside class="summary">
           <h2 class="section__h">Récapitulatif</h2>
-          <dl class="summary__rows">
-            <div>
-              <dt>Sous-total HT</dt>
-              <dd>{{ formatEuros(cart.summary.subtotalHt) }}</dd>
-            </div>
-            <div v-if="cart.summary.vipDiscountAmount > 0" class="summary__discount">
-              <dt>Remise VIP</dt>
-              <dd>− {{ formatEuros(cart.summary.vipDiscountAmount) }}</dd>
-            </div>
-            <div>
-              <dt>TVA</dt>
-              <dd>{{ formatEuros(cart.summary.vatAmount) }}</dd>
-            </div>
-            <div class="summary__total">
-              <dt>Total TTC</dt>
-              <dd>{{ formatEuros(cart.summary.totalTtc) }}</dd>
-            </div>
-          </dl>
+          <CartTotals :summary="cart.summary" />
           <label class="terms">
             <input v-model="termsAccepted" type="checkbox" name="terms" required />
             <span>
@@ -340,29 +339,10 @@ const addressLine = (a: Address) =>
   padding: 1.5rem;
   align-self: start;
 }
-.summary__rows {
-  margin: 0 0 1.25rem;
-}
-.summary__rows > div {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.4rem 0;
-}
-.summary__rows dt {
+.addr-zone {
+  margin: -0.4rem 0 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--paper-dim);
-}
-.summary__rows dd {
-  margin: 0;
-}
-.summary__discount dd {
-  color: var(--brass);
-}
-.summary__total {
-  border-top: 1px solid var(--ink-line);
-  margin-top: 0.4rem;
-  padding-top: 0.8rem !important;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
 }
 .terms {
   display: flex;

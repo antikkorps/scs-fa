@@ -43,6 +43,7 @@ import { searchRoutes } from "./search/index.js"
 import { seoRoutes } from "./seo/index.js"
 import { adminShipmentRoutes } from "./shipments/admin.js"
 import { startShipmentTrackingScheduler } from "./shipments/tracking/sync.js"
+import { adminShippingRateRoutes } from "./shipping-rates/admin.js"
 import { adminTagRoutes } from "./tags/admin.js"
 import { tagRoutes } from "./tags/index.js"
 
@@ -122,6 +123,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(adminPaymentRoutes, { prefix: "/api/admin/payments" })
   await fastify.register(adminOrderRoutes, { prefix: "/api/admin/orders" })
   await fastify.register(adminShipmentRoutes, { prefix: "/api/admin/shipments" })
+  await fastify.register(adminShippingRateRoutes, { prefix: "/api/admin/shipping-rates" })
   await fastify.register(adminBlogRoutes, { prefix: "/api/admin/blog" })
   await fastify.register(adminBlogImageRoutes, { prefix: "/api/admin/blog/images" })
   await fastify.register(adminMetricsRoutes, { prefix: "/api/admin/metrics" })

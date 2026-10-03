@@ -1,4 +1,12 @@
-import { calculateVipDiscount, computePriceTtc, round2 } from "@armurier/shared"
+import {
+  calculateVipDiscount,
+  computePriceTtc,
+  computeShippingCost,
+  requiresVirement,
+  round2,
+  type ShippableLine,
+  type ShippingQuote,
+} from "@armurier/shared"
 import { asc, eq, sql } from "drizzle-orm"
 import { db } from "../db/client.js"
 import {
@@ -14,6 +22,7 @@ import {
   tags,
   users,
 } from "../db/schema.js"
+import { loadShippingRates } from "../shipping-rates/service.js"
 
 // A product's tag slugs, as a correlated aggregate. Built with the query builder
 // rather than a raw string so the `products.id` reference stays qualified — a
@@ -46,6 +55,8 @@ export interface CartProductLine {
   tagSlugs: string[]
   legalCategory: string | null
   requiresLegalVerification: boolean
+  /** Parcels one unit travels in — drives the firearm shipping rate (story 12.3). */
+  parcelCount: number
 }
 
 export interface CartArtworkLine {
@@ -70,11 +81,41 @@ export interface CartView {
   artworkItems: CartArtworkLine[]
   summary: {
     itemCount: number
+    /** Goods only, before the VIP discount. */
     subtotalHt: number
     vipDiscountAmount: number
+    /** Goods AND shipping VAT. */
     vatAmount: number
+    /** What the customer pays: goods and shipping (story 12.3). */
     totalTtc: number
+    shipping: ShippingQuote
   }
+}
+
+/** A cart's lines as the shipping grid sees them. */
+function shippableLinesOf(items: CartProductLine[], artworkItems: CartArtworkLine[]): ShippableLine[] {
+  return [
+    ...items.map((l) => ({
+      kind: "product" as const,
+      categorySlug: l.categorySlug,
+      qty: l.qty,
+      parcelCount: l.parcelCount,
+      vatPct: l.vatPct,
+      netHt: round2(l.lineHt - l.discountAmount),
+      lineTtc: l.lineTtc,
+      requiresPaymentVirement: requiresVirement(l.legalCategory),
+    })),
+    ...artworkItems.map((l) => ({
+      kind: "print" as const,
+      categorySlug: l.categorySlug,
+      qty: 1,
+      parcelCount: 1,
+      vatPct: l.vatPct,
+      netHt: round2(l.lineHt - l.discountAmount),
+      lineTtc: l.lineTtc,
+      requiresPaymentVirement: false,
+    })),
+  ]
 }
 
 /** Load and shape a user's cart (product variants + artwork prints) with computed totals and VIP discount. */
@@ -99,6 +140,7 @@ export async function loadCart(userId: string): Promise<CartView> {
       vatPct: products.vatPct,
       marginPct: products.marginPct,
       requiresLegalVerification: products.requiresLegalVerification,
+      parcelCount: products.parcelCount,
       categorySlug: productCategories.slug,
       // Snapshotted onto the order so the VIP rule can tell a new firearm from a
       // second-hand one after the fact (state is a tag since story 11.1).
@@ -164,6 +206,7 @@ export async function loadCart(userId: string): Promise<CartView> {
       tagSlugs: r.tagSlugs,
       legalCategory: r.legalCategory,
       requiresLegalVerification: r.requiresLegalVerification,
+      parcelCount: r.parcelCount,
     }
   })
 
@@ -192,14 +235,25 @@ export async function loadCart(userId: string): Promise<CartView> {
   const allLines = [...items, ...artworkItems]
   const subtotalHt = round2(allLines.reduce((sum, l) => sum + l.lineHt, 0))
   const vipDiscountAmount = round2(allLines.reduce((sum, l) => sum + l.discountAmount, 0))
-  const totalTtc = round2(allLines.reduce((sum, l) => sum + l.lineTtc, 0))
-  const vatAmount = round2(totalTtc - (subtotalHt - vipDiscountAmount))
+  const goodsTtc = round2(allLines.reduce((sum, l) => sum + l.lineTtc, 0))
+  const goodsVat = round2(goodsTtc - (subtotalHt - vipDiscountAmount))
   const itemCount = items.reduce((sum, l) => sum + l.qty, 0) + artworkItems.length
+
+  // Priced on the net (VIP-discounted) lines, but the discount itself never
+  // touches shipping (story 12.3).
+  const shipping = computeShippingCost(shippableLinesOf(items, artworkItems), await loadShippingRates())
 
   return {
     isVip,
     items,
     artworkItems,
-    summary: { itemCount, subtotalHt, vipDiscountAmount, vatAmount, totalTtc },
+    summary: {
+      itemCount,
+      subtotalHt,
+      vipDiscountAmount,
+      vatAmount: round2(goodsVat + shipping.vatAmount),
+      totalTtc: round2(goodsTtc + shipping.totalTtc),
+      shipping,
+    },
   }
 }

@@ -130,6 +130,10 @@ function num(v: unknown): number | null {
           <dl class="totals">
             <div><dt>Sous-total HT</dt><dd>{{ formatEuros(order.subtotalHt) }}</dd></div>
             <div v-if="order.vipDiscountAmount > 0"><dt>Remise VIP</dt><dd>−{{ formatEuros(order.vipDiscountAmount) }}</dd></div>
+            <div>
+              <dt>Livraison HT</dt>
+              <dd>{{ formatEuros(order.shippingHt) }} <small>({{ formatEuros(order.shippingCost) }} TTC)</small></dd>
+            </div>
             <div><dt>TVA</dt><dd>{{ formatEuros(order.vatAmount) }}</dd></div>
             <div class="totals__grand"><dt>Total TTC</dt><dd>{{ formatEuros(order.totalTtc) }}</dd></div>
           </dl>

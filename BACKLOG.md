@@ -618,6 +618,35 @@
 - Lecture `.xlsx` sans garde contre une **bombe zip** au-delà du plafond de 15 Mo du fichier déposé (route réservée aux admins)
 - Pas d'**écran fournisseurs** (création implicite à l'import ; marge par défaut modifiable seulement en base pour l'instant)
 
+**Story 12.3** — Frais de port au tunnel d'achat — ✅ **CODÉE** _(créée le 2026-09-29, trouvé en 12.1 ; codée le 2026-10-03)_
+
+> Constat : `orders.shipping_cost` vaut **toujours 0** et le récapitulatif du tunnel n'affiche **aucun frais de port** — chaque envoi serait à la charge de la boutique, et le client doit connaître le **prix total livraison comprise avant de commander** (C. conso. L221-5, L112-1). Bloquant pour la mise en ligne.
+
+**Décisions tranchées avec Franck (2026-10-03) :**
+
+- [x] **Modèle de calcul** : **forfait par classe d'envoi**, sans poids. Arme = forfait **par colis** (× `parcelCount`, donc 2 pour une arme de cat. B), envoi assuré contre signature compris ; munitions et accessoires = **un forfait par commande** (« petits colis ») ; tirage Gun Art = forfait **par tirage** (emballage dédié). Total = somme des classes présentes.
+- [x] **Gratuité** : seuil réglable, **sur les petits colis seulement** (munitions + accessoires) ; armes et tirages restent payants. **La remise VIP ne s'applique pas au port.**
+- [x] **Transporteur imposé** par la boutique (choisi à l'expédition, écran 11.9) : un seul tarif affiché au client, pas de point relais pour les armes.
+- [x] **Zone** : **France métropolitaine, Corse comprise**, grille unique ; le tunnel refuse une adresse de livraison hors zone (pays ≠ FR, codes postaux 97/98). Le « À compléter » des CGV est rempli → `CURRENT_TERMS_VERSION` incrémentée.
+- [x] **Grille en écran admin** (table + migration, modifications au journal d'audit), grille par défaut à remplacer par celle du client.
+- [x] **TVA du port au prorata** des taux des articles du panier.
+
+**Livré (2026-10-03) :**
+
+- **Calcul partagé** `computeShippingCost` (`packages/shared/src/shipping-costs.ts`) : chaque classe produit des « tranches » de port portant le **taux de TVA et le canal de paiement** de l'article transporté — le port d'une arme payée par virement part dans le virement, et le forfait petits colis est réparti **au prorata du HT net** des articles qu'il transporte (méthode du plus fort reste : aucun centime perdu ni inventé). Montants saisis TTC, HT dérivé de façon que HT + TVA = TTC au centime près (`PaymentSplitItem.vatAmount`).
+- **Grille en base** : table `shipping_rates` à ligne unique (migration **0015**, grille par défaut 25 € / colis arme, 8,90 € petits colis offerts dès 150 €, 15 € / tirage). Écran **`/admin/livraison`** + `GET/PUT /api/admin/shipping-rates` (remplacement entier, journal d'audit avant/après). Grille absente ⇒ grille par défaut, **jamais un port à zéro**.
+- **Panier / tunnel** : composant `CartTotals` (factorise le récapitulatif recopié dans les deux pages) : ligne « Livraison HT » avec détail par classe (TTC), « Offerte », et « plus que X € » avant la gratuité. Zone contrôlée au tunnel **et** à l'API (`422 UndeliverableAddress`, `isDeliverableAddress`).
+- **Commande** : `shipping_cost` (TTC) + nouvelle colonne `shipping_ht` figés ; la TVA du port est dans `vat_amount`, `total_ttc` l'inclut ; affichés au détail client et admin et dans l'**e-mail de confirmation**.
+- **CGV** : zone (art. 2), mode de calcul des frais (art. 4), transporteur choisi par la boutique (art. 7) → `CURRENT_TERMS_VERSION` = **2026-10-03**.
+- Tests : shared 266, API 593, web 322, outils 79 = **1 260**.
+
+**Restent / à savoir :**
+
+- ⚠️ **Grille par défaut = placeholder** : à remplacer par celle du client depuis `/admin/livraison`.
+- Les **métriques de chiffre d'affaires** (`metrics/service.ts`) somment `total_ttc`, donc **port compris** désormais — à distinguer si le client veut un CA « marchandises ».
+- Facture : la table `invoices` attend l'intégration Henrri ; le port y sera une ligne à part (HT + TVA déjà figés sur la commande).
+- Le formulaire d'adresse ne propose pas de pays (FR par défaut) : un client hors zone est arrêté au code postal (97/98) ou par l'API.
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).

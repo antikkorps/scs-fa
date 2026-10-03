@@ -138,6 +138,9 @@ export interface AdminOrderDetail {
   vatAmount: number
   totalTtc: number
   vipDiscountAmount: number
+  /** Delivery frozen on the order (story 12.3): TTC and HT, inside the totals. */
+  shippingCost: number
+  shippingHt: number
   items: OrderItem[]
   shippingAddress: AddressSnapshot | null
   billingAddress: AddressSnapshot | null

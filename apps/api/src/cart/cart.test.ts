@@ -16,6 +16,7 @@ import {
   productVariants,
   users,
 } from "../db/schema.js"
+import { pinShippingRates } from "../test/shipping-rates.js"
 
 const PREFIX = "TEST31-"
 const PLAINTEXT_PASSWORD = "MotDePasseTresLong123!"
@@ -71,9 +72,12 @@ describe("cart (/api/cart)", () => {
     return { authorization: `Bearer ${token}` }
   }
 
+  let restoreShippingRates: () => Promise<void>
+
   beforeAll(async () => {
     app = await buildApp()
     await app.ready()
+    restoreShippingRates = await pinShippingRates()
 
     // Clean any leftovers from a previous run
     await cleanup()
@@ -207,6 +211,7 @@ describe("cart (/api/cart)", () => {
   })
 
   afterAll(async () => {
+    await restoreShippingRates()
     await cleanup()
     await app.close()
   })
@@ -251,7 +256,13 @@ describe("cart (/api/cart)", () => {
     // 850 * 2 = 1700 HT, TTC 20% = 2040
     expect(data.items[0].lineHt).toBe(1700)
     expect(data.items[0].lineTtc).toBe(2040)
-    expect(data.summary).toMatchObject({ itemCount: 2, subtotalHt: 1700, totalTtc: 2040 })
+    // + delivery (story 12.3): two handguns, one parcel each at 25 TTC — VAT 8.33 of it.
+    expect(data.summary).toMatchObject({ itemCount: 2, subtotalHt: 1700, vatAmount: 348.33, totalTtc: 2090 })
+    expect(data.summary.shipping).toMatchObject({
+      totalTtc: 50,
+      totalHt: 41.67,
+      breakdown: [{ shippingClass: "firearm", units: 2, amountTtc: 50 }],
+    })
   })
 
   it("increments quantity when the same variant is added twice", async () => {

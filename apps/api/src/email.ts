@@ -267,6 +267,8 @@ export type OrderConfirmationEmail = {
   lines: Array<{ name: string; qty: number }>
   subtotalHt: number
   vipDiscount: number
+  /** Delivery, HT (story 12.3) — its VAT is in `vat`, and `totalTtc` includes it. */
+  shippingHt: number
   vat: number
   totalTtc: number
   /** Card-payable part (0 when none). */
@@ -317,6 +319,7 @@ export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmatio
   const totals: Array<[string, string]> = [
     ["Sous-total HT", EUROS.format(o.subtotalHt)],
     ...(o.vipDiscount > 0 ? ([["Remise VIP", `− ${EUROS.format(o.vipDiscount)}`]] as Array<[string, string]>) : []),
+    ["Livraison HT", o.shippingHt > 0 ? EUROS.format(o.shippingHt) : "Offerte"],
     ["TVA", EUROS.format(o.vat)],
     ["Total TTC", EUROS.format(o.totalTtc)],
   ]
