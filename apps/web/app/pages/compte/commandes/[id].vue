@@ -271,6 +271,10 @@ function toggleUpload(docType: string) {
               <dt>Remise VIP ({{ order.vipDiscountAppliedPct }}%)</dt>
               <dd>−{{ formatEuros(order.vipDiscountAmount) }}</dd>
             </div>
+            <div>
+              <dt>Livraison HT</dt>
+              <dd>{{ order.shippingHt > 0 ? formatEuros(order.shippingHt) : "Offerte" }}</dd>
+            </div>
             <div><dt>TVA</dt><dd>{{ formatEuros(order.vatAmount) }}</dd></div>
             <div class="totals__ttc"><dt>Total TTC</dt><dd>{{ formatEuros(order.totalTtc) }}</dd></div>
           </dl>

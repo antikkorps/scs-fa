@@ -9,6 +9,7 @@ const nav = [
   { to: "/admin/payments/virements", label: "Virements", icon: "▤" },
   { to: "/admin/produits", label: "Produits", icon: "▧" },
   { to: "/admin/imports", label: "Import catalogues", icon: "⇪" },
+  { to: "/admin/livraison", label: "Frais de port", icon: "⇶" },
   { to: "/admin/armes-anciennes", label: "Armes de collection", icon: "⚑" },
   { to: "/admin/gun-art/oeuvres", label: "Œuvres Gun Art", icon: "◈" },
   { to: "/admin/gun-art/series", label: "Séries", icon: "❋" },

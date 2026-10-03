@@ -68,6 +68,9 @@ export interface OrderDetail {
   totalTtc: number
   vipDiscountAmount: number
   vipDiscountAppliedPct: number
+  /** Delivery frozen on the order (story 12.3): TTC and HT, inside the totals. */
+  shippingCost: number
+  shippingHt: number
   items: unknown
   shippingAddress: unknown
   billingAddress: unknown

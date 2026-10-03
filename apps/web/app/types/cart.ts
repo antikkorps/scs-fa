@@ -1,3 +1,4 @@
+import type { ShippingQuote } from "@armurier/shared"
 import type { LegalCategoryCode } from "~/types/product"
 
 export interface CartProductLine {
@@ -43,11 +44,17 @@ export interface CartView {
   isVip: boolean
   items: CartProductLine[]
   artworkItems: CartArtworkLine[]
-  summary: {
-    itemCount: number
-    subtotalHt: number
-    vipDiscountAmount: number
-    vatAmount: number
-    totalTtc: number
-  }
+  summary: CartSummary
+}
+
+export interface CartSummary {
+  itemCount: number
+  /** Goods only, before the VIP discount. */
+  subtotalHt: number
+  vipDiscountAmount: number
+  /** Goods and shipping VAT. */
+  vatAmount: number
+  /** Goods and shipping (story 12.3). */
+  totalTtc: number
+  shipping: ShippingQuote
 }
