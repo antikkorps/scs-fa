@@ -3,6 +3,7 @@ import {
   CURRENT_TERMS_VERSION,
   calculateOrderPaymentSplit,
   createOrderSchema,
+  isDeliverableAddress,
   paginationSchema,
   requiresVirement,
   round2,
@@ -128,10 +129,20 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       billing = b
     }
 
+    // The shop delivers to metropolitan France only, Corsica included (CGV art. 7,
+    // story 12.3). Checked here, not only in the form: the grid prices nothing else.
+    if (!isDeliverableAddress(shipping)) {
+      return reply.code(422).send({
+        error: "UndeliverableAddress",
+        message: "We only deliver to metropolitan France, Corsica included",
+      })
+    }
+
     const shippingSnapshot = toSnapshot(shipping)
     const billingSnapshot = toSnapshot(billing)
 
-    // Payment split is computed on the net (VIP-discounted) line amounts
+    // Payment split is computed on the net (VIP-discounted) line amounts. Each
+    // shipping slice rides with the line it carries — its VAT rate and bucket.
     const splitItems = [
       ...cart.items.map((l) => ({
         priceHt: round2(l.lineHt - l.discountAmount),
@@ -143,6 +154,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         vatPct: l.vatPct,
         requiresPaymentVirement: false,
       })),
+      ...cart.summary.shipping.portions,
     ]
     const split = calculateOrderPaymentSplit(splitItems)
 
@@ -192,6 +204,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
               ? round2((cart.summary.vipDiscountAmount / cart.summary.subtotalHt) * 100)
               : 0
             ).toFixed(2),
+            shippingCost: cart.summary.shipping.totalTtc.toFixed(2),
+            shippingHt: cart.summary.shipping.totalHt.toFixed(2),
             shippingAddress: shippingSnapshot,
             billingAddress: billingSnapshot,
             shippingAddressStreet: shippingSnapshot.line1,
@@ -300,7 +314,12 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       entityType: "order",
       entityId: orderId,
       action: "order.created",
-      newValue: { totalTtc: cart.summary.totalTtc, splitType: split.splitType, termsVersion: acceptedTermsVersion },
+      newValue: {
+        totalTtc: cart.summary.totalTtc,
+        shippingTtc: cart.summary.shipping.totalTtc,
+        splitType: split.splitType,
+        termsVersion: acceptedTermsVersion,
+      },
       ipAddress: request.ip,
       userAgent: request.headers["user-agent"] ?? null,
     })
@@ -400,6 +419,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         totalTtc: orders.totalTtc,
         vipDiscountAmount: orders.vipDiscountAmount,
         vipDiscountAppliedPct: orders.vipDiscountAppliedPct,
+        shippingCost: orders.shippingCost,
+        shippingHt: orders.shippingHt,
         items: orders.itemsJson,
         shippingAddress: orders.shippingAddress,
         billingAddress: orders.billingAddress,
@@ -445,6 +466,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         totalTtc: Number(order.totalTtc),
         vipDiscountAmount: Number(order.vipDiscountAmount),
         vipDiscountAppliedPct: Number(order.vipDiscountAppliedPct),
+        shippingCost: Number(order.shippingCost),
+        shippingHt: Number(order.shippingHt),
         shipments,
         payment: {
           carte: carte ? { status: carte.paymentStatus, amountTtc: Number(carte.amountTtc) } : null,

@@ -1295,6 +1295,32 @@ export const artworkCartItemsRelations = relations(artworkCartItems, ({ one }) =
 // 7. COMMANDES
 // ============================================================================
 
+/**
+ * Grille des frais de port (story 12.3) — UNE seule ligne (`id` = 1, contrainte),
+ * modifiée depuis le back-office sans déploiement. Montants TTC, tels que le
+ * client les lit. La migration insère la grille par défaut ; elle est à remplacer
+ * par celle du client. Le calcul vit dans `@armurier/shared` (`computeShippingCost`).
+ */
+export const shippingRates = pgTable(
+  "shipping_rates",
+  {
+    id: integer("id").primaryKey().default(1),
+    firearmParcelTtc: decimal("firearm_parcel_ttc", { precision: 8, scale: 2 }).notNull(),
+    smallParcelTtc: decimal("small_parcel_ttc", { precision: 8, scale: 2 }).notNull(),
+    // NULL = les petits colis ne sont jamais offerts.
+    smallParcelFreeFromTtc: decimal("small_parcel_free_from_ttc", { precision: 10, scale: 2 }),
+    printTtc: decimal("print_ttc", { precision: 8, scale: 2 }).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  () => [
+    check("chk_shipping_rates_singleton", sql`id = 1`),
+    check(
+      "chk_shipping_rates_non_negative",
+      sql`firearm_parcel_ttc >= 0 AND small_parcel_ttc >= 0 AND print_ttc >= 0 AND (small_parcel_free_from_ttc IS NULL OR small_parcel_free_from_ttc >= 0)`,
+    ),
+  ],
+)
+
 export const orders = pgTable(
   "orders",
   {
@@ -1364,7 +1390,10 @@ export const orders = pgTable(
 
     // Livraison
     shippingMethod: varchar("shipping_method", { length: 50 }), // 'std', 'express', 'retirait'
+    // Story 12.3 : frais de port FIGÉS à la commande (TTC + leur HT). Leur TVA est
+    // comprise dans `vat_amount`, et `total_ttc` les inclut.
     shippingCost: decimal("shipping_cost", { precision: 8, scale: 2 }).default("0"),
+    shippingHt: decimal("shipping_ht", { precision: 8, scale: 2 }).notNull().default("0"),
     shippingAddressStreet: varchar("shipping_address_street", { length: 255 }),
     shippingAddressPostal: varchar("shipping_address_postal", { length: 10 }),
     shippingAddressCity: varchar("shipping_address_city", { length: 100 }),

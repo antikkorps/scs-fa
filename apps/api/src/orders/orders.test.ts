@@ -20,6 +20,7 @@ import {
   users,
 } from "../db/schema.js"
 import { sendOrderConfirmationEmail } from "../email.js"
+import { pinShippingRates } from "../test/shipping-rates.js"
 import { resendPendingConfirmations, sendOrderConfirmation } from "./confirmation.js"
 
 // The confirmation e-mail is sent in the background of every order (story 12.1):
@@ -98,10 +99,15 @@ describe("orders (POST /api/orders)", () => {
     await db.delete(users).where(like(users.email, "cart-test32%"))
   }
 
+  // Shipping (story 12.3) is priced at TEST_SHIPPING_RATES: firearm parcel 25,
+  // small parcels 9 (free from 150), print 15 — all TTC.
+  let restoreShippingRates: () => Promise<void>
+
   beforeAll(async () => {
     app = await buildApp()
     await app.ready()
     await cleanup()
+    restoreShippingRates = await pinShippingRates()
 
     const passwordHash = await hash(PASSWORD, { memoryCost: 19_456, timeCost: 2, parallelism: 1 })
     const [u1] = await db
@@ -245,6 +251,7 @@ describe("orders (POST /api/orders)", () => {
   })
 
   afterAll(async () => {
+    await restoreShippingRates()
     await cleanup()
     await app.close()
   })
@@ -412,8 +419,10 @@ describe("orders (POST /api/orders)", () => {
     expect(data.requiresLegalVerification).toBe(true)
     expect(data.legalVerificationStatus).toBe("pending")
     expect(data.paymentSplit.splitType).toBe("virement_only")
-    expect(data.paymentSplit.virement.amountTtc).toBe(1200)
-    expect(data.totals.totalTtc).toBe(1200)
+    // 1200 of goods + one insured firearm parcel, paid by transfer with the weapon.
+    expect(data.paymentSplit.virement.amountTtc).toBe(1225)
+    expect(data.totals.totalTtc).toBe(1225)
+    expect(data.totals.shipping.totalTtc).toBe(25)
     expect(data.shippingAddress).toMatchObject({ line1: "1 rue du Tir", city: "Paris", country: "FR" })
 
     const [variant] = await db
@@ -433,7 +442,8 @@ describe("orders (POST /api/orders)", () => {
     expect(data.requiresLegalVerification).toBe(false)
     expect(data.legalVerificationStatus).toBe("payment_pending")
     expect(data.paymentSplit.splitType).toBe("carte_only")
-    expect(data.paymentSplit.carte.amountTtc).toBe(120)
+    // 120 of goods + one small parcel (under the 150 threshold).
+    expect(data.paymentSplit.carte.amountTtc).toBe(129)
   })
 
   it("splits a mixed order and reserves the artwork print", async () => {
@@ -444,8 +454,9 @@ describe("orders (POST /api/orders)", () => {
     expect(res.statusCode).toBe(201)
     const { data } = res.json()
     expect(data.paymentSplit.splitType).toBe("mixed")
-    expect(data.paymentSplit.virement.amountTtc).toBe(1200)
-    expect(data.paymentSplit.carte.amountTtc).toBe(180)
+    expect(data.paymentSplit.virement.amountTtc).toBe(1225)
+    // Accessory 60 + print 120, plus their delivery: small parcel 9 + print 15.
+    expect(data.paymentSplit.carte.amountTtc).toBe(204)
 
     const [print] = await db
       .select({ status: artworkPrints.status, orderId: artworkPrints.orderId })
@@ -453,6 +464,79 @@ describe("orders (POST /api/orders)", () => {
       .where(eq(artworkPrints.id, printId))
     expect(print.status).toBe("reserved")
     expect(print.orderId).toBe(data.id)
+  })
+
+  // --- Story 12.3: shipping costs ---
+
+  it("freezes the delivery on the order: TTC, HT, and its VAT inside the totals", async () => {
+    await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+    const { data } = (await createOrder()).json()
+    const [row] = await db
+      .select({
+        shippingCost: orders.shippingCost,
+        shippingHt: orders.shippingHt,
+        subtotalHt: orders.subtotalHt,
+        vatAmount: orders.vatAmount,
+        totalTtc: orders.totalTtc,
+      })
+      .from(orders)
+      .where(eq(orders.id, data.id))
+    expect(row).toEqual({
+      shippingCost: "25.00",
+      shippingHt: "20.83",
+      subtotalHt: "1000.00",
+      vatAmount: "204.17",
+      totalTtc: "1225.00",
+    })
+  })
+
+  it("charges every parcel of a weapon that travels in two", async () => {
+    await db
+      .update(products)
+      .set({ parcelCount: 2 })
+      .where(eq(products.sku, `${PREFIX}reg`))
+    try {
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      const { data } = (await createOrder()).json()
+      expect(data.totals.shipping.totalTtc).toBe(50)
+      expect(data.paymentSplit.virement.amountTtc).toBe(1250)
+    } finally {
+      await db
+        .update(products)
+        .set({ parcelCount: 1 })
+        .where(eq(products.sku, `${PREFIX}reg`))
+    }
+  })
+
+  it("ships small parcels free from the threshold", async () => {
+    // 3 × 60 = 180 TTC of accessories ≥ 150.
+    await addToCart(token, { variantId: accessoryVariantId, qty: 3 })
+    const { data } = (await createOrder()).json()
+    expect(data.totals.shipping).toMatchObject({ totalTtc: 0, smallParcelFree: true })
+    expect(data.paymentSplit.carte.amountTtc).toBe(180)
+  })
+
+  it("refuses to deliver outside metropolitan France and creates nothing", async () => {
+    const [overseas] = await db
+      .insert(addresses)
+      .values({
+        userId,
+        firstName: "Jean",
+        lastName: "Tireur",
+        line1: "1 rue du Port",
+        postal: "97400",
+        city: "Saint-Denis",
+      })
+      .returning({ id: addresses.id })
+    try {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      const res = await createOrder({ shippingAddressId: overseas.id, acceptedTermsVersion: CURRENT_TERMS_VERSION })
+      expect(res.statusCode).toBe(422)
+      expect(res.json().error).toBe("UndeliverableAddress")
+      expect(await db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))).toHaveLength(0)
+    } finally {
+      await db.delete(addresses).where(eq(addresses.id, overseas.id))
+    }
   })
 
   it("rolls back and returns 409 when stock ran out before checkout", async () => {
@@ -489,7 +573,7 @@ describe("orders (POST /api/orders)", () => {
       id: created.id,
       paymentStatus: "pending",
       legalVerificationStatus: "payment_pending",
-      totalTtc: 120,
+      totalTtc: 129,
       itemCount: 2,
     })
   })
@@ -513,7 +597,9 @@ describe("orders (POST /api/orders)", () => {
       id: created.id,
       legalVerificationStatus: "pending",
       paymentStatus: "pending",
-      totalTtc: 1200,
+      totalTtc: 1225,
+      shippingCost: 25,
+      shippingHt: 20.83,
     })
     expect(data.items).toHaveLength(1)
     expect(data.items[0]).toMatchObject({ sku: `${PREFIX}reg`, qty: 1, requiresPaymentVirement: true })
@@ -521,7 +607,7 @@ describe("orders (POST /api/orders)", () => {
     expect(data.billingAddress).toMatchObject({ line1: "1 rue du Tir" })
     // Payment buckets: a regulated firearm is virement-only.
     expect(data.payment.carte).toBeNull()
-    expect(data.payment.virement).toMatchObject({ amountTtc: 1200 })
+    expect(data.payment.virement).toMatchObject({ amountTtc: 1225 })
     expect(typeof data.payment.virement.reference).toBe("string")
     expect(typeof data.payment.virement.iban).toBe("string")
   })

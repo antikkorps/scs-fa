@@ -16,6 +16,7 @@ const base = {
     { name: "Boîte de cartouches", qty: 3 },
   ],
   subtotalHt: 1000,
+  shippingHt: 20.83,
   vipDiscount: 0,
   vat: 200,
   totalTtc: 1200,
