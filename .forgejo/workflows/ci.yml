@@ -34,7 +34,7 @@ jobs:
       # publishing 5432 to the host is unnecessary — and it made concurrent PR
       # runs collide ("Bind for :::5432 failed: port is already allocated").
       testdb:
-        image: postgres:17-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: armurier
           POSTGRES_DB: armurier_test
