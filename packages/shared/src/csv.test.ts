@@ -42,7 +42,7 @@ describe("parseCsv", () => {
   })
 
   it("strips a UTF-8 BOM", () => {
-    expect(parseCsv("﻿ref;prix\nA;1")[0]).toEqual(["ref", "prix"])
+    expect(parseCsv("\uFEFFref;prix\nA;1")[0]).toEqual(["ref", "prix"])
   })
 
   it("accepts CRLF and CR line endings", () => {
@@ -67,7 +67,7 @@ describe("parseCsv", () => {
 
   it("returns nothing for an empty input", () => {
     expect(parseCsv("")).toEqual([])
-    expect(parseCsv("﻿\n\n")).toEqual([])
+    expect(parseCsv("\uFEFF\n\n")).toEqual([])
   })
 
   it("honours an explicit delimiter", () => {
