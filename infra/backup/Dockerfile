@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Postgres logical-backup sidecar: pg_dump on a cron schedule → S3, with rotation.
-# Based on postgres:17-alpine so pg_dump matches the prod server major version.
-FROM postgres:17-alpine
+# Based on postgres:18-alpine so pg_dump matches the prod server major version.
+FROM postgres:18-alpine
 
 # aws-cli (alpine community) talks to any S3-compatible endpoint (Scaleway here).
 RUN apk add --no-cache aws-cli

@@ -446,6 +446,12 @@
 - [x] **Documenté** dans le `README.md` (§ « Test isolation: checking the suite does not depend on file order ») : la commande de mesure, les deux règles (une suite crée son admin ; on assert sur ses propres lignes, pas sur un compte global) et l'avertissement de ne pas utiliser `--sequence.shuffle` tout court
 - **Done** : les trois passes en ordre de fichiers mélangé sont vertes, et la mesure est documentée dans le README pour qu'on la refasse au lieu de la redécouvrir.
 
+**Chore** — Passage à Postgres 18 avant la mise en prod ✅ _(2026-10-04, PR Renovate restée bloquée)_
+- [x] Fait **avant** la mise en ligne, tant qu'aucune donnée de prod n'est à migrer (choix de Franck)
+- [x] `postgres:18-alpine` en dev, en prod, en CI et dans l'image de sauvegarde (`pg_dump` doit suivre la version majeure du serveur)
+- [x] ⚠️ L'image 18 range ses données dans `/var/lib/postgresql/18/docker` et **refuse un volume monté sur `…/data`** : le volume se monte désormais sur `/var/lib/postgresql`, ce qui permettra un futur `pg_upgrade --link`
+- [x] Vérifié sur un Postgres 18.6 jetable : **597 tests API verts**, sauvegarde `pg_dump` 18.6 → restauration (41 tables) ; procédure de migration d'une base de dev 17 répétée sur une copie (données et 17 migrations identiques) et documentée dans le README
+
 ## PHASE 9 — Front, SEO & Découvrabilité (transverse)
 
 > Remarques Franck (2026-06-10, après démo front 5.3). Palette laiton + charbon **validée** — à conserver.

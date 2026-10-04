@@ -5,7 +5,7 @@ Nuxt 4 + Fastify + Drizzle + Postgres monorepo for a firearms e-commerce platfor
 ## Stack
 
 - **Frontend**: Nuxt 4, Vue 3 — hand-written components on the design tokens of `apps/web/app/assets/css/tokens.css` (no UI kit)
-- **Backend**: Fastify 5 (ESM), Drizzle ORM 0.45, PostgreSQL 17
+- **Backend**: Fastify 5 (ESM), Drizzle ORM 0.45, PostgreSQL 18
 - **Shared**: Zod (validation), shared types & constants
 - **Tooling**: pnpm workspaces, Biome (lint + format), Vitest, strict TypeScript
 - **Security**: `@fastify/helmet`, `@fastify/rate-limit`, JWT access + opaque rotating refresh tokens, argon2id password hashing (OWASP 2024 parameters)
@@ -113,6 +113,24 @@ pnpm db:migrate         # dev; CI and prod run the same command
 Never hand-write ALTERs against a database: a migration that isn't in `drizzle/`
 doesn't exist as far as CI and prod are concerned. `db:push` stays available for
 throwaway prototyping only.
+
+### Moving a local database from Postgres 17 to 18
+
+Postgres 18 refuses a volume holding 17 data, and its images keep their data one
+level deeper (`/var/lib/postgresql/18/docker`, hence the mount on the parent).
+A dev volume created before the switch has to be dumped and reloaded once:
+
+```bash
+# with the old compose file (postgres:17) still running
+docker exec armurier_postgres_dev pg_dumpall -U armurier --clean --if-exists > pg17-dev.sql
+docker compose -f docker-compose.dev.yml down
+docker volume rm scsfirearm_postgres_data   # the 17 data — the dump above is the copy
+docker compose -f docker-compose.dev.yml up -d
+docker exec -i armurier_postgres_dev psql -U armurier -d postgres < pg17-dev.sql
+```
+
+The restore prints two errors about the `armurier` role (it cannot drop itself,
+and the image already created it): both harmless.
 
 ## Structure
 

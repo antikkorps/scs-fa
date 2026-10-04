@@ -15,14 +15,16 @@ name: scs-firearm
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-armurier}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-armurier_prod}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Postgres 18+ keeps its data in /var/lib/postgresql/<major>/docker: mount
+      # the parent, so a later major upgrade (pg_upgrade --link) sees both.
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-armurier} -d ${POSTGRES_DB:-armurier_prod}"]
       interval: 10s
