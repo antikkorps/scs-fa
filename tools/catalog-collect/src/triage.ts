@@ -97,6 +97,17 @@ export interface SupplierBatch {
   config: SupplierConfig
 }
 
+/**
+ * The purchase prices a pro-area collection read, as if they came from a price
+ * list — so they go through the same reconciliation. `line` is the product's
+ * position in the collected file.
+ */
+export function pricesFromCollection(products: CollectedProduct[]): PriceListRow[] {
+  return products.flatMap((p, i) =>
+    p.purchasePrice === undefined ? [] : [{ line: i + 1, ref: p.supplierSku, price: p.purchasePrice, ean: null }],
+  )
+}
+
 const STATUS_LABELS: Record<ReconcileStatus, string> = {
   matched: "Rapproché",
   no_price: "Sans prix",

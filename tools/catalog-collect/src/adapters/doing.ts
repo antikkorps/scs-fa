@@ -10,10 +10,15 @@
 //   the "Brand > Collection" of the menu entry the product was found under.
 // - `#caracteristiques` opens with a stray `<![CDATA[`, which swallows the
 //   `<h2>` that follows: select the list and paragraphs directly.
+// - Pro area: the header form signs a reseller in (login code, not e-mail);
+//   product pages then show "Votre prix". The header always carries the
+//   sign-in form, hidden once signed in — the "Déconnexion" button is the
+//   reliable marker. Its link is never followed (discovery only reads the
+//   menu and listing fragments).
 
-import type { CollectedProduct } from "@armurier/shared"
+import { type CollectedProduct, parseBankAmount } from "@armurier/shared"
 import * as cheerio from "cheerio"
-import { type CollectScope, inScope, type SupplierAdapter } from "../adapter.js"
+import { type CollectScope, inScope, type ProLogin, type SupplierAdapter } from "../adapter.js"
 import { absoluteUrl, cleanText, fixC1, unique } from "../extract.js"
 import type { PoliteClient } from "../http.js"
 
@@ -110,17 +115,69 @@ export function parseDoingProduct(
     specs,
     imageUrls,
     sourceCategory: category ?? brand,
+    purchasePrice: parsePurchasePrice(html),
     sourceUrl: url,
   }
 }
 
-export function doingAdapter(config: { id: string; supplier: string; origin: string }): SupplierAdapter {
+/** The platform's header shows a "Déconnexion" button to a signed-in reseller. */
+export function isSignedIn(html: string, url = ""): boolean {
+  // Listing fragments carry no header at all: they cannot tell.
+  return (
+    url.includes("/liste_article/") ||
+    html.includes('id="bandeau_deconnexion"') ||
+    html.includes("id='bandeau_deconnexion'")
+  )
+}
+
+/**
+ * Our price, as the pro area prints it under "Votre prix" — only on a page
+ * served signed in. The page does not say "HT": it is read as excl. VAT,
+ * which the client still has to confirm against a Cor Caroli invoice.
+ */
+export function parsePurchasePrice(html: string): number | undefined {
+  if (!isSignedIn(html)) return undefined
+  const $ = cheerio.load(html)
+  const block = $("#descriptif .le_prix").first()
+  if (!/votre prix/i.test(block.text())) return undefined
+  const amount = parseBankAmount(block.find(".normal").first().text())
+  return Number.isFinite(amount) && amount > 0 ? amount : undefined
+}
+
+function proLoginFor(origin: string, envPrefix: string): ProLogin {
+  return {
+    envPrefix,
+    async signIn(client, { login, password }) {
+      // The header form posts to the page it sits on; a refusal redirects to
+      // the account page with an error code instead of signing in.
+      const landing = await client.postForm(`${origin}/`, {
+        szModeAuth_PM: "connexion",
+        szLoginAuth_PM: login,
+        szPasswordAuth_PM: password,
+      })
+      if (!isSignedIn(landing)) {
+        throw new Error(`${origin} refused the sign-in (check ${envPrefix}_LOGIN / ${envPrefix}_PASSWORD); not retried`)
+      }
+    },
+    isSignedIn,
+  }
+}
+
+export function doingAdapter(config: {
+  id: string
+  supplier: string
+  origin: string
+  /** `.env` prefix of the pro-area login, when the client has one. */
+  envPrefix?: string
+}): SupplierAdapter {
   // Filled while discovering, read while parsing: the product page itself
   // does not say which category it belongs to.
   const categoryOf = new Map<string, string>()
 
+  const { envPrefix, ...identity } = config
   return {
-    ...config,
+    ...identity,
+    ...(envPrefix ? { proLogin: proLoginFor(config.origin, envPrefix) } : {}),
     async *discover(client: PoliteClient, scope: CollectScope) {
       const collections = parseCollections(await client.get(`${config.origin}/`, { cache: false }), config.origin)
       for (const collection of collections) {
@@ -146,5 +203,15 @@ export function doingAdapter(config: { id: string; supplier: string; origin: str
   }
 }
 
-export const agoraTec = doingAdapter({ id: "agora-tec", supplier: "Agora-Tec", origin: "https://www.agora-tec.fr" })
-export const corCaroli = doingAdapter({ id: "cor-caroli", supplier: "Cor Caroli", origin: "https://www.cor-caroli.fr" })
+export const agoraTec = doingAdapter({
+  id: "agora-tec",
+  supplier: "Agora-Tec",
+  origin: "https://www.agora-tec.fr",
+  envPrefix: "AGORATEC",
+})
+export const corCaroli = doingAdapter({
+  id: "cor-caroli",
+  supplier: "Cor Caroli",
+  origin: "https://www.cor-caroli.fr",
+  envPrefix: "CORCAROLI",
+})

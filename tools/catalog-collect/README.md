@@ -39,6 +39,33 @@ Every request goes through `PoliteClient` (`src/http.ts`). It:
 | ESP France | stale sitemap plus the first page of each category | `robots.txt` forbids pagination, so coverage is partial **by design**. |
 | Armurerie de Paris | none | `robots.txt` disallows everything and there is no online catalogue. Enter by hand or through the import. |
 
+## Pro areas (signed-in collection)
+
+Some suppliers show a reseller what a public visitor cannot see, chiefly **our purchase price**. When this package's `.env` holds a supplier's login, `pnpm collect` signs in first and reads the price from each product page. The triage then uses it as if it came from a price list, unless a price list is configured, which takes precedence.
+
+```dotenv
+# tools/catalog-collect/.env — ignored by git and Docker, never pasted anywhere
+BGM_LOGIN=…          BGM_PASSWORD=…
+CORCAROLI_LOGIN=…    CORCAROLI_PASSWORD=…   # login code, not an e-mail
+AGORATEC_LOGIN=…     AGORATEC_PASSWORD=…
+```
+
+The rules that protect the client's accounts:
+
+- **Read-only.** The tool signs in once and reads pages. It never follows a logout link and never touches the account.
+- **A refused sign-in is never retried.** A second wrong attempt is how an account gets locked. Fix `.env` and run again.
+- **A lost session stops the run.** Every page must still be served signed in. Otherwise the run stops with `SessionLostError` before caching the page, so public pages are never collected as pro ones. Run it again: it resumes.
+- **Separate cache.** Signed-in pages are cached under `work/cache/<supplier>-pro/`, never mixed with public pages.
+- **A doubtful price is left out.** The price is read only from a signed-in page and only from the block the pro area prints it in. BGM must label it `HT`. The public JSON-LD price is never used.
+- Products collected publicly **before** a pro run have no price, and the resume skips them. Delete `work/collected/<supplier>.jsonl` to collect them again signed in.
+
+| Supplier | What the pro area adds |
+|---|---|
+| BGM Winfield | Purchase price excl. VAT, plus a resale coefficient (not kept). No EAN, no stock quantity, no downloadable price list. |
+| Cor Caroli (and Agora-Tec, same platform) | "Votre prix". No EAN. |
+| ESP France | Not wired: the login was refused during the reconnaissance. |
+| ClearMyVault | Not collectable: the shop is behind an anti-bot challenge (LWS / Anubis). Ask the maker for its catalogue. |
+
 ## `work/` (git-ignored: the client's business data)
 
 - `work/config.json`: see `config.example.json`. For each supplier it holds:
