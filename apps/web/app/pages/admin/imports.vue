@@ -24,8 +24,33 @@ const apiMessage = (err: unknown, fallback: string) =>
 
 // --- Step 1: file + preview --------------------------------------------------
 
+// --- Step 0: export (story 12.4) ----------------------------------------------
+
+const exporting = ref(false)
+const exportError = ref("")
+
+/** Download the catalogue in the import's columns, to edit in Excel and bring back. */
+async function runExport() {
+  exporting.value = true
+  exportError.value = ""
+  try {
+    const blob = await api<Blob>("/admin/catalog-imports/export", { responseType: "blob" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `catalogue-${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    exportError.value = apiMessage(err, "Export impossible.")
+  } finally {
+    exporting.value = false
+  }
+}
+
 const file = ref<File | null>(null)
 const overwrite = ref(false)
+const archiveMissing = ref(false)
 const previewing = ref(false)
 const previewError = ref("")
 const preview = ref<CatalogImportPreview | null>(null)
@@ -43,6 +68,7 @@ function onFile(event: Event) {
 function formFor(extra: Record<string, string> = {}) {
   const body = new FormData()
   body.append("overwrite", String(overwrite.value))
+  body.append("archiveMissing", String(archiveMissing.value))
   for (const [k, v] of Object.entries(extra)) body.append(k, v)
   if (file.value) body.append("file", file.value)
   return body
@@ -72,14 +98,24 @@ async function runPreview() {
   }
 }
 
-// Changing the overwrite option changes the warnings: the preview is stale.
-watch(overwrite, () => {
+// Changing an option changes the plan: the preview is stale.
+watch([overwrite, archiveMissing], () => {
   if (preview.value) preview.value = null
 })
 
 const counts = computed(() => previewFilterCounts(preview.value?.rows ?? []))
 const filtered = computed(() => filterPreviewRows(preview.value?.rows ?? [], filter.value))
 const toWrite = computed(() => (preview.value ? preview.value.summary.create + preview.value.summary.update : 0))
+const toArchive = computed(() => preview.value?.summary.archive ?? 0)
+const commitLabel = computed(() => {
+  const parts = [
+    toWrite.value > 0 ? `Importer ${plural(toWrite.value, "produit")}` : "",
+    toArchive.value > 0
+      ? `${toWrite.value > 0 ? "et archiver" : "Archiver"} ${plural(toArchive.value, "produit")}`
+      : "",
+  ]
+  return parts.filter(Boolean).join(" ")
+})
 
 // --- Step 2: commit ----------------------------------------------------------
 
@@ -88,7 +124,7 @@ const commitError = ref("")
 const result = ref<CatalogImportResult | null>(null)
 
 async function runCommit() {
-  if (!preview.value || toWrite.value === 0) return
+  if (!preview.value || toWrite.value + toArchive.value === 0) return
   committing.value = true
   commitError.value = ""
   try {
@@ -173,11 +209,27 @@ async function retry(id: string) {
       </div>
     </header>
 
-    <section class="panel" aria-labelledby="step-file">
-      <h2 id="step-file" class="panel__title">1. Fichier de tri</h2>
+    <section class="panel" aria-labelledby="step-export">
+      <h2 id="step-export" class="panel__title">Modifier le catalogue dans Excel</h2>
       <p class="hint">
-        Déposez le fichier de tri (<strong>.xlsx</strong> ou <strong>.csv</strong>). Seules les lignes marquées
-        « oui » dans la colonne <em>Importer</em> sont prises en compte. Rien n'est écrit avant votre confirmation.
+        Téléchargez le catalogue dans les colonnes de l'import : modifiez prix et textes, ajoutez des lignes, passez
+        <em>Actif</em> à « oui » ou « non » (même produit chez deux fournisseurs : une ligne active, l'autre non), puis
+        déposez le fichier ci-dessous. Le stock n'y figure pas : un fichier ne le modifie jamais.
+      </p>
+      <div class="actions">
+        <button class="btn btn-ghost" type="button" :disabled="exporting" @click="runExport">
+          {{ exporting ? "Préparation…" : "Exporter le catalogue (.xlsx)" }}
+        </button>
+        <span v-if="exportError" class="err" role="alert">{{ exportError }}</span>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="step-file">
+      <h2 id="step-file" class="panel__title">1. Fichier</h2>
+      <p class="hint">
+        Déposez le fichier de tri ou le catalogue exporté (<strong>.xlsx</strong> ou <strong>.csv</strong>). Seules les
+        lignes marquées « oui » dans la colonne <em>Importer</em> sont prises en compte. Rien n'est écrit avant votre
+        confirmation.
       </p>
       <div class="pick">
         <input
@@ -194,6 +246,16 @@ async function retry(id: string) {
             <small>Sinon, un produit déjà importé ne reçoit que les champs encore vides : vos retouches sont gardées.</small>
           </span>
         </label>
+        <label class="check">
+          <input v-model="archiveMissing" type="checkbox" />
+          <span>
+            Archiver les produits absents du fichier
+            <small>
+              Seulement pour les fournisseurs présents dans le fichier. Un produit archivé est retiré de la vente, jamais
+              effacé, et se réactive depuis l'écran Produits. La liste exacte s'affiche avant confirmation.
+            </small>
+          </span>
+        </label>
       </div>
       <div class="actions">
         <button class="btn btn-primary" type="button" :disabled="previewing || !file" @click="runPreview">
@@ -207,9 +269,10 @@ async function retry(id: string) {
       <h2 class="panel__title">Import terminé</h2>
       <p>
         <strong>{{ plural(result.created, "produit créé", "produits créés") }}</strong>,
-        {{ plural(result.updated, "produit mis à jour", "produits mis à jour") }}<template v-if="result.suppliersCreated">,
+        {{ plural(result.updated, "produit mis à jour", "produits mis à jour") }}<template v-if="result.archived">,
+          {{ plural(result.archived, "produit archivé", "produits archivés") }}</template><template v-if="result.suppliersCreated">,
           {{ plural(result.suppliersCreated, "nouveau fournisseur", "nouveaux fournisseurs") }}</template>.
-        Les produits créés sont <strong>hors ligne</strong> : publiez-les depuis la fiche produit une fois relus.
+        Les produits créés sans « Actif = oui » sont <strong>hors ligne</strong> : publiez-les une fois relus.
       </p>
       <p v-if="result.imagesQueued" class="hint">
         {{ plural(result.imagesQueued, "image", "images") }} en cours de téléchargement — suivi dans l'historique
@@ -226,7 +289,27 @@ async function retry(id: string) {
         <li><span class="stats__n bad">{{ preview.summary.invalid }}</span> en erreur</li>
         <li><span class="stats__n">{{ preview.summary.skipped }}</span> non retenues</li>
         <li><span class="stats__n">{{ preview.summary.images }}</span> images</li>
+        <li v-if="preview.summary.publish"><span class="stats__n ok">{{ preview.summary.publish }}</span> mis en ligne</li>
+        <li v-if="preview.summary.unpublish">
+          <span class="stats__n warn">{{ preview.summary.unpublish }}</span> retirés de la vente
+        </li>
+        <li v-if="preview.archiveMissing"><span class="stats__n bad">{{ preview.summary.archive }}</span> à archiver</li>
       </ul>
+
+      <details v-if="preview.summary.archive" class="notice archive" open>
+        <summary>
+          ⚠️ {{ plural(preview.summary.archive, "produit absent du fichier sera archivé", "produits absents du fichier seront archivés") }}
+          (retirés de la vente, réactivables depuis l'écran Produits)
+        </summary>
+        <ul>
+          <li v-for="a in preview.toArchive" :key="a.id">
+            {{ a.supplier }} · <span class="mono">{{ a.supplierSku }}</span> — {{ a.name }}
+          </li>
+        </ul>
+        <p v-if="preview.summary.archive > preview.toArchive.length" class="hint">
+          … et {{ preview.summary.archive - preview.toArchive.length }} autres.
+        </p>
+      </details>
 
       <p v-if="preview.suppliersToCreate.length" class="notice">
         ⚠️ Fournisseurs qui seront <strong>créés</strong> : {{ preview.suppliersToCreate.join(", ") }}. Une faute de
@@ -291,8 +374,13 @@ async function retry(id: string) {
       </button>
 
       <div class="actions actions--commit">
-        <button class="btn btn-primary" type="button" :disabled="committing || toWrite === 0" @click="runCommit">
-          {{ committing ? "Import en cours…" : `Importer ${plural(toWrite, "produit")}` }}
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="committing || toWrite + toArchive === 0"
+          @click="runCommit"
+        >
+          {{ committing ? "Import en cours…" : commitLabel || "Rien à importer" }}
         </button>
         <span v-if="commitError" class="err" role="alert">{{ commitError }}</span>
       </div>
@@ -311,6 +399,7 @@ async function retry(id: string) {
               <th>Fichier</th>
               <th class="num">Créés</th>
               <th class="num">Mis à jour</th>
+              <th class="num">Archivés</th>
               <th>Images</th>
             </tr>
           </thead>
@@ -324,6 +413,7 @@ async function retry(id: string) {
                 </td>
                 <td class="num">{{ i.createdCount }}</td>
                 <td class="num">{{ i.updatedCount }}</td>
+                <td class="num">{{ i.archivedCount }}</td>
                 <td>
                   <span class="ok">{{ i.images.done }} ok</span>
                   <span v-if="i.images.pending"> · {{ i.images.pending }} en cours</span>
@@ -333,7 +423,7 @@ async function retry(id: string) {
                 </td>
               </tr>
               <tr v-if="openFailures === i.id">
-                <td colspan="5" class="failures">
+                <td colspan="6" class="failures">
                   <p v-if="failuresError" class="err">{{ failuresError }}</p>
                   <ul>
                     <li v-for="f in failures" :key="f.id">
@@ -385,6 +475,15 @@ async function retry(id: string) {
   border-left: 3px solid #e0b15f;
   padding: 0.5rem 0.8rem;
   margin: 0 0 0.8rem;
+}
+.archive summary {
+  cursor: pointer;
+}
+.archive ul {
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0.6rem 0 0;
+  padding-left: 1.2rem;
 }
 .pick {
   display: flex;

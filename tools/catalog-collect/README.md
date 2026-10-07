@@ -52,7 +52,7 @@ Every request goes through `PoliteClient` (`src/http.ts`). It:
 
 The workbook has four sheets:
 
-- **À trier**: one row per article, in exactly the columns the import reads back (`CATALOG_IMPORT_COLUMNS`). Articles that matched the price list come first. There are drop-downs for *Importer*, *Catégorie* and *Catégorie légale*.
+- **À trier**: one row per article, in exactly the columns the import reads back (`CATALOG_IMPORT_COLUMNS`). Articles that matched the price list come first. There are drop-downs for *Importer*, *Actif*, *Catégorie* and *Catégorie légale*. The sheet itself is written by `addCatalogSheet` (`@armurier/shared/spreadsheet`), the same function the back-office catalogue export uses (story 12.4).
 - **Prix sans fiche**: price-list references for which no product sheet was collected. Nothing disappears silently.
 - **Lisez-moi**: the instructions for the client.
 - **Listes** (hidden): the source of the category drop-down.

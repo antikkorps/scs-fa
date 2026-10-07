@@ -309,12 +309,33 @@ export interface CatalogImportPreviewRow {
   images: number
 }
 
+/** A product the file no longer lists, archived on commit when asked (story 12.4). */
+export interface CatalogArchiveRow {
+  id: string
+  supplier: string
+  supplierSku: string
+  sku: string
+  name: string
+}
+
 export interface CatalogImportPreview {
   fileName: string
   fileSha256: string
   overwrite: boolean
-  summary: { create: number; update: number; invalid: number; skipped: number; images: number }
+  archiveMissing: boolean
+  summary: {
+    create: number
+    update: number
+    invalid: number
+    skipped: number
+    images: number
+    publish: number
+    unpublish: number
+    archive: number
+  }
   suppliersToCreate: string[]
+  /** At most 500 listed; `summary.archive` is the exact count. */
+  toArchive: CatalogArchiveRow[]
   rows: CatalogImportPreviewRow[]
 }
 
@@ -322,6 +343,7 @@ export interface CatalogImportResult {
   importId: string
   created: number
   updated: number
+  archived: number
   skipped: number
   invalid: number
   suppliersCreated: number
@@ -334,6 +356,7 @@ export interface CatalogImportHistoryRow {
   overwrite: boolean
   createdCount: number
   updatedCount: number
+  archivedCount: number
   skippedCount: number
   suppliersCreated: number
   createdAt: string

@@ -654,6 +654,53 @@
 - Facture : la table `invoices` attend l'intégration Henrri ; le port y sera une ligne à part (HT + TVA déjà figés sur la commande).
 - Le formulaire d'adresse ne propose pas de pays (FR par défaut) : un client hors zone est arrêté au code postal (97/98) ou par l'API.
 
+**Story 12.4** — Catalogue en aller-retour Excel (export → modification → ré-import, activation, archivage) — ✅ **CODÉE** _(créée et codée le 2026-10-07, demande client)_
+
+> Besoin : le client veut **extraire son catalogue** dans un fichier et le modifier dans Excel : ajouter et supprimer des lignes, remplir les prix, **activer certains produits et pas d'autres**. Cas typique : le même produit chez deux fournisseurs, une fiche active, l'autre non. Puis il ré-importe le fichier. La 12.2 a déjà fait le plus gros : le fichier de tri et l'import partagent les mêmes colonnes, l'import est idempotent, l'aperçu montre les changements avant validation.
+
+**Décisions tranchées avec Franck (2026-10-07) :**
+
+- [x] **Retirer une ligne = archiver**, jamais effacer. Archiver met hors ligne et masque le produit, réversible par un bouton « Réactiver ». Les commandes passées gardent leur référence.
+- [x] **Même produit chez deux fournisseurs = deux fiches**, une active, l'autre non. Pas de fiche à plusieurs offres fournisseurs (pas de changement de schéma).
+- [x] **Le stock reste hors du fichier** : un ré-import ne doit jamais fausser le stock.
+
+**Conception (garde-fous retenus à l'exécution) :**
+
+- **Export** `/admin/imports` → « Exporter le catalogue » (`.xlsx`, mêmes colonnes) : produits **avec fournisseur et référence**, non archivés, hors Gun Art et armes de collection. Les produits saisis à la main sans fournisseur n'ont pas de clé d'aller-retour et sont signalés.
+- **Colonne « Actif »** (Oui / Non, vide = inchangé) → mise en ligne. À la création, vide = hors ligne, comme avant.
+- **Colonne « Doublon possible »** (informative, jamais relue) : autres fiches de même EAN, ou de même marque et nom normalisé, chez un autre fournisseur. **Signalé, jamais tranché.**
+- **Archivage des lignes absentes** : uniquement si l'admin coche « Archiver les produits absents du fichier », et **seulement pour les fournisseurs présents dans le fichier**. Un fichier BGM n'archive jamais un produit Cor Caroli, et un fichier de tri issu de la collecte n'archive rien sans la case. L'aperçu **liste** les produits concernés avant validation.
+- **Version par ligne** (colonne « Version », date de dernière modification à l'export) : si la fiche a été modifiée dans le back-office depuis l'export et que « écraser » est coché, la ligne est **refusée** (ré-exporter) au lieu d'écraser la correction. Sans « écraser », simple avertissement.
+- **Stock** : l'export le laisse vide, et un ré-import ne le modifie plus jamais, même avec « écraser ». Il ne sert qu'à la création.
+- **Bug trouvé et corrigé** : la suppression d'un produit vérifiait `order_items`, une table que le tunnel n'écrit pas (les lignes vivent dans `orders.items_json`). **Un produit déjà commandé pouvait donc être supprimé définitivement.** La garde lit désormais `items_json`, et l'écran propose « Archiver ».
+
+**Livré (2026-10-07) :**
+
+- [x] **Migration `0017`** : `products.archived_at` (indexé), `catalog_imports.archived_count`.
+- [x] **Format partagé** : colonnes « Actif », « Doublon possible », « Version » dans `CATALOG_IMPORT_COLUMNS`. Une seule fonction écrit l'onglet catalogue, avec ses listes déroulantes : `addCatalogSheet` / `writeCatalogWorkbook` dans `@armurier/shared/spreadsheet`. Le fichier de tri (outil) et l'export (API) l'utilisent tous les deux.
+- [x] **API** :
+  - `GET /api/admin/catalog-imports/export` ;
+  - option `archiveMissing` à l'aperçu et à la validation, avec la liste `toArchive` et les compteurs `publish` / `unpublish` / `archive` ;
+  - une ligne visant un produit archivé est **refusée**, il faut le réactiver d'abord ;
+  - `POST /api/admin/products/:id/archive` et `/restore`, avec journal d'audit ; on ne peut pas publier un produit archivé (409) ;
+  - garde de suppression (produit **et** variante) sur `items_json`, fonction `orderedVariantIds`.
+- [x] **Proxy BFF** transparent octet pour octet (`responseType: "arrayBuffer"`). Il transmet `content-type`, `content-disposition` et `cache-control`, mais jamais un cookie (`server/utils/proxy-headers.ts`, testé). Avant, un téléchargement binaire n'aurait pas survécu au proxy.
+- [x] **Écrans** :
+  - `/admin/imports` : bouton « Exporter le catalogue », case « Archiver les produits absents du fichier », liste des produits à archiver dans l'aperçu, colonne « Archivés » dans l'historique ;
+  - `/admin/produits` : boutons « Archiver » / « Réactiver », badge, filtre « Afficher les archivés » ; refus de suppression expliqué en français ;
+  - fiche produit : bandeau « archivé » avec bouton « Réactiver », publication désactivée.
+- [x] **Vérifié en réel** (API + site, via le proxy) :
+  - import de 3 produits → export (doublon Alpha / Beta signalé) → modification dans Excel (une ligne supprimée, « Actif » inversé, un prix changé) → ré-import avec écrasement et archivage → **exactement** 1 mis en ligne, 1 retiré, 1 archivé, le prix appliqué ;
+  - archiver → publier refusé (409) → réactiver → supprimer (204) ;
+  - passe visuelle Playwright sur ordinateur et mobile : **0 débordement**. Au passage, corrigé un débordement de 440 px de la liste Produits sur mobile : l'en-tête `sr-only` n'était pas ancré à son conteneur.
+- Tests : **shared 267, API 606, web 330, outil 81 = 1 284**.
+
+**Reste / à savoir :**
+
+- Les produits **saisis à la main sans fournisseur** ne sont pas dans l'export : ils n'ont pas de clé d'aller-retour. L'onglet « Lisez-moi » de l'export les compte.
+- Le repérage des doublons est **indicatif** : même EAN (rarement fourni par les sites), ou mêmes mots dans marque + nom. Deux fiches au libellé différent ne seront pas repérées.
+- L'aperçu liste au plus 500 produits à archiver. Le nombre affiché, lui, est toujours exact.
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).

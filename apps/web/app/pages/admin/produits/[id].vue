@@ -2,6 +2,7 @@
 import { defaultParcelCount, LEGAL_CATEGORIES } from "@armurier/shared"
 import type { AdminProductDetail, AdminProductVariant } from "~/types/admin-catalogue"
 import type { AdminProfitability } from "~/types/admin-finance"
+import { formatDateTime } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 
@@ -44,6 +45,19 @@ const form = reactive({
 const legalCategoryOptions = LEGAL_CATEGORIES
 const profitability = ref<AdminProfitability | null>(null)
 const beneficiaryName = ref<string | null>(null)
+// Story 12.4: an archived product cannot be published until it is restored.
+const archivedAt = ref<string | null>(null)
+const restoreError = ref("")
+
+async function restore() {
+  restoreError.value = ""
+  try {
+    await api(`/admin/products/${id.value}/restore`, { method: "POST" })
+    await load()
+  } catch {
+    restoreError.value = "Réactivation impossible."
+  }
+}
 const loadError = ref(false)
 const saveError = ref<string | null>(null)
 const saving = ref(false)
@@ -93,6 +107,7 @@ async function load() {
       metaTitle: d.metaTitle ?? "",
       metaDescription: d.metaDescription ?? "",
     })
+    archivedAt.value = d.archivedAt ?? null
     profitability.value = d.profitability ?? null
     beneficiaryName.value = d.beneficiaryName ?? null
   } catch {
@@ -424,9 +439,15 @@ async function save() {
 
     <section class="panel">
       <h2 class="panel__title">Publication</h2>
+      <p v-if="archivedAt" class="archived" role="status">
+        Produit <strong>archivé</strong> le {{ formatDateTime(archivedAt) }} : retiré de la vente, conservé pour les
+        commandes passées. Réactivez-le pour pouvoir le publier.
+        <button class="btn-restore" type="button" @click="restore">Réactiver</button>
+        <span v-if="restoreError" class="archived__err" role="alert">{{ restoreError }}</span>
+      </p>
       <div class="fields">
         <label class="field field--check">
-          <input v-model="form.published" type="checkbox" class="check" >
+          <input v-model="form.published" type="checkbox" class="check" :disabled="Boolean(archivedAt)" >
           <span>Publié sur le site</span>
         </label>
         <label class="field field--check">
@@ -617,5 +638,30 @@ h1 {
   .variant {
     grid-template-columns: repeat(6, minmax(80px, 1fr)) auto;
   }
+}
+.archived {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--ink-line);
+  color: var(--paper-dim);
+  font-size: var(--fs-sm);
+}
+.btn-restore {
+  margin-left: 0.6rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--paper-dim);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.btn-restore:hover {
+  border-color: var(--brass);
+  color: var(--brass);
+}
+.archived__err {
+  margin-left: 0.6rem;
+  color: var(--danger);
 }
 </style>

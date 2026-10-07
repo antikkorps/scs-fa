@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { auditLogs, products, productVariants, tags, users } from "../db/schema.js"
+import { auditLogs, orders, products, productVariants, tags, users } from "../db/schema.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
 const ADMIN_EMAIL = "testprodadmin-admin@testprodadmin.local"
@@ -23,6 +23,7 @@ describe("admin product & tag CRUD (story 7.5a)", () => {
   async function cleanup() {
     const userIds = db.select({ id: users.id }).from(users).where(like(users.email, "testprodadmin-%"))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
+    await db.delete(orders).where(inArray(orders.userId, userIds))
     await db.delete(users).where(like(users.email, "testprodadmin-%"))
     await db.delete(products).where(like(products.sku, `${PREFIX}%`))
     await db.delete(tags).where(like(tags.slug, "testprodadmin-%"))
@@ -237,6 +238,85 @@ describe("admin product & tag CRUD (story 7.5a)", () => {
       expect((await asAdmin("DELETE", `${BASE}/${productId}`)).statusCode).toBe(204)
       expect(await db.select().from(products).where(eq(products.id, productId))).toHaveLength(0)
       expect(await db.select().from(productVariants).where(eq(productVariants.productId, productId))).toHaveLength(0)
+    })
+  })
+
+  /** Story 12.4 — archive instead of delete, and a delete guard that sees real orders. */
+  describe("archive", () => {
+    let archivedId: string
+    let variantId: string
+
+    beforeAll(async () => {
+      const res = await asAdmin("POST", BASE, {
+        sku: `${PREFIX}ARCH`,
+        slug: "testprodadmin-archive",
+        name: "Lunette à archiver",
+        categorySlug: "aide-visee",
+        legalCategory: "none",
+        priceHt: 120,
+        variants: [{ skuVariant: `${PREFIX}ARCH-A`, finition: "Noir", stockQty: 3 }],
+        published: true,
+      })
+      expect(res.statusCode).toBe(201)
+      archivedId = res.json().data.id
+      variantId = res.json().data.variants[0].id
+    })
+
+    it("refuses to delete a product that appears on an order, as checkout records it", async () => {
+      // Checkout writes its lines into orders.items_json, not into order_items.
+      const [customer] = await db.select({ id: users.id }).from(users).where(eq(users.email, CUSTOMER_EMAIL))
+      await db.insert(orders).values({
+        userId: customer?.id as string,
+        itemsJson: [
+          {
+            variantId,
+            qty: 1,
+            priceHt: 120,
+            name: "Lunette à archiver",
+            sku: `${PREFIX}ARCH-A`,
+            category: "aide-visee",
+            requiresPaymentVirement: false,
+          },
+        ],
+        subtotalHt: "120.00",
+        vatAmount: "24.00",
+        totalTtc: "144.00",
+      })
+      const res = await asAdmin("DELETE", `${BASE}/${archivedId}`)
+      expect(res.statusCode).toBe(409)
+      expect(res.json().message).toMatch(/archive it/)
+      // Removing the ordered variant through the form is refused just the same.
+      const patch = await asAdmin("PATCH", `${BASE}/${archivedId}`, {
+        variants: [{ skuVariant: `${PREFIX}ARCH-B`, finition: "Gris", stockQty: 1 }],
+      })
+      expect(patch.statusCode).toBe(409)
+    })
+
+    it("archives: off sale, kept in the database, logged", async () => {
+      const res = await asAdmin("POST", `${BASE}/${archivedId}/archive`)
+      expect(res.statusCode).toBe(200)
+      expect(res.json().data).toMatchObject({ published: false })
+      expect(res.json().data.archivedAt).toBeTruthy()
+      const logs = await db.select().from(auditLogs).where(eq(auditLogs.entityId, archivedId))
+      expect(logs.map((l) => l.action)).toContain("product.archived")
+      // Not publishable while archived.
+      expect((await asAdmin("PATCH", `${BASE}/${archivedId}`, { published: true })).statusCode).toBe(409)
+    })
+
+    it("restores it offline: going live again is a separate step", async () => {
+      const res = await asAdmin("POST", `${BASE}/${archivedId}/restore`)
+      expect(res.statusCode).toBe(200)
+      expect(res.json().data).toMatchObject({ archivedAt: null, published: false })
+      expect((await asAdmin("PATCH", `${BASE}/${archivedId}`, { published: true })).statusCode).toBe(200)
+    })
+
+    it("is admin only", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: `${BASE}/${archivedId}/archive`,
+        headers: { authorization: `Bearer ${customerToken}` },
+      })
+      expect(res.statusCode).toBe(403)
     })
   })
 })
