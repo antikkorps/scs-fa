@@ -613,6 +613,25 @@
 - [x] En plus : `safeGet` a une **échéance globale** (un serveur qui distille un octet à la fois n'est plus jamais « inactif ») ; numéros de ligne CSV **exacts** malgré les lignes vides ; historique des imports en **une requête** (au lieu d'une par import)
 - Tests après corrections : **shared 222, API 573, web 299, outil 79**
 
+**Espaces pro des fournisseurs (2026-10-07)** : le client a des accès revendeur et souhaite qu'on s'en serve, **en lecture seule et sans risquer de bloquer ses comptes**.
+
+- [x] Reconnaissance faite avec ses accès :
+  - **BGM** : prix d'achat **HT** + coefficient de revente sur chaque fiche ;
+  - **Cor Caroli** : « Votre prix » ;
+  - aucun des deux n'expose d'EAN, de quantité en stock ni de tarif téléchargeable.
+- [x] Connexion dans l'outil :
+  - identifiants dans `tools/catalog-collect/.env`, ignoré par git et Docker ;
+  - connexion **une seule fois**, **jamais rejouée** en cas de refus ;
+  - redirection de connexion suivie à la main, pour garder le cookie de session ;
+  - chaque page doit encore être servie connectée, sinon **`SessionLostError` arrête la collecte** sans rien mettre en cache ;
+  - cache séparé `cache/<fournisseur>-pro/`.
+- [x] `purchasePrice` ajouté au format pivot. Le tri l'utilise **comme un tarif** (même rapprochement) quand aucun tarif n'est configuré. Il n'est lu que sur une page connectée ; chez BGM, seulement s'il est libellé HT ; jamais depuis le JSON-LD public.
+- [x] **Validé en réel** sur 2 articles BGM et 2 articles Cor Caroli : connexion acceptée, prix lus. Outil : **92 tests**.
+- [x] **Cor Caroli** : la fiche n'indique pas si « Votre prix » est HT, mais leurs CGV le disent (« Nos prix s'entendent nets **hors taxes** départ stock », vérifié le 2026-10-07). La collecte complète peut être lancée.
+- **ESP** : une fois les identifiants corrigés, la connexion marche et les fiches affichent « Prix Revendeur … HT ». **Mais son `robots.txt` interdit `/authentication.php`.** Franck a choisi de **rester strict** (2026-10-07) : pas de connexion, fiches publiques comme avant. **Le prix d'achat viendra du tarif Excel d'ESP**, à leur demander.
+- **ClearMyVault** (nouveau fournisseur, fabricant d'agencement de coffres) : **pas de collecte possible**. La boutique est derrière une protection anti-robots (LWS / Anubis), qu'on ne contourne pas, et le `Crawl-delay` est de 60 s. Il faut leur demander leur catalogue pro (fichier + photos) et l'importer, ou saisir à la main.
+- **Humbert** : on attend son tarif CSV.
+
 **Reste ouvert :**
 
 - ⚠️ **Attendu du client** : un **tarif Excel par fournisseur** (pour caler les colonnes dans `work/config.json`) et le **périmètre** (catalogue complet ou familles : Agora-Tec annonce 4 464 articles dont de la cuisine, BGM 6 079, Toro ~12 300, Humbert plusieurs milliers d'articles avec toutes les déclinaisons)

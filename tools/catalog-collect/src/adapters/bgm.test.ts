@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs"
 import { collectedProductSchema } from "@armurier/shared"
 import { describe, expect, it } from "vitest"
 import { PoliteClient } from "../http.js"
-import { bgmWinfield, parseBgmProduct, parseCategories, parseListingPage } from "./bgm.js"
+import {
+  bgmWinfield,
+  isSignedIn,
+  parseBgmProduct,
+  parseCategories,
+  parseListingPage,
+  parsePurchasePrice,
+} from "./bgm.js"
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/bgm/${name}`, import.meta.url), "utf8")
 
@@ -46,6 +53,76 @@ describe("BGM Winfield", () => {
     const p = parseBgmProduct(fixture("product-11832.html"), "https://bgmwinfield.fr/armes/11832-x.html")
     expect(p?.sourceCategory).toBe("Armes > Armes d'épaule")
     expect(p?.brand).toBe("MARQUE-BETA")
+  })
+
+  it("reads our purchase price excl. VAT from a signed-in page", () => {
+    const url = "https://bgmwinfield.fr/optoelectronique/11884-marque-alpha-point-rouge-exemple-1x22.html"
+    const p = parseBgmProduct(fixture("product-11884-pro.html"), url)
+    expect(p?.purchasePrice).toBe(1021.33)
+    expect(collectedProductSchema.safeParse({ ...p, supplier: "BGM Winfield" }).success).toBe(true)
+  })
+
+  it("never takes a price from a signed-out page, nor one not labelled HT", () => {
+    // Signed out: the JSON-LD still carries the PUBLIC price, which must not become a cost.
+    expect(parseBgmProduct(fixture("product-11884.html"), "https://bgmwinfield.fr/x")?.purchasePrice).toBeUndefined()
+    const pro = fixture("product-11884-pro.html")
+    expect(parsePurchasePrice(pro.replace('"is_logged":true', '"is_logged":false'))).toBeUndefined()
+    expect(parsePurchasePrice(pro.replace(/>\s*HT\s*</, ">TTC<"))).toBeUndefined()
+  })
+
+  it("signs in once, then checks the account page", async () => {
+    const calls: { url: string; method: string; body?: string; cookie?: string }[] = []
+    const client = new PoliteClient({
+      minIntervalMs: 0,
+      sleep: async () => {},
+      cookies: true,
+      fetch: async (url, init) => {
+        const headers = (init?.headers ?? {}) as Record<string, string>
+        calls.push({
+          url,
+          method: init?.method ?? "GET",
+          body: init?.body as string | undefined,
+          cookie: headers.cookie,
+        })
+        if (url.endsWith("/robots.txt")) return new Response("", { status: 404 })
+        if (init?.method === "POST") {
+          // PrestaShop sets the session on the redirect itself.
+          return new Response(null, {
+            status: 302,
+            headers: { location: "/mon-compte", "set-cookie": "PrestaShop-abc=signed; path=/" },
+          })
+        }
+        return new Response(
+          `<script>var prestashop = {"customer":{"is_logged":${headers.cookie ? "true" : "false"}}}</script>`,
+        )
+      },
+    })
+    await bgmWinfield.proLogin?.signIn(client, { login: "pro@example.fr", password: "s3cret&=" })
+    const post = calls.find((c) => c.method === "POST")
+    expect(new URLSearchParams(post?.body)).toEqual(
+      new URLSearchParams({ back: "my-account", email: "pro@example.fr", password: "s3cret&=", submitLogin: "1" }),
+    )
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(1)
+    expect(calls.at(-1)).toMatchObject({ url: "https://bgmwinfield.fr/mon-compte", cookie: "PrestaShop-abc=signed" })
+  })
+
+  it("reports a refused sign-in without retrying it", async () => {
+    let posts = 0
+    const client = new PoliteClient({
+      minIntervalMs: 0,
+      sleep: async () => {},
+      cookies: true,
+      acceptPage: isSignedIn,
+      fetch: async (url, init) => {
+        if (url.endsWith("/robots.txt")) return new Response("", { status: 404 })
+        if (init?.method === "POST") posts++
+        return new Response('<script>var prestashop = {"customer":{"is_logged":false}}</script>')
+      },
+    })
+    await expect(bgmWinfield.proLogin?.signIn(client, { login: "a@b.fr", password: "x" })).rejects.toThrow(
+      /refused the sign-in/,
+    )
+    expect(posts).toBe(1)
   })
 
   it("returns null for a page without product data", () => {

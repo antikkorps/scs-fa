@@ -6,18 +6,22 @@
 //
 // Everything it reads and writes lives under ./work (git-ignored): the page
 // cache, the collected products, the supplier price lists and config.json.
+// Pro-area logins live in this package's `.env` (git- and Docker-ignored).
 
+import { existsSync } from "node:fs"
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { type PriceListRow, readPriceList } from "@armurier/shared"
 import { readSpreadsheet } from "@armurier/shared/spreadsheet"
+import type { Credentials, SupplierAdapter } from "./adapter.js"
 import { ADAPTERS, adapterById } from "./adapters/index.js"
 import { readCollected, runCollection } from "./collect.js"
 import { PoliteClient } from "./http.js"
 import {
   buildTriageModel,
   type Category,
+  pricesFromCollection,
   type SupplierBatch,
   supplierConfigSchema,
   type TriageConfig,
@@ -25,10 +29,19 @@ import {
   writeTriageWorkbook,
 } from "./triage.js"
 
-const WORK = resolve(import.meta.dirname, "..", "work")
+const PACKAGE = resolve(import.meta.dirname, "..")
+const WORK = join(PACKAGE, "work")
 const COLLECTED = join(WORK, "collected")
 
 const log = (message: string) => console.info(`[${new Date().toLocaleTimeString("fr-FR")}] ${message}`)
+
+/** The supplier's pro-area login from `.env`, or null to collect public pages. */
+function credentialsFor(adapter: SupplierAdapter): Credentials | null {
+  if (!adapter.proLogin) return null
+  const login = process.env[`${adapter.proLogin.envPrefix}_LOGIN`]?.trim()
+  const password = process.env[`${adapter.proLogin.envPrefix}_PASSWORD`]
+  return login && password ? { login, password } : null
+}
 
 async function collect(args: string[]) {
   const { values, positionals } = parseArgs({
@@ -48,7 +61,21 @@ async function collect(args: string[]) {
   for (const id of positionals) {
     const adapter = adapterById(id)
     if (!adapter) throw new Error(`Unknown supplier "${id}" — see --list`)
-    const client = new PoliteClient({ cacheDir: join(WORK, "cache", id), cookies: true, log })
+    const credentials = credentialsFor(adapter)
+    const proLogin = credentials ? adapter.proLogin : undefined
+    const client = new PoliteClient({
+      // Signed-in pages differ from public ones: they never share a cache.
+      cacheDir: join(WORK, "cache", proLogin ? `${id}-pro` : id),
+      cookies: true,
+      acceptPage: proLogin?.isSignedIn,
+      log,
+    })
+    if (proLogin && credentials) {
+      await proLogin.signIn(client, credentials)
+      log(`${id}: signed in to the pro area`)
+    } else if (adapter.proLogin) {
+      log(`${id}: no ${adapter.proLogin.envPrefix}_LOGIN / _PASSWORD in .env — public pages only, no purchase price`)
+    }
     log(`${id}: collecting${values.only.length ? ` (only: ${values.only.join(", ")})` : " the whole catalogue"}…`)
     const report = await runCollection(adapter, client, {
       outFile: join(COLLECTED, `${id}.jsonl`),
@@ -118,7 +145,13 @@ async function triage(args: string[]) {
       )
       for (const issue of issues.slice(0, 10)) log(`   line ${issue.line}: ${issue.message}`)
     } else {
-      log(`${id}: no price list configured — every article will be "Sans prix"`)
+      const collected = pricesFromCollection(products)
+      if (collected.length > 0) {
+        prices = collected
+        log(`${id}: no price list — ${collected.length} purchase prices read from the pro area`)
+      } else {
+        log(`${id}: no price list configured — every article will be "Sans prix"`)
+      }
     }
     batches.push({
       supplier: products[0]?.supplier ?? adapterById(id)?.supplier ?? id,
@@ -138,6 +171,8 @@ async function triage(args: string[]) {
       `${model.stats.ambiguous} ambiguous; ${model.orphans.length} prices without a product sheet`,
   )
 }
+
+if (existsSync(join(PACKAGE, ".env"))) process.loadEnvFile(join(PACKAGE, ".env"))
 
 const [command, ...rest] = process.argv.slice(2)
 try {

@@ -44,6 +44,12 @@ export const collectedProductSchema = z.object({
    * never copied into it.
    */
   supplierLegalClass: z.string().trim().max(50).optional(),
+  /**
+   * What the supplier charges US, excl. VAT, as its pro area shows it to a
+   * signed-in reseller (BGM). Stands in for a price list; strictly admin data,
+   * never a public field.
+   */
+  purchasePrice: z.number().positive().max(1_000_000).optional(),
   sourceUrl: httpUrl,
 })
 
