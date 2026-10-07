@@ -627,7 +627,7 @@
   - cache séparé `cache/<fournisseur>-pro/`.
 - [x] `purchasePrice` ajouté au format pivot. Le tri l'utilise **comme un tarif** (même rapprochement) quand aucun tarif n'est configuré. Il n'est lu que sur une page connectée ; chez BGM, seulement s'il est libellé HT ; jamais depuis le JSON-LD public.
 - [x] **Validé en réel** sur 2 articles BGM et 2 articles Cor Caroli : connexion acceptée, prix lus. Outil : **92 tests**.
-- ⚠️ **Cor Caroli** : la page ne dit pas si « Votre prix » est **HT**. Le client doit le confirmer sur une facture avant la collecte complète.
+- [x] **Cor Caroli** : la fiche n'indique pas si « Votre prix » est HT, mais leurs CGV le disent (« Nos prix s'entendent nets **hors taxes** départ stock », vérifié le 2026-10-07). La collecte complète peut être lancée.
 - **ESP** : une fois les identifiants corrigés, la connexion marche et les fiches affichent « Prix Revendeur … HT ». **Mais son `robots.txt` interdit `/authentication.php`.** Franck a choisi de **rester strict** (2026-10-07) : pas de connexion, fiches publiques comme avant. **Le prix d'achat viendra du tarif Excel d'ESP**, à leur demander.
 - **ClearMyVault** (nouveau fournisseur, fabricant d'agencement de coffres) : **pas de collecte possible**. La boutique est derrière une protection anti-robots (LWS / Anubis), qu'on ne contourne pas, et le `Crawl-delay` est de 60 s. Il faut leur demander leur catalogue pro (fichier + photos) et l'importer, ou saisir à la main.
 - **Humbert** : on attend son tarif CSV.

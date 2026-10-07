@@ -132,8 +132,9 @@ export function isSignedIn(html: string, url = ""): boolean {
 
 /**
  * Our price, as the pro area prints it under "Votre prix" — only on a page
- * served signed in. The page does not say "HT": it is read as excl. VAT,
- * which the client still has to confirm against a Cor Caroli invoice.
+ * served signed in. The page does not say "HT", but the terms of sale do
+ * (`/conditions-generales-de-vente.htm`: « Nos prix s'entendent nets hors
+ * taxes départ stock »).
  */
 export function parsePurchasePrice(html: string): number | undefined {
   if (!isSignedIn(html)) return undefined

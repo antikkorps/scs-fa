@@ -63,7 +63,7 @@ The rules that protect the client's accounts:
 | Supplier | What the pro area adds |
 |---|---|
 | BGM Winfield | Purchase price excl. VAT, plus a resale coefficient (not kept). No EAN, no stock quantity, no downloadable price list. |
-| Cor Caroli (and Agora-Tec, same platform) | "Votre prix". No EAN. |
+| Cor Caroli (and Agora-Tec, same platform) | "Votre prix", excl. VAT per their terms of sale ("nets hors taxes départ stock"). No EAN. |
 | ESP France | "Prix Revendeur … HT", but **not used**: its `robots.txt` disallows `/authentication.php`, and the client chose to stay strict (2026-10-07). Prices come from ESP's price list. |
 | ClearMyVault | Not collectable: the shop is behind an anti-bot challenge (LWS / Anubis). Ask the maker for its catalogue. |
 
