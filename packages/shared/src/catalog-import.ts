@@ -249,6 +249,8 @@ export interface CatalogImportColumn {
  */
 export const CATALOG_IMPORT_COLUMNS = [
   { key: "import", header: "Importer", required: true },
+  // Story 12.4: online or not. Blank leaves an existing product as it is.
+  { key: "active", header: "Actif", required: false },
   { key: "supplier", header: "Fournisseur", required: true },
   { key: "supplierSku", header: "Réf. fournisseur", required: true },
   { key: "ean", header: "EAN", required: false },
@@ -269,6 +271,11 @@ export const CATALOG_IMPORT_COLUMNS = [
   { key: "sourceUrl", header: "URL source", required: false },
   { key: "matchStatus", header: "Rapprochement", required: false },
   { key: "sku", header: "SKU", required: false },
+  // Story 12.4, written by the catalogue export. Informational: the import ignores it.
+  { key: "duplicates", header: "Doublon possible", required: false },
+  // When the exported product was last modified: lets the import spot a sheet
+  // older than an edit made in the back-office since.
+  { key: "version", header: "Version", required: false },
 ] as const satisfies readonly CatalogImportColumn[]
 
 export type CatalogImportColumnKey = (typeof CATALOG_IMPORT_COLUMNS)[number]["key"]
@@ -276,7 +283,7 @@ export type CatalogImportColumnKey = (typeof CATALOG_IMPORT_COLUMNS)[number]["ke
 /** Values offered in the legal-category drop-down of the triage workbook. */
 export const LEGAL_CATEGORY_CHOICES = ["A", "B", "C", "D", "Aucune"] as const
 
-/** Values offered in the "Importer" drop-down. */
+/** Values offered in the "Importer" and "Actif" drop-downs. */
 export const IMPORT_CHOICES = ["oui", "non"] as const
 
 const NONE_SPELLINGS = new Set(
@@ -296,6 +303,10 @@ const YES = new Set(["oui", "o", "yes", "y", "x", "1", "true", "vrai"])
 const NO = new Set(["non", "n", "no", "0", "false", "faux"])
 
 export interface CatalogImportRow {
+  /** "Actif": true / false, or null when the cell is blank (an existing product keeps its state). */
+  active: boolean | null
+  /** "Version": the product's last modification when the sheet was exported, or null. */
+  version: Date | null
   supplier: string
   supplierSku: string
   ean: string | null
@@ -428,6 +439,16 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
   // `products.vat_pct` is decimal(4,2): 100 would overflow and abort the whole batch.
   const vatPct = number("vatPct", "TVA %", null, 0, 99.99)
   const stockQty = number("stockQty", "Stock", null, 0, 1_000_000)
+
+  const activeCell = normaliseHeader(get("active"))
+  const active = !activeCell ? null : YES.has(activeCell) ? true : NO.has(activeCell) ? false : undefined
+  if (active === undefined) errors.push(`« Actif » doit valoir oui, non ou rester vide (lu : « ${get("active")} »)`)
+
+  const rawVersion = get("version")
+  const version = rawVersion ? new Date(rawVersion) : null
+  if (version && Number.isNaN(version.getTime())) {
+    errors.push(`« Version » illisible : « ${rawVersion} » (colonne écrite par l'export, à ne pas modifier)`)
+  }
   if (stockQty !== null && !Number.isInteger(stockQty)) errors.push(`Stock non entier : « ${get("stockQty")} »`)
 
   const imageUrls = get("imageUrls")
@@ -451,6 +472,8 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
     status: "valid",
     errors: [],
     data: {
+      active: active ?? null,
+      version,
       supplier,
       supplierSku,
       ean,

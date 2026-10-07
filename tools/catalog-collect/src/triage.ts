@@ -7,17 +7,14 @@
 // fills "Importer": choosing what to sell is the client's call.
 
 import {
-  CATALOG_IMPORT_COLUMNS,
-  type CatalogImportColumnKey,
   type CollectedProduct,
-  IMPORT_CHOICES,
-  LEGAL_CATEGORY_CHOICES,
   type LegalCategory,
   type PriceListRow,
   proposeSalePriceHt,
   type ReconcileStatus,
   reconcileCatalog,
 } from "@armurier/shared"
+import { addCatalogSheet, type CatalogSheetRow } from "@armurier/shared/spreadsheet"
 import ExcelJS from "exceljs"
 import { z } from "zod"
 import { cleanText, htmlToText, truncate } from "./extract.js"
@@ -73,7 +70,7 @@ export interface Category {
 
 // --- Model -----------------------------------------------------------------
 
-export type TriageRow = Record<CatalogImportColumnKey, string | number | null>
+export type TriageRow = CatalogSheetRow
 
 export interface OrphanPrice {
   supplier: string
@@ -210,29 +207,6 @@ export function buildTriageModel(batches: SupplierBatch[], categories: Category[
 
 // --- Workbook --------------------------------------------------------------
 
-const WIDTHS: Partial<Record<CatalogImportColumnKey, number>> = {
-  import: 10,
-  supplier: 18,
-  supplierSku: 16,
-  ean: 15,
-  name: 42,
-  brand: 16,
-  category: 24,
-  legalCategory: 14,
-  supplierLegalClass: 14,
-  costPriceHt: 12,
-  priceHt: 13,
-  vatPct: 7,
-  stockQty: 8,
-  description: 40,
-  longDescription: 30,
-  imageUrls: 30,
-  sourceCategory: 26,
-  sourceUrl: 30,
-  matchStatus: 16,
-  sku: 14,
-}
-
 const README = [
   "Fichier de tri — import des catalogues fournisseurs",
   "",
@@ -255,38 +229,12 @@ export async function writeTriageWorkbook(model: TriageModel, categories: Catego
   wb.creator = "SCS Firearm — collecte catalogues"
   wb.created = new Date()
 
-  const ws = wb.addWorksheet("À trier", { views: [{ state: "frozen", ySplit: 1, xSplit: 5 }] })
-  ws.columns = CATALOG_IMPORT_COLUMNS.map((c) => ({ header: c.header, key: c.key, width: WIDTHS[c.key] ?? 14 }))
-  ws.getRow(1).font = { bold: true }
-  for (const row of model.rows) ws.addRow(row)
-  const last = Math.max(model.rows.length + 1, 2)
-  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: CATALOG_IMPORT_COLUMNS.length } }
-
-  // Drop-down sources live on a hidden sheet: a list of categories may exceed
-  // the 255 characters an inline list allows.
-  const lists = wb.addWorksheet("Listes", { state: "veryHidden" })
-  categories.forEach((c, i) => {
-    lists.getCell(i + 1, 1).value = c.name
-  })
-  const col = (key: CatalogImportColumnKey) => ws.getColumn(key).letter
-  // exceljs supports range validations but its typings omit them.
-  const validations = (ws as unknown as { dataValidations: { add(range: string, v: ExcelJS.DataValidation): void } })
-    .dataValidations
-  const list = (key: CatalogImportColumnKey, formula: string, prompt: string) => {
-    validations.add(`${col(key)}2:${col(key)}${last}`, {
-      type: "list",
-      allowBlank: true,
-      formulae: [formula],
-      showErrorMessage: true,
-      errorTitle: "Valeur non prévue",
-      error: prompt,
-    })
-  }
-  list("import", `"${IMPORT_CHOICES.join(",")}"`, "Répondez oui ou non.")
-  list("legalCategory", `"${LEGAL_CATEGORY_CHOICES.join(",")}"`, "Choisissez A, B, C, D ou Aucune.")
-  if (categories.length > 0)
-    list("category", `Listes!$A$1:$A$${categories.length}`, "Choisissez une catégorie de la liste.")
-  for (const key of ["costPriceHt", "priceHt"] as const) ws.getColumn(key).numFmt = "#,##0.00 €"
+  addCatalogSheet(
+    wb,
+    "À trier",
+    model.rows,
+    categories.map((c) => c.name),
+  )
 
   const orphans = wb.addWorksheet("Prix sans fiche", { views: [{ state: "frozen", ySplit: 1 }] })
   orphans.columns = [
