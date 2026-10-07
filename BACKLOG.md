@@ -701,6 +701,19 @@
 - Le repérage des doublons est **indicatif** : même EAN (rarement fourni par les sites), ou mêmes mots dans marque + nom. Deux fiches au libellé différent ne seront pas repérées.
 - L'aperçu liste au plus 500 produits à archiver. Le nombre affiché, lui, est toujours exact.
 
+**Fichiers de tri à envoyer au client (2026-10-07) :**
+
+- **Un fichier par fournisseur** (choix de Franck) : `pnpm triage --supplier <id>`. Ça reste sous les limites de l'import (20 000 lignes, 15 Mo), et le client peut trier un fournisseur à la fois.
+- **Humbert prêt** : `work/tri-humbert-catalogues-2026-10-07.xlsx`, 6 479 lignes, sans prix (le client remplit achat et vente).
+  - Règles dans `work/config.json`, ignoré par git, à recréer à l'identique sur l'autre machine.
+  - **Catégorie légale par la lettre du classement Humbert** (`^A` → A, `^B` → B, `^C` → C, `^D` → D). Les **2 404 « NR » restent vides**, décision de Franck.
+  - Catégories proposées à partir de la famille Humbert ; 546 lignes sans proposition.
+  - ⚠️ **8 articles classés A** chez Humbert (A1.8, A1.9bis) : à signaler au client.
+  - ⚠️ Rappel : 746 articles portent un **visuel générique de gamme**.
+- **Restent à collecter** (décision de Franck : catalogues complets) :
+  - **BGM** et **Cor Caroli**, avec les prix pro, à lancer le 2026-10-08 ;
+  - **Toro**, **Agora-Tec** et **ESP**, en public. Pour ESP, les prix viendront de son tarif.
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
