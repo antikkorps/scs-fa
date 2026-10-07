@@ -698,14 +698,14 @@
 - [x] **Migration `0017`** : `products.archived_at` (indexé), `catalog_imports.archived_count`.
 - [x] **Format partagé** : colonnes « Actif », « Doublon possible », « Version » dans `CATALOG_IMPORT_COLUMNS`. Une seule fonction écrit l'onglet catalogue, avec ses listes déroulantes : `addCatalogSheet` / `writeCatalogWorkbook` dans `@armurier/shared/spreadsheet`. Le fichier de tri (outil) et l'export (API) l'utilisent tous les deux.
 - [x] **API** :
-  - `GET /api/admin/catalog-imports/export` ;
+  - `GET /api/admin/catalog-imports/export`, **catalogue complet ou un seul fournisseur** (`?supplierId=`, liste dans `GET …/suppliers`), pour garder un fichier par fournisseur comme pour le tri. Les doublons sont toujours cherchés chez **tous** les fournisseurs ;
   - option `archiveMissing` à l'aperçu et à la validation, avec la liste `toArchive` et les compteurs `publish` / `unpublish` / `archive` ;
   - une ligne visant un produit archivé est **refusée**, il faut le réactiver d'abord ;
   - `POST /api/admin/products/:id/archive` et `/restore`, avec journal d'audit ; on ne peut pas publier un produit archivé (409) ;
   - garde de suppression (produit **et** variante) sur `items_json`, fonction `orderedVariantIds`.
 - [x] **Proxy BFF** transparent octet pour octet (`responseType: "arrayBuffer"`). Il transmet `content-type`, `content-disposition` et `cache-control`, mais jamais un cookie (`server/utils/proxy-headers.ts`, testé). Avant, un téléchargement binaire n'aurait pas survécu au proxy.
 - [x] **Écrans** :
-  - `/admin/imports` : bouton « Exporter le catalogue », case « Archiver les produits absents du fichier », liste des produits à archiver dans l'aperçu, colonne « Archivés » dans l'historique ;
+  - `/admin/imports` : bouton « Exporter le catalogue » avec choix du fournisseur, case « Archiver les produits absents du fichier », liste des produits à archiver dans l'aperçu, colonne « Archivés » dans l'historique ;
   - `/admin/produits` : boutons « Archiver » / « Réactiver », badge, filtre « Afficher les archivés » ; refus de suppression expliqué en français ;
   - fiche produit : bandeau « archivé » avec bouton « Réactiver », publication désactivée.
 - [x] **Vérifié en réel** (API + site, via le proxy) :
@@ -719,6 +719,19 @@
 - Les produits **saisis à la main sans fournisseur** ne sont pas dans l'export : ils n'ont pas de clé d'aller-retour. L'onglet « Lisez-moi » de l'export les compte.
 - Le repérage des doublons est **indicatif** : même EAN (rarement fourni par les sites), ou mêmes mots dans marque + nom. Deux fiches au libellé différent ne seront pas repérées.
 - L'aperçu liste au plus 500 produits à archiver. Le nombre affiché, lui, est toujours exact.
+
+**Fichiers de tri à envoyer au client (2026-10-07) :**
+
+- **Un fichier par fournisseur** (choix de Franck) : `pnpm triage --supplier <id>`. Ça reste sous les limites de l'import (20 000 lignes, 15 Mo), et le client peut trier un fournisseur à la fois.
+- **Humbert prêt** : `work/tri-humbert-catalogues-2026-10-07.xlsx`, 6 479 lignes, sans prix (le client remplit achat et vente).
+  - Règles dans `work/config.json`, ignoré par git, à recréer à l'identique sur l'autre machine.
+  - **Catégorie légale par la lettre du classement Humbert** (`^A` → A, `^B` → B, `^C` → C, `^D` → D). Les **2 404 « NR » restent vides**, décision de Franck.
+  - Catégories proposées à partir de la famille Humbert ; 546 lignes sans proposition.
+  - ⚠️ **8 articles classés A** chez Humbert (A1.8, A1.9bis) : à signaler au client.
+  - ⚠️ Rappel : 746 articles portent un **visuel générique de gamme**.
+- **Restent à collecter** (décision de Franck : catalogues complets) :
+  - **BGM** et **Cor Caroli**, avec les prix pro, à lancer le 2026-10-08 ;
+  - **Toro**, **Agora-Tec** et **ESP**, en public. Pour ESP, les prix viendront de son tarif.
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 

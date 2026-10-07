@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { slugify } from "@armurier/shared"
 import type {
+  CatalogExportSupplier,
   CatalogFailedImage,
   CatalogImportHistoryRow,
   CatalogImportPreview,
@@ -28,17 +30,31 @@ const apiMessage = (err: unknown, fallback: string) =>
 
 const exporting = ref(false)
 const exportError = ref("")
+// One supplier's file keeps the same flow as the triage files: sort, import,
+// and "archive what is missing" only ever touches that supplier.
+const exportSupplier = ref("")
+const { data: suppliersData } = await useAsyncData(
+  "admin-catalog-export-suppliers",
+  () => api<{ data: CatalogExportSupplier[] }>("/admin/catalog-imports/suppliers"),
+  { server: false },
+)
+const exportSuppliers = computed(() => suppliersData.value?.data ?? [])
 
 /** Download the catalogue in the import's columns, to edit in Excel and bring back. */
 async function runExport() {
   exporting.value = true
   exportError.value = ""
   try {
-    const blob = await api<Blob>("/admin/catalog-imports/export", { responseType: "blob" })
+    const chosen = exportSuppliers.value.find((s) => s.id === exportSupplier.value)
+    const blob = await api<Blob>("/admin/catalog-imports/export", {
+      responseType: "blob",
+      query: chosen ? { supplierId: chosen.id } : {},
+    })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `catalogue-${new Date().toISOString().slice(0, 10)}.xlsx`
+    const label = chosen ? `${slugify(chosen.name, 40)}-` : ""
+    a.download = `catalogue-${label}${new Date().toISOString().slice(0, 10)}.xlsx`
     a.click()
     URL.revokeObjectURL(url)
   } catch (err) {
@@ -217,6 +233,13 @@ async function retry(id: string) {
         déposez le fichier ci-dessous. Le stock n'y figure pas : un fichier ne le modifie jamais.
       </p>
       <div class="actions">
+        <label class="sr-only" for="export-supplier">Fournisseur à exporter</label>
+        <select id="export-supplier" v-model="exportSupplier" class="select">
+          <option value="">Tous les fournisseurs</option>
+          <option v-for="s in exportSuppliers" :key="s.id" :value="s.id">
+            {{ s.name }} ({{ plural(s.products, "produit") }})
+          </option>
+        </select>
         <button class="btn btn-ghost" type="button" :disabled="exporting" @click="runExport">
           {{ exporting ? "Préparation…" : "Exporter le catalogue (.xlsx)" }}
         </button>
@@ -475,6 +498,27 @@ async function retry(id: string) {
   border-left: 3px solid #e0b15f;
   padding: 0.5rem 0.8rem;
   margin: 0 0 0.8rem;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.select {
+  max-width: 100%;
+  padding: 0.5rem 0.7rem;
+  background: var(--ink);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  color: var(--paper);
+  font: inherit;
+  font-size: var(--fs-sm);
 }
 .archive summary {
   cursor: pointer;

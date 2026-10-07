@@ -218,9 +218,10 @@ const README = [
   "3. Le prix de vente HT est proposé à partir du prix d'achat et de la marge du fournisseur : ajustez-le librement.",
   "4. Les lignes « Sans prix » n'ont pas été trouvées dans le tarif : saisissez un prix de vente pour les importer.",
   "5. L'onglet « Prix sans fiche » liste les références du tarif dont aucune fiche n'a été récupérée.",
+  "6. Colonne Actif : « oui » met le produit en ligne dès l'import ; laissée vide, il arrive hors ligne, à publier après relecture.",
   "",
   "Ne renommez pas les colonnes. Enregistrez au format .xlsx, puis déposez le fichier dans l'administration :",
-  "Import catalogues → Prévisualiser → Importer. Les produits arrivent hors ligne, à publier après relecture.",
+  "Import catalogues → Prévisualiser → Importer. Rien n'est écrit avant que vous ayez validé l'aperçu.",
 ]
 
 /** The triage workbook, ready to be written to disk. */

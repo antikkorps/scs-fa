@@ -309,6 +309,13 @@ export interface CatalogImportPreviewRow {
   images: number
 }
 
+/** A supplier offered by the per-supplier catalogue export (story 12.4). */
+export interface CatalogExportSupplier {
+  id: string
+  name: string
+  products: number
+}
+
 /** A product the file no longer lists, archived on commit when asked (story 12.4). */
 export interface CatalogArchiveRow {
   id: string
