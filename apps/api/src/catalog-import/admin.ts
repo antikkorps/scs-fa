@@ -1,14 +1,16 @@
 import { createHash } from "node:crypto"
-import { MAX_CATALOG_IMPORT_FILE_BYTES, uuidParamSchema } from "@armurier/shared"
+import { MAX_CATALOG_IMPORT_FILE_BYTES, slugify, uuidParamSchema } from "@armurier/shared"
 import { readSpreadsheet, SpreadsheetError } from "@armurier/shared/spreadsheet"
 import { and, desc, eq } from "drizzle-orm"
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
+import { z } from "zod"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { catalogImportImages, catalogImports, products } from "../db/schema.js"
+import { catalogImportImages, catalogImports, products, suppliers } from "../db/schema.js"
 import { env } from "../env.js"
-import { exportCatalogWorkbook } from "./export.js"
+import { validationError } from "../http.js"
+import { exportableSuppliers, exportCatalogWorkbook } from "./export.js"
 import { drainCatalogImages, imageQueueStats } from "./images.js"
 import {
   commitCatalogImport,
@@ -89,6 +91,8 @@ const planOptions = (upload: Upload): PlanOptions => ({
 
 /** The preview lists at most this many products to archive; the count is always exact. */
 const ARCHIVE_PREVIEW_LIMIT = 500
+
+const exportQuerySchema = z.object({ supplierId: z.string().uuid().optional() })
 
 /** Public shape of a plan row — internal resolution details stay server-side. */
 function reportRow(row: ImportPlan["rows"][number]) {
@@ -172,16 +176,28 @@ export const adminCatalogImportRoutes: FastifyPluginAsync = async (fastify) => {
    * GET /export — the catalogue as a workbook in the import's own columns
    * (story 12.4): edit it in Excel, then preview and import it back.
    */
-  fastify.get("/export", async (_request, reply) => {
-    const { workbook, rows } = await exportCatalogWorkbook()
+  fastify.get("/export", async (request, reply) => {
+    const query = exportQuerySchema.safeParse(request.query)
+    if (!query.success) return reply.code(400).send(validationError(query.error.issues))
+    const { supplierId } = query.data
+    let label = ""
+    if (supplierId) {
+      const [supplier] = await db.select({ name: suppliers.name }).from(suppliers).where(eq(suppliers.id, supplierId))
+      if (!supplier) return reply.code(404).send({ error: "NotFound", message: "Supplier not found" })
+      label = `${slugify(supplier.name, 40)}-`
+    }
+    const { workbook, rows } = await exportCatalogWorkbook({ supplierId })
     const date = new Date().toISOString().slice(0, 10)
     return reply
       .header("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-      .header("content-disposition", `attachment; filename="catalogue-${date}.xlsx"`)
+      .header("content-disposition", `attachment; filename="catalogue-${label}${date}.xlsx"`)
       .header("x-catalogue-rows", String(rows))
       .header("cache-control", "no-store")
       .send(workbook)
   })
+
+  /** GET /suppliers — suppliers with products to export, for the per-supplier export. */
+  fastify.get("/suppliers", async (_request, reply) => reply.send({ data: await exportableSuppliers() }))
 
   /** GET / — import history, most recent first, with each import's image queue. */
   fastify.get("/", async (_request, reply) => {

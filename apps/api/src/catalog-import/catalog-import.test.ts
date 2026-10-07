@@ -477,10 +477,10 @@ describe("admin catalogue import (story 12.2)", () => {
       row({ supplier: RT_A, imageUrls: "", longDescription: "", sourceUrl: "", ...over })
 
     /** The export as a table, plus the rows of one supplier keyed by reference. */
-    async function exportTable() {
+    async function exportTable(query = "") {
       const res = await app.inject({
         method: "GET",
-        url: `${BASE}/export`,
+        url: `${BASE}/export${query}`,
         headers: { authorization: `Bearer ${adminToken}` },
       })
       expect(res.statusCode).toBe(200)
@@ -530,6 +530,25 @@ describe("admin catalogue import (story 12.2)", () => {
       expect(line[col("version")]).toMatch(/^\d{4}-\d\d-\d\dT/)
       expect(line[col("duplicates")]).toBe(`${RT_B} B-77 (inactif)`)
       expect(table.find((r) => r[col("supplierSku")] === "RT-2")?.[col("duplicates")] ?? "").toBe("")
+    })
+
+    it("exports one supplier's part, still flagging duplicates held by the others", async () => {
+      const list = await app.inject({
+        method: "GET",
+        url: `${BASE}/suppliers`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      const beta = (list.json().data as { id: string; name: string; products: number }[]).find((s) => s.name === RT_B)
+      expect(beta?.products).toBe(1)
+
+      const { table, col } = await exportTable(`?supplierId=${beta?.id}`)
+      expect(table.slice(1).map((r) => r[col("supplierSku")])).toEqual(["B-77"])
+      expect(table[1]?.[col("duplicates")]).toBe(`${RT_A} RT-1 (actif)`)
+
+      const asAdmin = (url: string) =>
+        app.inject({ method: "GET", url, headers: { authorization: `Bearer ${adminToken}` } })
+      expect((await asAdmin(`${BASE}/export?supplierId=not-a-uuid`)).statusCode).toBe(400)
+      expect((await asAdmin(`${BASE}/export?supplierId=00000000-0000-4000-8000-000000000000`)).statusCode).toBe(404)
     })
 
     it("round-trips: Actif and prices apply, the stock never moves", async () => {

@@ -679,14 +679,14 @@
 - [x] **Migration `0017`** : `products.archived_at` (indexé), `catalog_imports.archived_count`.
 - [x] **Format partagé** : colonnes « Actif », « Doublon possible », « Version » dans `CATALOG_IMPORT_COLUMNS`. Une seule fonction écrit l'onglet catalogue, avec ses listes déroulantes : `addCatalogSheet` / `writeCatalogWorkbook` dans `@armurier/shared/spreadsheet`. Le fichier de tri (outil) et l'export (API) l'utilisent tous les deux.
 - [x] **API** :
-  - `GET /api/admin/catalog-imports/export` ;
+  - `GET /api/admin/catalog-imports/export`, **catalogue complet ou un seul fournisseur** (`?supplierId=`, liste dans `GET …/suppliers`), pour garder un fichier par fournisseur comme pour le tri. Les doublons sont toujours cherchés chez **tous** les fournisseurs ;
   - option `archiveMissing` à l'aperçu et à la validation, avec la liste `toArchive` et les compteurs `publish` / `unpublish` / `archive` ;
   - une ligne visant un produit archivé est **refusée**, il faut le réactiver d'abord ;
   - `POST /api/admin/products/:id/archive` et `/restore`, avec journal d'audit ; on ne peut pas publier un produit archivé (409) ;
   - garde de suppression (produit **et** variante) sur `items_json`, fonction `orderedVariantIds`.
 - [x] **Proxy BFF** transparent octet pour octet (`responseType: "arrayBuffer"`). Il transmet `content-type`, `content-disposition` et `cache-control`, mais jamais un cookie (`server/utils/proxy-headers.ts`, testé). Avant, un téléchargement binaire n'aurait pas survécu au proxy.
 - [x] **Écrans** :
-  - `/admin/imports` : bouton « Exporter le catalogue », case « Archiver les produits absents du fichier », liste des produits à archiver dans l'aperçu, colonne « Archivés » dans l'historique ;
+  - `/admin/imports` : bouton « Exporter le catalogue » avec choix du fournisseur, case « Archiver les produits absents du fichier », liste des produits à archiver dans l'aperçu, colonne « Archivés » dans l'historique ;
   - `/admin/produits` : boutons « Archiver » / « Réactiver », badge, filtre « Afficher les archivés » ; refus de suppression expliqué en français ;
   - fiche produit : bandeau « archivé » avec bouton « Réactiver », publication désactivée.
 - [x] **Vérifié en réel** (API + site, via le proxy) :

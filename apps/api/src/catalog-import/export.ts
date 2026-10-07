@@ -86,11 +86,40 @@ const README = [
   "  Si une fiche a été modifiée sur le site après cet export, l'import le signale au lieu d'écraser la correction.",
 ]
 
-/** Build the export workbook. */
-export async function exportCatalogWorkbook(): Promise<{ workbook: Buffer; rows: number }> {
-  const rows = await db
+/** What the export covers: products with a supplier key, not archived, not managed elsewhere. */
+const exportable = () =>
+  and(
+    sql`${products.supplierSku} is not null`,
+    isNull(products.archivedAt),
+    sql`${productCategories.slug} <> ${EXCLUDED_CATEGORY_SLUG}`,
+    sql`not exists (select 1 from ${artworks} where ${artworks.productId} = ${products.id})`,
+    sql`not exists (select 1 from ${ancientWeapons} where ${ancientWeapons.productId} = ${products.id})`,
+  )
+
+/** Suppliers that have something to export, for the per-supplier choice. */
+export async function exportableSuppliers(): Promise<{ id: string; name: string; products: number }[]> {
+  return db
+    .select({ id: suppliers.id, name: suppliers.name, products: sql<number>`count(*)::int` })
+    .from(products)
+    .innerJoin(suppliers, eq(suppliers.id, products.supplierId))
+    .innerJoin(productCategories, eq(productCategories.id, products.categoryId))
+    .where(exportable())
+    .groupBy(suppliers.id, suppliers.name)
+    .orderBy(asc(suppliers.name))
+}
+
+/**
+ * Build the export workbook — the whole catalogue, or one supplier's part of
+ * it. Duplicates are always looked for across EVERY supplier: the point is to
+ * see, in a BGM file, that Cor Caroli sells the same thing.
+ */
+export async function exportCatalogWorkbook(
+  options: { supplierId?: string } = {},
+): Promise<{ workbook: Buffer; rows: number }> {
+  const all = await db
     .select({
       id: products.id,
+      supplierId: suppliers.id,
       supplier: suppliers.name,
       supplierSku: sql<string>`${products.supplierSku}`,
       ean: products.ean,
@@ -112,16 +141,9 @@ export async function exportCatalogWorkbook(): Promise<{ workbook: Buffer; rows:
     .innerJoin(suppliers, eq(suppliers.id, products.supplierId))
     .innerJoin(productCategories, eq(productCategories.id, products.categoryId))
     .leftJoin(legalCategories, eq(legalCategories.id, products.legalCategoryId))
-    .where(
-      and(
-        sql`${products.supplierSku} is not null`,
-        isNull(products.archivedAt),
-        sql`${productCategories.slug} <> ${EXCLUDED_CATEGORY_SLUG}`,
-        sql`not exists (select 1 from ${artworks} where ${artworks.productId} = ${products.id})`,
-        sql`not exists (select 1 from ${ancientWeapons} where ${ancientWeapons.productId} = ${products.id})`,
-      ),
-    )
+    .where(exportable())
     .orderBy(asc(suppliers.name), asc(products.name))
+  const rows = options.supplierId ? all.filter((r) => r.supplierId === options.supplierId) : all
 
   const [{ manual } = { manual: 0 }] = await db
     .select({ manual: sql<number>`count(*)::int` })
@@ -135,7 +157,7 @@ export async function exportCatalogWorkbook(): Promise<{ workbook: Buffer; rows:
       ),
     )
 
-  const duplicates = findPossibleDuplicates(rows)
+  const duplicates = findPossibleDuplicates(all)
   const money = (v: string | null) => (v === null ? null : Number(v))
   const sheetRows: CatalogSheetRow[] = rows.map((r) => ({
     import: "oui",
@@ -163,8 +185,12 @@ export async function exportCatalogWorkbook(): Promise<{ workbook: Buffer; rows:
     .from(productCategories)
     .orderBy(asc(productCategories.name))
 
-  const summary = [`${rows.length} produits exportés, ${duplicates.size} avec un doublon possible.`]
-  if (manual > 0) {
+  const flagged = rows.filter((r) => duplicates.has(r.id)).length
+  const summary = [
+    `${rows.length} produits exportés${options.supplierId ? ` (${rows[0]?.supplier ?? "fournisseur sans produit"})` : ""}, ${flagged} avec un doublon possible.`,
+  ]
+  // A supplier's file is not about hand-made products: only the full export mentions them.
+  if (manual > 0 && !options.supplierId) {
     summary.push(
       `${manual} produits saisis à la main (sans fournisseur ou sans référence fournisseur) ne figurent pas ici : ils se modifient depuis l'écran Produits.`,
     )
