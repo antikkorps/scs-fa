@@ -16,6 +16,7 @@ pnpm collect --list                                   # available suppliers
 pnpm collect bgm-winfield                             # whole catalogue
 pnpm collect humbert --only "^optiques$" --limit 20   # one family, trial run
 pnpm triage                                           # build the workbook from everything collected
+pnpm triage --supplier humbert                        # one workbook per supplier (recommended)
 ```
 
 `--only` takes case-insensitive regular expressions matched against the supplier's own category labels, and can be repeated. A collection **resumes**: pages already collected are skipped, so an interrupted run or a re-run after a parser fix picks up where it stopped.

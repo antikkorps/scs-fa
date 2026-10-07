@@ -1,7 +1,7 @@
 // Command line of the catalogue collection (story 12.2). Run from this package:
 //
 //   pnpm collect <supplier> [--only <pattern>]... [--limit <n>]
-//   pnpm triage [--out <file.xlsx>]
+//   pnpm triage [--supplier <id>]... [--out <file.xlsx>]
 //   pnpm collect --list
 //
 // Everything it reads and writes lives under ./work (git-ignored): the page
@@ -83,11 +83,24 @@ async function loadCategories(config: TriageConfig): Promise<Category[]> {
 }
 
 async function triage(args: string[]) {
-  const { values } = parseArgs({ args, options: { out: { type: "string" } } })
+  const { values } = parseArgs({
+    args,
+    options: { out: { type: "string" }, supplier: { type: "string", multiple: true, default: [] } },
+  })
   const config = await loadConfig()
   const categories = await loadCategories(config)
-  const files = (await readdir(COLLECTED).catch(() => [])).filter((f) => f.endsWith(".jsonl") && !f.includes(".errors"))
-  if (files.length === 0) throw new Error(`Nothing collected yet in ${COLLECTED}`)
+  // One workbook per supplier keeps each file well under the import's limits
+  // (20 000 rows, 15 MB) and lets the client sort one supplier at a time.
+  const files = (await readdir(COLLECTED).catch(() => []))
+    .filter((f) => f.endsWith(".jsonl") && !f.includes(".errors"))
+    .filter((f) => values.supplier.length === 0 || values.supplier.includes(f.replace(/\.jsonl$/, "")))
+  if (files.length === 0) {
+    throw new Error(
+      values.supplier.length > 0
+        ? `Nothing collected for ${values.supplier.join(", ")} in ${COLLECTED}`
+        : `Nothing collected yet in ${COLLECTED}`,
+    )
+  }
 
   const batches: SupplierBatch[] = []
   for (const file of files) {
@@ -116,7 +129,8 @@ async function triage(args: string[]) {
   }
 
   const model = buildTriageModel(batches, categories)
-  const out = resolve(values.out ?? join(WORK, `tri-catalogues-${new Date().toISOString().slice(0, 10)}.xlsx`))
+  const label = values.supplier.length > 0 ? `${values.supplier.join("-")}-` : ""
+  const out = resolve(values.out ?? join(WORK, `tri-${label}catalogues-${new Date().toISOString().slice(0, 10)}.xlsx`))
   await mkdir(resolve(out, ".."), { recursive: true })
   await writeFile(out, await writeTriageWorkbook(model, categories))
   log(
@@ -131,7 +145,7 @@ try {
   else if (command === "triage") await triage(rest)
   else {
     console.error(
-      "Usage: cli.ts collect <supplier>… [--only <pattern>] [--limit <n>] | collect --list | triage [--out <file>]",
+      "Usage: cli.ts collect <supplier>… [--only <pattern>] [--limit <n>] | collect --list | triage [--supplier <id>]… [--out <file>]",
     )
     process.exit(2)
   }
