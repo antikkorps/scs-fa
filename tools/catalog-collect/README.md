@@ -53,6 +53,7 @@ AGORATEC_LOGIN=…     AGORATEC_PASSWORD=…
 The rules that protect the client's accounts:
 
 - **Read-only.** The tool signs in once and reads pages. It never follows a logout link and never touches the account.
+- **robots.txt applies to the sign-in too.** If a site disallows its login page, the tool does not sign in there.
 - **A refused sign-in is never retried.** A second wrong attempt is how an account gets locked. Fix `.env` and run again.
 - **A lost session stops the run.** Every page must still be served signed in. Otherwise the run stops with `SessionLostError` before caching the page, so public pages are never collected as pro ones. Run it again: it resumes.
 - **Separate cache.** Signed-in pages are cached under `work/cache/<supplier>-pro/`, never mixed with public pages.
@@ -63,7 +64,7 @@ The rules that protect the client's accounts:
 |---|---|
 | BGM Winfield | Purchase price excl. VAT, plus a resale coefficient (not kept). No EAN, no stock quantity, no downloadable price list. |
 | Cor Caroli (and Agora-Tec, same platform) | "Votre prix". No EAN. |
-| ESP France | Not wired: the login was refused during the reconnaissance. |
+| ESP France | "Prix Revendeur … HT", but **not used**: its `robots.txt` disallows `/authentication.php`, and the client chose to stay strict (2026-10-07). Prices come from ESP's price list. |
 | ClearMyVault | Not collectable: the shop is behind an anti-bot challenge (LWS / Anubis). Ask the maker for its catalogue. |
 
 ## `work/` (git-ignored: the client's business data)
