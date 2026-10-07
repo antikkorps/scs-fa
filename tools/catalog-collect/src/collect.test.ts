@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import type { SupplierAdapter } from "./adapter.js"
 import { readCollected, runCollection } from "./collect.js"
-import { PoliteClient } from "./http.js"
+import { PoliteClient, SessionLostError } from "./http.js"
 
 const pages: Record<string, string> = {
   "https://s.fr/p/1": "REF-1|Produit un",
@@ -66,6 +66,17 @@ describe("runCollection", () => {
     // The supplier name is the adapter's, whatever the parser said.
     expect(products.every((p) => p.supplier === "Fournisseur Test")).toBe(true)
     expect(await readFile(opts().errorFile, "utf8")).toContain("https://s.fr/p/broken")
+  })
+
+  it("stops the whole run when the pro session is lost, instead of logging every page as failed", async () => {
+    const signedOut = new PoliteClient({
+      fetch: async (url) => new Response(pages[url] ?? "", { status: pages[url] ? 200 : 404 }),
+      acceptPage: () => false,
+      minIntervalMs: 0,
+      sleep: async () => {},
+    })
+    await expect(runCollection(adapter, signedOut, opts())).rejects.toBeInstanceOf(SessionLostError)
+    expect(await readFile(opts().errorFile, "utf8").catch(() => "")).toBe("")
   })
 
   it("resumes: a second run only fetches what is missing", async () => {

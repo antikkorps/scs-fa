@@ -6,12 +6,16 @@
 // - Product pages carry a schema.org Product in JSON-LD (reference, name,
 //   brand, every image). No short description and no feature table: the
 //   specifications are written inside the description.
+// - Pro area: signed in, a product page shows OUR purchase price excl. VAT
+//   (plus the supplier's resale coefficient, not kept). Signed out, it shows
+//   no price block at all — the public price only lives in the JSON-LD, which
+//   is why the purchase price is never read from there.
 
-import type { CollectedProduct } from "@armurier/shared"
+import { type CollectedProduct, parseBankAmount } from "@armurier/shared"
 import * as cheerio from "cheerio"
-import { type CollectScope, inScope, type SupplierAdapter } from "../adapter.js"
+import { type CollectScope, inScope, type ProLogin, type SupplierAdapter } from "../adapter.js"
 import { absoluteUrl, cleanText, jsonLdOfType, ldImages, ldText, unique } from "../extract.js"
-import type { PoliteClient } from "../http.js"
+import { type PoliteClient, SessionLostError } from "../http.js"
 import { breadcrumbPath, imageIdFromUrl, originalImageUrl, unescapeHtml } from "./prestashop.js"
 
 const ORIGIN = "https://bgmwinfield.fr"
@@ -38,6 +42,25 @@ export function parseListingPage(html: string): { productUrls: string[]; next: s
       .filter((u): u is string => Boolean(u)),
   )
   return { productUrls, next: absoluteUrl($('a.js-pager-link[rel="next"]').attr("href"), ORIGIN) }
+}
+
+/** PrestaShop tells its own front-end whether the visitor is signed in. */
+export function isSignedIn(html: string): boolean {
+  return /"is_logged"\s*:\s*true/.test(html)
+}
+
+/**
+ * Our purchase price, excl. VAT, as the pro area prints it. Only read when the
+ * page was served signed in AND labels the price "HT": anything else could be
+ * a public, VAT-inclusive price, and a wrong cost is worse than none.
+ */
+export function parsePurchasePrice(html: string): number | undefined {
+  if (!isSignedIn(html)) return undefined
+  const $ = cheerio.load(html)
+  const prices = $(".product__prices").first()
+  if (cleanText(prices.find(".product__tax-label").first().text())?.toUpperCase() !== "HT") return undefined
+  const amount = parseBankAmount(prices.find(".product__current-price").first().text())
+  return Number.isFinite(amount) && amount > 0 ? amount : undefined
 }
 
 export function parseBgmProduct(html: string, url: string): Omit<CollectedProduct, "supplier"> | null {
@@ -78,14 +101,37 @@ export function parseBgmProduct(html: string, url: string): Omit<CollectedProduc
     specs: {},
     imageUrls,
     sourceCategory: breadcrumbPath(crumbs) ?? unescapeHtml(ldText(ld?.category)),
+    purchasePrice: parsePurchasePrice(html),
     sourceUrl: url,
   }
+}
+
+const proLogin: ProLogin = {
+  envPrefix: "BGM",
+  async signIn(client, { login, password }) {
+    await client.postForm(`${ORIGIN}/connexion?back=my-account`, {
+      back: "my-account",
+      email: login,
+      password,
+      submitLogin: "1",
+    })
+    // The landing page can be a CDN copy: ask the account page itself.
+    const account = await client.get(`${ORIGIN}/mon-compte`, { cache: false }).catch((err: unknown) => {
+      if (err instanceof SessionLostError) return ""
+      throw err
+    })
+    if (!isSignedIn(account)) {
+      throw new Error("BGM Winfield refused the sign-in (check BGM_LOGIN / BGM_PASSWORD); not retried")
+    }
+  },
+  isSignedIn,
 }
 
 export const bgmWinfield: SupplierAdapter = {
   id: "bgm-winfield",
   supplier: "BGM Winfield",
   origin: ORIGIN,
+  proLogin,
   async *discover(client: PoliteClient, scope: CollectScope) {
     const starts =
       scope.filters.length === 0
