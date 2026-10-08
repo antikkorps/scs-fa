@@ -39,4 +39,9 @@ describe("admin layout sidebar", () => {
     const active = wrapper.findAll(".nav__link--active").map((a) => a.attributes("href"))
     expect(active).toEqual(["/admin/gun-art/series"])
   })
+
+  it("heads the sidebar with the brand logo", async () => {
+    const wrapper = await mountAt("/admin")
+    expect(wrapper.find(".brand img.logo").attributes("alt")).toBe("SCS Firearms")
+  })
 })

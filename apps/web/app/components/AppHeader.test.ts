@@ -109,4 +109,11 @@ describe("AppHeader", () => {
     expect(document.querySelector("#msub-armurerie")?.textContent).toContain("Carabines")
     wrapper.unmount()
   })
+
+  it("shows the brand logo as the home link, named once by the link", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    const home = wrapper.find('a.brand[href="/"]')
+    expect(home.attributes("aria-label")).toBe("SCS Firearm — accueil")
+    expect(home.find("img.logo").attributes("alt")).toBe("")
+  })
 })
