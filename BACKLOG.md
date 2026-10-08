@@ -6,8 +6,19 @@
 
 ## Principes transverses (à respecter sur chaque story)
 
-- [ ] Tests écrits avec (ou avant) le code feature — Vitest
-- [ ] DRY : types/validation/constantes dans `packages/shared`
+- [ ] **TDD strict** (depuis le 2026-10-07) — Vitest. Les tests sont notre ceinture de sécurité contre les régressions. Pour chaque comportement et chaque bug :
+  1. écrire le test ;
+  2. le voir **échouer pour la bonne raison** ;
+  3. écrire le code minimal ;
+  4. refactorer, suite au vert.
+
+  Pour un bug, le test qui le reproduit précède le correctif. Un test qui ne peut pas venir d'abord (pure mise en page, site tiers inconnu) est signalé et ajouté juste après. On n'affaiblit jamais un test pour le faire passer.
+- [ ] **DRY et réutilisable** : types, validation et constantes dans `packages/shared`. On cherche ce qui existe avant d'écrire, et on factorise dès la deuxième copie.
+- [ ] **Lisibilité humaine**, bonnes pratiques à l'état de l'art :
+  - **pas de ternaire imbriqué** (`if` avec retour anticipé, `switch` ou table de correspondance) ;
+  - **pas de variable d'une lettre**, paramètres de fonctions fléchées compris (`(row) =>`, pas `(r) =>`) ; seuls les indices de boucle `i` / `j` sont tolérés ;
+  - fonctions courtes avec une seule responsabilité, noms qui disent l'intention, commentaires qui expliquent le **pourquoi** ;
+  - on relit chaque diff avec ces règles avant de commiter : Biome ne vérifie pas tout.
 - [ ] Biome clean (`pnpm lint && pnpm format:check`)
 - [ ] Security by design : inputs validés (Zod), RBAC, audit log, secrets en env
 - [ ] Doc mise à jour si décision non-triviale (`docs/`)
