@@ -91,7 +91,6 @@ export interface ImportPlanRow {
 
 export interface ImportPlan {
   rows: ImportPlanRow[]
-  suppliersToCreate: string[]
   toArchive: ArchivePlanRow[]
   summary: {
     create: number
@@ -167,15 +166,14 @@ export async function planCatalogImport(
     }
   }
 
-  // Suppliers: an unknown name is created at commit — and listed in the preview,
-  // where a typo ("BGM Winfeld") shows up as an unexpected new supplier.
+  // Suppliers: only those declared in the back office (story 12.5). The import
+  // used to create any unknown name, and a typo ("BGM Winfeld") made a twin.
   const supplierRows = await db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers)
-  const supplierIdByKey = new Map(supplierRows.map((s) => [supplierKey(s.name), s.id]))
-  const suppliersToCreate = new Map<string, string>()
+  const supplierIdByKey = new Map(supplierRows.map((supplier) => [supplierKey(supplier.name), supplier.id]))
   for (const row of active()) {
     const name = row.data?.supplier ?? ""
-    if (!supplierIdByKey.has(supplierKey(name)) && !suppliersToCreate.has(supplierKey(name))) {
-      suppliersToCreate.set(supplierKey(name), name)
+    if (!supplierIdByKey.has(supplierKey(name))) {
+      invalidate(row, `Fournisseur inconnu : « ${name} ». Créez-le d'abord dans Catalogue → Fournisseurs.`)
     }
   }
 
@@ -338,9 +336,6 @@ export async function planCatalogImport(
   return {
     rows,
     toArchive,
-    suppliersToCreate: [...new Set(active().map((r) => supplierKey(r.data?.supplier ?? "")))]
-      .map((k) => suppliersToCreate.get(k))
-      .filter((n): n is string => Boolean(n)),
     summary: {
       create: count("create"),
       update: count("update"),
@@ -361,7 +356,6 @@ export interface CommitResult {
   archived: number
   skipped: number
   invalid: number
-  suppliersCreated: number
   imagesQueued: number
 }
 
@@ -382,12 +376,6 @@ export async function commitCatalogImport(
     const legal = await tx.select({ id: legalCategories.id, category: legalCategories.category }).from(legalCategories)
     const legalId = new Map(legal.map((l) => [l.category, l.id]))
 
-    if (plan.suppliersToCreate.length > 0) {
-      await tx
-        .insert(suppliers)
-        .values(plan.suppliersToCreate.map((name) => ({ name })))
-        .onConflictDoNothing()
-    }
     const supplierRows = await tx.select({ id: suppliers.id, name: suppliers.name }).from(suppliers)
     const supplierId = new Map(supplierRows.map((s) => [supplierKey(s.name), s.id]))
 
@@ -533,7 +521,6 @@ export async function commitCatalogImport(
       archived,
       skipped: plan.summary.skipped,
       invalid: plan.summary.invalid,
-      suppliersCreated: plan.suppliersToCreate.length,
       imagesQueued,
     }
     await tx
@@ -543,7 +530,6 @@ export async function commitCatalogImport(
         updatedCount: updated,
         archivedCount: archived,
         skippedCount: result.skipped,
-        suppliersCreated: result.suppliersCreated,
       })
       .where(eq(catalogImports.id, imp.id))
     return result

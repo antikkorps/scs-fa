@@ -733,6 +733,28 @@
   - **BGM** et **Cor Caroli**, avec les prix pro, à lancer le 2026-10-08 ;
   - **Toro**, **Agora-Tec** et **ESP**, en public. Pour ESP, les prix viendront de son tarif.
 
+**Story 12.5** — Fournisseurs gérés dans le back-office — ✅ **CODÉE** _(créée et codée le 2026-10-08, demande de Franck)_
+
+> Besoin : l'export par fournisseur propose une liste tirée de la base, mais rien ne permettait d'y **ajouter un fournisseur**. Le client ne pouvait donc pas commencer le fichier d'un nouveau fournisseur. L'import créait bien un fournisseur à partir de tout nom inconnu, mais une faute de frappe (« BGM Winfeld ») suffisait à créer un doublon.
+
+**Décisions tranchées avec Franck (2026-10-08) :**
+
+- [x] **Écran `/admin/fournisseurs`** (groupe Catalogue) : liste, création et modification. Suppression **seulement si aucun produit** ne s'y rattache, archivés compris.
+- [x] **Liste fermée** : l'import **ne crée plus de fournisseur**. Une ligne d'un fournisseur inconnu est invalide, avec le message « Créez-le d'abord dans Catalogue → Fournisseurs ». La comparaison ignore les majuscules, comme l'index unique `uq_suppliers_name_ci`.
+- [x] **Export** : la liste déroulante propose **tous** les fournisseurs. Un fournisseur sans produit donne un **fichier vierge** à remplir. La colonne Fournisseur du fichier devient une **liste déroulante** tirée de la base (onglet caché `Listes`, colonne B). Les listes couvrent aussi 500 lignes vides sous les données, pour les produits saisis à la main.
+
+**Livré :**
+
+- [x] **API** `GET/POST /api/admin/suppliers`, `PATCH/DELETE /api/admin/suppliers/:id`. Un nom déjà pris renvoie 409 ; c'est la base qui détecte le conflit, sans risque de course. Les messages sont en français, car l'écran les affiche tels quels.
+- [x] **Champs** : nom, e-mail, téléphone. ⚠️ `default_margin_pct` existe en base, mais **rien ne le lit** : il n'est pas proposé, pour ne pas promettre un effet qui n'existe pas.
+- [x] **DRY** : la détection de violation d'unicité Postgres, recopiée dans l'inscription et le blog, est mise en commun dans `apps/api/src/db/errors.ts`.
+- [x] **Outil de tri** : il ne connaît pas la base, donc pas de liste déroulante Fournisseur. Le « Lisez-moi » prévient que le fournisseur doit exister avant l'import.
+- [x] `catalog_imports.suppliers_created` est conservée pour l'historique ; les nouveaux imports y écrivent 0. `suppliersToCreate` (aperçu) et `suppliersCreated` (résultat) sont retirés de l'API.
+- [x] **Vérifié en réel** : création, doublon refusé (autre casse), export « fichier vierge » (en-tête seul, liste Fournisseur), suppression, 0 débordement sur mobile.
+- Tests : **shared 273, API 617, web 334, outil 93 = 1 317**.
+
+**À savoir :** avant d'importer les fichiers de tri (Humbert, BGM…), **créer chaque fournisseur** sous le nom de la colonne Fournisseur du fichier.
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).

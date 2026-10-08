@@ -28,10 +28,12 @@ describe("admin layout sidebar", () => {
     ])
     const links = wrapper.findAll(".nav__link").map((a) => a.attributes("href"))
     expect(links[0]).toBe("/admin")
-    expect(links).toHaveLength(18)
+    expect(links).toHaveLength(19)
     // No screen lost or listed twice in the regrouping.
     expect(new Set(links).size).toBe(links.length)
-    expect(links).toEqual(expect.arrayContaining(["/admin/livraison", "/admin/metrics", "/admin/blog"]))
+    expect(links).toEqual(
+      expect.arrayContaining(["/admin/livraison", "/admin/metrics", "/admin/blog", "/admin/fournisseurs"]),
+    )
   })
 
   it("highlights the current screen only — the dashboard matches exactly", async () => {

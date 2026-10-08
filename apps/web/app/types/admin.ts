@@ -340,7 +340,6 @@ export interface CatalogImportPreview {
     unpublish: number
     archive: number
   }
-  suppliersToCreate: string[]
   /** At most 500 listed; `summary.archive` is the exact count. */
   toArchive: CatalogArchiveRow[]
   rows: CatalogImportPreviewRow[]
@@ -353,7 +352,6 @@ export interface CatalogImportResult {
   archived: number
   skipped: number
   invalid: number
-  suppliersCreated: number
   imagesQueued: number
 }
 

@@ -184,4 +184,12 @@ describe("writeTriageWorkbook", () => {
     expect(validations).toEqual(expect.arrayContaining(['"oui,non"', '"A,B,C,D,Aucune"', "Listes!$A$1:$A$2"]))
     expect(wb.getWorksheet("Prix sans fiche")?.getRow(2).getCell(2).value).toBe("ORPHAN")
   })
+
+  it("warns that the supplier must exist in the back office before the import (story 12.5)", async () => {
+    const file = await writeTriageWorkbook(buildTriageModel([batch()], categories), categories)
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(file as unknown as ArrayBuffer)
+    const readme = wb.getWorksheet("Lisez-moi")?.getColumn(1).values.join("\n")
+    expect(readme).toMatch(/Catalogue → Fournisseurs/)
+  })
 })

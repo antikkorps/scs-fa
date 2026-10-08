@@ -8,6 +8,7 @@ import type {
   CatalogImportResult,
 } from "~/types/admin"
 import {
+  exportSupplierLabel,
   filterPreviewRows,
   IMPORT_ACTION_META,
   PREVIEW_FILTERS,
@@ -232,12 +233,17 @@ async function retry(id: string) {
         <em>Actif</em> à « oui » ou « non » (même produit chez deux fournisseurs : une ligne active, l'autre non), puis
         déposez le fichier ci-dessous. Le stock n'y figure pas : un fichier ne le modifie jamais.
       </p>
+      <p class="hint">
+        Nouveau fournisseur ? Déclarez-le d'abord dans
+        <NuxtLink to="/admin/fournisseurs">Fournisseurs</NuxtLink>, puis exportez son fichier vierge : la colonne
+        Fournisseur propose la liste, et l'import refuse un nom inconnu.
+      </p>
       <div class="actions">
         <label class="sr-only" for="export-supplier">Fournisseur à exporter</label>
         <select id="export-supplier" v-model="exportSupplier" class="select">
           <option value="">Tous les fournisseurs</option>
-          <option v-for="s in exportSuppliers" :key="s.id" :value="s.id">
-            {{ s.name }} ({{ plural(s.products, "produit") }})
+          <option v-for="supplier in exportSuppliers" :key="supplier.id" :value="supplier.id">
+            {{ exportSupplierLabel(supplier) }}
           </option>
         </select>
         <button class="btn btn-ghost" type="button" :disabled="exporting" @click="runExport">
@@ -293,8 +299,7 @@ async function retry(id: string) {
       <p>
         <strong>{{ plural(result.created, "produit créé", "produits créés") }}</strong>,
         {{ plural(result.updated, "produit mis à jour", "produits mis à jour") }}<template v-if="result.archived">,
-          {{ plural(result.archived, "produit archivé", "produits archivés") }}</template><template v-if="result.suppliersCreated">,
-          {{ plural(result.suppliersCreated, "nouveau fournisseur", "nouveaux fournisseurs") }}</template>.
+          {{ plural(result.archived, "produit archivé", "produits archivés") }}</template>.
         Les produits créés sans « Actif = oui » sont <strong>hors ligne</strong> : publiez-les une fois relus.
       </p>
       <p v-if="result.imagesQueued" class="hint">
@@ -334,10 +339,6 @@ async function retry(id: string) {
         </p>
       </details>
 
-      <p v-if="preview.suppliersToCreate.length" class="notice">
-        ⚠️ Fournisseurs qui seront <strong>créés</strong> : {{ preview.suppliersToCreate.join(", ") }}. Une faute de
-        frappe dans le nom apparaîtrait ici.
-      </p>
       <p v-if="preview.summary.invalid" class="hint">
         Les lignes en erreur sont <strong>laissées de côté</strong>. Corrigez-les dans le fichier et relancez l'import
         plus tard : les produits déjà importés seront mis à jour, jamais dupliqués.
@@ -493,11 +494,8 @@ async function retry(id: string) {
   font-size: var(--fs-sm);
   margin: 0 0 0.8rem;
 }
-.notice {
-  font-size: var(--fs-sm);
-  border-left: 3px solid #e0b15f;
-  padding: 0.5rem 0.8rem;
-  margin: 0 0 0.8rem;
+.hint a {
+  color: var(--brass);
 }
 .sr-only {
   position: absolute;

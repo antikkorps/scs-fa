@@ -130,7 +130,6 @@ export const adminCatalogImportRoutes: FastifyPluginAsync = async (fastify) => {
         fileSha256: sha256(upload.bytes),
         ...options,
         summary: plan.summary,
-        suppliersToCreate: plan.suppliersToCreate,
         toArchive: plan.toArchive.slice(0, ARCHIVE_PREVIEW_LIMIT),
         // Skipped rows are the human's own "non": listing them would only bury the rest.
         rows: plan.rows.filter((r) => r.action !== "skipped").map(reportRow),

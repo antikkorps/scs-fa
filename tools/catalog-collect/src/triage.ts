@@ -220,6 +220,9 @@ const README = [
   "5. L'onglet « Prix sans fiche » liste les références du tarif dont aucune fiche n'a été récupérée.",
   "6. Colonne Actif : « oui » met le produit en ligne dès l'import ; laissée vide, il arrive hors ligne, à publier après relecture.",
   "",
+  "7. Le fournisseur doit exister dans l'administration (Catalogue → Fournisseurs), sous le nom de la colonne Fournisseur,",
+  "   avant l'import : une ligne d'un fournisseur inconnu est refusée.",
+  "",
   "Ne renommez pas les colonnes. Enregistrez au format .xlsx, puis déposez le fichier dans l'administration :",
   "Import catalogues → Prévisualiser → Importer. Rien n'est écrit avant que vous ayez validé l'aperçu.",
 ]
@@ -230,12 +233,9 @@ export async function writeTriageWorkbook(model: TriageModel, categories: Catego
   wb.creator = "SCS Firearm — collecte catalogues"
   wb.created = new Date()
 
-  addCatalogSheet(
-    wb,
-    "À trier",
-    model.rows,
-    categories.map((c) => c.name),
-  )
+  // No supplier drop-down: this tool never sees the site's database. The import
+  // checks the name against the declared suppliers instead.
+  addCatalogSheet(wb, "À trier", model.rows, { categoryNames: categories.map((category) => category.name) })
 
   const orphans = wb.addWorksheet("Prix sans fiche", { views: [{ state: "frozen", ySplit: 1 }] })
   orphans.columns = [
