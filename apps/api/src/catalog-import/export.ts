@@ -82,7 +82,9 @@ const README = [
   "  fichier » à l'import, et seulement pour les fournisseurs présents dans le fichier. Il se réactive depuis l'écran Produits.",
   "• Pour que vos prix et textes remplacent ceux du site, cochez « Écraser » à l'import ; sinon seuls les champs vides sont remplis.",
   "• Le stock n'est pas dans ce fichier : il bouge avec les ventes, un fichier ne le modifie jamais.",
-  "• Ne modifiez pas les colonnes Fournisseur, Réf. fournisseur et Version : elles relient chaque ligne à son produit.",
+  "• Fournisseur : choisissez-le dans la liste. Un nouveau fournisseur se crée d'abord dans l'administration",
+  "  (Catalogue → Fournisseurs) : l'import refuse une ligne d'un fournisseur inconnu.",
+  "• Ne modifiez pas les colonnes Fournisseur, Réf. fournisseur et Version des lignes existantes : elles relient chaque ligne à son produit.",
   "  Si une fiche a été modifiée sur le site après cet export, l'import le signale au lieu d'écraser la correction.",
 ]
 
@@ -96,16 +98,28 @@ const exportable = () =>
     sql`not exists (select 1 from ${ancientWeapons} where ${ancientWeapons.productId} = ${products.id})`,
   )
 
-/** Suppliers that have something to export, for the per-supplier choice. */
+/** Every declared supplier, alphabetically — the Fournisseur drop-down of the export. */
+const declaredSuppliers = () =>
+  db
+    .select({ id: suppliers.id, name: suppliers.name })
+    .from(suppliers)
+    .orderBy(asc(sql`lower(${suppliers.name})`))
+
+/**
+ * Every supplier, for the per-supplier choice, with how many products its file
+ * would hold. One without any still gets a file: a blank one to fill in, which
+ * is how a new supplier's catalogue starts (story 12.5).
+ */
 export async function exportableSuppliers(): Promise<{ id: string; name: string; products: number }[]> {
-  return db
-    .select({ id: suppliers.id, name: suppliers.name, products: sql<number>`count(*)::int` })
+  const counts = await db
+    .select({ supplierId: products.supplierId, products: sql<number>`count(*)::int` })
     .from(products)
-    .innerJoin(suppliers, eq(suppliers.id, products.supplierId))
     .innerJoin(productCategories, eq(productCategories.id, products.categoryId))
     .where(exportable())
-    .groupBy(suppliers.id, suppliers.name)
-    .orderBy(asc(suppliers.name))
+    .groupBy(products.supplierId)
+  const countBySupplier = new Map(counts.map((count) => [count.supplierId, count.products]))
+  const all = await declaredSuppliers()
+  return all.map((supplier) => ({ ...supplier, products: countBySupplier.get(supplier.id) ?? 0 }))
 }
 
 /**
@@ -185,10 +199,11 @@ export async function exportCatalogWorkbook(
     .from(productCategories)
     .orderBy(asc(productCategories.name))
 
+  const supplierList = await declaredSuppliers()
+  const chosenSupplier = supplierList.find((supplier) => supplier.id === options.supplierId)
   const flagged = rows.filter((r) => duplicates.has(r.id)).length
-  const summary = [
-    `${rows.length} produits exportés${options.supplierId ? ` (${rows[0]?.supplier ?? "fournisseur sans produit"})` : ""}, ${flagged} avec un doublon possible.`,
-  ]
+  const scope = chosenSupplier ? ` (${chosenSupplier.name})` : ""
+  const summary = [`${rows.length} produits exportés${scope}, ${flagged} avec un doublon possible.`]
   // A supplier's file is not about hand-made products: only the full export mentions them.
   if (manual > 0 && !options.supplierId) {
     summary.push(
@@ -199,7 +214,12 @@ export async function exportCatalogWorkbook(
     creator: "SCS Firearms — export du catalogue",
     sheetName: "Catalogue",
     rows: sheetRows,
-    categoryNames: categories.filter((c) => c.slug !== EXCLUDED_CATEGORY_SLUG).map((c) => c.name),
+    lists: {
+      categoryNames: categories
+        .filter((category) => category.slug !== EXCLUDED_CATEGORY_SLUG)
+        .map((category) => category.name),
+      supplierNames: supplierList.map((supplier) => supplier.name),
+    },
     readme: [...README, "", ...summary],
   })
   return { workbook, rows: rows.length }

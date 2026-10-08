@@ -2,25 +2,13 @@ import { CURRENT_RGPD_CONSENT_VERSION, registerSchema } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
+import { isUniqueViolation } from "../db/errors.js"
 import { auditLogs, users } from "../db/schema.js"
 
 const ARGON2ID_OPTIONS = {
   memoryCost: 19_456, // 19 MiB — OWASP 2024 minimum for argon2id
   timeCost: 2,
   parallelism: 1,
-}
-
-const PG_UNIQUE_VIOLATION = "23505"
-
-type PgUniqueError = { code: string; constraint?: string }
-
-const hasPgCode = (e: unknown, code: string): boolean =>
-  typeof e === "object" && e !== null && "code" in e && (e as { code: unknown }).code === code
-
-const isUniqueViolation = (err: unknown): err is PgUniqueError => {
-  if (hasPgCode(err, PG_UNIQUE_VIOLATION)) return true
-  const cause = (err as { cause?: unknown })?.cause
-  return hasPgCode(cause, PG_UNIQUE_VIOLATION)
 }
 
 export const registerRoute: FastifyPluginAsync = async (fastify) => {

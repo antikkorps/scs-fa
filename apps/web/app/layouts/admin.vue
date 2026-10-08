@@ -20,6 +20,7 @@ const groups = [
     items: [
       { to: "/admin/produits", label: "Produits", icon: "▧" },
       { to: "/admin/imports", label: "Import catalogues", icon: "⇪" },
+      { to: "/admin/fournisseurs", label: "Fournisseurs", icon: "◧" },
       { to: "/admin/armes-anciennes", label: "Armes de collection", icon: "⚑" },
       { to: "/admin/tags", label: "Tags", icon: "⌗" },
     ],

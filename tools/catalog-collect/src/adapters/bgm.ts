@@ -11,7 +11,7 @@
 //   no price block at all — the public price only lives in the JSON-LD, which
 //   is why the purchase price is never read from there.
 
-import { type CollectedProduct, parseBankAmount } from "@armurier/shared"
+import { CATALOG_SUPPLIERS, type CollectedProduct, parseBankAmount } from "@armurier/shared"
 import * as cheerio from "cheerio"
 import { type CollectScope, inScope, type ProLogin, type SupplierAdapter } from "../adapter.js"
 import { absoluteUrl, cleanText, jsonLdOfType, ldImages, ldText, unique } from "../extract.js"
@@ -129,7 +129,7 @@ const proLogin: ProLogin = {
 
 export const bgmWinfield: SupplierAdapter = {
   id: "bgm-winfield",
-  supplier: "BGM Winfield",
+  supplier: CATALOG_SUPPLIERS.bgmWinfield,
   origin: ORIGIN,
   proLogin,
   async *discover(client: PoliteClient, scope: CollectScope) {
@@ -155,6 +155,6 @@ export const bgmWinfield: SupplierAdapter = {
   },
   parse(html, url) {
     const product = parseBgmProduct(html, url)
-    return product ? { ...product, supplier: "BGM Winfield" } : null
+    return product ? { ...product, supplier: CATALOG_SUPPLIERS.bgmWinfield } : null
   },
 }

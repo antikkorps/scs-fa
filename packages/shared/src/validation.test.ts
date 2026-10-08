@@ -6,6 +6,7 @@ import {
   cartItemSchema,
   createAncientWeaponSchema,
   createOrderSchema,
+  createSupplierSchema,
   loginSchema,
   newsletterSubscribeSchema,
   newsletterUnsubscribeSchema,
@@ -13,6 +14,7 @@ import {
   refreshSchema,
   registerSchema,
   updateProductSchema,
+  updateSupplierSchema,
 } from "./validation.js"
 
 describe("registerSchema", () => {
@@ -249,5 +251,31 @@ describe("createOrderSchema (story 12.1)", () => {
     const { acceptedTermsVersion: _, ...withoutTerms } = base
     expect(createOrderSchema.safeParse(withoutTerms).success).toBe(false)
     expect(createOrderSchema.safeParse({ ...base, acceptedTermsVersion: "" }).success).toBe(false)
+  })
+})
+
+describe("supplier schemas (story 12.5)", () => {
+  it("needs a name, trimmed, and takes the contact details as optional", () => {
+    expect(createSupplierSchema.parse({ name: "  BGM Winfield  " })).toEqual({ name: "BGM Winfield" })
+    expect(
+      createSupplierSchema.parse({
+        name: "Cor Caroli",
+        contactEmail: "pro@corcaroli.fr",
+        contactPhone: "+33 1 23 45 67 89",
+      }),
+    ).toMatchObject({ contactEmail: "pro@corcaroli.fr", contactPhone: "+33 1 23 45 67 89" })
+    expect(createSupplierSchema.safeParse({ name: "   " }).success).toBe(false)
+    expect(createSupplierSchema.safeParse({}).success).toBe(false)
+  })
+
+  it("refuses a malformed e-mail or phone, and any field it does not know", () => {
+    expect(createSupplierSchema.safeParse({ name: "Toro", contactEmail: "pas-un-mail" }).success).toBe(false)
+    expect(createSupplierSchema.safeParse({ name: "Toro", contactPhone: "appelez-moi" }).success).toBe(false)
+    expect(createSupplierSchema.safeParse({ name: "Toro", defaultMarginPct: 30 }).success).toBe(false)
+  })
+
+  it("patches any field, but never with nothing", () => {
+    expect(updateSupplierSchema.parse({ contactEmail: "contact@toro.fr" })).toEqual({ contactEmail: "contact@toro.fr" })
+    expect(updateSupplierSchema.safeParse({}).success).toBe(false)
   })
 })

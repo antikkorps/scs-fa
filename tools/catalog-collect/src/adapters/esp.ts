@@ -1,3 +1,4 @@
+import { CATALOG_SUPPLIERS } from "@armurier/shared"
 // ESP France (www.espfrance.com) — PrestaShop 1.4, no structured data.
 //
 // Coverage is PARTIAL BY DESIGN. robots.txt forbids `/*p=`, i.e. every
@@ -178,7 +179,7 @@ export const esp: SupplierAdapter = (() => {
   const categoryOf = new Map<string, string>()
   return {
     id: "esp-france",
-    supplier: "ESP France",
+    supplier: CATALOG_SUPPLIERS.espFrance,
     origin: ORIGIN,
     async *discover(client: PoliteClient, scope: CollectScope) {
       const seen = new Set<string>()
@@ -201,7 +202,7 @@ export const esp: SupplierAdapter = (() => {
     },
     parse(html, url) {
       const product = parseEspProduct(html, url, categoryOf.get(url))
-      return product ? { ...product, supplier: "ESP France" } : null
+      return product ? { ...product, supplier: CATALOG_SUPPLIERS.espFrance } : null
     },
   }
 })()

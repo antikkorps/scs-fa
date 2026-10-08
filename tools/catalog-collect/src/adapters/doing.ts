@@ -16,7 +16,7 @@
 //   reliable marker. Its link is never followed (discovery only reads the
 //   menu and listing fragments).
 
-import { type CollectedProduct, parseBankAmount } from "@armurier/shared"
+import { CATALOG_SUPPLIERS, type CollectedProduct, parseBankAmount } from "@armurier/shared"
 import * as cheerio from "cheerio"
 import { type CollectScope, inScope, type ProLogin, type SupplierAdapter } from "../adapter.js"
 import { absoluteUrl, cleanText, fixC1, unique } from "../extract.js"
@@ -206,13 +206,13 @@ export function doingAdapter(config: {
 
 export const agoraTec = doingAdapter({
   id: "agora-tec",
-  supplier: "Agora-Tec",
+  supplier: CATALOG_SUPPLIERS.agoraTec,
   origin: "https://www.agora-tec.fr",
   envPrefix: "AGORATEC",
 })
 export const corCaroli = doingAdapter({
   id: "cor-caroli",
-  supplier: "Cor Caroli",
+  supplier: CATALOG_SUPPLIERS.corCaroli,
   origin: "https://www.cor-caroli.fr",
   envPrefix: "CORCAROLI",
 })

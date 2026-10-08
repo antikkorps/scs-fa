@@ -25,7 +25,8 @@ const PASSWORD = "MotDePasseTresLong123!"
 const BASE = "/api/admin/catalog-imports"
 // Every supplier of this suite starts with the prefix, so cleanup is exact.
 const SUPPLIER = "Testcatimp Fournisseur"
-const OTHER_SUPPLIER = "Testcatimp Nouveau"
+// Never created: the import must refuse a supplier the admin has not declared.
+const UNKNOWN_SUPPLIER = "Testcatimp Inconnu"
 
 type Cells = Partial<Record<(typeof CATALOG_IMPORT_COLUMNS)[number]["key"], string>>
 
@@ -122,6 +123,8 @@ describe("admin catalogue import (story 12.2)", () => {
     app = await buildApp()
     await app.ready()
     await cleanup()
+    // Story 12.5: suppliers are declared in the back office before any import.
+    await db.insert(suppliers).values([SUPPLIER, "Testcatimp Rt Alpha", "Testcatimp Rt Beta"].map((name) => ({ name })))
     adminToken = await makeUser("testcatimp-admin@testcatimp.local", "admin")
     customerToken = await makeUser("testcatimp-cust@testcatimp.local", "customer")
   })
@@ -145,31 +148,35 @@ describe("admin catalogue import (story 12.2)", () => {
         row({ supplierSku: "BAD-CAT", name: "Testcatimp Mauvaise catégorie", category: "Inexistante" }),
         row({ supplierSku: "GUNART", name: "Testcatimp Gun Art", category: "gun-art" }),
         row({ supplierSku: "LATER", import: "non" }),
-        row({ supplierSku: "NEW-SUP", name: "Testcatimp Autre fournisseur", supplier: OTHER_SUPPLIER }),
+        row({ supplierSku: "NEW-SUP", name: "Testcatimp Autre fournisseur", supplier: UNKNOWN_SUPPLIER }),
       ]),
     )
     expect(res.statusCode).toBe(200)
     const data = res.json().data
     expect(data.fileSha256).toMatch(/^[0-9a-f]{64}$/)
     expect(data.summary).toEqual({
-      create: 2,
+      create: 1,
       update: 0,
-      invalid: 3,
+      invalid: 4,
       skipped: 1,
-      images: 4,
+      images: 2,
       publish: 0,
       unpublish: 0,
       archive: 0,
     })
-    expect(data.suppliersToCreate.sort()).toEqual([OTHER_SUPPLIER, SUPPLIER].sort())
+    expect(data).not.toHaveProperty("suppliersToCreate")
     // Skipped rows are not echoed back.
     expect(data.rows.map((r: { line: number }) => r.line)).toEqual([2, 3, 4, 5, 7])
     const byLine = new Map(data.rows.map((r: { line: number }) => [r.line, r]))
     expect((byLine.get(3) as { errors: string[] }).errors.join()).toMatch(/Catégorie légale obligatoire/)
     expect((byLine.get(4) as { errors: string[] }).errors.join()).toMatch(/Catégorie inconnue/)
     expect((byLine.get(5) as { errors: string[] }).errors.join()).toMatch(/propre écran/)
+    expect((byLine.get(7) as { errors: string[] }).errors.join()).toMatch(
+      /Fournisseur inconnu : « Testcatimp Inconnu ».*Fournisseurs/,
+    )
 
-    expect(await db.select().from(suppliers).where(like(suppliers.name, "Testcatimp%"))).toEqual([])
+    const known = await db.select({ name: suppliers.name }).from(suppliers).where(like(suppliers.name, "Testcatimp%"))
+    expect(known.map((supplier) => supplier.name)).not.toContain(UNKNOWN_SUPPLIER)
   })
 
   it("refuses a file without the required columns, and a file that is not a spreadsheet", async () => {
@@ -187,7 +194,12 @@ describe("admin catalogue import (story 12.2)", () => {
     expect(wrong.statusCode).toBe(409)
   })
 
-  it("creates unpublished products, the supplier, and queues the images", async () => {
+  it("matches a declared supplier whatever the case of the file", async () => {
+    const res = await upload(`${BASE}/preview`, sheet([row({ supplier: SUPPLIER.toUpperCase() })]))
+    expect(res.json().data.summary).toMatchObject({ create: 1, invalid: 0 })
+  })
+
+  it("creates unpublished products and queues the images", async () => {
     const { res } = await importFile(
       sheet([
         row(),
@@ -201,7 +213,8 @@ describe("admin catalogue import (story 12.2)", () => {
       ]),
     )
     expect(res.statusCode).toBe(201)
-    expect(res.json().data).toMatchObject({ created: 2, updated: 0, suppliersCreated: 1, imagesQueued: 2 })
+    expect(res.json().data).toMatchObject({ created: 2, updated: 0, imagesQueued: 2 })
+    expect(res.json().data).not.toHaveProperty("suppliersCreated")
 
     const redDot = await productByRef("RED-DOT-1")
     expect(redDot?.product).toMatchObject({
@@ -244,7 +257,7 @@ describe("admin catalogue import (story 12.2)", () => {
     )
     expect(preview.summary).toMatchObject({ create: 0, update: 1 })
     expect(preview.rows[0].warnings.join()).toMatch(/Catégorie légale en base \(none\).*conservée/)
-    expect(res.json().data).toMatchObject({ created: 0, updated: 1, suppliersCreated: 0, imagesQueued: 0 })
+    expect(res.json().data).toMatchObject({ created: 0, updated: 1, imagesQueued: 0 })
 
     const after = await productByRef("RED-DOT-1")
     expect(after?.product.id).toBe(before?.product.id)
@@ -549,6 +562,37 @@ describe("admin catalogue import (story 12.2)", () => {
         app.inject({ method: "GET", url, headers: { authorization: `Bearer ${adminToken}` } })
       expect((await asAdmin(`${BASE}/export?supplierId=not-a-uuid`)).statusCode).toBe(400)
       expect((await asAdmin(`${BASE}/export?supplierId=00000000-0000-4000-8000-000000000000`)).statusCode).toBe(404)
+    })
+
+    it("offers a supplier without products, whose export is a blank file to fill in (story 12.5)", async () => {
+      const [fresh] = await db
+        .insert(suppliers)
+        .values({ name: "Testcatimp Rt Vierge" })
+        .returning({ id: suppliers.id })
+      const list = await app.inject({
+        method: "GET",
+        url: `${BASE}/suppliers`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      const listed = (list.json().data as { id: string; name: string; products: number }[]).find(
+        (supplier) => supplier.id === fresh?.id,
+      )
+      expect(listed).toMatchObject({ name: "Testcatimp Rt Vierge", products: 0 })
+
+      const { table, col } = await exportTable(`?supplierId=${fresh?.id}`)
+      expect(table).toHaveLength(1)
+      expect(col("supplier")).toBeGreaterThanOrEqual(0)
+    })
+
+    it("lists the declared suppliers as the Fournisseur drop-down of the export", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: `${BASE}/export`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      const lists = await readSpreadsheet(res.rawPayload, { sheet: "Listes" })
+      const names = lists.map((line) => line[1]).filter(Boolean)
+      expect(names).toEqual(expect.arrayContaining([SUPPLIER, RT_A, RT_B, "Testcatimp Rt Vierge"]))
     })
 
     it("round-trips: Actif and prices apply, the stock never moves", async () => {
