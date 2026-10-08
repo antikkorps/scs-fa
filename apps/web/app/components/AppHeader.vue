@@ -91,7 +91,7 @@ async function signOut() {
 <template>
   <header class="hdr">
     <div class="container hdr__bar">
-      <NuxtLink to="/" class="brand" aria-label="SCS Firearm — accueil" @click="closeAll">
+      <NuxtLink to="/" class="brand" aria-label="SCS Firearms — accueil" @click="closeAll">
         <AppLogo decorative />
       </NuxtLink>
 

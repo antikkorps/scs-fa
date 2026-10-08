@@ -5,7 +5,7 @@ import { formatDate, formatEuros } from "~/utils/format"
 import { legalStatusLabel, paymentStatusLabel, statusTone } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Mes commandes — SCS Firearm" })
+useHead({ title: "Mes commandes — SCS Firearms" })
 
 const { list } = useOrders()
 

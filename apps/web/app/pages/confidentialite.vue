@@ -17,7 +17,7 @@ const UPDATED_ON = "24 septembre 2026"
 usePageSeo({
   title: "Politique de confidentialité",
   description:
-    "Quelles données SCS Firearm collecte, pourquoi, combien de temps elles sont conservées, avec qui elles sont partagées et comment exercer vos droits.",
+    "Quelles données SCS Firearms collecte, pourquoi, combien de temps elles sont conservées, avec qui elles sont partagées et comment exercer vos droits.",
   path: "/confidentialite",
   noindex: !REVIEWED,
 })
@@ -33,7 +33,7 @@ usePageSeo({
     :reviewed="REVIEWED"
   >
     <p>
-      Cette page explique quelles données personnelles SCS Firearm traite lorsque vous visitez le site, créez un
+      Cette page explique quelles données personnelles SCS Firearms traite lorsque vous visitez le site, créez un
       compte, passez commande ou vous abonnez à nos envois, pourquoi, pendant combien de temps, et comment exercer vos
       droits. Elle s'applique aux deux univers du site : l'armurerie et la galerie Gun Art.
     </p>
@@ -172,7 +172,7 @@ usePageSeo({
 
     <h2>Destinataires et sous-traitants</h2>
     <p>
-      Vos données sont traitées par l'équipe de SCS Firearm. Nous ne les vendons pas. Nous faisons appel aux
+      Vos données sont traitées par l'équipe de SCS Firearms. Nous ne les vendons pas. Nous faisons appel aux
       prestataires suivants, qui n'agissent que sur nos instructions :
     </p>
     <ul>

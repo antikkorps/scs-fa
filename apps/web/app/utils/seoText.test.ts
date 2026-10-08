@@ -12,7 +12,7 @@ describe("metaDescription (story 9.6)", () => {
 
   it("cuts a long one on a word boundary, within the limit, with an ellipsis", () => {
     const long =
-      "SCS Firearm réunit une armurerie de précision — armes, munitions, optiques et accessoires encadrés par la réglementation française — et Gun Art, des tirages d'art en édition limitée, signés, numérotés et certifiés."
+      "SCS Firearms réunit une armurerie de précision — armes, munitions, optiques et accessoires encadrés par la réglementation française — et Gun Art, des tirages d'art en édition limitée, signés, numérotés et certifiés."
     const out = metaDescription(long)
     expect(out.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX)
     expect(out.endsWith("…")).toBe(true)

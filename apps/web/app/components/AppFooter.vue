@@ -43,7 +43,7 @@ const { reopen } = useConsent()
     </div>
 
     <div class="container ft__base">
-      <p>© {{ year }} SCS Firearm. Tous droits réservés.</p>
+      <p>© {{ year }} SCS Firearms. Tous droits réservés.</p>
       <nav class="ft__legal" aria-label="Informations légales">
         <NuxtLink to="/mentions-legales">Mentions légales</NuxtLink>
         <NuxtLink to="/cgv">CGV</NuxtLink>

@@ -178,7 +178,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         ibanRecipient: "FR7630006000011234567890189",
         bicRecipient: "AGRIFRPP",
         bankName: "Banque Test",
-        accountHolderName: "SCS Firearm SAS",
+        accountHolderName: "SCS Firearms SAS",
         paymentReference: opts.reference ?? `SCS-TEST-${orderId.slice(0, 4)}`,
         paymentStatus: opts.status ?? "awaiting_transfer",
       })
@@ -569,7 +569,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(virement.ibanRecipient).toBe("FR7630006000011234567890189")
         expect(virement.bicRecipient).toBe("AGRIFRPP")
         expect(virement.bankName).toBe("Banque Test")
-        expect(virement.accountHolderName).toBe("SCS Firearm SAS")
+        expect(virement.accountHolderName).toBe("SCS Firearms SAS")
         // unique, typo-resistant reference
         expect(virement.paymentReference).toMatch(/^SCS-[0-9A-Z]{4}-[0-9A-Z]{4}$/)
         expect(virement.paymentReference).not.toMatch(/[ILOU]/)
@@ -635,7 +635,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
           iban: "FR7630006000011234567890189",
           bic: "AGRIFRPP",
           bankName: "Banque Test",
-          accountHolder: "SCS Firearm SAS",
+          accountHolder: "SCS Firearms SAS",
           paymentStatus: "awaiting_transfer",
         })
       })

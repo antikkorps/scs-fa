@@ -3,7 +3,7 @@ import type { MaybeRefOrGetter } from "vue"
 export interface PageSeo {
   /** The page's own title; the site name is appended by the title template. "" on the home page. */
   title: MaybeRefOrGetter<string>
-  /** Title on social cards. Defaults to "<title> — SCS Firearm". */
+  /** Title on social cards. Defaults to "<title> — SCS Firearms". */
   socialTitle?: MaybeRefOrGetter<string>
   description: MaybeRefOrGetter<string>
   /** Path of the page's canonical URL, e.g. "/boutique/glock-17". */
@@ -18,7 +18,7 @@ export interface PageSeo {
   noindex?: boolean
 }
 
-const DEFAULT_IMAGE = { path: "/og-default.png", width: 1200, height: 630, alt: "SCS Firearm — Armurerie & Gun Art" }
+const DEFAULT_IMAGE = { path: "/og-default.png", width: 1200, height: 630, alt: "SCS Firearms — Armurerie & Gun Art" }
 
 /**
  * Everything a page tells search engines and social networks about itself, in
@@ -35,7 +35,7 @@ export function usePageSeo(seo: PageSeo) {
   const siteUrl = useRuntimeConfig().public.siteUrl as string
 
   const title = () => toValue(seo.title)
-  const socialTitle = () => toValue(seo.socialTitle) || (title() ? `${title()} — SCS Firearm` : "SCS Firearm")
+  const socialTitle = () => toValue(seo.socialTitle) || (title() ? `${title()} — SCS Firearms` : "SCS Firearms")
   const description = () => metaDescription(toValue(seo.description))
   const url = () => `${siteUrl}${toValue(seo.path)}`
   const ownImage = () => ogImageUrl(toValue(seo.image), siteUrl)
