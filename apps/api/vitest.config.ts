@@ -27,7 +27,7 @@ export default defineConfig({
       VIREMENT_IBAN: "FR7630006000011234567890189",
       VIREMENT_BIC: "AGRIFRPP",
       VIREMENT_BANK_NAME: "Banque Test",
-      VIREMENT_ACCOUNT_HOLDER: "SCS Firearm SAS",
+      VIREMENT_ACCOUNT_HOLDER: "SCS Firearms SAS",
     },
     include: ["src/**/*.{test,spec}.ts"],
     coverage: {

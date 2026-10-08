@@ -17,7 +17,7 @@ const UPDATED_ON = "29 septembre 2026"
 usePageSeo({
   title: "Mentions légales",
   description:
-    "Éditeur, directeur de la publication, hébergeur et propriété intellectuelle du site SCS Firearm, armurerie et galerie Gun Art.",
+    "Éditeur, directeur de la publication, hébergeur et propriété intellectuelle du site SCS Firearms, armurerie et galerie Gun Art.",
   path: "/mentions-legales",
   noindex: !REVIEWED,
 })
@@ -36,7 +36,7 @@ const id = LEGAL_IDENTITY
   >
     <h2>Éditeur du site</h2>
     <p>
-      Le site SCS Firearm est édité par <LegalFact :value="id.companyName" label="raison sociale" />,
+      Le site SCS Firearms est édité par <LegalFact :value="id.companyName" label="raison sociale" />,
       <LegalFact :value="id.legalForm" label="forme juridique" /> au capital de
       <LegalFact :value="id.shareCapital" label="capital" />.
     </p>
@@ -52,7 +52,7 @@ const id = LEGAL_IDENTITY
     <h2>Activité réglementée</h2>
     <p>
       Le commerce des armes, de leurs éléments et de leurs munitions est une activité réglementée par le Code de la
-      sécurité intérieure. SCS Firearm l'exerce sous couvert de l'autorisation
+      sécurité intérieure. SCS Firearms l'exerce sous couvert de l'autorisation
       <LegalFact :value="id.firearmsTradeAuthorisation" label="référence et préfecture de l'autorisation" />. Les
       conditions propres à l'achat d'un article réglementé sont détaillées dans nos
       <NuxtLink to="/cgv">conditions générales de vente</NuxtLink> et dans notre
@@ -70,7 +70,7 @@ const id = LEGAL_IDENTITY
 
     <h2>Propriété intellectuelle</h2>
     <p>
-      La structure du site, ses textes, sa charte graphique et ses logos sont la propriété de SCS Firearm. Les œuvres de
+      La structure du site, ses textes, sa charte graphique et ses logos sont la propriété de SCS Firearms. Les œuvres de
       la galerie Gun Art et leurs reproductions sont protégées par le droit d'auteur et appartiennent à
       <NuxtLink to="/collection/artiste">leur artiste</NuxtLink>. Toute reproduction ou diffusion, totale ou
       partielle, sans autorisation écrite préalable est interdite (articles L122-4 et L335-2 du Code de la propriété

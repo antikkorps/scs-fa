@@ -4,7 +4,7 @@ import { NEWSLETTER_SEGMENT_LABELS, type NewsletterSegment } from "@armurier/sha
 // Double opt-in, step 2 (story 11.4). Landing page of the link mailed at signup:
 // following it is what turns a captured address into a lawful, timestamped
 // consent — nothing is sent before this page has been reached.
-useHead({ title: "Confirmation d'inscription — SCS Firearm" })
+useHead({ title: "Confirmation d'inscription — SCS Firearms" })
 // A confirmation link is single-use and personal: it has nothing to do in an index.
 useSeoMeta({ robots: "noindex, nofollow" })
 

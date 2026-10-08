@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { forgotPasswordSchema } from "@armurier/shared"
 
-useHead({ title: "Mot de passe oublié — SCS Firearm" })
+useHead({ title: "Mot de passe oublié — SCS Firearms" })
 
 const { forgotPassword } = useAuth()
 

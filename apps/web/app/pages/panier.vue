@@ -3,7 +3,7 @@ import type { CartView } from "~/types/cart"
 import { formatEuros } from "~/utils/format"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Mon panier — SCS Firearm" })
+useHead({ title: "Mon panier — SCS Firearms" })
 
 const { fetchCart, updateItem, removeItem, removeArtworkItem } = useCart()
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { loginSchema } from "@armurier/shared"
 
-useHead({ title: "Connexion — SCS Firearm" })
+useHead({ title: "Connexion — SCS Firearms" })
 
 const { login, isAuthenticated } = useAuth()
 const route = useRoute()

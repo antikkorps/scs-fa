@@ -211,7 +211,7 @@ export async function exportCatalogWorkbook(
     )
   }
   const workbook = await writeCatalogWorkbook({
-    creator: "SCS Firearm — export du catalogue",
+    creator: "SCS Firearms — export du catalogue",
     sheetName: "Catalogue",
     rows: sheetRows,
     lists: {
