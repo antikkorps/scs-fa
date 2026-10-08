@@ -740,8 +740,11 @@
   - Catégories proposées à partir de la famille Humbert ; 546 lignes sans proposition.
   - ⚠️ **8 articles classés A** chez Humbert (A1.8, A1.9bis) : à signaler au client.
   - ⚠️ Rappel : 746 articles portent un **visuel générique de gamme**.
+- **Cor Caroli prêt (2026-10-08)** : `work/tri-cor-caroli-catalogues-2026-10-08.xlsx`, 1 554 lignes, **prix d'achat pro HT** sur 1 525. Les 29 sans prix n'en affichent aucun, même connecté (guidons MC5x…).
+  - Règles dans `work/config.json` (clé `cor-caroli`) : **marge 30 %** ; catégorie du site déduite de la collection Cor Caroli (1 553 sur 1 554) ; **catégorie légale par la lettre du classement Cor Caroli**, comme pour Humbert (décision de Franck).
+  - L'adaptateur lit désormais ce classement (« Catégorie d'arme » : B1, C 1°-b…) dans `supplierLegalClass`. 192 articles en ont un ; **11 armes sur 185 n'en ont pas**, le client complète.
 - **Restent à collecter** (décision de Franck : catalogues complets) :
-  - **BGM** et **Cor Caroli**, avec les prix pro, à lancer le 2026-10-08 ;
+  - **BGM**, avec les prix pro, collecte lancée le 2026-10-08 ;
   - **Toro**, **Agora-Tec** et **ESP**, en public. Pour ESP, les prix viendront de son tarif.
 
 **Story 12.5** — Fournisseurs gérés dans le back-office — ✅ **CODÉE** _(créée et codée le 2026-10-08, demande de Franck)_
