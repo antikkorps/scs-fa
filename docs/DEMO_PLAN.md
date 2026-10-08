@@ -22,7 +22,7 @@
 ## 1. Checklist pré-démo (à faire AVANT, pour que rien ne plante)
 
 - [ ] **Docker up** : `pnpm docker:up` (Postgres dev) — vérifier `pg_isready`.
-- [ ] **DB seedée** : `pnpm db:seed` (données de référence + admin). Vérifier
+- [ ] **DB seedée** : `pnpm db:seed:demo` (données de référence, admin et catalogue de démo). Vérifier
       que la boutique et la collection ont des articles.
 - [ ] **API** up : `pnpm dev:api` (port 8081) → `curl localhost:8081/health`.
 - [ ] **Web** up : `pnpm dev:web` (port 3000).

@@ -766,6 +766,8 @@
 
 - [x] **Seed de déploiement** (demande de Franck) : `seedSuppliers()` déclare les 6 fournisseurs collectés (Agora-Tec, BGM Winfield, Cor Caroli, ESP France, Humbert, Toro Distribution). Il peut être relancé sans risque : un fournisseur déjà présent, quelle que soit sa casse, n'est ni dupliqué ni renommé. Les noms viennent d'**une seule constante**, `CATALOG_SUPPLIERS` (`@armurier/shared`), que lisent aussi les adaptateurs de collecte : le nom écrit dans les fichiers de tri est donc toujours celui qui est semé.
 
+- [x] **Seed séparé (2026-10-08, demande de Franck)** : `just seed` / `pnpm db:seed` ne pose plus que les **données de référence** (catégories légales et produits, tags, fournisseurs, admin). Le **catalogue de démo** (œuvres, produits, armes de collection, articles de blog) passe par `--demo` (`just seed-demo`, `pnpm db:seed:demo`), réservé au dev et aux démos. Avant, un déploiement aurait mis en ligne de faux produits. **En production, le seed refuse le mot de passe admin d'exemple** de `.env.example`. Testé de bout en bout sur une base vide (`seed-cli.test.ts`).
+
 **À savoir :** un fournisseur **hors collecte** (Armurerie de Paris, ClearMyVault…) se crée à la main dans Catalogue → Fournisseurs avant son premier import.
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
