@@ -753,7 +753,9 @@
 - [x] **Vérifié en réel** : création, doublon refusé (autre casse), export « fichier vierge » (en-tête seul, liste Fournisseur), suppression, 0 débordement sur mobile.
 - Tests : **shared 273, API 617, web 334, outil 93 = 1 317**.
 
-**À savoir :** avant d'importer les fichiers de tri (Humbert, BGM…), **créer chaque fournisseur** sous le nom de la colonne Fournisseur du fichier.
+- [x] **Seed de déploiement** (demande de Franck) : `seedSuppliers()` déclare les 6 fournisseurs collectés (Agora-Tec, BGM Winfield, Cor Caroli, ESP France, Humbert, Toro Distribution). Il peut être relancé sans risque : un fournisseur déjà présent, quelle que soit sa casse, n'est ni dupliqué ni renommé. Les noms viennent d'**une seule constante**, `CATALOG_SUPPLIERS` (`@armurier/shared`), que lisent aussi les adaptateurs de collecte : le nom écrit dans les fichiers de tri est donc toujours celui qui est semé.
+
+**À savoir :** un fournisseur **hors collecte** (Armurerie de Paris, ClearMyVault…) se crée à la main dans Catalogue → Fournisseurs avant son premier import.
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 

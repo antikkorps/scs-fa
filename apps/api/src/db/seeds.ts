@@ -21,11 +21,13 @@ import {
   tags,
   users,
 } from "./schema.js"
+import { seedSuppliers } from "./seed-suppliers.js"
 
 export async function seedDatabase() {
   console.log("🌱 Seeding database...")
 
   await seedAdminUser()
+  await seedSuppliers()
 
   // ========================================================================
   // CATÉGORIES LÉGALES FRANÇAISES (Classification préfectorale)

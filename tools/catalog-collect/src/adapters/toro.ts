@@ -11,7 +11,7 @@
 //   they are never read. Combinations (sizes…) are not separate products:
 //   they are summed up in one "Déclinaisons" spec.
 
-import { type CollectedProduct, normaliseEan } from "@armurier/shared"
+import { CATALOG_SUPPLIERS, type CollectedProduct, normaliseEan } from "@armurier/shared"
 import * as cheerio from "cheerio"
 import { type CollectScope, inScope, type SupplierAdapter } from "../adapter.js"
 import { absoluteUrl, cleanText, fixC1, htmlToText, parseSitemap, truncate, unique } from "../extract.js"
@@ -208,7 +208,7 @@ export const toro: SupplierAdapter = (() => {
   const categoryOf = new Map<string, string>()
   return {
     id: "toro-distribution",
-    supplier: "Toro Distribution",
+    supplier: CATALOG_SUPPLIERS.toroDistribution,
     origin: ORIGIN,
     async *discover(client: PoliteClient, scope: CollectScope) {
       if (scope.filters.length === 0) {
@@ -240,7 +240,7 @@ export const toro: SupplierAdapter = (() => {
     },
     parse(html, url) {
       const product = parseToroProduct(html, url, categoryOf.get(url))
-      return product ? { ...product, supplier: "Toro Distribution" } : null
+      return product ? { ...product, supplier: CATALOG_SUPPLIERS.toroDistribution } : null
     },
   }
 })()
