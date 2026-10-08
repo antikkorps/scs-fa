@@ -227,7 +227,7 @@ const README = [
 /** The triage workbook, ready to be written to disk. */
 export async function writeTriageWorkbook(model: TriageModel, categories: Category[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = "SCS Firearm — collecte catalogues"
+  wb.creator = "SCS Firearms — collecte catalogues"
   wb.created = new Date()
 
   addCatalogSheet(

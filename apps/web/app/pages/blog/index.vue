@@ -12,7 +12,7 @@ const articles = computed(() => data.value?.data ?? [])
 
 const pageUrl = `${siteUrl}/blog`
 const description =
-  "Le journal SCS Firearm : histoire de l'armurerie de collection, regards d'artistes et coulisses des éditions Gun Art."
+  "Le journal SCS Firearms : histoire de l'armurerie de collection, regards d'artistes et coulisses des éditions Gun Art."
 
 usePageSeo({
   title: "Le Journal",
@@ -25,7 +25,7 @@ useHead({
     {
       rel: "alternate",
       type: "application/rss+xml",
-      title: "SCS Firearm — Le Journal",
+      title: "SCS Firearms — Le Journal",
       href: `${siteUrl}/blog/rss.xml`,
     },
   ],
@@ -36,7 +36,7 @@ useHead({
         serializeJsonLd({
           "@context": "https://schema.org",
           "@type": "Blog",
-          name: "Le Journal — SCS Firearm",
+          name: "Le Journal — SCS Firearms",
           url: pageUrl,
           blogPost: articles.value.map((a) => ({
             "@type": "BlogPosting",

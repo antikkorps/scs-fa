@@ -20,7 +20,7 @@ if (only.value) {
 usePageSeo({
   title: "Les artistes",
   description:
-    "Les artistes de la collection Gun Art de SCS Firearm : leur parcours, leurs séries et leurs tirages en édition limitée.",
+    "Les artistes de la collection Gun Art de SCS Firearms : leur parcours, leurs séries et leurs tirages en édition limitée.",
   path: "/collection/artiste",
   noindex: true,
 })

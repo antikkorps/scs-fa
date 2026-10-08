@@ -14,7 +14,7 @@ if (typeof legacyCategory === "string" && legacyCategory) {
 
 const pageUrl = `${siteUrl}/boutique`
 const description =
-  "La boutique armurerie SCS Firearm : armes de chasse et de tir, munitions, optiques et accessoires. Catégories légales, prix TTC et stock en temps réel."
+  "La boutique armurerie SCS Firearms : armes de chasse et de tir, munitions, optiques et accessoires. Catégories légales, prix TTC et stock en temps réel."
 
 usePageSeo({
   title: "Boutique armurerie",
@@ -36,7 +36,7 @@ usePageSeo({
       </p>
     </section>
 
-    <ShopCatalogue category="" base-path="/boutique" list-name="Boutique armurerie SCS Firearm" />
+    <ShopCatalogue category="" base-path="/boutique" list-name="Boutique armurerie SCS Firearms" />
   </div>
 </template>
 

@@ -1,5 +1,5 @@
 /**
- * Who SCS Firearm is, legally (story 12.1) — the facts the legal notice, the
+ * Who SCS Firearms is, legally (story 12.1) — the facts the legal notice, the
  * CGV, the privacy policy and the order confirmation e-mail all state.
  * Written once here so they can never disagree.
  *

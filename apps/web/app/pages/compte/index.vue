@@ -3,7 +3,7 @@ import type { Profile, UpdateProfile } from "~/types/account"
 import { formatDate } from "~/utils/format"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Mon compte — SCS Firearm" })
+useHead({ title: "Mon compte — SCS Firearms" })
 
 const { get, update } = useProfile()
 const { user } = useAuth()

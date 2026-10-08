@@ -4,11 +4,11 @@ const siteUrl = config.public.siteUrl as string
 
 // Site-wide SEO defaults; pages override title/description/canonical.
 useHead({
-  titleTemplate: (t) => (t ? `${t} — SCS Firearm` : "SCS Firearm — Armurerie en ligne & Gun Art"),
+  titleTemplate: (t) => (t ? `${t} — SCS Firearms` : "SCS Firearms — Armurerie en ligne & Gun Art"),
 })
 
 useSeoMeta({
-  ogSiteName: "SCS Firearm",
+  ogSiteName: "SCS Firearms",
   ogType: "website",
   ogLocale: "fr_FR",
   twitterCard: "summary_large_image",
@@ -36,7 +36,7 @@ useHead({
         "@context": "https://schema.org",
         "@type": "Organization",
         "@id": organizationId,
-        name: "SCS Firearm",
+        name: "SCS Firearms",
         url: siteUrl,
         description:
           "Armurerie en ligne réglementée — armes de chasse et de tir, armes de collection, munitions et accessoires — et Gun Art, des tirages d'art photographiques en édition strictement limitée, signés et numérotés.",
@@ -44,13 +44,13 @@ useHead({
           {
             "@type": "OnlineStore",
             "@id": `${siteUrl}/boutique#store`,
-            name: "Armurerie SCS Firearm",
+            name: "Armurerie SCS Firearms",
             url: `${siteUrl}/boutique`,
           },
           {
             "@type": "OnlineStore",
             "@id": `${siteUrl}/collection#store`,
-            name: "Gun Art — SCS Firearm",
+            name: "Gun Art — SCS Firearms",
             url: `${siteUrl}/collection`,
           },
         ],
@@ -63,7 +63,7 @@ useHead({
         "@context": "https://schema.org",
         "@type": "WebSite",
         "@id": `${siteUrl}/#website`,
-        name: "SCS Firearm",
+        name: "SCS Firearms",
         url: siteUrl,
         inLanguage: "fr-FR",
         publisher: { "@id": organizationId },

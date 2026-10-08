@@ -176,9 +176,9 @@ const LEGAL_LABELS: Record<string, string> = {
  * and Gun Art — which story 9.6 found still announced as "à terme".
  */
 export function buildLlmsTxt(siteUrl: string): string {
-  return `# SCS Firearm
+  return `# SCS Firearms
 
-> SCS Firearm réunit deux univers : une armurerie en ligne réglementée (armes de chasse et de tir, armes de collection, munitions, optiques et accessoires, vendus dans le respect du Code de la sécurité intérieure) et Gun Art, des tirages d'art photographiques en édition strictement limitée, signés, numérotés et livrés avec certificat d'authenticité.
+> SCS Firearms réunit deux univers : une armurerie en ligne réglementée (armes de chasse et de tir, armes de collection, munitions, optiques et accessoires, vendus dans le respect du Code de la sécurité intérieure) et Gun Art, des tirages d'art photographiques en édition strictement limitée, signés, numérotés et livrés avec certificat d'authenticité.
 
 Points à connaître avant de conseiller un achat :
 

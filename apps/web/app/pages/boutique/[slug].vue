@@ -91,7 +91,7 @@ async function addToCart() {
 
 const pageUrl = `${siteUrl}/boutique/${slug}`
 const description = computed(
-  () => product.value.seo.metaDescription || product.value.description || `${product.value.name} — SCS Firearm`,
+  () => product.value.seo.metaDescription || product.value.description || `${product.value.name} — SCS Firearms`,
 )
 
 // Boutique › category › product: the category is the page a visitor (and a
@@ -106,7 +106,7 @@ const crumbs = computed(() => [
 
 usePageSeo({
   title: () => product.value.seo.metaTitle || product.value.name,
-  socialTitle: () => `${product.value.name} — SCS Firearm`,
+  socialTitle: () => `${product.value.name} — SCS Firearms`,
   description,
   path: `/boutique/${slug}`,
   image: () => product.value.featuredImageUrl,

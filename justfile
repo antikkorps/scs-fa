@@ -1,4 +1,4 @@
-# SCS Firearm — ops & deployment recipes.
+# SCS Firearms — ops & deployment recipes.
 #
 # Runner: `just` (https://github.com/casey/just — `brew install just`).
 # This complements the pnpm scripts: dev/build/test/lint stay in package.json;
