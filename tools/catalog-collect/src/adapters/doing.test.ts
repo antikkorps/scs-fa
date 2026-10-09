@@ -6,6 +6,7 @@ import {
   corCaroli,
   doingAdapter,
   isSignedIn,
+  legalClassFromSpecs,
   parseCollections,
   parseDoingProduct,
   parseListingFragment,
@@ -80,6 +81,17 @@ describe("Doing platform (Agora-Tec, Cor Caroli)", () => {
     expect(p?.longDescription).toContain("Exemple d’autonomie")
     expect(p?.longDescription).not.toMatch(/[\u0080-\u009f]/)
     expect(p?.specs["Type de réticule"]).toBe("Red Dot 2 MOA")
+  })
+
+  it("keeps the supplier's legal class, whichever way the platform spells its label", () => {
+    expect(legalClassFromSpecs({ "Catégorie d_arme": "B1" })).toBe("B1")
+    expect(legalClassFromSpecs({ "Catégorie d arme": "C 1°-b)" })).toBe("C 1°-b)")
+    expect(legalClassFromSpecs({ "Catégorie d’arme": " D " })).toBe("D")
+  })
+
+  it("reads no legal class from the '_' placeholder or a sheet without one", () => {
+    expect(legalClassFromSpecs({ "Catégorie d_arme": "_" })).toBeUndefined()
+    expect(legalClassFromSpecs({ Calibre: "9x19" })).toBeUndefined()
   })
 
   it("reads our price from a signed-in page, and only from one", () => {

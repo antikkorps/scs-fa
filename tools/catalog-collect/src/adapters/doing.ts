@@ -115,9 +115,26 @@ export function parseDoingProduct(
     specs,
     imageUrls,
     sourceCategory: category ?? brand,
+    supplierLegalClass: legalClassFromSpecs(specs),
     purchasePrice: parsePurchasePrice(html),
     sourceUrl: url,
   }
+}
+
+// "Catégorie d'arme": the apostrophe reaches us as "_", " " or "’" depending on the sheet.
+const LEGAL_CLASS_LABEL = /^catégorie d.?arme$/i
+// "_" is how the platform prints an empty legal class.
+const EMPTY_LEGAL_CLASS = /^_+$/
+
+/**
+ * The supplier's own legal classification ("B1", "C 1°-b)"…), kept as a hint
+ * for the triage rules. It is never turned into a legal category by itself.
+ */
+export function legalClassFromSpecs(specs: Record<string, string>): string | undefined {
+  const label = Object.keys(specs).find((key) => LEGAL_CLASS_LABEL.test(key.trim()))
+  const value = label ? specs[label]?.trim() : undefined
+  if (!value || EMPTY_LEGAL_CLASS.test(value)) return undefined
+  return value
 }
 
 /** The platform's header shows a "Déconnexion" button to a signed-in reseller. */
