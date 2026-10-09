@@ -20,6 +20,7 @@ const groups = [
     items: [
       { to: "/admin/produits", label: "Produits", icon: "▧" },
       { to: "/admin/imports", label: "Import catalogues", icon: "⇪" },
+      { to: "/admin/fournisseurs", label: "Fournisseurs", icon: "◧" },
       { to: "/admin/armes-anciennes", label: "Armes de collection", icon: "⚑" },
       { to: "/admin/tags", label: "Tags", icon: "⌗" },
     ],
@@ -67,7 +68,7 @@ async function signOut() {
   <div class="admin" :class="{ 'admin--open': mobileOpen }">
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand__mark">SCS</span>
+        <AppLogo />
         <span class="brand__sub">Administration</span>
       </div>
       <nav class="nav" aria-label="Administration">
@@ -135,16 +136,12 @@ async function signOut() {
 .brand {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  --logo-height: 1.9rem;
   padding: 0 0.6rem 1.4rem;
   border-bottom: 1px solid var(--ink-line);
   margin-bottom: 1.2rem;
-}
-.brand__mark {
-  font-family: var(--font-display);
-  font-size: var(--fs-xl);
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-eyebrow);
-  color: var(--brass);
 }
 .brand__sub {
   font-size: var(--fs-xs);

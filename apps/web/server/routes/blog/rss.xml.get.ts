@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>SCS Firearm — Le Journal</title>
+    <title>SCS Firearms — Le Journal</title>
     <link>${escapeXml(`${siteUrl}/blog`)}</link>
     <atom:link href="${escapeXml(`${siteUrl}/blog/rss.xml`)}" rel="self" type="application/rss+xml" />
     <description>Histoires &amp; coulisses de l'armurerie de collection et des éditions Gun Art.</description>

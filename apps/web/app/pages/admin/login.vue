@@ -38,7 +38,7 @@ async function submit() {
   <main class="auth">
     <form class="card" @submit.prevent="submit">
       <p class="eyebrow">Administration</p>
-      <h1 class="card__title">SCS Firearm</h1>
+      <h1 class="card__title">SCS Firearms</h1>
       <p class="card__lede">Accès réservé à l'équipe.</p>
 
       <label class="field">

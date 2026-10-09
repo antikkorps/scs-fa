@@ -167,7 +167,7 @@ describe("auth/profile (GET & PATCH /api/auth/me)", () => {
       const logs = await db.select().from(auditLogs).where(eq(auditLogs.entityId, row.id))
       const profileLog = logs.find((l) => l.action === "user.profile_updated")
       expect(profileLog).toBeDefined()
-      expect((profileLog?.newValue as Record<string, unknown>).firstName).toBe("Audit")
+      expect((profileLog?.newValue as Record<string, unknown> | undefined)?.firstName).toBe("Audit")
     })
 
     it("returns 400 on empty body", async () => {

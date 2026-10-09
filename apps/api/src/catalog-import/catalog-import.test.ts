@@ -1,4 +1,5 @@
 import { CATALOG_IMPORT_COLUMNS, CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { readSpreadsheet } from "@armurier/shared/spreadsheet"
 import { hash } from "@node-rs/argon2"
 import { and, eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
@@ -24,7 +25,8 @@ const PASSWORD = "MotDePasseTresLong123!"
 const BASE = "/api/admin/catalog-imports"
 // Every supplier of this suite starts with the prefix, so cleanup is exact.
 const SUPPLIER = "Testcatimp Fournisseur"
-const OTHER_SUPPLIER = "Testcatimp Nouveau"
+// Never created: the import must refuse a supplier the admin has not declared.
+const UNKNOWN_SUPPLIER = "Testcatimp Inconnu"
 
 type Cells = Partial<Record<(typeof CATALOG_IMPORT_COLUMNS)[number]["key"], string>>
 
@@ -96,11 +98,12 @@ describe("admin catalogue import (story 12.2)", () => {
     })
   }
 
-  async function importFile(file: Buffer, overwrite = false) {
-    const preview = await upload(`${BASE}/preview`, file, { overwrite: String(overwrite) })
+  async function importFile(file: Buffer, overwrite = false, fields: Record<string, string> = {}) {
+    const preview = await upload(`${BASE}/preview`, file, { overwrite: String(overwrite), ...fields })
     expect(preview.statusCode).toBe(200)
     const res = await upload(BASE, file, {
       overwrite: String(overwrite),
+      ...fields,
       expectedSha256: preview.json().data.fileSha256,
     })
     return { preview: preview.json().data, res }
@@ -120,6 +123,8 @@ describe("admin catalogue import (story 12.2)", () => {
     app = await buildApp()
     await app.ready()
     await cleanup()
+    // Story 12.5: suppliers are declared in the back office before any import.
+    await db.insert(suppliers).values([SUPPLIER, "Testcatimp Rt Alpha", "Testcatimp Rt Beta"].map((name) => ({ name })))
     adminToken = await makeUser("testcatimp-admin@testcatimp.local", "admin")
     customerToken = await makeUser("testcatimp-cust@testcatimp.local", "customer")
   })
@@ -143,22 +148,35 @@ describe("admin catalogue import (story 12.2)", () => {
         row({ supplierSku: "BAD-CAT", name: "Testcatimp Mauvaise catégorie", category: "Inexistante" }),
         row({ supplierSku: "GUNART", name: "Testcatimp Gun Art", category: "gun-art" }),
         row({ supplierSku: "LATER", import: "non" }),
-        row({ supplierSku: "NEW-SUP", name: "Testcatimp Autre fournisseur", supplier: OTHER_SUPPLIER }),
+        row({ supplierSku: "NEW-SUP", name: "Testcatimp Autre fournisseur", supplier: UNKNOWN_SUPPLIER }),
       ]),
     )
     expect(res.statusCode).toBe(200)
     const data = res.json().data
     expect(data.fileSha256).toMatch(/^[0-9a-f]{64}$/)
-    expect(data.summary).toEqual({ create: 2, update: 0, invalid: 3, skipped: 1, images: 4 })
-    expect(data.suppliersToCreate.sort()).toEqual([OTHER_SUPPLIER, SUPPLIER].sort())
+    expect(data.summary).toEqual({
+      create: 1,
+      update: 0,
+      invalid: 4,
+      skipped: 1,
+      images: 2,
+      publish: 0,
+      unpublish: 0,
+      archive: 0,
+    })
+    expect(data).not.toHaveProperty("suppliersToCreate")
     // Skipped rows are not echoed back.
     expect(data.rows.map((r: { line: number }) => r.line)).toEqual([2, 3, 4, 5, 7])
     const byLine = new Map(data.rows.map((r: { line: number }) => [r.line, r]))
     expect((byLine.get(3) as { errors: string[] }).errors.join()).toMatch(/Catégorie légale obligatoire/)
     expect((byLine.get(4) as { errors: string[] }).errors.join()).toMatch(/Catégorie inconnue/)
     expect((byLine.get(5) as { errors: string[] }).errors.join()).toMatch(/propre écran/)
+    expect((byLine.get(7) as { errors: string[] }).errors.join()).toMatch(
+      /Fournisseur inconnu : « Testcatimp Inconnu ».*Fournisseurs/,
+    )
 
-    expect(await db.select().from(suppliers).where(like(suppliers.name, "Testcatimp%"))).toEqual([])
+    const known = await db.select({ name: suppliers.name }).from(suppliers).where(like(suppliers.name, "Testcatimp%"))
+    expect(known.map((supplier) => supplier.name)).not.toContain(UNKNOWN_SUPPLIER)
   })
 
   it("refuses a file without the required columns, and a file that is not a spreadsheet", async () => {
@@ -176,7 +194,12 @@ describe("admin catalogue import (story 12.2)", () => {
     expect(wrong.statusCode).toBe(409)
   })
 
-  it("creates unpublished products, the supplier, and queues the images", async () => {
+  it("matches a declared supplier whatever the case of the file", async () => {
+    const res = await upload(`${BASE}/preview`, sheet([row({ supplier: SUPPLIER.toUpperCase() })]))
+    expect(res.json().data.summary).toMatchObject({ create: 1, invalid: 0 })
+  })
+
+  it("creates unpublished products and queues the images", async () => {
     const { res } = await importFile(
       sheet([
         row(),
@@ -190,7 +213,8 @@ describe("admin catalogue import (story 12.2)", () => {
       ]),
     )
     expect(res.statusCode).toBe(201)
-    expect(res.json().data).toMatchObject({ created: 2, updated: 0, suppliersCreated: 1, imagesQueued: 2 })
+    expect(res.json().data).toMatchObject({ created: 2, updated: 0, imagesQueued: 2 })
+    expect(res.json().data).not.toHaveProperty("suppliersCreated")
 
     const redDot = await productByRef("RED-DOT-1")
     expect(redDot?.product).toMatchObject({
@@ -233,7 +257,7 @@ describe("admin catalogue import (story 12.2)", () => {
     )
     expect(preview.summary).toMatchObject({ create: 0, update: 1 })
     expect(preview.rows[0].warnings.join()).toMatch(/Catégorie légale en base \(none\).*conservée/)
-    expect(res.json().data).toMatchObject({ created: 0, updated: 1, suppliersCreated: 0, imagesQueued: 0 })
+    expect(res.json().data).toMatchObject({ created: 0, updated: 1, imagesQueued: 0 })
 
     const after = await productByRef("RED-DOT-1")
     expect(after?.product.id).toBe(before?.product.id)
@@ -455,6 +479,185 @@ describe("admin catalogue import (story 12.2)", () => {
       })
       const [row0] = await db.select().from(catalogImportImages).where(eq(catalogImportImages.importId, importId))
       expect(row0).toMatchObject({ status: "failed", error: "Interrupted during download" })
+    })
+  })
+
+  /** Story 12.4 — export, edit in Excel, import back. */
+  describe("catalogue round trip", () => {
+    const RT_A = "Testcatimp Rt Alpha"
+    const RT_B = "Testcatimp Rt Beta"
+    const rt = (over: Cells = {}): Cells =>
+      row({ supplier: RT_A, imageUrls: "", longDescription: "", sourceUrl: "", ...over })
+
+    /** The export as a table, plus the rows of one supplier keyed by reference. */
+    async function exportTable(query = "") {
+      const res = await app.inject({
+        method: "GET",
+        url: `${BASE}/export${query}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers["content-type"]).toContain("spreadsheetml")
+      const table = await readSpreadsheet(res.rawPayload)
+      const headers = table[0] ?? []
+      const col = (key: string) => headers.indexOf(CATALOG_IMPORT_COLUMNS.find((c) => c.key === key)?.header ?? "")
+      return { table, col }
+    }
+    const csvOf = (table: string[][]) =>
+      Buffer.from(table.map((r) => r.map((c) => csvCell(c ?? "")).join(";")).join("\n"), "utf8")
+
+    beforeAll(async () => {
+      const { res } = await importFile(
+        sheet([
+          rt({
+            supplierSku: "RT-1",
+            name: "Testcatimp Rt Lunette Orion 3-9x40",
+            brand: "Orion",
+            ean: "4006381333931",
+            active: "oui",
+          }),
+          rt({ supplierSku: "RT-2", name: "Testcatimp Rt Bipied", active: "" }),
+          rt({ supplierSku: "RT-3", name: "Testcatimp Rt Sangle", active: "non" }),
+          rt({
+            supplier: RT_B,
+            supplierSku: "B-77",
+            name: "Testcatimp Rt Lunette Orion 3-9x40",
+            brand: "Orion",
+            ean: "4006381333931",
+          }),
+        ]),
+      )
+      expect(res.json().data).toMatchObject({ created: 4 })
+      expect((await productByRef("RT-1"))?.product.published).toBe(true)
+      // A blank "Actif" on creation keeps the old rule: offline until a human says otherwise.
+      expect((await productByRef("RT-2"))?.product.published).toBe(false)
+    })
+
+    it("exports the catalogue in the import's columns, without stock, flagging cross-supplier duplicates", async () => {
+      const { table, col } = await exportTable()
+      const line = table.find((r) => r[col("supplierSku")] === "RT-1") as string[]
+      expect(line[col("import")]).toBe("oui")
+      expect(line[col("active")]).toBe("oui")
+      expect(line[col("supplier")]).toBe(RT_A)
+      expect(line[col("stockQty")] ?? "").toBe("")
+      expect(line[col("version")]).toMatch(/^\d{4}-\d\d-\d\dT/)
+      expect(line[col("duplicates")]).toBe(`${RT_B} B-77 (inactif)`)
+      expect(table.find((r) => r[col("supplierSku")] === "RT-2")?.[col("duplicates")] ?? "").toBe("")
+    })
+
+    it("exports one supplier's part, still flagging duplicates held by the others", async () => {
+      const list = await app.inject({
+        method: "GET",
+        url: `${BASE}/suppliers`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      const beta = (list.json().data as { id: string; name: string; products: number }[]).find((s) => s.name === RT_B)
+      expect(beta?.products).toBe(1)
+
+      const { table, col } = await exportTable(`?supplierId=${beta?.id}`)
+      expect(table.slice(1).map((r) => r[col("supplierSku")])).toEqual(["B-77"])
+      expect(table[1]?.[col("duplicates")]).toBe(`${RT_A} RT-1 (actif)`)
+
+      const asAdmin = (url: string) =>
+        app.inject({ method: "GET", url, headers: { authorization: `Bearer ${adminToken}` } })
+      expect((await asAdmin(`${BASE}/export?supplierId=not-a-uuid`)).statusCode).toBe(400)
+      expect((await asAdmin(`${BASE}/export?supplierId=00000000-0000-4000-8000-000000000000`)).statusCode).toBe(404)
+    })
+
+    it("offers a supplier without products, whose export is a blank file to fill in (story 12.5)", async () => {
+      const [fresh] = await db
+        .insert(suppliers)
+        .values({ name: "Testcatimp Rt Vierge" })
+        .returning({ id: suppliers.id })
+      const list = await app.inject({
+        method: "GET",
+        url: `${BASE}/suppliers`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      const listed = (list.json().data as { id: string; name: string; products: number }[]).find(
+        (supplier) => supplier.id === fresh?.id,
+      )
+      expect(listed).toMatchObject({ name: "Testcatimp Rt Vierge", products: 0 })
+
+      const { table, col } = await exportTable(`?supplierId=${fresh?.id}`)
+      expect(table).toHaveLength(1)
+      expect(col("supplier")).toBeGreaterThanOrEqual(0)
+    })
+
+    it("lists the declared suppliers as the Fournisseur drop-down of the export", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: `${BASE}/export`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      const lists = await readSpreadsheet(res.rawPayload, { sheet: "Listes" })
+      const names = lists.map((line) => line[1]).filter(Boolean)
+      expect(names).toEqual(expect.arrayContaining([SUPPLIER, RT_A, RT_B, "Testcatimp Rt Vierge"]))
+    })
+
+    it("round-trips: Actif and prices apply, the stock never moves", async () => {
+      const rt2 = await productByRef("RT-2")
+      await db
+        .update(products)
+        .set({ stockQty: 9 })
+        .where(eq(products.id, rt2?.product.id as string))
+      const { table, col } = await exportTable()
+      const line = table.find((r) => r[col("supplierSku")] === "RT-2") as string[]
+      line[col("active")] = "oui"
+      line[col("priceHt")] = "77"
+      // Even typed in by hand, a stock cell does not overwrite the real stock.
+      line[col("stockQty")] = "500"
+      const kept = table.filter((r, i) => i === 0 || r === line)
+      const { preview, res } = await importFile(csvOf(kept), true)
+      expect(preview.summary).toMatchObject({ update: 1, publish: 1, archive: 0 })
+      expect(preview.rows[0].warnings).toContain("Mis en ligne")
+      expect(res.statusCode).toBe(201)
+      expect((await productByRef("RT-2"))?.product).toMatchObject({ published: true, priceHt: "77.00", stockQty: 9 })
+    })
+
+    it("refuses to overwrite a product edited in the back-office after the export", async () => {
+      const { table, col } = await exportTable()
+      const rt3 = await productByRef("RT-3")
+      await db
+        .update(products)
+        .set({ priceHt: "12.00", updatedAt: new Date(Date.now() + 60_000) })
+        .where(eq(products.id, rt3?.product.id as string))
+      const kept = table.filter((r, i) => i === 0 || r[col("supplierSku")] === "RT-3")
+      const overwrite = await upload(`${BASE}/preview`, csvOf(kept), { overwrite: "true" })
+      expect(overwrite.json().data.rows[0]).toMatchObject({ action: "invalid" })
+      expect(overwrite.json().data.rows[0].errors.join()).toMatch(/après cet export/)
+      // Without overwrite only blanks get filled: a warning is enough.
+      const fill = await upload(`${BASE}/preview`, csvOf(kept))
+      expect(fill.json().data.rows[0]).toMatchObject({ action: "update" })
+      expect(fill.json().data.rows[0].warnings.join()).toMatch(/après cet export/)
+    })
+
+    it("archives what the file no longer lists — on request, and only for the file's suppliers", async () => {
+      // RT-1 listed, RT-2 skipped ("non" still counts as listed), RT-3 gone; Beta absent from the file.
+      const file = sheet([rt({ supplierSku: "RT-1" }), rt({ supplierSku: "RT-2", import: "non" })])
+      const plain = await upload(`${BASE}/preview`, file)
+      expect(plain.json().data.summary.archive).toBe(0)
+
+      const { preview, res } = await importFile(file, false, { archiveMissing: "true" })
+      expect(preview.toArchive.map((a: { supplierSku: string }) => a.supplierSku)).toEqual(["RT-3"])
+      expect(res.json().data).toMatchObject({ archived: 1 })
+      const rt3 = await productByRef("RT-3")
+      expect(rt3?.product.archivedAt).toBeTruthy()
+      expect(rt3?.product.published).toBe(false)
+      expect((await productByRef("B-77"))?.product.archivedAt).toBeNull()
+      const logs = await db
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.entityId, rt3?.product.id as string))
+      expect(logs.map((l) => l.action)).toContain("product.archived")
+      const [imp] = await db.select().from(catalogImports).where(eq(catalogImports.id, res.json().data.importId))
+      expect(imp?.archivedCount).toBe(1)
+
+      // Archived products leave the export, and a sheet cannot quietly revive one.
+      const { table, col } = await exportTable()
+      expect(table.some((r) => r[col("supplierSku")] === "RT-3")).toBe(false)
+      const revive = await upload(`${BASE}/preview`, sheet([rt({ supplierSku: "RT-3", active: "oui" })]))
+      expect(revive.json().data.rows[0].errors.join()).toMatch(/Produit archivé/)
     })
   })
 })

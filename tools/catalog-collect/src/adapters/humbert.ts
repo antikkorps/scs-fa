@@ -1,3 +1,4 @@
+import { CATALOG_SUPPLIERS } from "@armurier/shared"
 // Humbert (www.humbert.com) — Symfony site, no robots.txt, no sitemap, no
 // structured data; everything is in the server-rendered HTML.
 //
@@ -127,7 +128,7 @@ export const humbert: SupplierAdapter = (() => {
   const familyOf = new Map<string, string>()
   return {
     id: "humbert",
-    supplier: "Humbert",
+    supplier: CATALOG_SUPPLIERS.humbert,
     origin: ORIGIN,
     async *discover(client: PoliteClient, scope: CollectScope) {
       const families = parseFamilies(await client.get(`${ORIGIN}/fr/`))
@@ -155,7 +156,7 @@ export const humbert: SupplierAdapter = (() => {
     },
     parse(html, url) {
       const product = parseHumbertProduct(html, url, familyOf.get(url))
-      return product ? { ...product, supplier: "Humbert" } : null
+      return product ? { ...product, supplier: CATALOG_SUPPLIERS.humbert } : null
     },
   }
 })()

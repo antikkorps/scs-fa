@@ -226,6 +226,19 @@ describe("parseCatalogImportTable", () => {
     priceHt: "429,99",
   }
 
+  it("reads « Actif » as on / off / unchanged, and the export's « Version »", () => {
+    const parse = (over: Record<string, string>) =>
+      parseCatalogImportTable([header, line({ ...valid, ...over })]).rows[0]
+    expect(parse({ active: "oui" })?.data?.active).toBe(true)
+    expect(parse({ active: "Non" })?.data?.active).toBe(false)
+    expect(parse({})?.data).toMatchObject({ active: null, version: null })
+    expect(parse({ active: "peut-être" })?.errors.join()).toMatch(/« Actif » doit valoir/)
+    expect(parse({ version: "2026-10-07T18:00:00.000Z" })?.data?.version?.toISOString()).toBe(
+      "2026-10-07T18:00:00.000Z",
+    )
+    expect(parse({ version: "hier" })?.errors.join()).toMatch(/« Version » illisible/)
+  })
+
   it("parses a valid row and derives the missing SKU and slug", () => {
     const { rows, missingColumns } = parseCatalogImportTable([header, line(valid)])
     expect(missingColumns).toEqual([])

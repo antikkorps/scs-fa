@@ -620,6 +620,10 @@ export const products = pgTable(
     // Statuts
     published: boolean("published").default(true),
     featured: boolean("featured").default(false),
+    // Archivé (story 12.4) : retiré du catalogue sans être effacé — les
+    // commandes passées gardent leur référence, et « Réactiver » le ramène.
+    // Un produit archivé est toujours hors ligne.
+    archivedAt: timestamp("archived_at"),
 
     // Recherche full-text (généré: name pondéré A, description B, longDescription C)
     searchVector: tsvector("search_vector").generatedAlwaysAs(
@@ -635,6 +639,7 @@ export const products = pgTable(
      index("idx_products_legal_category").on(t.legalCategoryId),
      index("idx_products_slug").on(t.slug),
      index("idx_products_published").on(t.published),
+     index("idx_products_archived").on(t.archivedAt),
      index("idx_products_requires_legal").on(
       t.requiresLegalVerification,
     ),
@@ -2145,6 +2150,8 @@ export const catalogImports = pgTable(
     createdCount: integer("created_count").notNull().default(0),
     updatedCount: integer("updated_count").notNull().default(0),
     skippedCount: integer("skipped_count").notNull().default(0),
+    // Story 12.4: products the file no longer listed, archived on request.
+    archivedCount: integer("archived_count").notNull().default(0),
     suppliersCreated: integer("suppliers_created").notNull().default(0),
     createdBy: uuid("created_by"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs"
 import { describe, expect, it } from "vitest"
-import { readSpreadsheet, SpreadsheetError } from "./spreadsheet.js"
+import { CATALOG_IMPORT_COLUMNS } from "./catalog-import.js"
+import { addCatalogSheet, readSpreadsheet, SpreadsheetError } from "./spreadsheet.js"
 
 async function xlsx(build: (ws: ExcelJS.Worksheet, wb: ExcelJS.Workbook) => void): Promise<Uint8Array> {
   const wb = new ExcelJS.Workbook()
@@ -94,5 +95,43 @@ describe("readSpreadsheet — csv", () => {
     await expect(readSpreadsheet(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x00, 0x01]))).rejects.toBeInstanceOf(
       SpreadsheetError,
     )
+  })
+})
+
+describe("addCatalogSheet — drop-downs", () => {
+  type ListValidation = { type: string; formulae: string[] }
+  const columnLetter = (key: string) =>
+    String.fromCharCode(65 + CATALOG_IMPORT_COLUMNS.findIndex((column) => column.key === key))
+
+  /** The validations of the sheet, by range ("C2:C501" → its list). */
+  function validations(ws: ExcelJS.Worksheet): Record<string, ListValidation> {
+    return (ws as unknown as { dataValidations: { model: Record<string, ListValidation> } }).dataValidations.model
+  }
+  const validationOf = (ws: ExcelJS.Worksheet, key: string) =>
+    Object.entries(validations(ws)).find(([range]) => range.startsWith(`${columnLetter(key)}2:`))
+
+  it("offers the declared suppliers in the Fournisseur column, from the hidden list sheet", () => {
+    const wb = new ExcelJS.Workbook()
+    const ws = addCatalogSheet(wb, "Catalogue", [], { categoryNames: ["Optiques"], supplierNames: ["BGM", "Humbert"] })
+    const [, supplier] = validationOf(ws, "supplier") ?? []
+    expect(supplier?.type).toBe("list")
+    expect(supplier?.formulae).toEqual(["Listes!$B$1:$B$2"])
+    const lists = wb.getWorksheet("Listes")
+    expect([lists?.getCell("B1").value, lists?.getCell("B2").value]).toEqual(["BGM", "Humbert"])
+  })
+
+  it("leaves the Fournisseur column free when no supplier list is given", () => {
+    const ws = addCatalogSheet(new ExcelJS.Workbook(), "À trier", [], { categoryNames: ["Optiques"] })
+    expect(validationOf(ws, "supplier")).toBeUndefined()
+  })
+
+  it("keeps the drop-downs on the blank lines below the data, where new products are typed", () => {
+    const ws = addCatalogSheet(new ExcelJS.Workbook(), "Catalogue", [{ name: "Lunette" }], {
+      categoryNames: ["Optiques"],
+      supplierNames: ["BGM"],
+    })
+    const [range] = validationOf(ws, "supplier") ?? []
+    const lastRow = Number(range?.split(":")[1]?.replace(/^[A-Z]+/, ""))
+    expect(lastRow).toBeGreaterThanOrEqual(500)
   })
 })

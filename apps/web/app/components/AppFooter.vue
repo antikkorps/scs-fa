@@ -8,9 +8,7 @@ const { reopen } = useConsent()
   <footer class="ft">
     <div class="container ft__grid">
       <div class="ft__brand">
-        <p class="brand">
-          <span class="brand__mark">SCS</span> <span class="brand__word">Firearm</span>
-        </p>
+        <AppLogo class="brand" />
         <p class="ft__tag">
           Armurerie de précision &amp; galerie Gun Art — du fonctionnel à l'œuvre d'art, avec exigence et conformité
           réglementaire.
@@ -45,7 +43,7 @@ const { reopen } = useConsent()
     </div>
 
     <div class="container ft__base">
-      <p>© {{ year }} SCS Firearm. Tous droits réservés.</p>
+      <p>© {{ year }} SCS Firearms. Tous droits réservés.</p>
       <nav class="ft__legal" aria-label="Informations légales">
         <NuxtLink to="/mentions-legales">Mentions légales</NuxtLink>
         <NuxtLink to="/cgv">CGV</NuxtLink>
@@ -92,13 +90,8 @@ const { reopen } = useConsent()
   padding-bottom: 2.5rem;
 }
 .brand {
-  font-family: var(--font-display);
-  font-size: var(--fs-lg);
-  margin: 0 0 0.75rem;
-}
-.brand__mark {
-  color: var(--brass);
-  font-weight: var(--fw-bold);
+  --logo-height: 2.25rem;
+  margin: 0 0 1rem;
 }
 .ft__tag {
   color: var(--paper-dim);

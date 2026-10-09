@@ -28,7 +28,7 @@ describe("NewsletterSignup", () => {
     const boxes = wrapper.findAll(".nl__seg input")
     expect(boxes).toHaveLength(3)
     expect(boxes.filter((b) => (b.element as HTMLInputElement).checked)).toHaveLength(1)
-    expect((boxes[2]?.element as HTMLInputElement).checked).toBe(true)
+    expect((boxes[2]?.element as HTMLInputElement | undefined)?.checked).toBe(true)
   })
 
   it("submits the ticked segments with the capture path as consent proof", async () => {

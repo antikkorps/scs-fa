@@ -78,6 +78,8 @@ export interface AdminProductListItem {
   priceHt: number
   stockQty: number | null
   published: boolean
+  /** Story 12.4: set when archived — off sale, kept for past orders. */
+  archivedAt: string | null
   featured: boolean
   featuredImageUrl: string | null
   categorySlug: string

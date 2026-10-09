@@ -23,7 +23,10 @@ const columns: CatalogueColumn[] = [
   { key: "published", label: "Publié", boolean: true },
 ]
 
-const rows = computed(() => data.value?.data ?? [])
+// Archived products (story 12.4) stay out of the way unless asked for.
+const showArchived = ref(false)
+const archivedCount = computed(() => (data.value?.data ?? []).filter((p) => p.archivedAt).length)
+const rows = computed(() => (data.value?.data ?? []).filter((p) => showArchived.value || !p.archivedAt))
 </script>
 
 <template>
@@ -41,6 +44,11 @@ const rows = computed(() => data.value?.data ?? [])
       ne puisse pas désynchroniser une pièce de son édition ou de sa provenance.
     </p>
 
+    <label v-if="archivedCount" class="toggle">
+      <input v-model="showArchived" type="checkbox" />
+      Afficher les produits archivés ({{ archivedCount }})
+    </label>
+
     <p v-if="pending" class="state">Chargement…</p>
     <p v-else-if="error" class="state state--error">Impossible de charger les produits.</p>
     <AdminCatalogueList
@@ -51,6 +59,7 @@ const rows = computed(() => data.value?.data ?? [])
       endpoint="/admin/products"
       label-key="name"
       noun="produit"
+      archivable
       @changed="refresh()"
     />
   </div>
@@ -94,6 +103,15 @@ h1 {
   color: var(--paper-dim);
   font-size: var(--fs-base);
   line-height: var(--lh-relaxed);
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
+  cursor: pointer;
 }
 .state {
   color: var(--paper-dim);

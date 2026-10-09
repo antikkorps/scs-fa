@@ -16,7 +16,7 @@ const CONDITION = {
 
 /** The Organization node declared sitewide in app.vue. */
 export function organizationRef(siteUrl: string) {
-  return { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearm" }
+  return { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearms" }
 }
 
 export interface ProductLdInput {

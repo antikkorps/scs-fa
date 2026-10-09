@@ -148,7 +148,7 @@ describe("AdminShipmentsPanel (story 11.9)", () => {
 
       const call = apiMock.mock.calls.find(([url]) => String(url).endsWith("/refresh-tracking"))
       expect(call?.[0]).toBe("/admin/shipments/s1/refresh-tracking")
-      expect((call?.[1] as { method: string }).method).toBe("POST")
+      expect((call?.[1] as { method: string } | undefined)?.method).toBe("POST")
     })
 
     /** A button that silently does nothing is worse than one that explains itself. */
@@ -178,7 +178,7 @@ describe("AdminShipmentsPanel (story 11.9)", () => {
 
     const patch = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
     expect(patch?.[0]).toBe("/admin/shipments/s1")
-    expect((patch?.[1] as { body: unknown }).body).toEqual({ status: "shipped" })
+    expect((patch?.[1] as { body: unknown } | undefined)?.body).toEqual({ status: "shipped" })
     expect(wrapper.find(".alert").text()).toContain("tracking number is required")
     expect(wrapper.emitted("changed")).toBeFalsy()
   })

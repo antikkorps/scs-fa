@@ -88,8 +88,8 @@ describe("buildRobots", () => {
 describe("buildLlmsTxt", () => {
   it("produces an H1, a summary blockquote and the key links", () => {
     const txt = buildLlmsTxt(SITE)
-    expect(txt.startsWith("# SCS Firearm")).toBe(true)
-    expect(txt).toContain("> SCS Firearm")
+    expect(txt.startsWith("# SCS Firearms")).toBe(true)
+    expect(txt).toContain("> SCS Firearms")
     expect(txt).toContain(`[Collection](${SITE}/collection)`)
     expect(txt).toContain(`${SITE}/llms-full.txt`)
     expect(txt).toContain(`GET ${SITE}/api/artworks`)

@@ -91,9 +91,8 @@ async function signOut() {
 <template>
   <header class="hdr">
     <div class="container hdr__bar">
-      <NuxtLink to="/" class="brand" aria-label="SCS Firearm — accueil" @click="closeAll">
-        <span class="brand__mark">SCS</span>
-        <span class="brand__word">Firearm</span>
+      <NuxtLink to="/" class="brand" aria-label="SCS Firearms — accueil" @click="closeAll">
+        <AppLogo decorative />
       </NuxtLink>
 
       <nav class="nav" aria-label="Navigation principale">
@@ -326,9 +325,7 @@ async function signOut() {
       <Transition name="overlay">
         <nav v-if="open" id="mobile-nav" class="mobile" aria-label="Navigation mobile">
           <div class="mobile__top">
-            <span class="brand">
-              <span class="brand__mark">SCS</span><span class="brand__word">Firearm</span>
-            </span>
+            <AppLogo class="brand" />
             <button type="button" class="mobile__close" aria-label="Fermer le menu" @click="open = false">✕</button>
           </div>
 
@@ -441,20 +438,9 @@ async function signOut() {
 }
 .brand {
   display: inline-flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  font-family: var(--font-display);
-  font-size: var(--fs-xl);
-  letter-spacing: var(--ls-wide);
+  align-items: center;
   flex-shrink: 0;
-}
-.brand__mark {
-  color: var(--brass);
-  font-weight: var(--fw-bold);
-}
-.brand__word {
-  color: var(--paper);
-  font-weight: var(--fw-medium);
+  --logo-height: 2.1rem;
 }
 
 /* Center spine */
@@ -850,11 +836,7 @@ async function signOut() {
   margin-bottom: 1rem;
 }
 .mobile__top .brand {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  font-family: var(--font-display);
-  font-size: var(--fs-xl);
+  --logo-height: 2.1rem;
 }
 .mobile__close {
   width: 44px;
@@ -1073,6 +1055,9 @@ async function signOut() {
   }
   .burger {
     display: none;
+  }
+  .brand {
+    --logo-height: 2.5rem;
   }
 }
 </style>

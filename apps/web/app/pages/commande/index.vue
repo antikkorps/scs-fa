@@ -5,7 +5,7 @@ import type { Address, NewAddress } from "~/types/checkout"
 import { formatDate, formatEuros } from "~/utils/format"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Commande — SCS Firearm" })
+useHead({ title: "Commande — SCS Firearms" })
 
 const { fetchCart, count: cartCount } = useCart()
 const { list: listAddresses, create: createAddress } = useAddresses()

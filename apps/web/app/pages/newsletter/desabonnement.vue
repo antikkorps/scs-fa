@@ -5,7 +5,7 @@ import { NEWSLETTER_SEGMENT_LABELS, type NewsletterSegment, type NewsletterSubsc
 // link, no account, no login. Per-segment so someone who only wants to stop the
 // Gun Art letters does not have to leave everything — and a full unsubscribe
 // **erases** the address rather than flagging it.
-useHead({ title: "Gérer mes abonnements — SCS Firearm" })
+useHead({ title: "Gérer mes abonnements — SCS Firearms" })
 useSeoMeta({ robots: "noindex, nofollow" })
 
 const route = useRoute()

@@ -39,7 +39,7 @@ function detectDelimiter(text: string): CsvDelimiter {
  *   dropped; empty cells are kept so columns stay aligned.
  */
 export function parseCsv(input: string, options: { delimiter?: CsvDelimiter } = {}): string[][] {
-  const text = input.startsWith("﻿") ? input.slice(1) : input
+  const text = input.startsWith("\uFEFF") ? input.slice(1) : input
   const delimiter = options.delimiter ?? detectDelimiter(text)
 
   const rows: string[][] = []

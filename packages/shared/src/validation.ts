@@ -1016,6 +1016,27 @@ export const updateBeneficiarySchema = toPatchSchema(createBeneficiarySchema.omi
   { message: "At least one field must be provided" },
 )
 
+// --- Fournisseurs (story 12.5) -------------------------------------------------
+
+/**
+ * A supplier is created here before its first import: the import no longer
+ * creates one from a name it does not know, where a typo made a duplicate.
+ * ⚠️ `default_margin_pct` exists in the table but nothing reads it: offering it
+ * in the form would promise an effect that does not exist.
+ */
+export const createSupplierSchema = z
+  .object({
+    name: z.string().trim().min(1).max(255),
+    contactEmail: emailSchema.optional(),
+    contactPhone: phoneSchema.optional(),
+  })
+  .strict()
+
+export const updateSupplierSchema = toPatchSchema(createSupplierSchema).refine(
+  (patch) => Object.keys(patch).length > 0,
+  { message: "At least one field must be provided" },
+)
+
 export const updatePayoutSchema = z
   .object({
     // Only the human decision is patchable: marking a payout settled. The rate,
@@ -1102,6 +1123,8 @@ export type UpdateShipmentInput = z.infer<typeof updateShipmentSchema>
 
 export type CreateBeneficiaryInput = z.infer<typeof createBeneficiarySchema>
 export type UpdateBeneficiaryInput = z.infer<typeof updateBeneficiarySchema>
+export type CreateSupplierInput = z.infer<typeof createSupplierSchema>
+export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>
 export type UpdatePayoutInput = z.infer<typeof updatePayoutSchema>
 
 // Story 12.3 — the shipping rate grid. Replaced whole (PUT), never patched: the

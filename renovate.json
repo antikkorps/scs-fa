@@ -2,7 +2,6 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "minimumReleaseAge": "90 days",
-  "prCreation": "not-pending",
   "vulnerabilityAlerts": {
     "minimumReleaseAge": "0 days",
     "labels": ["security"]
@@ -30,6 +29,16 @@
       "matchUpdateTypes": ["major"],
       "matchDepTypes": ["devDependencies"],
       "groupName": "devDeps major"
+    },
+    {
+      "description": "Group CI action updates into a single PR",
+      "matchManagers": ["github-actions"],
+      "groupName": "ci actions"
+    },
+    {
+      "description": "exceljs is CommonJS and requires uuid; uuid 12+ is ESM-only, so the override stays on 11.x",
+      "matchDepNames": ["exceljs>uuid"],
+      "allowedVersions": "<12"
     }
   ]
 }

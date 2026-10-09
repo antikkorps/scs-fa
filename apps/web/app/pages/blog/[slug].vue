@@ -21,12 +21,12 @@ const hero = computed(() => article.value.featuredImageUrl || undefined)
 
 const pageUrl = `${siteUrl}/blog/${slug}`
 const description = computed(
-  () => article.value.metaDescription ?? article.value.excerpt ?? `${article.value.title} — Le Journal SCS Firearm.`,
+  () => article.value.metaDescription ?? article.value.excerpt ?? `${article.value.title} — Le Journal SCS Firearms.`,
 )
 
 usePageSeo({
   title: () => article.value.metaTitle ?? article.value.title,
-  socialTitle: () => `${article.value.title} — SCS Firearm`,
+  socialTitle: () => `${article.value.title} — SCS Firearms`,
   description,
   path: `/blog/${slug}`,
   type: "article",
@@ -55,8 +55,8 @@ useHead({
           dateModified: article.value.updatedAt ?? article.value.publishedAt ?? undefined,
           author: article.value.authorName
             ? { "@type": "Person", name: article.value.authorName }
-            : { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearm" },
-          publisher: { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearm" },
+            : { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearms" },
+          publisher: { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "SCS Firearms" },
           ...(article.value.tags && {
             keywords: article.value.tags,
           }),

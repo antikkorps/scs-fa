@@ -19,7 +19,7 @@ const VERSION_LABEL = formatDate(CURRENT_TERMS_VERSION)
 usePageSeo({
   title: "Conditions générales de vente",
   description:
-    "Commande, paiement, livraison, droit de rétractation, garanties et conditions propres aux armes réglementées et aux tirages Gun Art vendus sur SCS Firearm.",
+    "Commande, paiement, livraison, droit de rétractation, garanties et conditions propres aux armes réglementées et aux tirages Gun Art vendus sur SCS Firearms.",
   path: "/cgv",
   noindex: !REVIEWED,
 })

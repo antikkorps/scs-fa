@@ -21,11 +21,18 @@ import {
   tags,
   users,
 } from "./schema.js"
+import { seedSuppliers } from "./seed-suppliers.js"
 
-export async function seedDatabase() {
-  console.log("🌱 Seeding database...")
+/**
+ * What a live site needs to work: the legal and product categories, the tags
+ * that carry a weapon's state and era, the collected suppliers and the admin
+ * account. Every step is idempotent, so a deployment can run it again.
+ */
+export async function seedReferenceData() {
+  console.log("🌱 Seeding reference data...")
 
   await seedAdminUser()
+  await seedSuppliers()
 
   // ========================================================================
   // CATÉGORIES LÉGALES FRANÇAISES (Classification préfectorale)
@@ -176,11 +183,24 @@ export async function seedDatabase() {
   console.log("✅ Product categories seeded")
 
   await seedTags()
+
+  console.log("🌱 Reference data complete!")
+}
+
+/**
+ * The demo catalogue — Gun Art artists, series and artworks, armurerie
+ * products, collection weapons and journal posts — for development and
+ * demonstrations only: on a live site it would sell things that do not exist.
+ * Needs the reference data first.
+ */
+export async function seedDemoData() {
+  console.log("🎭 Seeding demo data...")
+
   await seedGunArt()
   await seedArmurerie()
   await seedBlog()
 
-  console.log("🌱 Seeding complete!")
+  console.log("🎭 Demo data complete!")
 }
 
 // ==========================================================================
@@ -425,12 +445,19 @@ const GUN_ART_PIECES = [
   },
 ] as const
 
+// The sample password of `.env.example`, also the development default.
+const SAMPLE_ADMIN_PASSWORD = "AdminSCS-ChangeMe-2026!"
+
 // Idempotent admin account so the backoffice is usable right after a seed.
 // Credentials come from env (ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD) with dev
-// defaults — override them in any shared/staging environment.
+// defaults — which production refuses: a copied `.env.example` would otherwise
+// open the back office with a password published in the repository.
 async function seedAdminUser() {
   const email = process.env.ADMIN_SEED_EMAIL ?? "admin@scs-firearm.local"
-  const password = process.env.ADMIN_SEED_PASSWORD ?? "AdminSCS-ChangeMe-2026!"
+  const password = process.env.ADMIN_SEED_PASSWORD ?? SAMPLE_ADMIN_PASSWORD
+  if (process.env.NODE_ENV === "production" && password === SAMPLE_ADMIN_PASSWORD) {
+    throw new Error("Set ADMIN_SEED_PASSWORD in .env: production refuses the sample admin password")
+  }
 
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
   if (existing) {

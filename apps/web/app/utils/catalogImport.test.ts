@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { CatalogImportPreviewRow } from "~/types/admin"
-import { filterPreviewRows, plural, previewFilterCounts } from "./catalogImport"
+import { exportSupplierLabel, filterPreviewRows, plural, previewFilterCounts } from "./catalogImport"
 
 const row = (over: Partial<CatalogImportPreviewRow>): CatalogImportPreviewRow => ({
   line: 2,
@@ -41,5 +41,12 @@ describe("plural", () => {
     expect(plural(0, "produit")).toBe("0 produit")
     expect(plural(1200, "produit")).toMatch(/^1\s200 produits$/)
     expect(plural(2, "nouveau fournisseur", "nouveaux fournisseurs")).toBe("2 nouveaux fournisseurs")
+  })
+})
+
+describe("exportSupplierLabel (story 12.5)", () => {
+  it("counts a supplier's products, and calls an empty one's file what it is: blank", () => {
+    expect(exportSupplierLabel({ id: "s1", name: "BGM", products: 1200 })).toBe("BGM (1\u202f200 produits)")
+    expect(exportSupplierLabel({ id: "s2", name: "Toro", products: 0 })).toBe("Toro (fichier vierge)")
   })
 })

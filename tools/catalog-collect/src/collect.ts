@@ -7,7 +7,7 @@ import { appendFile, mkdir, readFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { type CollectedProduct, collectedProductSchema, normaliseSupplierRef } from "@armurier/shared"
 import type { CollectScope, SupplierAdapter } from "./adapter.js"
-import type { PoliteClient } from "./http.js"
+import { type PoliteClient, SessionLostError } from "./http.js"
 
 export interface CollectOptions {
   outFile: string
@@ -76,6 +76,8 @@ export async function runCollection(
       report.collected++
       if (report.collected % 25 === 0) log(`${adapter.id}: ${report.collected} products`)
     } catch (err) {
+      // Every page after it would be read signed out: stop, resume later.
+      if (err instanceof SessionLostError) throw err
       report.failed++
       const message = err instanceof Error ? err.message : String(err)
       await appendFile(options.errorFile, `${JSON.stringify({ url, error: message.slice(0, 2000) })}\n`, "utf8")
