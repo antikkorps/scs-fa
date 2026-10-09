@@ -104,7 +104,7 @@ describe("admin/reversements.vue (story 11.10)", () => {
 
     const call = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
     expect(call?.[0]).toBe("/admin/finance/payouts/p1")
-    expect((call?.[1] as { body: { status: string } }).body.status).toBe("paid")
+    expect((call?.[1] as { body: { status: string } } | undefined)?.body.status).toBe("paid")
   })
 
   it("relays the server's refusal to settle an unpaid sale", async () => {

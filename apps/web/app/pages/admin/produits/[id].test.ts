@@ -125,10 +125,10 @@ describe("admin product form (story 7.5a)", () => {
     await flushPromises()
 
     const call = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
-    const body = (call?.[1] as { body: { variants: Array<Record<string, unknown>> } }).body
-    expect(body.variants[0]).toMatchObject({ id: "v1", skuVariant: "ARM-1-A", finition: "Bronzé" })
+    const body = (call?.[1] as { body: { variants: Array<Record<string, unknown>> } } | undefined)?.body
+    expect(body?.variants[0]).toMatchObject({ id: "v1", skuVariant: "ARM-1-A", finition: "Bronzé" })
     // Empty attributes are omitted, not sent as empty strings.
-    expect(body.variants[0]).not.toHaveProperty("munition")
+    expect(body?.variants[0]).not.toHaveProperty("munition")
   })
 
   it("adds a variant without an id, so the server inserts it", async () => {
@@ -141,9 +141,9 @@ describe("admin product form (story 7.5a)", () => {
     await flushPromises()
 
     const call = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
-    const body = (call?.[1] as { body: { variants: Array<Record<string, unknown>> } }).body
-    expect(body.variants).toHaveLength(2)
-    expect(body.variants[1]).not.toHaveProperty("id")
+    const body = (call?.[1] as { body: { variants: Array<Record<string, unknown>> } } | undefined)?.body
+    expect(body?.variants).toHaveLength(2)
+    expect(body?.variants[1]).not.toHaveProperty("id")
   })
 
   it("relays the server's refusal to remove a variant that is on an order", async () => {

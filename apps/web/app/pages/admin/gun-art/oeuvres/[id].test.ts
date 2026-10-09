@@ -114,11 +114,11 @@ describe("admin artwork form (story 7.5a)", () => {
     await flushPromises()
 
     const patchCall = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
-    const body = (patchCall?.[1] as { body: Record<string, unknown> }).body
+    const body = (patchCall?.[1] as { body: Record<string, unknown> } | undefined)?.body
     expect(body).not.toHaveProperty("sku")
     expect(body).not.toHaveProperty("slug")
     expect(body).not.toHaveProperty("editionLimit")
-    expect(body.title).toBe("Éclat")
+    expect(body?.title).toBe("Éclat")
   })
 
   it("sends the edition size only when creating", async () => {
@@ -130,8 +130,8 @@ describe("admin artwork form (story 7.5a)", () => {
     await flushPromises()
 
     const postCall = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "POST")
-    const body = (postCall?.[1] as { body: Record<string, unknown> }).body
-    expect(body.editionLimit).toBe(25)
+    const body = (postCall?.[1] as { body: Record<string, unknown> } | undefined)?.body
+    expect(body?.editionLimit).toBe(25)
     expect(body).toHaveProperty("sku")
   })
 
