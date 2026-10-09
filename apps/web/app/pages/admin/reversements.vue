@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AdminBeneficiary, AdminPayout } from "~/types/admin-finance"
-import { formatDate, formatEuros } from "~/utils/format"
+import { formatDate, formatEuros, formatPercent } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Reversements — Administration SCS" })
@@ -111,7 +111,7 @@ const totalDue = computed(() => payouts.value.filter((p) => p.status === "due").
               <td>{{ p.label }}</td>
               <td class="cell--dim">{{ formatDate(p.orderPlacedAt) }}</td>
               <td class="cell--num">{{ formatEuros(p.baseHt) }}</td>
-              <td class="cell--num">{{ p.sharePct }} %</td>
+              <td class="cell--num">{{ formatPercent(p.sharePct) }}</td>
               <td class="cell--num cell--strong">{{ formatEuros(p.amountHt) }}</td>
               <td>
                 <span class="badge" :class="`badge--${p.status}`">{{ STATUS_LABELS[p.status] ?? p.status }}</span>

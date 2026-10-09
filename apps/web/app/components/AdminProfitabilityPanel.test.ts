@@ -35,7 +35,12 @@ describe("AdminProfitabilityPanel (story 11.10)", () => {
     expect(text).toContain("Florian")
     expect(text).toContain("100,00")
     expect(text).toContain("250,00")
-    expect(text).toContain("25 %")
+    expect(text.replace(/\s/g, " ")).toContain("25 %")
+  })
+
+  it("writes a fractional margin rate with a decimal comma", async () => {
+    const wrapper = await mounted({ ...base, marginPct: 12.5 })
+    expect(wrapper.text().replace(/\s/g, " ")).toContain("12,5 %")
   })
 
   it("marks a loss instead of dressing it up", async () => {

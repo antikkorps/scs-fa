@@ -2,12 +2,32 @@
 
 import { type ArtworkOrientation, mediaSrcset } from "@armurier/shared"
 
+/** NaN counts as absent: a failed computation must not print "NaN". */
+function isMissing(value: number | null | undefined): value is null | undefined {
+  return value === null || value === undefined || Number.isNaN(value)
+}
+
 const EUROS = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" })
 
 /** Format an amount as EUR (fr-FR), or an em dash when absent. */
 export function formatEuros(amount: number | null | undefined): string {
-  if (amount === null || amount === undefined || Number.isNaN(amount)) return "—"
+  if (isMissing(amount)) return "—"
   return EUROS.format(amount)
+}
+
+const PERCENT = new Intl.NumberFormat("fr-FR", { style: "percent", maximumFractionDigits: 2 })
+const NUMBER = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 })
+
+/** Format a percentage expressed as 0–100 (the API's `…Pct` fields), e.g. "66,67 %". */
+export function formatPercent(pct: number | null | undefined): string {
+  if (isMissing(pct)) return "—"
+  return PERCENT.format(pct / 100)
+}
+
+/** Format a plain number in fr-FR (decimal comma, grouped thousands), or an em dash when absent. */
+export function formatNumber(value: number | null | undefined): string {
+  if (isMissing(value)) return "—"
+  return NUMBER.format(value)
 }
 
 const DATETIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" })
