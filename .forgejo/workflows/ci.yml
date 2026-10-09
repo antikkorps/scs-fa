@@ -9,15 +9,19 @@ on:
     branches: [main]
   pull_request:
 
-# Serialize ALL CI runs repo-wide. The Forgejo runner shares one Docker network
-# (`forgejo-config_internal`) across jobs, so two concurrent runs would each spin
-# up a Postgres service under the same `testdb` alias and step on each other
-# (manifested as "port already allocated", then "relation \"users\" does not
-# exist" when a run's schema push/seed hit the wrong database). A constant group
-# with cancel-in-progress: false queues runs so they never overlap.
+# One group per branch: a new commit cancels the run still going (or queued) for
+# the previous one, since only the latest commit's result counts.
+#
+# Runs never overlap across branches either, but that is the runner's job, not
+# this file's: it shares one Docker network across jobs, so two concurrent runs
+# would each spin up a Postgres service under the same `testdb` alias and step
+# on each other ("port already allocated", then "relation \"users\" does not
+# exist"). The runner is set to `capacity: 1` for that reason. Forgejo allows a
+# single concurrency group per workflow, so a repo-wide queue here would rule
+# out per-branch cancellation.
 concurrency:
-  group: ci-${{ github.repository }}
-  cancel-in-progress: false
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
