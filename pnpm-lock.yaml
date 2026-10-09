@@ -144,8 +144,8 @@ importers:
         specifier: 0.14.0
         version: 0.14.0(db0@0.3.4(drizzle-orm@0.45.2(@types/pg@8.20.0)(pg@8.22.0)))(ioredis@5.10.1)(magicast@0.5.3)(vite@7.3.5(@types/node@24.13.2)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       '@stripe/stripe-js':
-        specifier: 8.11.0
-        version: 8.11.0
+        specifier: 9.9.0
+        version: 9.9.0
       '@tiptap/extension-image':
         specifier: 3.27.1
         version: 3.27.1(@tiptap/core@3.27.1(@tiptap/pm@3.27.1))
@@ -2521,8 +2521,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@stripe/stripe-js@8.11.0':
-    resolution: {integrity: sha512-3fVF4z3efsgwgyj64nFK+6F4/vMw0mUXD2TBbOfftJtKVNx4JNv3CSfe1fY4DCtCk0JFp8/YPNcRkzgV0HJ8cg==}
+  '@stripe/stripe-js@9.9.0':
+    resolution: {integrity: sha512-Vwqe6Q5cU4i82tPyAv2BpaW/fQSNdOSO4/J8EeDLPp5/oIZiMmdB+Hgh863zFH+rtoxpuWGvD1L7QPh8k1Rdvw==}
     engines: {node: '>=12.16'}
 
   '@tiptap/core@3.27.1':
@@ -8074,7 +8074,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@stripe/stripe-js@8.11.0': {}
+  '@stripe/stripe-js@9.9.0': {}
 
   '@tiptap/core@3.27.1(@tiptap/pm@3.27.1)':
     dependencies:
