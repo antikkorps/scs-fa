@@ -30,8 +30,8 @@ describe("ProductTagFilters", () => {
   it("checks the boxes matching the current selection", async () => {
     const wrapper = await mountSuspended(ProductTagFilters, { props: { facets, selected: ["occasion"] } })
     const boxes = wrapper.findAll("input[type=checkbox]")
-    expect((boxes[0]?.element as HTMLInputElement).checked).toBe(true)
-    expect((boxes[1]?.element as HTMLInputElement).checked).toBe(false)
+    expect((boxes[0]?.element as HTMLInputElement | undefined)?.checked).toBe(true)
+    expect((boxes[1]?.element as HTMLInputElement | undefined)?.checked).toBe(false)
   })
 
   it("emits toggle with the tag slug when a box is ticked", async () => {
