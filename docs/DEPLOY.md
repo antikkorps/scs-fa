@@ -67,7 +67,9 @@ docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
 # Build + start the stack.
 docker compose -f docker-compose.prod.yml up -d --build
 
-# Seed reference data + the admin user (idempotent; safe to re-run).
+# Seed reference data + the admin user (idempotent; safe to re-run). No demo
+# content: `--demo` (just seed-demo) is for demo servers only. Set
+# ADMIN_SEED_PASSWORD first — production refuses the sample one.
 docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/db/seed-cli.ts
 ```
 

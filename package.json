@@ -18,6 +18,7 @@
     "db:push": "pnpm --filter @armurier/api db:push",
     "db:generate": "pnpm --filter @armurier/api db:generate",
     "db:seed": "pnpm --filter @armurier/api db:seed",
+    "db:seed:demo": "pnpm --filter @armurier/api db:seed:demo",
     "db:studio": "pnpm --filter @armurier/api db:studio",
     "docker:up": "docker compose -f docker-compose.dev.yml up -d",
     "docker:down": "docker compose -f docker-compose.dev.yml down",
