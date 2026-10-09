@@ -2,7 +2,7 @@
 import { orderReference } from "@armurier/shared"
 import type { OrderAddressSnapshot, OrderLegal, OrderLineItem, RequiredDoc } from "~/types/account"
 import type { OrderDetail } from "~/types/checkout"
-import { formatDate, formatDateTime, formatEuros } from "~/utils/format"
+import { formatDate, formatDateTime, formatEuros, formatPercent } from "~/utils/format"
 import { needsUpload, requiredDocStatusLabel, requiredDocTone } from "~/utils/legal"
 import {
   legalStatusLabel,
@@ -268,7 +268,7 @@ function toggleUpload(docType: string) {
           <dl class="totals">
             <div><dt>Sous-total HT</dt><dd>{{ formatEuros(order.subtotalHt) }}</dd></div>
             <div v-if="order.vipDiscountAmount > 0" class="totals__vip">
-              <dt>Remise VIP ({{ order.vipDiscountAppliedPct }}%)</dt>
+              <dt>Remise VIP ({{ formatPercent(order.vipDiscountAppliedPct) }})</dt>
               <dd>−{{ formatEuros(order.vipDiscountAmount) }}</dd>
             </div>
             <div>

@@ -2,7 +2,7 @@
 import { defaultParcelCount, LEGAL_CATEGORIES } from "@armurier/shared"
 import type { AdminProductDetail, AdminProductVariant } from "~/types/admin-catalogue"
 import type { AdminProfitability } from "~/types/admin-finance"
-import { formatDateTime } from "~/utils/format"
+import { formatDateTime, formatPercent } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 
@@ -408,7 +408,7 @@ async function save() {
           <select v-model="form.beneficiaryId" class="ctl">
             <option value="">— aucun —</option>
             <option v-for="b in beneficiaryOptions" :key="b.id" :value="b.id">
-              {{ b.name }} ({{ b.defaultSharePct }} %)
+              {{ b.name }} ({{ formatPercent(b.defaultSharePct) }})
             </option>
           </select>
         </label>
