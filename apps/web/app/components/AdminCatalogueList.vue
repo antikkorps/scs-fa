@@ -6,6 +6,10 @@
  * Products and collection weapons both need exactly this, and the deletion
  * refusal ("this appears on an order — unpublish it instead") is the part worth
  * writing once: it is the message that keeps a purchase trail from being erased.
+ *
+ * With `archivable` (products, story 12.4) each row also gets "Archiver" /
+ * "Réactiver": the way out for a product that is on an order and can no longer
+ * be deleted.
  */
 export interface CatalogueColumn {
   key: string
@@ -31,6 +35,8 @@ const props = defineProps<{
   endpoint: string
   labelKey: string
   noun: string
+  /** Rows carry `archivedAt`; offer archive / restore next to delete. */
+  archivable?: boolean
 }>()
 
 const emit = defineEmits<(e: "changed") => void>()
@@ -42,6 +48,22 @@ function cell(row: CatalogueRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key]
 }
 
+const isArchived = (row: CatalogueRow) => Boolean(cell(row, "archivedAt"))
+
+async function toggleArchive(row: CatalogueRow) {
+  const label = String(cell(row, props.labelKey) ?? row.id)
+  const archive = !isArchived(row)
+  if (archive && !confirm(`Archiver « ${label} » ? Il sera retiré de la vente, sans être effacé.`)) return
+  removeError.value = null
+  try {
+    await api(`${props.endpoint}/${row.id}/${archive ? "archive" : "restore"}`, { method: "POST" })
+    emit("changed")
+  } catch (err) {
+    const body = (err as { data?: { message?: string } }).data
+    removeError.value = body?.message ?? "L'opération a échoué."
+  }
+}
+
 async function remove(row: CatalogueRow) {
   const label = String(cell(row, props.labelKey) ?? row.id)
   if (!confirm(`Supprimer « ${label} » ? Cette action est définitive.`)) return
@@ -50,8 +72,11 @@ async function remove(row: CatalogueRow) {
     await api(`${props.endpoint}/${row.id}`, { method: "DELETE" })
     emit("changed")
   } catch (err) {
-    const body = (err as { data?: { message?: string } }).data
-    removeError.value = body?.message ?? "La suppression a échoué."
+    const { data: body, statusCode } = err as { data?: { message?: string }; statusCode?: number }
+    removeError.value =
+      props.archivable && statusCode === 409
+        ? `« ${label} » figure sur une commande : archivez-le plutôt que de le supprimer.`
+        : (body?.message ?? "La suppression a échoué.")
   }
 }
 </script>
@@ -71,15 +96,23 @@ async function remove(row: CatalogueRow) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in rows" :key="row.id">
+            <tr v-for="row in rows" :key="row.id" :class="{ 'row--archived': archivable && isArchived(row) }">
               <td v-for="(c, i) in columns" :key="c.key" :class="{ 'cell--num': c.numeric }">
-                <NuxtLink v-if="i === 0" :to="`${editBase}/${row.id}`" class="title">{{ cell(row, c.key) }}</NuxtLink>
+                <template v-if="i === 0">
+                  <NuxtLink :to="`${editBase}/${row.id}`" class="title">{{ cell(row, c.key) }}</NuxtLink>
+                  <span v-if="archivable && isArchived(row)" class="badge">Archivé</span>
+                </template>
                 <template v-else-if="c.boolean">{{ cell(row, c.key) ? "Oui" : "Non" }}</template>
                 <template v-else>{{ cell(row, c.key) ?? "—" }}</template>
               </td>
               <td class="cell--actions">
-                <NuxtLink :to="`${editBase}/${row.id}`" class="link">Modifier</NuxtLink>
-                <button class="link link--danger" type="button" @click="remove(row)">Supprimer</button>
+                <div class="actions">
+                  <NuxtLink :to="`${editBase}/${row.id}`" class="link">Modifier</NuxtLink>
+                  <button v-if="archivable" class="link" type="button" @click="toggleArchive(row)">
+                    {{ isArchived(row) ? "Réactiver" : "Archiver" }}
+                  </button>
+                  <button class="link link--danger" type="button" @click="remove(row)">Supprimer</button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -98,6 +131,8 @@ async function remove(row: CatalogueRow) {
 }
 .tablewrap {
   overflow-x: auto;
+  /* Anchors the visually-hidden header: positioned against the page, it widened it on mobile. */
+  position: relative;
 }
 .grid {
   width: 100%;
@@ -117,6 +152,17 @@ async function remove(row: CatalogueRow) {
   text-transform: uppercase;
   white-space: nowrap;
 }
+.row--archived td {
+  color: var(--paper-faint);
+}
+.badge {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  font-size: var(--fs-xs);
+  color: var(--paper-faint);
+}
 .title {
   color: var(--paper);
   text-decoration: none;
@@ -130,8 +176,14 @@ async function remove(row: CatalogueRow) {
   color: var(--paper-dim);
 }
 .cell--actions {
-  text-align: right;
   white-space: nowrap;
+}
+/* Stacked, so a third action does not push the table past its frame. */
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
 }
 .link {
   background: none;

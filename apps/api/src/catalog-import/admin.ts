@@ -1,15 +1,24 @@
 import { createHash } from "node:crypto"
-import { MAX_CATALOG_IMPORT_FILE_BYTES, uuidParamSchema } from "@armurier/shared"
+import { MAX_CATALOG_IMPORT_FILE_BYTES, slugify, uuidParamSchema } from "@armurier/shared"
 import { readSpreadsheet, SpreadsheetError } from "@armurier/shared/spreadsheet"
 import { and, desc, eq } from "drizzle-orm"
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
+import { z } from "zod"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { catalogImportImages, catalogImports, products } from "../db/schema.js"
+import { catalogImportImages, catalogImports, products, suppliers } from "../db/schema.js"
 import { env } from "../env.js"
+import { validationError } from "../http.js"
+import { exportableSuppliers, exportCatalogWorkbook } from "./export.js"
 import { drainCatalogImages, imageQueueStats } from "./images.js"
-import { commitCatalogImport, ImportFileError, type ImportPlan, planCatalogImport } from "./service.js"
+import {
+  commitCatalogImport,
+  ImportFileError,
+  type ImportPlan,
+  type PlanOptions,
+  planCatalogImport,
+} from "./service.js"
 
 interface Upload {
   bytes: Buffer
@@ -61,9 +70,9 @@ async function readUpload(request: FastifyRequest, reply: FastifyReply): Promise
 }
 
 /** Parse + plan, turning file-level problems into a 400. */
-async function planFromUpload(upload: Upload, overwrite: boolean, reply: FastifyReply): Promise<ImportPlan | null> {
+async function planFromUpload(upload: Upload, options: PlanOptions, reply: FastifyReply): Promise<ImportPlan | null> {
   try {
-    return await planCatalogImport(await readSpreadsheet(upload.bytes), overwrite)
+    return await planCatalogImport(await readSpreadsheet(upload.bytes), options)
   } catch (err) {
     if (err instanceof SpreadsheetError || err instanceof ImportFileError) {
       await reply.code(400).send({ error: "BadRequest", message: err.message })
@@ -75,6 +84,15 @@ async function planFromUpload(upload: Upload, overwrite: boolean, reply: Fastify
 
 const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex")
 const isTrue = (v: string | undefined) => v === "true" || v === "1" || v === "on"
+const planOptions = (upload: Upload): PlanOptions => ({
+  overwrite: isTrue(upload.fields.overwrite),
+  archiveMissing: isTrue(upload.fields.archiveMissing),
+})
+
+/** The preview lists at most this many products to archive; the count is always exact. */
+const ARCHIVE_PREVIEW_LIMIT = 500
+
+const exportQuerySchema = z.object({ supplierId: z.string().uuid().optional() })
 
 /** Public shape of a plan row — internal resolution details stay server-side. */
 function reportRow(row: ImportPlan["rows"][number]) {
@@ -103,16 +121,16 @@ export const adminCatalogImportRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/preview", async (request, reply) => {
     const upload = await readUpload(request, reply)
     if (!upload) return reply
-    const overwrite = isTrue(upload.fields.overwrite)
-    const plan = await planFromUpload(upload, overwrite, reply)
+    const options = planOptions(upload)
+    const plan = await planFromUpload(upload, options, reply)
     if (!plan) return reply
     return reply.send({
       data: {
         fileName: upload.fileName,
         fileSha256: sha256(upload.bytes),
-        overwrite,
+        ...options,
         summary: plan.summary,
-        suppliersToCreate: plan.suppliersToCreate,
+        toArchive: plan.toArchive.slice(0, ARCHIVE_PREVIEW_LIMIT),
         // Skipped rows are the human's own "non": listing them would only bury the rest.
         rows: plan.rows.filter((r) => r.action !== "skipped").map(reportRow),
       },
@@ -134,17 +152,17 @@ export const adminCatalogImportRoutes: FastifyPluginAsync = async (fastify) => {
         message: "This file is not the one that was previewed — preview it again before importing",
       })
     }
-    const overwrite = isTrue(upload.fields.overwrite)
-    const plan = await planFromUpload(upload, overwrite, reply)
+    const options = planOptions(upload)
+    const plan = await planFromUpload(upload, options, reply)
     if (!plan) return reply
-    if (plan.summary.create + plan.summary.update === 0) {
+    if (plan.summary.create + plan.summary.update + plan.summary.archive === 0) {
       return reply.code(400).send({ error: "BadRequest", message: "Nothing to import" })
     }
 
     const result = await commitCatalogImport(plan, {
       fileName: upload.fileName,
       fileSha256,
-      overwrite,
+      overwrite: options.overwrite,
       userId: request.user.sub,
     })
     request.log.info({ ...result }, "catalogue import committed")
@@ -152,6 +170,33 @@ export const adminCatalogImportRoutes: FastifyPluginAsync = async (fastify) => {
     if (result.imagesQueued > 0 && env.NODE_ENV !== "test") void drainCatalogImages(request.log)
     return reply.code(201).send({ data: result })
   })
+
+  /**
+   * GET /export — the catalogue as a workbook in the import's own columns
+   * (story 12.4): edit it in Excel, then preview and import it back.
+   */
+  fastify.get("/export", async (request, reply) => {
+    const query = exportQuerySchema.safeParse(request.query)
+    if (!query.success) return reply.code(400).send(validationError(query.error.issues))
+    const { supplierId } = query.data
+    let label = ""
+    if (supplierId) {
+      const [supplier] = await db.select({ name: suppliers.name }).from(suppliers).where(eq(suppliers.id, supplierId))
+      if (!supplier) return reply.code(404).send({ error: "NotFound", message: "Supplier not found" })
+      label = `${slugify(supplier.name, 40)}-`
+    }
+    const { workbook, rows } = await exportCatalogWorkbook({ supplierId })
+    const date = new Date().toISOString().slice(0, 10)
+    return reply
+      .header("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .header("content-disposition", `attachment; filename="catalogue-${label}${date}.xlsx"`)
+      .header("x-catalogue-rows", String(rows))
+      .header("cache-control", "no-store")
+      .send(workbook)
+  })
+
+  /** GET /suppliers — suppliers with products to export, for the per-supplier export. */
+  fastify.get("/suppliers", async (_request, reply) => reply.send({ data: await exportableSuppliers() }))
 
   /** GET / — import history, most recent first, with each import's image queue. */
   fastify.get("/", async (_request, reply) => {

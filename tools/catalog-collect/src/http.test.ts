@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
-import { DisallowedError, HttpError, PoliteClient } from "./http.js"
+import { DisallowedError, HttpError, PoliteClient, SessionLostError } from "./http.js"
 
 type Route = string | { status: number; body?: string; headers?: Record<string, string> } | Error
 
@@ -120,6 +120,36 @@ describe("PoliteClient", () => {
     expect(await client.get("https://s.fr/list", { cache: false })).toBe("page 3")
     expect(seen).toEqual([null, "PHPSESSID=abc", "PHPSESSID=abc"])
     expect(await readdir(dir)).toEqual([])
+  })
+
+  it("refuses, and never caches, a page served without the signed-in session", async () => {
+    dir = await mkdtemp(join(tmpdir(), "collect-cache-"))
+    const site = fakeSite({ "https://s.fr/in": "SIGNED-IN product", "https://s.fr/out": "public product" })
+    const client = new PoliteClient({
+      fetch: site.fetch,
+      cacheDir: dir,
+      acceptPage: (html) => html.startsWith("SIGNED-IN"),
+      ...clock(),
+    })
+    expect(await client.get("https://s.fr/in")).toBe("SIGNED-IN product")
+    await expect(client.get("https://s.fr/out")).rejects.toBeInstanceOf(SessionLostError)
+    expect(await readdir(dir)).toHaveLength(1)
+  })
+
+  it("posts a form once, never retried even on a 503", async () => {
+    let posts = 0
+    const fetch = async (url: string, init?: RequestInit) => {
+      if (url.endsWith("robots.txt")) return new Response("", { status: 404 })
+      posts++
+      expect(init?.method).toBe("POST")
+      expect(new Headers(init?.headers).get("content-type")).toBe("application/x-www-form-urlencoded")
+      return new Response("busy", { status: 503 })
+    }
+    const client = new PoliteClient({ fetch, ...clock() })
+    await expect(client.postForm("https://s.fr/login", { email: "a@b.fr", password: "x" })).rejects.toBeInstanceOf(
+      HttpError,
+    )
+    expect(posts).toBe(1)
   })
 
   it("exposes the sitemaps robots.txt declares", async () => {

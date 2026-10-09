@@ -28,7 +28,7 @@ export const REGULATION_FAQ: FaqSection[] = [
         question: "Comment les armes sont-elles classées en France ?",
         answer: [
           "Le Code de la sécurité intérieure range les armes en quatre catégories, de A à D, selon leur dangerosité. La catégorie décide de qui peut acheter une arme et des pièces à fournir.",
-          "Catégorie A : armes interdites à l'acquisition et à la détention, sauf exceptions très encadrées. SCS Firearm ne les vend pas.",
+          "Catégorie A : armes interdites à l'acquisition et à la détention, sauf exceptions très encadrées. SCS Firearms ne les vend pas.",
           "Catégorie B : armes soumises à autorisation préfectorale.",
           "Catégorie C : armes soumises à déclaration.",
           "Catégorie D : armes dont l'acquisition et la détention sont libres pour les personnes majeures.",
@@ -86,7 +86,7 @@ export const REGULATION_FAQ: FaqSection[] = [
     ],
   },
   {
-    title: "Acheter sur SCS Firearm",
+    title: "Acheter sur SCS Firearms",
     entries: [
       {
         question: "Comment se déroule un achat réglementé ?",

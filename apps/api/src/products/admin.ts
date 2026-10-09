@@ -14,9 +14,10 @@ import { db } from "../db/client.js"
 import {
   ancientWeapons,
   artworks,
+  auditLogs,
   cartItems,
   legalCategories,
-  orderItems,
+  orders,
   productCategories,
   products,
   productTags,
@@ -31,6 +32,24 @@ import { sanitizeRichTextHtml } from "../sanitize.js"
 import { adminProductCrossSellRoutes } from "./cross-sell.js"
 
 type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db
+
+/**
+ * The variants, among `variantIds`, that appear on an order. Checkout writes
+ * its lines into `orders.items_json`, NOT into the `order_items` table — a
+ * guard reading that table saw no order at all, and let an ordered product be
+ * deleted.
+ */
+export async function orderedVariantIds(variantIds: string[], tx: DbExecutor = db): Promise<Set<string>> {
+  if (variantIds.length === 0) return new Set()
+  const result = await tx.execute<{ id: string }>(sql`
+    select distinct line->>'variantId' as id
+    from ${orders}, jsonb_array_elements(${orders.itemsJson}) as line
+    where line->>'variantId' in (${sql.join(
+      variantIds.map((id) => sql`${id}`),
+      sql`, `,
+    )})`)
+  return new Set(result.rows.map((r) => r.id))
+}
 
 /**
  * Products that back a Gun Art piece or a collection weapon are edited through
@@ -69,13 +88,12 @@ async function syncVariants(productId: string, wanted: ProductVariantInput[], tx
   const keptIds = new Set(wanted.map((v) => v.id).filter((id): id is string => Boolean(id)))
   const doomed = existing.filter((row) => !keptIds.has(row.id))
 
+  const ordered = await orderedVariantIds(
+    doomed.map((row) => row.id),
+    tx,
+  )
   for (const row of doomed) {
-    const [inUse] = await tx
-      .select({ id: orderItems.id })
-      .from(orderItems)
-      .where(eq(orderItems.variantId, row.id))
-      .limit(1)
-    if (inUse) {
+    if (ordered.has(row.id)) {
       throw new VariantInUseError(row.skuVariant)
     }
     await tx.delete(cartItems).where(eq(cartItems.variantId, row.id))
@@ -121,6 +139,7 @@ async function loadAdminProduct(id: string) {
       stockQty: products.stockQty,
       trackStock: products.trackStock,
       published: products.published,
+      archivedAt: products.archivedAt,
       featured: products.featured,
       featuredImageUrl: products.featuredImageUrl,
       metaTitle: products.metaTitle,
@@ -213,6 +232,7 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
         priceHt: products.priceHt,
         stockQty: products.stockQty,
         published: products.published,
+        archivedAt: products.archivedAt,
         featured: products.featured,
         featuredImageUrl: products.featuredImageUrl,
         categorySlug: productCategories.slug,
@@ -318,6 +338,12 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
     if (!existing) return reply.code(404).send({ error: "NotFound", message: "Product not found" })
 
     const { categorySlug, legalCategory, tagSlugs, variants, ...body } = parsed.data
+    if (existing.archivedAt && body.published === true) {
+      return reply.code(409).send({
+        error: "Conflict",
+        message: "This product is archived — restore it before publishing it",
+      })
+    }
 
     try {
       await db.transaction(async (tx) => {
@@ -392,6 +418,42 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send({ data: await loadAdminProduct(params.data.id) })
   })
 
+  /**
+   * POST /:id/archive, /:id/restore (story 12.4). Archiving takes the product
+   * off sale and out of the export without deleting anything — past orders
+   * keep pointing at it. Restoring brings it back OFFLINE: going live again
+   * is a separate, deliberate step.
+   */
+  for (const [path, archive] of [
+    ["/:id/archive", true],
+    ["/:id/restore", false],
+  ] as const) {
+    fastify.post(path, async (request, reply) => {
+      const params = uuidParamSchema.safeParse(request.params)
+      if (!params.success) return reply.code(400).send(validationError(params.error.issues))
+      const existing = await loadAdminProduct(params.data.id)
+      if (!existing) return reply.code(404).send({ error: "NotFound", message: "Product not found" })
+      if (Boolean(existing.archivedAt) !== archive) {
+        const now = new Date()
+        await db.transaction(async (tx) => {
+          await tx
+            .update(products)
+            .set(archive ? { archivedAt: now, published: false, updatedAt: now } : { archivedAt: null, updatedAt: now })
+            .where(eq(products.id, params.data.id))
+          await tx.insert(auditLogs).values({
+            userId: request.user.sub,
+            userRole: "admin",
+            entityType: "product",
+            entityId: params.data.id,
+            action: archive ? "product.archived" : "product.restored",
+            newValue: { sku: existing.sku, source: "admin" },
+          })
+        })
+      }
+      return reply.send({ data: await loadAdminProduct(params.data.id) })
+    })
+  }
+
   /** DELETE /:id — refused as soon as the product appears on an order. */
   fastify.delete("/:id", async (request, reply) => {
     const params = uuidParamSchema.safeParse(request.params)
@@ -400,15 +462,15 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
     const existing = await loadAdminProduct(params.data.id)
     if (!existing) return reply.code(404).send({ error: "NotFound", message: "Product not found" })
 
-    const [ordered] = await db
-      .select({ id: orderItems.id })
-      .from(orderItems)
-      .where(eq(orderItems.productId, params.data.id))
-      .limit(1)
-    if (ordered) {
+    const variants = await db
+      .select({ id: productVariants.id })
+      .from(productVariants)
+      .where(eq(productVariants.productId, params.data.id))
+    const ordered = await orderedVariantIds(variants.map((v) => v.id))
+    if (ordered.size > 0) {
       return reply.code(409).send({
         error: "Conflict",
-        message: "This product appears on an order — unpublish it instead of deleting it",
+        message: "This product appears on an order — archive it instead of deleting it",
       })
     }
 

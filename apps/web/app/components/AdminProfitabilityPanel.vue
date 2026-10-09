@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AdminProfitability } from "~/types/admin-finance"
-import { formatEuros } from "~/utils/format"
+import { formatEuros, formatPercent } from "~/utils/format"
 
 /**
  * Cost, charges, third-party share and margin for one article (story 11.10).
@@ -39,7 +39,7 @@ defineProps<{
       </div>
       <div class="prof__total">
         <dt>= Marge</dt>
-        <dd>{{ formatEuros(profitability.marginHt) }} <span>({{ profitability.marginPct }} %)</span></dd>
+        <dd>{{ formatEuros(profitability.marginHt) }} <span>({{ formatPercent(profitability.marginPct) }})</span></dd>
       </div>
     </dl>
 

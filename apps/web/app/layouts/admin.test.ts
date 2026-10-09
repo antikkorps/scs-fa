@@ -28,15 +28,22 @@ describe("admin layout sidebar", () => {
     ])
     const links = wrapper.findAll(".nav__link").map((a) => a.attributes("href"))
     expect(links[0]).toBe("/admin")
-    expect(links).toHaveLength(18)
+    expect(links).toHaveLength(19)
     // No screen lost or listed twice in the regrouping.
     expect(new Set(links).size).toBe(links.length)
-    expect(links).toEqual(expect.arrayContaining(["/admin/livraison", "/admin/metrics", "/admin/blog"]))
+    expect(links).toEqual(
+      expect.arrayContaining(["/admin/livraison", "/admin/metrics", "/admin/blog", "/admin/fournisseurs"]),
+    )
   })
 
   it("highlights the current screen only — the dashboard matches exactly", async () => {
     const wrapper = await mountAt("/admin/gun-art/series")
     const active = wrapper.findAll(".nav__link--active").map((a) => a.attributes("href"))
     expect(active).toEqual(["/admin/gun-art/series"])
+  })
+
+  it("heads the sidebar with the brand logo", async () => {
+    const wrapper = await mountAt("/admin")
+    expect(wrapper.find(".brand img.logo").attributes("alt")).toBe("SCS Firearms")
   })
 })

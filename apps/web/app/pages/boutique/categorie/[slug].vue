@@ -19,7 +19,7 @@ const description = computed(() => categoryMetaDescription(name.value, category.
 
 usePageSeo({
   title: () => `${name.value} — Boutique armurerie`,
-  socialTitle: () => `${name.value} — SCS Firearm`,
+  socialTitle: () => `${name.value} — SCS Firearms`,
   description,
   path: () => categoryPath(slug.value),
   // ShopCatalogue states the canonical: it knows the page of results.
@@ -40,7 +40,7 @@ usePageSeo({
       :key="slug"
       :category="slug"
       :base-path="categoryPath(slug)"
-      :list-name="`${name} — Boutique armurerie SCS Firearm`"
+      :list-name="`${name} — Boutique armurerie SCS Firearms`"
     />
   </div>
 </template>

@@ -7,6 +7,8 @@ import {
   formatDate,
   formatDateTime,
   formatEuros,
+  formatNumber,
+  formatPercent,
 } from "./format.js"
 
 describe("formatEuros", () => {
@@ -19,6 +21,36 @@ describe("formatEuros", () => {
     expect(formatEuros(null)).toBe("—")
     expect(formatEuros(undefined)).toBe("—")
     expect(formatEuros(Number.NaN)).toBe("—")
+  })
+})
+
+describe("formatPercent", () => {
+  // fr-FR: decimal comma, narrow no-break space before the sign
+  it("formats a percentage (0–100) the French way", () => {
+    expect(formatPercent(66.67).replace(/\s/g, " ")).toBe("66,67 %")
+    expect(formatPercent(30).replace(/\s/g, " ")).toBe("30 %")
+  })
+
+  it("rounds to two decimals at most", () => {
+    expect(formatPercent(12.3456).replace(/\s/g, " ")).toBe("12,35 %")
+  })
+
+  it("returns an em dash for null/undefined/NaN", () => {
+    expect(formatPercent(null)).toBe("—")
+    expect(formatPercent(undefined)).toBe("—")
+    expect(formatPercent(Number.NaN)).toBe("—")
+  })
+})
+
+describe("formatNumber", () => {
+  it("uses a decimal comma and groups thousands (fr-FR)", () => {
+    expect(formatNumber(12.5)).toBe("12,5")
+    expect(formatNumber(1234.5).replace(/\s/g, " ")).toBe("1 234,5")
+  })
+
+  it("returns an em dash for null/undefined/NaN", () => {
+    expect(formatNumber(null)).toBe("—")
+    expect(formatNumber(Number.NaN)).toBe("—")
   })
 })
 

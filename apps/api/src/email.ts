@@ -237,7 +237,7 @@ export async function sendNewsletterConfirmationEmail(
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to,
-    subject: "Confirmez votre inscription à la newsletter SCS Firearm",
+    subject: "Confirmez votre inscription à la newsletter SCS Firearms",
     // One-click unsubscribe headers (RFC 8058): mail clients surface a native
     // unsubscribe button, which keeps complaints off the spam button.
     headers: {
@@ -345,7 +345,7 @@ export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmatio
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to,
-    subject: `Confirmation de votre commande ${o.orderRef} — SCS Firearm`,
+    subject: `Confirmation de votre commande ${o.orderRef} — SCS Firearms`,
     text:
       `${hello}\n\nNous avons bien reçu votre commande ${o.orderRef} du ${placed}.\n\n` +
       `Articles :\n${o.lines.map((l) => `- ${l.name}${l.qty > 1 ? ` × ${l.qty}` : ""}`).join("\n")}\n\n` +

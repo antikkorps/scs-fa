@@ -2,7 +2,13 @@ import { type CollectedProduct, parseCatalogImportTable } from "@armurier/shared
 import { readSpreadsheet } from "@armurier/shared/spreadsheet"
 import ExcelJS from "exceljs"
 import { describe, expect, it } from "vitest"
-import { buildTriageModel, type SupplierBatch, supplierConfigSchema, writeTriageWorkbook } from "./triage.js"
+import {
+  buildTriageModel,
+  pricesFromCollection,
+  type SupplierBatch,
+  supplierConfigSchema,
+  writeTriageWorkbook,
+} from "./triage.js"
 
 const categories = [
   { slug: "aide-visee", name: "Aides à la visée" },
@@ -125,6 +131,15 @@ describe("buildTriageModel", () => {
     expect(model.stats).toEqual({ matched: 0, no_price: 2, ambiguous: 0 })
   })
 
+  it("reconciles purchase prices read from a pro area like a price list", () => {
+    const products = [product({ purchasePrice: 70 }), product({ supplierSku: "CARA-9", name: "Carabine" })]
+    const prices = pricesFromCollection(products)
+    expect(prices).toEqual([{ line: 1, ref: "AP-1", price: 70, ean: null }])
+    const model = buildTriageModel([batch({ products, prices })], categories)
+    expect(model.stats).toEqual({ matched: 1, no_price: 1, ambiguous: 0 })
+    expect(model.orphans).toEqual([])
+  })
+
   it("falls back to plain text when the HTML would exceed the import limit", () => {
     // Ampersands and line breaks grow when escaped and wrapped: still within the limit.
     const long = product({ longDescription: `<p>${"a & b<br>".repeat(4000)}</p>`, specs: {} })
@@ -168,5 +183,13 @@ describe("writeTriageWorkbook", () => {
     ).map((v) => v.formulae[0])
     expect(validations).toEqual(expect.arrayContaining(['"oui,non"', '"A,B,C,D,Aucune"', "Listes!$A$1:$A$2"]))
     expect(wb.getWorksheet("Prix sans fiche")?.getRow(2).getCell(2).value).toBe("ORPHAN")
+  })
+
+  it("warns that the supplier must exist in the back office before the import (story 12.5)", async () => {
+    const file = await writeTriageWorkbook(buildTriageModel([batch()], categories), categories)
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(file as unknown as ArrayBuffer)
+    const readme = wb.getWorksheet("Lisez-moi")?.getColumn(1).values.join("\n")
+    expect(readme).toMatch(/Catalogue → Fournisseurs/)
   })
 })

@@ -30,7 +30,7 @@ describe("productJsonLd", () => {
       availability: "https://schema.org/InStock",
       itemCondition: "https://schema.org/NewCondition",
       url: `${SITE}/boutique/glock-17`,
-      seller: { "@type": "Organization", "@id": `${SITE}/#organization`, name: "SCS Firearm" },
+      seller: { "@type": "Organization", "@id": `${SITE}/#organization`, name: "SCS Firearms" },
     })
     expect(ld.additionalProperty).toEqual({ "@type": "PropertyValue", name: "Catégorie légale", value: "B" })
   })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { MetricsResult } from "~/types/admin"
-import { formatEuros } from "~/utils/format"
+import { formatEuros, formatNumber, formatPercent } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Métriques — Administration SCS" })
@@ -73,16 +73,16 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
         </div>
         <div class="kpi">
           <span class="kpi__value">{{ formatEuros(m.commission.amount) }}</span>
-          <span class="kpi__label">Commission ({{ m.commission.ratePct }}%)</span>
+          <span class="kpi__label">Commission ({{ formatPercent(m.commission.ratePct) }})</span>
           <span class="kpi__hint">part partenaire sur le CA net</span>
         </div>
         <div class="kpi">
-          <span class="kpi__value">{{ m.funnel.conversionPct }}%</span>
+          <span class="kpi__value">{{ formatPercent(m.funnel.conversionPct) }}</span>
           <span class="kpi__label">Conversion</span>
           <span class="kpi__hint">{{ m.funnel.paidOrders }} payées / {{ m.funnel.totalOrders }} commandes</span>
         </div>
         <div class="kpi">
-          <span class="kpi__value">{{ m.legalSla.withinSlaPct }}%</span>
+          <span class="kpi__value">{{ formatPercent(m.legalSla.withinSlaPct) }}</span>
           <span class="kpi__label">SLA légal (48h)</span>
           <span class="kpi__hint">
             {{ m.legalSla.withinSla }}/{{ m.legalSla.reviewed }} dans les délais ·
@@ -114,7 +114,7 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
           <div><dt>Remboursées</dt><dd>{{ m.funnel.refundedOrders }}</dd></div>
           <div><dt>Échouées / annulées</dt><dd class="bad">{{ m.funnel.failedOrders }}</dd></div>
           <div v-if="m.legalSla.avgReviewHours !== null">
-            <dt>Délai moyen de revue doc</dt><dd>{{ m.legalSla.avgReviewHours }} h</dd>
+            <dt>Délai moyen de revue doc</dt><dd>{{ formatNumber(m.legalSla.avgReviewHours) }} h</dd>
           </div>
         </dl>
       </section>
@@ -162,6 +162,10 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
   margin-bottom: 1.6rem;
 }
 .kpi {
+  /* The card is the size reference for its value (cqi below), and a grid
+     item may shrink below its content instead of pushing past the column. */
+  container-type: inline-size;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -180,7 +184,10 @@ const chartTotal = computed(() => chart.value.reduce((s, p) => s + p.grossTtc, 0
      serves oldstyle figures, which are unusable here. */
   font-family: var(--font-body);
   font-variant-numeric: var(--nums);
-  font-size: var(--fs-2xl);
+  /* A seven-figure turnover must fit the card: scale with its width, between
+     the medium and the display size, and wrap as a last resort. */
+  font-size: clamp(var(--fs-md), 10.5cqi, var(--fs-2xl));
+  overflow-wrap: anywhere;
   font-weight: var(--fw-bold);
   line-height: var(--lh-tight);
 }

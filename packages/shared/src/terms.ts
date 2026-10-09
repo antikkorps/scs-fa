@@ -10,4 +10,4 @@
  * `/cgv` — never for a pure layout change. Orders placed under the old text
  * keep their version.
  */
-export const CURRENT_TERMS_VERSION = "2026-10-03"
+export const CURRENT_TERMS_VERSION = "2026-10-08"

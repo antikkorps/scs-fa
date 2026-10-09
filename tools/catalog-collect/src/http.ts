@@ -20,6 +20,17 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * A page came back without the signed-in session a pro collection depends on
+ * (expired, or the site logged us out). The run must stop: carrying on would
+ * collect public pages as if they were pro ones.
+ */
+export class SessionLostError extends Error {
+  constructor(readonly url: string) {
+    super(`Pro session lost on ${url}: the collection stops, run it again to sign in anew`)
+  }
+}
+
 export class DisallowedError extends Error {
   constructor(readonly url: string) {
     super(`robots.txt disallows ${url}`)
@@ -40,6 +51,12 @@ export interface PoliteClientOptions {
    * a listing filter in the PHP session: the next page only makes sense with it.
    */
   cookies?: boolean
+  /**
+   * For a signed-in collection: every page fetched must pass this check (the
+   * site still sees us signed in), or the request fails with
+   * `SessionLostError` and nothing is cached.
+   */
+  acceptPage?: (html: string, url: string) => boolean
   fetch?: FetchLike
   sleep?: (ms: number) => Promise<void>
   now?: () => number
@@ -52,7 +69,8 @@ export class PoliteClient {
   private readonly robots = new Map<string, Promise<RobotsRules>>()
   private readonly nextSlot = new Map<string, number>()
   private readonly jar = new Map<string, Map<string, string>>()
-  private readonly opts: Required<Omit<PoliteClientOptions, "cacheDir">> & { cacheDir?: string }
+  private readonly opts: Required<Omit<PoliteClientOptions, "cacheDir" | "acceptPage">> &
+    Pick<PoliteClientOptions, "cacheDir" | "acceptPage">
 
   constructor(options: PoliteClientOptions = {}) {
     this.opts = {
@@ -88,8 +106,18 @@ export class PoliteClient {
     if (slot > now) await this.opts.sleep(slot - now)
   }
 
-  private async request(url: string, { allowMissing = false } = {}): Promise<string | null> {
+  private async request(
+    url: string,
+    {
+      allowMissing = false,
+      form,
+      redirects = 0,
+    }: { allowMissing?: boolean; form?: Record<string, string>; redirects?: number } = {},
+  ): Promise<string | null> {
     const { host } = new URL(url)
+    // A sign-in is never replayed: a second wrong attempt is how an account
+    // gets locked.
+    const maxRetries = form ? 0 : this.opts.maxRetries
     const crawlDelay = url.endsWith("/robots.txt") ? null : (await this.rulesFor(new URL(url).origin)).crawlDelaySeconds
     for (let attempt = 0; ; attempt++) {
       await this.throttle(host, crawlDelay)
@@ -102,19 +130,28 @@ export class PoliteClient {
             "user-agent": this.opts.userAgent,
             "accept-language": "fr-FR,fr;q=0.9",
             ...(cookie ? { cookie } : {}),
+            ...(form ? { "content-type": "application/x-www-form-urlencoded" } : {}),
           },
-          redirect: "follow",
+          ...(form ? { method: "POST", body: new URLSearchParams(form).toString() } : {}),
+          // A sign-in sets its session cookie on the redirect itself, which
+          // `fetch` would follow without letting us read it.
+          redirect: form || redirects > 0 ? "manual" : "follow",
         })
       } catch (err) {
-        if (attempt >= this.opts.maxRetries) throw err
+        if (attempt >= maxRetries) throw err
         this.opts.log(`network error on ${url}, retrying`)
         await this.opts.sleep(2 ** attempt * this.opts.minIntervalMs)
         continue
       }
       if (this.opts.cookies) this.keepCookies(host, res)
+      const location = res.headers.get("location")
+      if ((form || redirects > 0) && res.status >= 300 && res.status < 400 && location) {
+        if (redirects >= 5) throw new HttpError(url, res.status)
+        return this.request(new URL(location, url).toString(), { redirects: redirects + 1 })
+      }
       if (res.ok) return res.text()
       if (allowMissing && (res.status === 404 || res.status === 410)) return null
-      if (RETRYABLE.has(res.status) && attempt < this.opts.maxRetries) {
+      if (RETRYABLE.has(res.status) && attempt < maxRetries) {
         const retryAfter = Number(res.headers.get("retry-after"))
         const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2 ** attempt * 5000
         this.opts.log(`HTTP ${res.status} on ${url}, waiting ${Math.round(wait / 1000)} s`)
@@ -155,11 +192,23 @@ export class PoliteClient {
     const rules = await this.rulesFor(parsed.origin)
     if (!rules.isAllowed(parsed.pathname + parsed.search)) throw new DisallowedError(url)
     const text = (await this.request(url)) as string
+    if (this.opts.acceptPage && !this.opts.acceptPage(text, url)) throw new SessionLostError(url)
     if (cached && this.opts.cacheDir) {
       await mkdir(this.opts.cacheDir, { recursive: true })
       await writeFile(cached, text, "utf8")
     }
     return text
+  }
+
+  /**
+   * POST a form (a sign-in) and return the page it lands on. Never cached,
+   * never retried; the fields are not logged anywhere.
+   */
+  async postForm(url: string, fields: Record<string, string>): Promise<string> {
+    const parsed = new URL(url)
+    const rules = await this.rulesFor(parsed.origin)
+    if (!rules.isAllowed(parsed.pathname + parsed.search)) throw new DisallowedError(url)
+    return (await this.request(url, { form: fields })) as string
   }
 
   /** The sitemaps a host declares in its robots.txt. */

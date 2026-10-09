@@ -29,7 +29,7 @@ const description =
 
 usePageSeo({
   title: "",
-  socialTitle: "SCS Firearm — Armurerie en ligne & Gun Art",
+  socialTitle: "SCS Firearms — Armurerie en ligne & Gun Art",
   description,
   path: "/",
   image: () => featured.value?.featuredImageUrl,
@@ -55,7 +55,7 @@ usePageSeo({
       />
       <div class="hero__veil" />
       <div class="container hero__inner">
-        <p class="eyebrow">La maison SCS Firearm</p>
+        <p class="eyebrow">La maison SCS Firearms</p>
         <h1 class="hero__title">Armurerie de précision<br />& Gun Art.</h1>
         <p class="hero__lede">
           Deux univers, une même exigence : une armurerie encadrée par la réglementation française, et une galerie de
@@ -128,7 +128,7 @@ usePageSeo({
       <p class="eyebrow">À propos</p>
       <h2 class="about__title">Une maison, deux exigences</h2>
       <p class="about__text">
-        SCS Firearm réunit deux savoir-faire&nbsp;: une <strong>armurerie de précision</strong>, où chaque arme, munition
+        SCS Firearms réunit deux savoir-faire&nbsp;: une <strong>armurerie de précision</strong>, où chaque arme, munition
         et accessoire est sélectionné et encadré par les obligations légales françaises, et une galerie
         <strong>Gun Art</strong>, qui élève l'objet au rang d'œuvre à travers des tirages signés en édition limitée.
       </p>

@@ -1,23 +1,27 @@
 // Command line of the catalogue collection (story 12.2). Run from this package:
 //
 //   pnpm collect <supplier> [--only <pattern>]... [--limit <n>]
-//   pnpm triage [--out <file.xlsx>]
+//   pnpm triage [--supplier <id>]... [--out <file.xlsx>]
 //   pnpm collect --list
 //
 // Everything it reads and writes lives under ./work (git-ignored): the page
 // cache, the collected products, the supplier price lists and config.json.
+// Pro-area logins live in this package's `.env` (git- and Docker-ignored).
 
+import { existsSync } from "node:fs"
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { type PriceListRow, readPriceList } from "@armurier/shared"
 import { readSpreadsheet } from "@armurier/shared/spreadsheet"
+import type { Credentials, SupplierAdapter } from "./adapter.js"
 import { ADAPTERS, adapterById } from "./adapters/index.js"
 import { readCollected, runCollection } from "./collect.js"
 import { PoliteClient } from "./http.js"
 import {
   buildTriageModel,
   type Category,
+  pricesFromCollection,
   type SupplierBatch,
   supplierConfigSchema,
   type TriageConfig,
@@ -25,10 +29,19 @@ import {
   writeTriageWorkbook,
 } from "./triage.js"
 
-const WORK = resolve(import.meta.dirname, "..", "work")
+const PACKAGE = resolve(import.meta.dirname, "..")
+const WORK = join(PACKAGE, "work")
 const COLLECTED = join(WORK, "collected")
 
 const log = (message: string) => console.info(`[${new Date().toLocaleTimeString("fr-FR")}] ${message}`)
+
+/** The supplier's pro-area login from `.env`, or null to collect public pages. */
+function credentialsFor(adapter: SupplierAdapter): Credentials | null {
+  if (!adapter.proLogin) return null
+  const login = process.env[`${adapter.proLogin.envPrefix}_LOGIN`]?.trim()
+  const password = process.env[`${adapter.proLogin.envPrefix}_PASSWORD`]
+  return login && password ? { login, password } : null
+}
 
 async function collect(args: string[]) {
   const { values, positionals } = parseArgs({
@@ -48,7 +61,21 @@ async function collect(args: string[]) {
   for (const id of positionals) {
     const adapter = adapterById(id)
     if (!adapter) throw new Error(`Unknown supplier "${id}" — see --list`)
-    const client = new PoliteClient({ cacheDir: join(WORK, "cache", id), cookies: true, log })
+    const credentials = credentialsFor(adapter)
+    const proLogin = credentials ? adapter.proLogin : undefined
+    const client = new PoliteClient({
+      // Signed-in pages differ from public ones: they never share a cache.
+      cacheDir: join(WORK, "cache", proLogin ? `${id}-pro` : id),
+      cookies: true,
+      acceptPage: proLogin?.isSignedIn,
+      log,
+    })
+    if (proLogin && credentials) {
+      await proLogin.signIn(client, credentials)
+      log(`${id}: signed in to the pro area`)
+    } else if (adapter.proLogin) {
+      log(`${id}: no ${adapter.proLogin.envPrefix}_LOGIN / _PASSWORD in .env — public pages only, no purchase price`)
+    }
     log(`${id}: collecting${values.only.length ? ` (only: ${values.only.join(", ")})` : " the whole catalogue"}…`)
     const report = await runCollection(adapter, client, {
       outFile: join(COLLECTED, `${id}.jsonl`),
@@ -83,11 +110,24 @@ async function loadCategories(config: TriageConfig): Promise<Category[]> {
 }
 
 async function triage(args: string[]) {
-  const { values } = parseArgs({ args, options: { out: { type: "string" } } })
+  const { values } = parseArgs({
+    args,
+    options: { out: { type: "string" }, supplier: { type: "string", multiple: true, default: [] } },
+  })
   const config = await loadConfig()
   const categories = await loadCategories(config)
-  const files = (await readdir(COLLECTED).catch(() => [])).filter((f) => f.endsWith(".jsonl") && !f.includes(".errors"))
-  if (files.length === 0) throw new Error(`Nothing collected yet in ${COLLECTED}`)
+  // One workbook per supplier keeps each file well under the import's limits
+  // (20 000 rows, 15 MB) and lets the client sort one supplier at a time.
+  const files = (await readdir(COLLECTED).catch(() => []))
+    .filter((f) => f.endsWith(".jsonl") && !f.includes(".errors"))
+    .filter((f) => values.supplier.length === 0 || values.supplier.includes(f.replace(/\.jsonl$/, "")))
+  if (files.length === 0) {
+    throw new Error(
+      values.supplier.length > 0
+        ? `Nothing collected for ${values.supplier.join(", ")} in ${COLLECTED}`
+        : `Nothing collected yet in ${COLLECTED}`,
+    )
+  }
 
   const batches: SupplierBatch[] = []
   for (const file of files) {
@@ -105,7 +145,13 @@ async function triage(args: string[]) {
       )
       for (const issue of issues.slice(0, 10)) log(`   line ${issue.line}: ${issue.message}`)
     } else {
-      log(`${id}: no price list configured — every article will be "Sans prix"`)
+      const collected = pricesFromCollection(products)
+      if (collected.length > 0) {
+        prices = collected
+        log(`${id}: no price list — ${collected.length} purchase prices read from the pro area`)
+      } else {
+        log(`${id}: no price list configured — every article will be "Sans prix"`)
+      }
     }
     batches.push({
       supplier: products[0]?.supplier ?? adapterById(id)?.supplier ?? id,
@@ -116,7 +162,8 @@ async function triage(args: string[]) {
   }
 
   const model = buildTriageModel(batches, categories)
-  const out = resolve(values.out ?? join(WORK, `tri-catalogues-${new Date().toISOString().slice(0, 10)}.xlsx`))
+  const label = values.supplier.length > 0 ? `${values.supplier.join("-")}-` : ""
+  const out = resolve(values.out ?? join(WORK, `tri-${label}catalogues-${new Date().toISOString().slice(0, 10)}.xlsx`))
   await mkdir(resolve(out, ".."), { recursive: true })
   await writeFile(out, await writeTriageWorkbook(model, categories))
   log(
@@ -125,13 +172,15 @@ async function triage(args: string[]) {
   )
 }
 
+if (existsSync(join(PACKAGE, ".env"))) process.loadEnvFile(join(PACKAGE, ".env"))
+
 const [command, ...rest] = process.argv.slice(2)
 try {
   if (command === "collect") await collect(rest)
   else if (command === "triage") await triage(rest)
   else {
     console.error(
-      "Usage: cli.ts collect <supplier>… [--only <pattern>] [--limit <n>] | collect --list | triage [--out <file>]",
+      "Usage: cli.ts collect <supplier>… [--only <pattern>] [--limit <n>] | collect --list | triage [--supplier <id>]… [--out <file>]",
     )
     process.exit(2)
   }

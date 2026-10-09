@@ -1,4 +1,4 @@
-# SCS Firearm — ops & deployment recipes.
+# SCS Firearms — ops & deployment recipes.
 #
 # Runner: `just` (https://github.com/casey/just — `brew install just`).
 # This complements the pnpm scripts: dev/build/test/lint stay in package.json;
@@ -24,9 +24,13 @@ deploy:
 migrate:
     {{ compose }} --profile migrate run --rm migrate
 
-# Seed reference data + admin user (idempotent, safe to re-run)
+# Seed reference data + admin user (idempotent, safe to re-run). No demo content.
 seed:
     {{ compose }} exec api node_modules/.bin/tsx src/db/seed-cli.ts
+
+# Reference data + the demo catalogue (fake products, artworks, posts) — demo servers only, never the live site
+seed-demo:
+    {{ compose }} exec api node_modules/.bin/tsx src/db/seed-cli.ts --demo
 
 # Update flow: pull, migrate, rebuild, prune dangling images
 update:

@@ -43,8 +43,8 @@ const PAYOUTS = [
     beneficiaryId: "b2",
     beneficiaryName: "Florian",
     label: "Carabine",
-    sharePct: 10,
-    baseHt: 500,
+    sharePct: 12.5,
+    baseHt: 400,
     amountHt: 50,
     status: "paid",
     paidAt: "2026-08-25T10:00:00.000Z",
@@ -69,8 +69,14 @@ describe("admin/reversements.vue (story 11.10)", () => {
     const rows = wrapper.findAll("tbody tr")
     expect(rows).toHaveLength(2)
     expect(rows[0]?.text()).toContain("Sylvain")
-    expect(rows[0]?.text()).toContain("40 %")
+    expect(rows[0]?.text().replace(/\s/g, " ")).toContain("40 %")
     expect(rows[0]?.text()).toContain("200,00")
+  })
+
+  it("writes a fractional rate with a decimal comma", async () => {
+    const wrapper = await mounted()
+    const secondRow = wrapper.findAll("tbody tr")[1]?.text() ?? ""
+    expect(secondRow.replace(/\s/g, " ")).toContain("12,5 %")
   })
 
   it("says the figures were frozen at the sale, rather than leaving it to be guessed", async () => {
@@ -98,7 +104,7 @@ describe("admin/reversements.vue (story 11.10)", () => {
 
     const call = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
     expect(call?.[0]).toBe("/admin/finance/payouts/p1")
-    expect((call?.[1] as { body: { status: string } }).body.status).toBe("paid")
+    expect((call?.[1] as { body: { status: string } } | undefined)?.body.status).toBe("paid")
   })
 
   it("relays the server's refusal to settle an unpaid sale", async () => {

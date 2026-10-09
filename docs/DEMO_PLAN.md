@@ -1,4 +1,4 @@
-# Plan de présentation — Démo SCS Firearm
+# Plan de présentation — Démo SCS Firearms
 
 > Public : **client / porteur métier** (armurier + Gun Art). Angle : valeur
 > métier, parcours réglementé de bout en bout, conformité, et sérieux
@@ -9,7 +9,7 @@
 
 ## 0. Pitch d'ouverture (~1 min)
 
-> « SCS Firearm, c'est **une maison, deux univers** sur une même plateforme :
+> « SCS Firearms, c'est **une maison, deux univers** sur une même plateforme :
 > une **armurerie de précision** entièrement encadrée par la réglementation
 > française (armes, munitions, optiques), et **Gun Art**, une galerie de tirages
 > d'art en édition limitée. La difficulté du métier — vendre de l'arme en
@@ -22,7 +22,7 @@
 ## 1. Checklist pré-démo (à faire AVANT, pour que rien ne plante)
 
 - [ ] **Docker up** : `pnpm docker:up` (Postgres dev) — vérifier `pg_isready`.
-- [ ] **DB seedée** : `pnpm db:seed` (données de référence + admin). Vérifier
+- [ ] **DB seedée** : `pnpm db:seed:demo` (données de référence, admin et catalogue de démo). Vérifier
       que la boutique et la collection ont des articles.
 - [ ] **API** up : `pnpm dev:api` (port 8081) → `curl localhost:8081/health`.
 - [ ] **Web** up : `pnpm dev:web` (port 3000).

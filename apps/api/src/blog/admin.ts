@@ -4,6 +4,7 @@ import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
+import { isUniqueViolation } from "../db/errors.js"
 import { blogPosts, users } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
@@ -42,15 +43,6 @@ const FULL_FIELDS = {
   createdAt: blogPosts.createdAt,
   updatedAt: blogPosts.updatedAt,
 } as const
-
-// Postgres unique-violation (slug already taken). node-postgres surfaces the
-// driver error on `.cause` once wrapped by Drizzle, so check both levels.
-const hasPgCode = (e: unknown, code: string): boolean =>
-  typeof e === "object" && e !== null && "code" in e && (e as { code: unknown }).code === code
-
-function isUniqueViolation(err: unknown): boolean {
-  return hasPgCode(err, "23505") || hasPgCode((err as { cause?: unknown })?.cause, "23505")
-}
 
 // Admin blog CRUD. Mounted under /api/admin/blog.
 export const adminBlogRoutes: FastifyPluginAsync = async (fastify) => {

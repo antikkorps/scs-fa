@@ -16,6 +16,7 @@ pnpm collect --list                                   # available suppliers
 pnpm collect bgm-winfield                             # whole catalogue
 pnpm collect humbert --only "^optiques$" --limit 20   # one family, trial run
 pnpm triage                                           # build the workbook from everything collected
+pnpm triage --supplier humbert                        # one workbook per supplier (recommended)
 ```
 
 `--only` takes case-insensitive regular expressions matched against the supplier's own category labels, and can be repeated. A collection **resumes**: pages already collected are skipped, so an interrupted run or a re-run after a parser fix picks up where it stopped.
@@ -39,6 +40,34 @@ Every request goes through `PoliteClient` (`src/http.ts`). It:
 | ESP France | stale sitemap plus the first page of each category | `robots.txt` forbids pagination, so coverage is partial **by design**. |
 | Armurerie de Paris | none | `robots.txt` disallows everything and there is no online catalogue. Enter by hand or through the import. |
 
+## Pro areas (signed-in collection)
+
+Some suppliers show a reseller what a public visitor cannot see, chiefly **our purchase price**. When this package's `.env` holds a supplier's login, `pnpm collect` signs in first and reads the price from each product page. The triage then uses it as if it came from a price list, unless a price list is configured, which takes precedence.
+
+```dotenv
+# tools/catalog-collect/.env — ignored by git and Docker, never pasted anywhere
+BGM_LOGIN=…          BGM_PASSWORD=…
+CORCAROLI_LOGIN=…    CORCAROLI_PASSWORD=…   # login code, not an e-mail
+AGORATEC_LOGIN=…     AGORATEC_PASSWORD=…
+```
+
+The rules that protect the client's accounts:
+
+- **Read-only.** The tool signs in once and reads pages. It never follows a logout link and never touches the account.
+- **robots.txt applies to the sign-in too.** If a site disallows its login page, the tool does not sign in there.
+- **A refused sign-in is never retried.** A second wrong attempt is how an account gets locked. Fix `.env` and run again.
+- **A lost session stops the run.** Every page must still be served signed in. Otherwise the run stops with `SessionLostError` before caching the page, so public pages are never collected as pro ones. Run it again: it resumes.
+- **Separate cache.** Signed-in pages are cached under `work/cache/<supplier>-pro/`, never mixed with public pages.
+- **A doubtful price is left out.** The price is read only from a signed-in page and only from the block the pro area prints it in. BGM must label it `HT`. The public JSON-LD price is never used.
+- Products collected publicly **before** a pro run have no price, and the resume skips them. Delete `work/collected/<supplier>.jsonl` to collect them again signed in.
+
+| Supplier | What the pro area adds |
+|---|---|
+| BGM Winfield | Purchase price excl. VAT, plus a resale coefficient (not kept). No EAN, no stock quantity, no downloadable price list. |
+| Cor Caroli (and Agora-Tec, same platform) | "Votre prix", excl. VAT per their terms of sale ("nets hors taxes départ stock"). No EAN. |
+| ESP France | "Prix Revendeur … HT", but **not used**: its `robots.txt` disallows `/authentication.php`, and the client chose to stay strict (2026-10-07). Prices come from ESP's price list. |
+| ClearMyVault | Not collectable: the shop is behind an anti-bot challenge (LWS / Anubis). Ask the maker for its catalogue. |
+
 ## `work/` (git-ignored: the client's business data)
 
 - `work/config.json`: see `config.example.json`. For each supplier it holds:
@@ -52,7 +81,7 @@ Every request goes through `PoliteClient` (`src/http.ts`). It:
 
 The workbook has four sheets:
 
-- **À trier**: one row per article, in exactly the columns the import reads back (`CATALOG_IMPORT_COLUMNS`). Articles that matched the price list come first. There are drop-downs for *Importer*, *Catégorie* and *Catégorie légale*.
+- **À trier**: one row per article, in exactly the columns the import reads back (`CATALOG_IMPORT_COLUMNS`). Articles that matched the price list come first. There are drop-downs for *Importer*, *Actif*, *Catégorie* and *Catégorie légale*. The sheet itself is written by `addCatalogSheet` (`@armurier/shared/spreadsheet`), the same function the back-office catalogue export uses (story 12.4).
 - **Prix sans fiche**: price-list references for which no product sheet was collected. Nothing disappears silently.
 - **Lisez-moi**: the instructions for the client.
 - **Listes** (hidden): the source of the category drop-down.

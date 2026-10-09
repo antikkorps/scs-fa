@@ -21,14 +21,14 @@ const description = computed(
     artist.value.metaDescription ??
     [
       `${artist.value.name}${artist.value.headline ? `, ${artist.value.headline.replace(/\.$/, "")}` : ""}.`,
-      "Parcours, séries et tirages d'art en édition limitée de la collection Gun Art de SCS Firearm.",
+      "Parcours, séries et tirages d'art en édition limitée de la collection Gun Art de SCS Firearms.",
       artist.value.bio ?? "",
     ].join(" "),
 )
 
 usePageSeo({
   title: () => artist.value.metaTitle ?? artist.value.name ?? "",
-  socialTitle: () => `${artist.value.name} — SCS Firearm`,
+  socialTitle: () => `${artist.value.name} — SCS Firearms`,
   description,
   path: `/collection/artiste/${slug}`,
   type: "profile",

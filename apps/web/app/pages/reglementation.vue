@@ -11,7 +11,7 @@ const REVIEWED = EDITORIAL_PAGES.reglementation.reviewed
 
 usePageSeo({
   title: "Acheter une arme légalement : la réglementation",
-  socialTitle: "Acheter une arme légalement — SCS Firearm",
+  socialTitle: "Acheter une arme légalement — SCS Firearms",
   description:
     "Catégories A, B, C et D, autorisation préfectorale, déclaration, SIA, âge minimum : ce qu'il faut pour acheter une arme en France, et comment se passe un achat réglementé.",
   path: "/reglementation",
@@ -28,7 +28,7 @@ useHead({
     crumb="Réglementation"
     eyebrow="Armurerie"
     title="Acheter une arme légalement"
-    lede="Ce qu'il faut savoir avant d'acheter une arme en France, et comment se déroule un achat réglementé chez SCS Firearm."
+    lede="Ce qu'il faut savoir avant d'acheter une arme en France, et comment se déroule un achat réglementé chez SCS Firearms."
     draft-subject="Ce guide"
     :reviewed="REVIEWED"
   >

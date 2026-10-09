@@ -6,8 +6,19 @@
 
 ## Principes transverses (à respecter sur chaque story)
 
-- [ ] Tests écrits avec (ou avant) le code feature — Vitest
-- [ ] DRY : types/validation/constantes dans `packages/shared`
+- [ ] **TDD strict** (depuis le 2026-10-07) — Vitest. Les tests sont notre ceinture de sécurité contre les régressions. Pour chaque comportement et chaque bug :
+  1. écrire le test ;
+  2. le voir **échouer pour la bonne raison** ;
+  3. écrire le code minimal ;
+  4. refactorer, suite au vert.
+
+  Pour un bug, le test qui le reproduit précède le correctif. Un test qui ne peut pas venir d'abord (pure mise en page, site tiers inconnu) est signalé et ajouté juste après. On n'affaiblit jamais un test pour le faire passer.
+- [ ] **DRY et réutilisable** : types, validation et constantes dans `packages/shared`. On cherche ce qui existe avant d'écrire, et on factorise dès la deuxième copie.
+- [ ] **Lisibilité humaine**, bonnes pratiques à l'état de l'art :
+  - **pas de ternaire imbriqué** (`if` avec retour anticipé, `switch` ou table de correspondance) ;
+  - **pas de variable d'une lettre**, paramètres de fonctions fléchées compris (`(row) =>`, pas `(r) =>`) ; seuls les indices de boucle `i` / `j` sont tolérés ;
+  - fonctions courtes avec une seule responsabilité, noms qui disent l'intention, commentaires qui expliquent le **pourquoi** ;
+  - on relit chaque diff avec ces règles avant de commiter : Biome ne vérifie pas tout.
 - [ ] Biome clean (`pnpm lint && pnpm format:check`)
 - [ ] Security by design : inputs validés (Zod), RBAC, audit log, secrets en env
 - [ ] Doc mise à jour si décision non-triviale (`docs/`)
@@ -613,6 +624,25 @@
 - [x] En plus : `safeGet` a une **échéance globale** (un serveur qui distille un octet à la fois n'est plus jamais « inactif ») ; numéros de ligne CSV **exacts** malgré les lignes vides ; historique des imports en **une requête** (au lieu d'une par import)
 - Tests après corrections : **shared 222, API 573, web 299, outil 79**
 
+**Espaces pro des fournisseurs (2026-10-07)** : le client a des accès revendeur et souhaite qu'on s'en serve, **en lecture seule et sans risquer de bloquer ses comptes**.
+
+- [x] Reconnaissance faite avec ses accès :
+  - **BGM** : prix d'achat **HT** + coefficient de revente sur chaque fiche ;
+  - **Cor Caroli** : « Votre prix » ;
+  - aucun des deux n'expose d'EAN, de quantité en stock ni de tarif téléchargeable.
+- [x] Connexion dans l'outil :
+  - identifiants dans `tools/catalog-collect/.env`, ignoré par git et Docker ;
+  - connexion **une seule fois**, **jamais rejouée** en cas de refus ;
+  - redirection de connexion suivie à la main, pour garder le cookie de session ;
+  - chaque page doit encore être servie connectée, sinon **`SessionLostError` arrête la collecte** sans rien mettre en cache ;
+  - cache séparé `cache/<fournisseur>-pro/`.
+- [x] `purchasePrice` ajouté au format pivot. Le tri l'utilise **comme un tarif** (même rapprochement) quand aucun tarif n'est configuré. Il n'est lu que sur une page connectée ; chez BGM, seulement s'il est libellé HT ; jamais depuis le JSON-LD public.
+- [x] **Validé en réel** sur 2 articles BGM et 2 articles Cor Caroli : connexion acceptée, prix lus. Outil : **92 tests**.
+- [x] **Cor Caroli** : la fiche n'indique pas si « Votre prix » est HT, mais leurs CGV le disent (« Nos prix s'entendent nets **hors taxes** départ stock », vérifié le 2026-10-07). La collecte complète peut être lancée.
+- **ESP** : une fois les identifiants corrigés, la connexion marche et les fiches affichent « Prix Revendeur … HT ». **Mais son `robots.txt` interdit `/authentication.php`.** Franck a choisi de **rester strict** (2026-10-07) : pas de connexion, fiches publiques comme avant. **Le prix d'achat viendra du tarif Excel d'ESP**, à leur demander.
+- **ClearMyVault** (nouveau fournisseur, fabricant d'agencement de coffres) : **pas de collecte possible**. La boutique est derrière une protection anti-robots (LWS / Anubis), qu'on ne contourne pas, et le `Crawl-delay` est de 60 s. Il faut leur demander leur catalogue pro (fichier + photos) et l'importer, ou saisir à la main.
+- **Humbert** : on attend son tarif CSV.
+
 **Reste ouvert :**
 
 - ⚠️ **Attendu du client** : un **tarif Excel par fournisseur** (pour caler les colonnes dans `work/config.json`) et le **périmètre** (catalogue complet ou familles : Agora-Tec annonce 4 464 articles dont de la cuisine, BGM 6 079, Toro ~12 300, Humbert plusieurs milliers d'articles avec toutes les déclinaisons)
@@ -623,7 +653,7 @@
 - **EAN** : aucun des sites visités ne l'expose — il ne viendra que des tarifs qui le portent
 - Non traité (mineur) : l'aperçu charge tous les produits des fournisseurs connus, la confirmation écrit ligne par ligne (acceptable pour quelques milliers d'articles) ; une cellule Excel contenant un lien rend l'adresse du lien plutôt que le texte affiché
 - Lecture `.xlsx` sans garde contre une **bombe zip** au-delà du plafond de 15 Mo du fichier déposé (route réservée aux admins)
-- Pas d'**écran fournisseurs** (création implicite à l'import ; marge par défaut modifiable seulement en base pour l'instant)
+- ~~Pas d'**écran fournisseurs**~~ → réglé par la **story 12.5** (écran Fournisseurs, l'import n'accepte plus que les fournisseurs déclarés)
 
 **Story 12.3** — Frais de port au tunnel d'achat — ✅ **CODÉE** _(créée le 2026-09-29, trouvé en 12.1 ; codée le 2026-10-03)_
 
@@ -653,6 +683,146 @@
 - Les **métriques de chiffre d'affaires** (`metrics/service.ts`) somment `total_ttc`, donc **port compris** désormais — à distinguer si le client veut un CA « marchandises ».
 - Facture : la table `invoices` attend l'intégration Henrri ; le port y sera une ligne à part (HT + TVA déjà figés sur la commande).
 - Le formulaire d'adresse ne propose pas de pays (FR par défaut) : un client hors zone est arrêté au code postal (97/98) ou par l'API.
+
+**Story 12.4** — Catalogue en aller-retour Excel (export → modification → ré-import, activation, archivage) — ✅ **CODÉE** _(créée et codée le 2026-10-07, demande client)_
+
+> Besoin : le client veut **extraire son catalogue** dans un fichier et le modifier dans Excel : ajouter et supprimer des lignes, remplir les prix, **activer certains produits et pas d'autres**. Cas typique : le même produit chez deux fournisseurs, une fiche active, l'autre non. Puis il ré-importe le fichier. La 12.2 a déjà fait le plus gros : le fichier de tri et l'import partagent les mêmes colonnes, l'import est idempotent, l'aperçu montre les changements avant validation.
+
+**Décisions tranchées avec Franck (2026-10-07) :**
+
+- [x] **Retirer une ligne = archiver**, jamais effacer. Archiver met hors ligne et masque le produit, réversible par un bouton « Réactiver ». Les commandes passées gardent leur référence.
+- [x] **Même produit chez deux fournisseurs = deux fiches**, une active, l'autre non. Pas de fiche à plusieurs offres fournisseurs (pas de changement de schéma).
+- [x] **Le stock reste hors du fichier** : un ré-import ne doit jamais fausser le stock.
+
+**Conception (garde-fous retenus à l'exécution) :**
+
+- **Export** `/admin/imports` → « Exporter le catalogue » (`.xlsx`, mêmes colonnes) : produits **avec fournisseur et référence**, non archivés, hors Gun Art et armes de collection. Les produits saisis à la main sans fournisseur n'ont pas de clé d'aller-retour et sont signalés.
+- **Colonne « Actif »** (Oui / Non, vide = inchangé) → mise en ligne. À la création, vide = hors ligne, comme avant.
+- **Colonne « Doublon possible »** (informative, jamais relue) : autres fiches de même EAN, ou de même marque et nom normalisé, chez un autre fournisseur. **Signalé, jamais tranché.**
+- **Archivage des lignes absentes** : uniquement si l'admin coche « Archiver les produits absents du fichier », et **seulement pour les fournisseurs présents dans le fichier**. Un fichier BGM n'archive jamais un produit Cor Caroli, et un fichier de tri issu de la collecte n'archive rien sans la case. L'aperçu **liste** les produits concernés avant validation.
+- **Version par ligne** (colonne « Version », date de dernière modification à l'export) : si la fiche a été modifiée dans le back-office depuis l'export et que « écraser » est coché, la ligne est **refusée** (ré-exporter) au lieu d'écraser la correction. Sans « écraser », simple avertissement.
+- **Stock** : l'export le laisse vide, et un ré-import ne le modifie plus jamais, même avec « écraser ». Il ne sert qu'à la création.
+- **Bug trouvé et corrigé** : la suppression d'un produit vérifiait `order_items`, une table que le tunnel n'écrit pas (les lignes vivent dans `orders.items_json`). **Un produit déjà commandé pouvait donc être supprimé définitivement.** La garde lit désormais `items_json`, et l'écran propose « Archiver ».
+
+**Livré (2026-10-07) :**
+
+- [x] **Migration `0017`** : `products.archived_at` (indexé), `catalog_imports.archived_count`.
+- [x] **Format partagé** : colonnes « Actif », « Doublon possible », « Version » dans `CATALOG_IMPORT_COLUMNS`. Une seule fonction écrit l'onglet catalogue, avec ses listes déroulantes : `addCatalogSheet` / `writeCatalogWorkbook` dans `@armurier/shared/spreadsheet`. Le fichier de tri (outil) et l'export (API) l'utilisent tous les deux.
+- [x] **API** :
+  - `GET /api/admin/catalog-imports/export`, **catalogue complet ou un seul fournisseur** (`?supplierId=`, liste dans `GET …/suppliers`), pour garder un fichier par fournisseur comme pour le tri. Les doublons sont toujours cherchés chez **tous** les fournisseurs ;
+  - option `archiveMissing` à l'aperçu et à la validation, avec la liste `toArchive` et les compteurs `publish` / `unpublish` / `archive` ;
+  - une ligne visant un produit archivé est **refusée**, il faut le réactiver d'abord ;
+  - `POST /api/admin/products/:id/archive` et `/restore`, avec journal d'audit ; on ne peut pas publier un produit archivé (409) ;
+  - garde de suppression (produit **et** variante) sur `items_json`, fonction `orderedVariantIds`.
+- [x] **Proxy BFF** transparent octet pour octet (`responseType: "arrayBuffer"`). Il transmet `content-type`, `content-disposition` et `cache-control`, mais jamais un cookie (`server/utils/proxy-headers.ts`, testé). Avant, un téléchargement binaire n'aurait pas survécu au proxy.
+- [x] **Écrans** :
+  - `/admin/imports` : bouton « Exporter le catalogue » avec choix du fournisseur, case « Archiver les produits absents du fichier », liste des produits à archiver dans l'aperçu, colonne « Archivés » dans l'historique ;
+  - `/admin/produits` : boutons « Archiver » / « Réactiver », badge, filtre « Afficher les archivés » ; refus de suppression expliqué en français ;
+  - fiche produit : bandeau « archivé » avec bouton « Réactiver », publication désactivée.
+- [x] **Vérifié en réel** (API + site, via le proxy) :
+  - import de 3 produits → export (doublon Alpha / Beta signalé) → modification dans Excel (une ligne supprimée, « Actif » inversé, un prix changé) → ré-import avec écrasement et archivage → **exactement** 1 mis en ligne, 1 retiré, 1 archivé, le prix appliqué ;
+  - archiver → publier refusé (409) → réactiver → supprimer (204) ;
+  - passe visuelle Playwright sur ordinateur et mobile : **0 débordement**. Au passage, corrigé un débordement de 440 px de la liste Produits sur mobile : l'en-tête `sr-only` n'était pas ancré à son conteneur.
+- Tests : **shared 267, API 606, web 330, outil 81 = 1 284**.
+
+**Reste / à savoir :**
+
+- Les produits **saisis à la main sans fournisseur** ne sont pas dans l'export : ils n'ont pas de clé d'aller-retour. L'onglet « Lisez-moi » de l'export les compte.
+- Le repérage des doublons est **indicatif** : même EAN (rarement fourni par les sites), ou mêmes mots dans marque + nom. Deux fiches au libellé différent ne seront pas repérées.
+- L'aperçu liste au plus 500 produits à archiver. Le nombre affiché, lui, est toujours exact.
+
+**Fichiers de tri à envoyer au client (2026-10-07) :**
+
+- **Un fichier par fournisseur** (choix de Franck) : `pnpm triage --supplier <id>`. Ça reste sous les limites de l'import (20 000 lignes, 15 Mo), et le client peut trier un fournisseur à la fois.
+- **Humbert prêt** : `work/tri-humbert-catalogues-2026-10-07.xlsx`, 6 479 lignes, sans prix (le client remplit achat et vente).
+  - Règles dans `work/config.json`, ignoré par git, à recréer à l'identique sur l'autre machine.
+  - **Catégorie légale par la lettre du classement Humbert** (`^A` → A, `^B` → B, `^C` → C, `^D` → D). Les **2 404 « NR » restent vides**, décision de Franck.
+  - Catégories proposées à partir de la famille Humbert ; 546 lignes sans proposition.
+  - ⚠️ **8 articles classés A** chez Humbert (A1.8, A1.9bis) : à signaler au client.
+  - ⚠️ Rappel : 746 articles portent un **visuel générique de gamme**.
+- **Cor Caroli prêt (2026-10-08)** : `work/tri-cor-caroli-catalogues-2026-10-08.xlsx`, 1 554 lignes, **prix d'achat pro HT** sur 1 525. Les 29 sans prix n'en affichent aucun, même connecté (guidons MC5x…).
+  - Règles dans `work/config.json` (clé `cor-caroli`) : **marge 30 %** ; catégorie du site déduite de la collection Cor Caroli (1 553 sur 1 554) ; **catégorie légale par la lettre du classement Cor Caroli**, comme pour Humbert (décision de Franck).
+  - L'adaptateur lit désormais ce classement (« Catégorie d'arme » : B1, C 1°-b…) dans `supplierLegalClass`. 192 articles en ont un ; **11 armes sur 185 n'en ont pas**, le client complète.
+- **BGM prêt (2026-10-08)** : `work/tri-bgm-winfield-catalogues-2026-10-08.xlsx`, 6 089 lignes, **prix d'achat pro HT** sur 6 083 (les 6 autres affichent 0,00 €).
+  - Règles dans `work/config.json` (clé `bgm-winfield`) : **marge 30 %** ; catégorie du site déduite de l'arborescence BGM.
+  - **Catégorie légale vide partout** : BGM ne publie aucun classement. Le client la remplit, en priorité sur les 347 armes longues et 255 armes de poing.
+  - **443 lignes sans catégorie, volontairement** : « Rechargement » (367 : poudres, amorces, projectiles, outils) à trancher avec le client, la poudre et les amorces relevant d'une réglementation propre ; « A implanter » (76), que BGM n'a pas encore classés.
+  - 1 974 fiches **sans photo** et 2 185 sans description : **réellement absentes chez BGM** (image « pas de photo » par défaut), l'outil ne rate rien. Aucun EAN.
+- **Restent à collecter** (décision de Franck : catalogues complets) :
+  - **Toro**, **Agora-Tec** et **ESP**, en public. Pour ESP, les prix viendront de son tarif.
+
+**Story 12.5** — Fournisseurs gérés dans le back-office — ✅ **CODÉE** _(créée et codée le 2026-10-08, demande de Franck)_
+
+> Besoin : l'export par fournisseur propose une liste tirée de la base, mais rien ne permettait d'y **ajouter un fournisseur**. Le client ne pouvait donc pas commencer le fichier d'un nouveau fournisseur. L'import créait bien un fournisseur à partir de tout nom inconnu, mais une faute de frappe (« BGM Winfeld ») suffisait à créer un doublon.
+
+**Décisions tranchées avec Franck (2026-10-08) :**
+
+- [x] **Écran `/admin/fournisseurs`** (groupe Catalogue) : liste, création et modification. Suppression **seulement si aucun produit** ne s'y rattache, archivés compris.
+- [x] **Liste fermée** : l'import **ne crée plus de fournisseur**. Une ligne d'un fournisseur inconnu est invalide, avec le message « Créez-le d'abord dans Catalogue → Fournisseurs ». La comparaison ignore les majuscules, comme l'index unique `uq_suppliers_name_ci`.
+- [x] **Export** : la liste déroulante propose **tous** les fournisseurs. Un fournisseur sans produit donne un **fichier vierge** à remplir. La colonne Fournisseur du fichier devient une **liste déroulante** tirée de la base (onglet caché `Listes`, colonne B). Les listes couvrent aussi 500 lignes vides sous les données, pour les produits saisis à la main.
+
+**Livré :**
+
+- [x] **API** `GET/POST /api/admin/suppliers`, `PATCH/DELETE /api/admin/suppliers/:id`. Un nom déjà pris renvoie 409 ; c'est la base qui détecte le conflit, sans risque de course. Les messages sont en français, car l'écran les affiche tels quels.
+- [x] **Champs** : nom, e-mail, téléphone. ⚠️ `default_margin_pct` existe en base, mais **rien ne le lit** : il n'est pas proposé, pour ne pas promettre un effet qui n'existe pas.
+- [x] **DRY** : la détection de violation d'unicité Postgres, recopiée dans l'inscription et le blog, est mise en commun dans `apps/api/src/db/errors.ts`.
+- [x] **Outil de tri** : il ne connaît pas la base, donc pas de liste déroulante Fournisseur. Le « Lisez-moi » prévient que le fournisseur doit exister avant l'import.
+- [x] `catalog_imports.suppliers_created` est conservée pour l'historique ; les nouveaux imports y écrivent 0. `suppliersToCreate` (aperçu) et `suppliersCreated` (résultat) sont retirés de l'API.
+- [x] **Vérifié en réel** : création, doublon refusé (autre casse), export « fichier vierge » (en-tête seul, liste Fournisseur), suppression, 0 débordement sur mobile.
+- Tests : **shared 273, API 617, web 334, outil 93 = 1 317**.
+
+- [x] **Seed de déploiement** (demande de Franck) : `seedSuppliers()` déclare les 6 fournisseurs collectés (Agora-Tec, BGM Winfield, Cor Caroli, ESP France, Humbert, Toro Distribution). Il peut être relancé sans risque : un fournisseur déjà présent, quelle que soit sa casse, n'est ni dupliqué ni renommé. Les noms viennent d'**une seule constante**, `CATALOG_SUPPLIERS` (`@armurier/shared`), que lisent aussi les adaptateurs de collecte : le nom écrit dans les fichiers de tri est donc toujours celui qui est semé.
+
+- [x] **Seed séparé (2026-10-08, demande de Franck)** : `just seed` / `pnpm db:seed` ne pose plus que les **données de référence** (catégories légales et produits, tags, fournisseurs, admin). Le **catalogue de démo** (œuvres, produits, armes de collection, articles de blog) passe par `--demo` (`just seed-demo`, `pnpm db:seed:demo`), réservé au dev et aux démos. Avant, un déploiement aurait mis en ligne de faux produits. **En production, le seed refuse le mot de passe admin d'exemple** de `.env.example`. Testé de bout en bout sur une base vide (`seed-cli.test.ts`).
+
+**À savoir :** un fournisseur **hors collecte** (Armurerie de Paris, ClearMyVault…) se crée à la main dans Catalogue → Fournisseurs avant son premier import.
+
+**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 📝 **À CADRER** _(créée le 2026-10-08, demande du client)_
+
+> Besoin : le client facture avec **Henrri** (logiciel gratuit du groupe Rivalis). Chaque commande payée sur le site doit y devenir une facture, sans ressaisie. Henrri a une API publique pensée pour ce cas (« une boutique en ligne peut générer automatiquement la facture d'une commande »).
+
+**Ce qu'on sait de l'API (2026-10-08, pages publiques) :**
+
+- Ressources : **factures et devis** (création, lecture), **clients** (synchronisation), **catalogue produits**.
+- Authentification : `clientId` / `clientSecret` générés dans le compte Henrri (avatar → « API & Intégrations »), échangés contre un **jeton JWT valable 10 minutes**.
+- **Coût en crédits** : lectures gratuites ; **8 crédits par facture finalisée**, 2 par devis validé.
+
+| Pack | Prix / mois | Crédits / mois | Factures / mois | Débit |
+|---|---|---|---|---|
+| 1 | 0 € | 200 | 25 | 60 req/min |
+| 2 | 10 € | 1 000 | 125 | 120 req/min |
+| 3 | 20 € | 2 000 | 250 | 300 req/min |
+| 4 | 30 € | 4 000 | 500 | 600 req/min |
+
+- **Bac à sable gratuit et illimité** : tout le développement et les tests se font dessus.
+- ⚠️ La **documentation technique** (adresses, schémas) n'est **pas publique** : elle est dans le compte Henrri. La page d'aide « Avez-vous une API ? » refuse les accès automatiques.
+- Facturation électronique : Henrri annonce la **réception** des e-factures en septembre 2026 et l'**émission** en septembre 2027. Les ventes aux particuliers (B2C) ne sont pas des e-factures, elles relèvent de l'e-reporting : à confirmer avec le comptable.
+
+**Décisions à trancher (avec le client et son comptable) — ne pas coder avant :**
+
+- [ ] **Moment de la facture.** Proposé : quand la commande est **entièrement payée**. Une commande mixte se règle en deux parties (carte pour le libre, virement pour les armes réglementées) : une seule facture à la fin, ou une par paiement ?
+- [ ] **Numérotation : Henrri**, jamais le site. Deux séries parallèles seraient une anomalie comptable. Le site garde sa référence de commande et le numéro Henrri de la facture.
+- [ ] **Contenu.** Proposé : les **lignes de la commande** (désignation, référence, quantité, prix HT, taux de TVA), plus une ligne **frais de port**. Pas de synchronisation du catalogue : des milliers d'articles pour rien.
+- [ ] **Clients.** Créer chaque acheteur dans Henrri (nom, adresse de facturation, e-mail) ? Si oui, Henrri devient **sous-traitant RGPD** : à ajouter à `/confidentialite` et au registre.
+- [ ] **Remboursements → avoirs** dans Henrri (total ou partiel, à partir de la table `refunds`).
+- [ ] **Gun Art** : les tirages sont vendus **pour le compte de l'artiste** (CGV art. 12). Faut-il une facture de mandataire avec mention spécifique, ou une commission ? **À valider par le comptable.**
+- [ ] **Envoi au client** : par Henrri (son e-mail), ou par le site (PDF récupéré et joint à un e-mail SCS Firearms, ou disponible dans « Mes commandes ») ?
+- [ ] **Pack** selon le volume de commandes attendu : 25 factures par mois en gratuit, 125 pour 10 €…
+- [ ] **Commandes passées avant la mise en service** : rattrapage ou non.
+
+**Conception proposée (à confirmer une fois la documentation lue) :**
+
+- **File d'attente avec relances**, sur le modèle de l'e-mail de confirmation (`confirmation_sent_at`, `ORDER_CONFIRMATION_RETRY_MINUTES`). Une facture Henrri qui échoue (API indisponible, crédits épuisés) **ne bloque jamais une vente**. Elle repart plus tard, et un compteur dans le tableau de bord signale les factures en souffrance.
+- **Idempotence** : l'identifiant et le numéro de la facture Henrri sont stockés sur la commande (migration). Une relance ne crée jamais de doublon : elle vérifie d'abord ce qui existe chez Henrri, ce qui ne coûte rien puisque les lectures sont gratuites.
+- **Secrets** dans `.env` (`HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`, `HENRRI_BASE_URL` pour basculer entre bac à sable et production). Jeton gardé en mémoire et renouvelé avant expiration. Jamais journalisé.
+- **Admin** : sur la fiche commande, le numéro de facture Henrri avec un lien, son statut et un bouton « Relancer la facture ».
+- **Tests** : client HTTP Henrri simulé dans la CI ; passe réelle sur le bac à sable avant la production.
+
+**Attendu du client :**
+
+- un accès au **bac à sable** Henrri (`clientId` / `clientSecret`) et le lien vers la documentation de l'API ;
+- les réponses aux décisions ci-dessus, Gun Art et e-reporting avec son **comptable** ;
+- plus tard, les identifiants de **production** et le choix du pack.
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 

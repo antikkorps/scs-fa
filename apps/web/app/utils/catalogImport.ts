@@ -1,7 +1,7 @@
 // Presentation helpers of the catalogue import screen (story 12.2): labels and
 // the filters of the preview table, kept out of the page so they can be tested.
 
-import type { CatalogImportAction, CatalogImportPreviewRow } from "~/types/admin"
+import type { CatalogExportSupplier, CatalogImportAction, CatalogImportPreviewRow } from "~/types/admin"
 import type { Severity } from "~/utils/status"
 
 export const IMPORT_ACTION_META: Record<CatalogImportAction, { label: string; severity: Severity }> = {
@@ -43,4 +43,10 @@ export function previewFilterCounts(rows: CatalogImportPreviewRow[]): Record<Pre
 /** "12 produits" / "1 produit" — the commit button states exactly what it will do. */
 export function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
   return `${n.toLocaleString("fr-FR")} ${n > 1 ? pluralForm : singular}`
+}
+
+/** The per-supplier export choice: a supplier with no product yet gets a blank file to fill in. */
+export function exportSupplierLabel(supplier: CatalogExportSupplier): string {
+  if (supplier.products === 0) return `${supplier.name} (fichier vierge)`
+  return `${supplier.name} (${plural(supplier.products, "produit")})`
 }

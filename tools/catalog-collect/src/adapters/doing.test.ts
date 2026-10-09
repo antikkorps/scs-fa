@@ -2,7 +2,17 @@ import { readFileSync } from "node:fs"
 import { collectedProductSchema } from "@armurier/shared"
 import { describe, expect, it } from "vitest"
 import { PoliteClient } from "../http.js"
-import { doingAdapter, parseCollections, parseDoingProduct, parseListingFragment, parsePageCount } from "./doing.js"
+import {
+  corCaroli,
+  doingAdapter,
+  isSignedIn,
+  legalClassFromSpecs,
+  parseCollections,
+  parseDoingProduct,
+  parseListingFragment,
+  parsePageCount,
+  parsePurchasePrice,
+} from "./doing.js"
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/doing/${name}`, import.meta.url), "utf8")
 const AGORA = "https://www.agora-tec.fr"
@@ -71,6 +81,51 @@ describe("Doing platform (Agora-Tec, Cor Caroli)", () => {
     expect(p?.longDescription).toContain("Exemple d’autonomie")
     expect(p?.longDescription).not.toMatch(/[\u0080-\u009f]/)
     expect(p?.specs["Type de réticule"]).toBe("Red Dot 2 MOA")
+  })
+
+  it("keeps the supplier's legal class, whichever way the platform spells its label", () => {
+    expect(legalClassFromSpecs({ "Catégorie d_arme": "B1" })).toBe("B1")
+    expect(legalClassFromSpecs({ "Catégorie d arme": "C 1°-b)" })).toBe("C 1°-b)")
+    expect(legalClassFromSpecs({ "Catégorie d’arme": " D " })).toBe("D")
+  })
+
+  it("reads no legal class from the '_' placeholder or a sheet without one", () => {
+    expect(legalClassFromSpecs({ "Catégorie d_arme": "_" })).toBeUndefined()
+    expect(legalClassFromSpecs({ Calibre: "9x19" })).toBeUndefined()
+  })
+
+  it("reads our price from a signed-in page, and only from one", () => {
+    const url = "https://www.cor-caroli.fr/article.php-REFD001"
+    const pro = fixture("product-REFD001-pro.html")
+    expect(parseDoingProduct(pro, url, undefined)).toMatchObject({ supplierSku: "REFD001", purchasePrice: 1105.7 })
+    expect(parseDoingProduct(fixture("product-REFD001.html"), url, undefined)?.purchasePrice).toBeUndefined()
+    expect(parsePurchasePrice(pro.replace("bandeau_deconnexion", "autre_bouton"))).toBeUndefined()
+  })
+
+  it("accepts listing fragments, which carry no header, as signed in", () => {
+    expect(isSignedIn("<li>…</li>", "https://www.cor-caroli.fr/les-articles.htm/liste_article/page/0")).toBe(true)
+    expect(isSignedIn(fixture("product-REFD001.html"), "https://www.cor-caroli.fr/article.php-REFD001")).toBe(false)
+  })
+
+  it("signs in through the header form, without retrying a refusal", async () => {
+    const posts: string[] = []
+    const client = new PoliteClient({
+      minIntervalMs: 0,
+      sleep: async () => {},
+      cookies: true,
+      fetch: async (url, init) => {
+        if (url.endsWith("/robots.txt")) return new Response("", { status: 404 })
+        posts.push(String(init?.body))
+        return new Response(fixture("product-REFD001.html"))
+      },
+    })
+    await expect(corCaroli.proLogin?.signIn(client, { login: "C12345", password: "pw" })).rejects.toThrow(
+      /refused the sign-in/,
+    )
+    expect(posts).toHaveLength(1)
+    expect(new URLSearchParams(posts[0])).toEqual(
+      new URLSearchParams({ szModeAuth_PM: "connexion", szLoginAuth_PM: "C12345", szPasswordAuth_PM: "pw" }),
+    )
   })
 
   it("returns null for a page that is not a product", () => {

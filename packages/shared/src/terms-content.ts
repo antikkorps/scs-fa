@@ -41,7 +41,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     title: "1. Objet et vendeur",
     blocks: [
       p(
-        "Les présentes conditions régissent les ventes conclues sur le site SCS Firearm entre ",
+        "Les présentes conditions régissent les ventes conclues sur le site SCS Firearms entre ",
         f("companyName", "raison sociale"),
         ", ",
         f("legalForm", "forme juridique"),
@@ -49,16 +49,16 @@ export const TERMS_SECTIONS: TermsSection[] = [
         f("siret", "SIRET"),
         ", dont le siège est situé ",
         f("address", "adresse postale"),
-        " (« SCS Firearm »), et toute personne physique achetant en qualité de consommateur (« le client »). Leurs coordonnées complètes figurent dans les ",
+        " (« SCS Firearms »), et toute personne physique achetant en qualité de consommateur (« le client »). Leurs coordonnées complètes figurent dans les ",
         a("mentions légales", "/mentions-legales"),
         ".",
       ),
       p(
         "Le site réunit deux univers : l'",
         b("armurerie"),
-        " (armes, munitions, accessoires, armes de collection), vendue par SCS Firearm, et la galerie ",
+        " (armes, munitions, accessoires, armes de collection), vendue par SCS Firearms, et la galerie ",
         b("Gun Art"),
-        " (tirages d'art), vendue par SCS Firearm pour le compte de l'artiste. Les articles 1 à 11 s'appliquent à tous les achats ; l'article 12 ajoute les règles propres aux articles réglementés, l'article 13 celles propres aux tirages Gun Art.",
+        " (tirages d'art), vendue par SCS Firearms pour le compte de l'artiste. Les articles 1 à 11 s'appliquent à tous les achats ; l'article 12 ajoute les règles propres aux articles réglementés, l'article 13 celles propres aux tirages Gun Art.",
       ),
       p(
         "Le client accepte ces conditions en cochant la case prévue à cet effet avant de commander. La version acceptée est enregistrée avec la commande et lui est adressée avec la confirmation de commande : c'est elle qui s'applique à cette commande, même si le texte évolue ensuite.",
@@ -122,7 +122,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
       list(
         [
           b("par carte bancaire"),
-          ", pour les armes de catégorie D, les articles en vente libre et les tirages Gun Art. Le paiement est traité par notre prestataire Stripe : SCS Firearm n'a jamais connaissance des numéros de carte ;",
+          ", pour les armes de catégorie D, les articles en vente libre et les tirages Gun Art. Le paiement est traité par notre prestataire Stripe : SCS Firearms n'a jamais connaissance des numéros de carte ;",
         ],
         [
           b("par virement bancaire"),
@@ -132,7 +132,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
         ],
       ),
       p(
-        "Une commande qui mêle les deux types d'articles est réglée en deux parties, dont le détail s'affiche après la commande. Les articles restent la propriété de SCS Firearm (ou, pour un tirage Gun Art, de l'artiste) jusqu'au paiement complet de leur prix.",
+        "Une commande qui mêle les deux types d'articles est réglée en deux parties, dont le détail s'affiche après la commande. Les articles restent la propriété de SCS Firearms (ou, pour un tirage Gun Art, de l'artiste) jusqu'au paiement complet de leur prix.",
       ),
     ],
   },
@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     title: "10. Responsabilité",
     blocks: [
       p(
-        "SCS Firearm n'est pas responsable de l'inexécution d'une commande due au client, au fait imprévisible et insurmontable d'un tiers, ou à un cas de force majeure. Le client reste seul responsable de l'usage, de la détention et du transport des articles achetés, dans le respect de la réglementation en vigueur.",
+        "SCS Firearms n'est pas responsable de l'inexécution d'une commande due au client, au fait imprévisible et insurmontable d'un tiers, ou à un cas de force majeure. Le client reste seul responsable de l'usage, de la détention et du transport des articles achetés, dans le respect de la réglementation en vigueur.",
       ),
     ],
   },
@@ -251,14 +251,14 @@ export const TERMS_SECTIONS: TermsSection[] = [
       ),
       p(
         b("Refus de vente."),
-        " SCS Firearm est tenu de refuser une vente lorsque les pièces fournies ne permettent pas d'établir que l'acheteur peut légalement acquérir l'article, ou lorsque la loi l'impose. Dans ce cas, la commande — ou la partie de la commande concernée — est annulée et les sommes correspondantes sont intégralement remboursées sous 14 jours. ",
+        " SCS Firearms est tenu de refuser une vente lorsque les pièces fournies ne permettent pas d'établir que l'acheteur peut légalement acquérir l'article, ou lorsque la loi l'impose. Dans ce cas, la commande — ou la partie de la commande concernée — est annulée et les sommes correspondantes sont intégralement remboursées sous 14 jours. ",
         todo("À confirmer : délai laissé au client pour fournir ses pièces avant annulation."),
       ),
       p(
         b("Expédition."),
         " Une arme de catégorie B est expédiée en deux colis distincts : l'arme d'un côté, ses éléments essentiels de l'autre. ",
         todo("À confirmer : remise contre signature ?"),
-        " Le retour d'un article réglementé, y compris au titre du droit de rétractation, se fait selon les mêmes modalités, après accord préalable avec SCS Firearm sur le mode d'envoi, afin que la vente puisse être annulée dans le SIA.",
+        " Le retour d'un article réglementé, y compris au titre du droit de rétractation, se fait selon les mêmes modalités, après accord préalable avec SCS Firearms sur le mode d'envoi, afin que la vente puisse être annulée dans le SIA.",
       ),
     ],
   },
@@ -266,7 +266,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     title: "13. Tirages Gun Art",
     blocks: [
       p(
-        "Les tirages de la galerie Gun Art sont vendus par SCS Firearm pour le compte de leur artiste. ",
+        "Les tirages de la galerie Gun Art sont vendus par SCS Firearms pour le compte de leur artiste. ",
         todo("À confirmer par le juriste : qualification exacte de ce mandat de vente et mention qu'elle impose."),
         " Chaque tirage appartient à une édition limitée : son numéro dans l'édition et son format figurent sur la fiche. Lorsque la fiche l'indique, un certificat d'authenticité signé l'accompagne.",
       ),
