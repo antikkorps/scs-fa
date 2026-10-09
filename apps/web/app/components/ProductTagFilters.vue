@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { TagFacetGroup } from "~/types/product"
 
-// Faceted tag filter. Mirrors the API semantics — OR inside a facet, AND across
-// facets — so the hint text under each group tells the truth about what ticking
-// a second box will do.
+// Faceted tag filter. The API combines the boxes the way every shop does — OR
+// inside a facet, AND across facets — so no hint explains it: it read as jargon
+// (Franck, 2026-10-08). "Tag" stays an admin word; visitors read "Affiner".
 const props = defineProps<{
   facets: TagFacetGroup[]
   selected: string[]
@@ -20,7 +20,7 @@ const hasSelection = computed(() => props.selected.length > 0)
 <template>
   <div v-if="facets.length > 0" class="tagf">
     <div class="tagf__head">
-      <h2 class="tagf__title">Filtrer par tag</h2>
+      <h2 class="tagf__title">Affiner</h2>
       <button v-if="hasSelection" type="button" class="tagf__clear" @click="emit('clear')">
         Tout effacer
       </button>
@@ -28,9 +28,6 @@ const hasSelection = computed(() => props.selected.length > 0)
 
     <fieldset v-for="group in facets" :key="group.facet" class="tagf__group">
       <legend class="tagf__legend">{{ tagFacetLabel(group.facet) }}</legend>
-      <p class="tagf__hint">
-        Plusieurs choix élargissent le résultat&nbsp;; croiser deux rubriques le restreint.
-      </p>
       <ul class="tagf__list">
         <li v-for="tag in group.tags" :key="tag.slug">
           <label class="tagf__item" :class="{ 'tagf__item--on': selectedSet.has(tag.slug) }">
@@ -41,7 +38,7 @@ const hasSelection = computed(() => props.selected.length > 0)
               @change="emit('toggle', tag.slug)"
             />
             <span class="tagf__name">{{ tag.name }}</span>
-            <span class="tagf__count" aria-label="produits">{{ tag.productCount }}</span>
+            <span class="tagf__count" :aria-label="`${tag.productCount} produits`">({{ tag.productCount }})</span>
           </label>
         </li>
       </ul>
@@ -97,13 +94,9 @@ const hasSelection = computed(() => props.selected.length > 0)
   text-transform: uppercase;
   opacity: 0.75;
   padding: 0;
+  margin-bottom: 0.4rem;
 }
 
-.tagf__hint {
-  font-size: var(--fs-sm);
-  opacity: 0.6;
-  margin: 0.15rem 0 0.5rem;
-}
 
 .tagf__list {
   display: flex;

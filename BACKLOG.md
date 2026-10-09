@@ -653,7 +653,7 @@
 - **EAN** : aucun des sites visités ne l'expose — il ne viendra que des tarifs qui le portent
 - Non traité (mineur) : l'aperçu charge tous les produits des fournisseurs connus, la confirmation écrit ligne par ligne (acceptable pour quelques milliers d'articles) ; une cellule Excel contenant un lien rend l'adresse du lien plutôt que le texte affiché
 - Lecture `.xlsx` sans garde contre une **bombe zip** au-delà du plafond de 15 Mo du fichier déposé (route réservée aux admins)
-- Pas d'**écran fournisseurs** (création implicite à l'import ; marge par défaut modifiable seulement en base pour l'instant)
+- ~~Pas d'**écran fournisseurs**~~ → réglé par la **story 12.5** (écran Fournisseurs, l'import n'accepte plus que les fournisseurs déclarés)
 
 **Story 12.3** — Frais de port au tunnel d'achat — ✅ **CODÉE** _(créée le 2026-09-29, trouvé en 12.1 ; codée le 2026-10-03)_
 
@@ -740,8 +740,15 @@
   - Catégories proposées à partir de la famille Humbert ; 546 lignes sans proposition.
   - ⚠️ **8 articles classés A** chez Humbert (A1.8, A1.9bis) : à signaler au client.
   - ⚠️ Rappel : 746 articles portent un **visuel générique de gamme**.
+- **Cor Caroli prêt (2026-10-08)** : `work/tri-cor-caroli-catalogues-2026-10-08.xlsx`, 1 554 lignes, **prix d'achat pro HT** sur 1 525. Les 29 sans prix n'en affichent aucun, même connecté (guidons MC5x…).
+  - Règles dans `work/config.json` (clé `cor-caroli`) : **marge 30 %** ; catégorie du site déduite de la collection Cor Caroli (1 553 sur 1 554) ; **catégorie légale par la lettre du classement Cor Caroli**, comme pour Humbert (décision de Franck).
+  - L'adaptateur lit désormais ce classement (« Catégorie d'arme » : B1, C 1°-b…) dans `supplierLegalClass`. 192 articles en ont un ; **11 armes sur 185 n'en ont pas**, le client complète.
+- **BGM prêt (2026-10-08)** : `work/tri-bgm-winfield-catalogues-2026-10-08.xlsx`, 6 089 lignes, **prix d'achat pro HT** sur 6 083 (les 6 autres affichent 0,00 €).
+  - Règles dans `work/config.json` (clé `bgm-winfield`) : **marge 30 %** ; catégorie du site déduite de l'arborescence BGM.
+  - **Catégorie légale vide partout** : BGM ne publie aucun classement. Le client la remplit, en priorité sur les 347 armes longues et 255 armes de poing.
+  - **443 lignes sans catégorie, volontairement** : « Rechargement » (367 : poudres, amorces, projectiles, outils) à trancher avec le client, la poudre et les amorces relevant d'une réglementation propre ; « A implanter » (76), que BGM n'a pas encore classés.
+  - 1 974 fiches **sans photo** et 2 185 sans description : **réellement absentes chez BGM** (image « pas de photo » par défaut), l'outil ne rate rien. Aucun EAN.
 - **Restent à collecter** (décision de Franck : catalogues complets) :
-  - **BGM** et **Cor Caroli**, avec les prix pro, à lancer le 2026-10-08 ;
   - **Toro**, **Agora-Tec** et **ESP**, en public. Pour ESP, les prix viendront de son tarif.
 
 **Story 12.5** — Fournisseurs gérés dans le back-office — ✅ **CODÉE** _(créée et codée le 2026-10-08, demande de Franck)_
@@ -766,7 +773,56 @@
 
 - [x] **Seed de déploiement** (demande de Franck) : `seedSuppliers()` déclare les 6 fournisseurs collectés (Agora-Tec, BGM Winfield, Cor Caroli, ESP France, Humbert, Toro Distribution). Il peut être relancé sans risque : un fournisseur déjà présent, quelle que soit sa casse, n'est ni dupliqué ni renommé. Les noms viennent d'**une seule constante**, `CATALOG_SUPPLIERS` (`@armurier/shared`), que lisent aussi les adaptateurs de collecte : le nom écrit dans les fichiers de tri est donc toujours celui qui est semé.
 
+- [x] **Seed séparé (2026-10-08, demande de Franck)** : `just seed` / `pnpm db:seed` ne pose plus que les **données de référence** (catégories légales et produits, tags, fournisseurs, admin). Le **catalogue de démo** (œuvres, produits, armes de collection, articles de blog) passe par `--demo` (`just seed-demo`, `pnpm db:seed:demo`), réservé au dev et aux démos. Avant, un déploiement aurait mis en ligne de faux produits. **En production, le seed refuse le mot de passe admin d'exemple** de `.env.example`. Testé de bout en bout sur une base vide (`seed-cli.test.ts`).
+
 **À savoir :** un fournisseur **hors collecte** (Armurerie de Paris, ClearMyVault…) se crée à la main dans Catalogue → Fournisseurs avant son premier import.
+
+**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 📝 **À CADRER** _(créée le 2026-10-08, demande du client)_
+
+> Besoin : le client facture avec **Henrri** (logiciel gratuit du groupe Rivalis). Chaque commande payée sur le site doit y devenir une facture, sans ressaisie. Henrri a une API publique pensée pour ce cas (« une boutique en ligne peut générer automatiquement la facture d'une commande »).
+
+**Ce qu'on sait de l'API (2026-10-08, pages publiques) :**
+
+- Ressources : **factures et devis** (création, lecture), **clients** (synchronisation), **catalogue produits**.
+- Authentification : `clientId` / `clientSecret` générés dans le compte Henrri (avatar → « API & Intégrations »), échangés contre un **jeton JWT valable 10 minutes**.
+- **Coût en crédits** : lectures gratuites ; **8 crédits par facture finalisée**, 2 par devis validé.
+
+| Pack | Prix / mois | Crédits / mois | Factures / mois | Débit |
+|---|---|---|---|---|
+| 1 | 0 € | 200 | 25 | 60 req/min |
+| 2 | 10 € | 1 000 | 125 | 120 req/min |
+| 3 | 20 € | 2 000 | 250 | 300 req/min |
+| 4 | 30 € | 4 000 | 500 | 600 req/min |
+
+- **Bac à sable gratuit et illimité** : tout le développement et les tests se font dessus.
+- ⚠️ La **documentation technique** (adresses, schémas) n'est **pas publique** : elle est dans le compte Henrri. La page d'aide « Avez-vous une API ? » refuse les accès automatiques.
+- Facturation électronique : Henrri annonce la **réception** des e-factures en septembre 2026 et l'**émission** en septembre 2027. Les ventes aux particuliers (B2C) ne sont pas des e-factures, elles relèvent de l'e-reporting : à confirmer avec le comptable.
+
+**Décisions à trancher (avec le client et son comptable) — ne pas coder avant :**
+
+- [ ] **Moment de la facture.** Proposé : quand la commande est **entièrement payée**. Une commande mixte se règle en deux parties (carte pour le libre, virement pour les armes réglementées) : une seule facture à la fin, ou une par paiement ?
+- [ ] **Numérotation : Henrri**, jamais le site. Deux séries parallèles seraient une anomalie comptable. Le site garde sa référence de commande et le numéro Henrri de la facture.
+- [ ] **Contenu.** Proposé : les **lignes de la commande** (désignation, référence, quantité, prix HT, taux de TVA), plus une ligne **frais de port**. Pas de synchronisation du catalogue : des milliers d'articles pour rien.
+- [ ] **Clients.** Créer chaque acheteur dans Henrri (nom, adresse de facturation, e-mail) ? Si oui, Henrri devient **sous-traitant RGPD** : à ajouter à `/confidentialite` et au registre.
+- [ ] **Remboursements → avoirs** dans Henrri (total ou partiel, à partir de la table `refunds`).
+- [ ] **Gun Art** : les tirages sont vendus **pour le compte de l'artiste** (CGV art. 12). Faut-il une facture de mandataire avec mention spécifique, ou une commission ? **À valider par le comptable.**
+- [ ] **Envoi au client** : par Henrri (son e-mail), ou par le site (PDF récupéré et joint à un e-mail SCS Firearms, ou disponible dans « Mes commandes ») ?
+- [ ] **Pack** selon le volume de commandes attendu : 25 factures par mois en gratuit, 125 pour 10 €…
+- [ ] **Commandes passées avant la mise en service** : rattrapage ou non.
+
+**Conception proposée (à confirmer une fois la documentation lue) :**
+
+- **File d'attente avec relances**, sur le modèle de l'e-mail de confirmation (`confirmation_sent_at`, `ORDER_CONFIRMATION_RETRY_MINUTES`). Une facture Henrri qui échoue (API indisponible, crédits épuisés) **ne bloque jamais une vente**. Elle repart plus tard, et un compteur dans le tableau de bord signale les factures en souffrance.
+- **Idempotence** : l'identifiant et le numéro de la facture Henrri sont stockés sur la commande (migration). Une relance ne crée jamais de doublon : elle vérifie d'abord ce qui existe chez Henrri, ce qui ne coûte rien puisque les lectures sont gratuites.
+- **Secrets** dans `.env` (`HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`, `HENRRI_BASE_URL` pour basculer entre bac à sable et production). Jeton gardé en mémoire et renouvelé avant expiration. Jamais journalisé.
+- **Admin** : sur la fiche commande, le numéro de facture Henrri avec un lien, son statut et un bouton « Relancer la facture ».
+- **Tests** : client HTTP Henrri simulé dans la CI ; passe réelle sur le bac à sable avant la production.
+
+**Attendu du client :**
+
+- un accès au **bac à sable** Henrri (`clientId` / `clientSecret`) et le lien vers la documentation de l'API ;
+- les réponses aux décisions ci-dessus, Gun Art et e-reporting avec son **comptable** ;
+- plus tard, les identifiants de **production** et le choix du pack.
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 

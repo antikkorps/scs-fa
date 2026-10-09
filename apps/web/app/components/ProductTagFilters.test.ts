@@ -27,11 +27,19 @@ describe("ProductTagFilters", () => {
     expect(wrapper.text()).toContain("4")
   })
 
+  it("speaks plainly: a short title, no jargon, no explanation of how boxes combine", async () => {
+    const wrapper = await mountSuspended(ProductTagFilters, { props: { facets, selected: [] } })
+    expect(wrapper.find(".tagf__title").text()).toBe("Affiner")
+    expect(wrapper.text()).not.toMatch(/tag/i)
+    expect(wrapper.find(".tagf__hint").exists()).toBe(false)
+    expect(wrapper.findAll(".tagf__count").map((count) => count.text())).toEqual(["(4)", "(9)", "(2)"])
+  })
+
   it("checks the boxes matching the current selection", async () => {
     const wrapper = await mountSuspended(ProductTagFilters, { props: { facets, selected: ["occasion"] } })
     const boxes = wrapper.findAll("input[type=checkbox]")
-    expect((boxes[0]?.element as HTMLInputElement).checked).toBe(true)
-    expect((boxes[1]?.element as HTMLInputElement).checked).toBe(false)
+    expect((boxes[0]?.element as HTMLInputElement | undefined)?.checked).toBe(true)
+    expect((boxes[1]?.element as HTMLInputElement | undefined)?.checked).toBe(false)
   })
 
   it("emits toggle with the tag slug when a box is ticked", async () => {

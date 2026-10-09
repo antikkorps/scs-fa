@@ -77,8 +77,8 @@ describe("AdminMediaGallery (story 7.5b)", () => {
 
     const call = apiMock.mock.calls.find(([url]) => String(url).includes("/reorder"))
     expect(call).toBeDefined()
-    const body = (call?.[1] as { body: { ids: string[] } }).body
-    expect(body.ids).toEqual(["m2", "m1"])
+    const body = (call?.[1] as { body: { ids: string[] } } | undefined)?.body
+    expect(body?.ids).toEqual(["m2", "m1"])
     expect(wrapper.findAll(".item")[0]?.find(".badge--main").exists()).toBe(true)
   })
 
@@ -98,7 +98,7 @@ describe("AdminMediaGallery (story 7.5b)", () => {
     await flushPromises()
 
     const patch = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
-    expect((patch?.[1] as { body: { alt: string } }).body.alt).toBe("Nouveau texte")
+    expect((patch?.[1] as { body: { alt: string } } | undefined)?.body.alt).toBe("Nouveau texte")
 
     // Emptying it would make the gallery unusable; the API refuses it, so the
     // component does not even ask.

@@ -29,9 +29,9 @@ cp apps/api/.env.example apps/api/.env
 # 3. Start Postgres (5435) + Mailpit, the local SMTP trap (8025)
 pnpm docker:up
 
-# 4. Apply the schema + seeds (legal categories + products)
+# 4. Apply the schema + seeds (reference data + the demo catalogue)
 pnpm db:migrate
-pnpm db:seed
+pnpm db:seed:demo
 
 # 5. Start the API (port 8081)
 pnpm dev:api
@@ -55,7 +55,8 @@ pnpm dev:web
 | `pnpm db:generate`    | Generate a SQL migration from `schema.ts` (commit the file) |
 | `pnpm db:migrate`     | Apply pending migrations (dev, CI and prod)                |
 | `pnpm db:push`        | Diff the schema straight into a DB — **prototyping only**, never on a shared or deployed database |
-| `pnpm db:seed`        | Run the seeds                                              |
+| `pnpm db:seed`        | Reference data + admin (what production runs)              |
+| `pnpm db:seed:demo`   | Reference data + the demo catalogue (dev and demos only)   |
 | `pnpm db:studio`      | Drizzle Studio web UI                                      |
 | `pnpm docker:up/down` | Dev Postgres lifecycle                                     |
 
