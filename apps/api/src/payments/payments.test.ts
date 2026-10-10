@@ -27,12 +27,19 @@ import {
 vi.mock("./stripe.js", () => ({
   createPaymentIntent: vi.fn(),
   retrievePaymentIntent: vi.fn(),
+  retrieveCharge: vi.fn(),
   createRefund: vi.fn(),
   constructWebhookEvent: vi.fn(),
 }))
 
 import { recomputeVipStatus } from "../vip/service.js"
-import { constructWebhookEvent, createPaymentIntent, createRefund, retrievePaymentIntent } from "./stripe.js"
+import {
+  constructWebhookEvent,
+  createPaymentIntent,
+  createRefund,
+  retrieveCharge,
+  retrievePaymentIntent,
+} from "./stripe.js"
 
 // The confirmation e-mail is sent in the background of every order (story 12.1):
 // keep it off the network and observable.
@@ -290,6 +297,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
   beforeEach(() => {
     vi.mocked(createPaymentIntent).mockReset()
     vi.mocked(retrievePaymentIntent).mockReset()
+    vi.mocked(retrieveCharge).mockReset()
     vi.mocked(createRefund).mockReset()
     vi.mocked(constructWebhookEvent).mockReset()
   })
@@ -433,17 +441,20 @@ describe("payments — Stripe card (Story 6.1)", () => {
       const orderId = await insertOrder(userId, [CARD_ITEM])
       await insertCarte(orderId, { intentId: "pi_ok_1" })
 
+      // Webhook payloads carry `latest_charge` as a bare id: the card details
+      // live on the charge, fetched separately.
+      vi.mocked(retrieveCharge).mockResolvedValue({
+        id: "ch_ok_1",
+        payment_method_details: { card: { last4: "4242", brand: "visa" } },
+      } as never)
+
       const res = await post({
         type: "payment_intent.succeeded",
-        data: {
-          object: {
-            id: "pi_ok_1",
-            charges: { data: [{ payment_method_details: { card: { last4: "4242", brand: "visa" } } }] },
-          },
-        },
+        data: { object: { id: "pi_ok_1", latest_charge: "ch_ok_1" } },
       })
 
       expect(res.statusCode).toBe(200)
+      expect(vi.mocked(retrieveCharge)).toHaveBeenCalledWith("ch_ok_1")
       const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
       expect(carte.paymentStatus).toBe("received")
       expect(carte.last4).toBe("4242")
@@ -451,6 +462,23 @@ describe("payments — Stripe card (Story 6.1)", () => {
       expect(carte.processedAt).not.toBeNull()
       const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
       expect(order.paymentStatus).toBe("received")
+    })
+
+    it("still settles the payment when the charge lookup fails (card details left empty)", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { intentId: "pi_ok_2" })
+      vi.mocked(retrieveCharge).mockRejectedValue(new Error("Stripe unavailable"))
+
+      const res = await post({
+        type: "payment_intent.succeeded",
+        data: { object: { id: "pi_ok_2", latest_charge: "ch_ok_2" } },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(carte.paymentStatus).toBe("received")
+      expect(carte.last4).toBeNull()
+      expect(carte.brand).toBeNull()
     })
 
     it("does not flip a mixed order to received while the transfer is still due", async () => {
@@ -463,6 +491,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
       })
 
       expect(res.statusCode).toBe(200)
+      expect(vi.mocked(retrieveCharge)).not.toHaveBeenCalled() // no charge id, nothing to look up
       const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
       expect(carte.paymentStatus).toBe("received")
       const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
@@ -1205,8 +1234,8 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(pending.paymentStatus).toBe("received") // not refunded until confirmed
 
         vi.mocked(constructWebhookEvent).mockReturnValue({
-          type: "charge.refunded",
-          data: { object: { refunds: { data: [{ id: "re_async", status: "succeeded" }] } } },
+          type: "refund.updated",
+          data: { object: { id: "re_async", status: "succeeded" } },
         } as never)
         const fire = () =>
           app.inject({
