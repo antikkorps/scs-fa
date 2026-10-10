@@ -18,11 +18,11 @@
     "@armurier/shared": "workspace:*",
     "@nuxt/fonts": "0.14.0",
     "@stripe/stripe-js": "9.9.0",
-    "@tiptap/extension-image": "3.27.1",
-    "@tiptap/extension-link": "3.27.1",
-    "@tiptap/pm": "3.27.1",
-    "@tiptap/starter-kit": "3.27.1",
-    "@tiptap/vue-3": "3.27.1",
+    "@tiptap/extension-image": "3.27.3",
+    "@tiptap/extension-link": "3.27.3",
+    "@tiptap/pm": "3.27.3",
+    "@tiptap/starter-kit": "3.27.3",
+    "@tiptap/vue-3": "3.27.3",
     "nuxt": "^4.4.7",
     "vue": "3.5.39",
     "vue-router": "5.1.0"
@@ -30,13 +30,13 @@
   "devDependencies": {
     "@nuxt/devtools": "3.2.4",
     "@nuxt/test-utils": "4.0.3",
-    "@types/node": "24.13.2",
+    "@types/node": "24.13.3",
     "@vitest/coverage-v8": "^4.1.0",
-    "@vue/language-core": "3.3.5",
+    "@vue/language-core": "3.3.7",
     "@vue/test-utils": "2.4.11",
     "happy-dom": "20.10.6",
     "typescript": "5.9.3",
     "vitest": "^4.1.0",
-    "vue-tsc": "3.3.5"
+    "vue-tsc": "3.3.7"
   }
 }
