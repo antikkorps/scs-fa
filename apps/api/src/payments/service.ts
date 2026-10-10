@@ -7,6 +7,7 @@ import {
   type ReconcileVirementInput,
 } from "@armurier/shared"
 import { and, eq, inArray } from "drizzle-orm"
+import type { FastifyBaseLogger } from "fastify"
 import type Stripe from "stripe"
 import { db } from "../db/client.js"
 import { auditLogs, orders, paymentCarte, paymentVirement } from "../db/schema.js"
@@ -14,7 +15,7 @@ import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import { settleStripeRefund } from "./refunds.js"
-import { createPaymentIntent, retrievePaymentIntent } from "./stripe.js"
+import { createPaymentIntent, retrieveCharge, retrievePaymentIntent } from "./stripe.js"
 
 // Bank-transfer bucket states an admin (or CSV import) may still act on: the
 // money has not been confirmed yet. A bucket already in PAID_PAYMENT_STATUSES is
@@ -447,16 +448,29 @@ export async function importBankStatement(csv: string, adminId: string): Promise
   return { total: lines.length, reconciled, needsReview: lines.length - reconciled, lines }
 }
 
-/** Pull last4/brand from a PaymentIntent's card details, best-effort. */
-function cardDetails(intent: Stripe.PaymentIntent): { last4: string | null; brand: string | null } {
-  // Depending on the API version, the charge may be inlined under `charges`.
-  const charge = (
-    intent as unknown as {
-      charges?: { data?: Array<{ payment_method_details?: { card?: { last4?: string; brand?: string } } }> }
-    }
-  ).charges?.data?.[0]
-  const card = charge?.payment_method_details?.card
-  return { last4: card?.last4 ?? null, brand: card?.brand ?? null }
+type Logger = Pick<FastifyBaseLogger, "warn">
+
+type CardDetails = { last4: string | null; brand: string | null }
+
+const NO_CARD_DETAILS: CardDetails = { last4: null, brand: null }
+
+/**
+ * Pull last4/brand from the PaymentIntent's charge, best-effort. Webhook
+ * payloads only carry `latest_charge` as an id, so the charge is fetched; a
+ * failed lookup must never block settling a payment Stripe already collected.
+ */
+async function cardDetails(intent: Stripe.PaymentIntent, log: Logger): Promise<CardDetails> {
+  const latestCharge = intent.latest_charge
+  if (!latestCharge) return NO_CARD_DETAILS
+
+  try {
+    const charge = typeof latestCharge === "string" ? await retrieveCharge(latestCharge) : latestCharge
+    const card = charge.payment_method_details?.card
+    return { last4: card?.last4 ?? null, brand: card?.brand ?? null }
+  } catch (err) {
+    log.warn({ err, paymentIntentId: intent.id }, "Stripe charge lookup failed — card details left empty")
+    return NO_CARD_DETAILS
+  }
 }
 
 /**
@@ -466,11 +480,11 @@ function cardDetails(intent: Stripe.PaymentIntent): { last4: string | null; bran
  * Stripe still receives a 200 and stops retrying. Matching is by stored
  * PaymentIntent id, so a webhook for a superseded intent is safely ignored.
  */
-export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
+export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promise<void> {
   switch (event.type) {
     case "payment_intent.succeeded": {
       const intent = event.data.object as Stripe.PaymentIntent
-      const { last4, brand } = cardDetails(intent)
+      const { last4, brand } = await cardDetails(intent, log)
       await settleCartePayment(
         intent.id,
         {
@@ -500,18 +514,12 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       await settleCartePayment(intent.id, { paymentStatus: "cancelled" })
       return
     }
+    // `charge.refunded` is deliberately not handled: its charge no longer
+    // inlines `refunds`, and every status change already arrives as a refund event.
     case "refund.updated":
     case "refund.created": {
       const refund = event.data.object as Stripe.Refund
       await settleStripeRefund(refund.id, refund.status ?? "")
-      return
-    }
-    case "charge.refunded": {
-      // The charge carries its refunds inline; settle each one we know about.
-      const charge = event.data.object as Stripe.Charge
-      for (const refund of charge.refunds?.data ?? []) {
-        await settleStripeRefund(refund.id, refund.status ?? "")
-      }
       return
     }
     default:

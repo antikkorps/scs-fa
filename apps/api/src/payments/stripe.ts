@@ -22,6 +22,10 @@ export function retrievePaymentIntent(id: string): Promise<Stripe.PaymentIntent>
   return client().paymentIntents.retrieve(id)
 }
 
+export function retrieveCharge(id: string): Promise<Stripe.Charge> {
+  return client().charges.retrieve(id)
+}
+
 /** Issue a refund against a PaymentIntent (full when `amount` is omitted, else partial, in cents). */
 export function createRefund(params: Stripe.RefundCreateParams): Promise<Stripe.Refund> {
   return client().refunds.create(params)

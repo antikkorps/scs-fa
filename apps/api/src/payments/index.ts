@@ -98,7 +98,7 @@ export const stripeWebhookRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(400).send({ error: "InvalidSignature", message: "Webhook signature verification failed" })
     }
 
-    await handleStripeEvent(event)
+    await handleStripeEvent(event, request.log)
     return reply.code(200).send({ received: true })
   })
 }
