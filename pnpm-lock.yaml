@@ -98,8 +98,8 @@ importers:
         specifier: 0.35.3
         version: 0.35.3(@types/node@24.13.3)
       stripe:
-        specifier: 20.4.1
-        version: 20.4.1(@types/node@24.13.3)
+        specifier: 22.3.1
+        version: 22.3.1(@types/node@24.13.3)
       tsx:
         specifier: 4.23.0
         version: 4.23.0
@@ -1442,9 +1442,6 @@ packages:
 
   '@jridgewell/source-map@0.3.11':
     resolution: {integrity: sha512-ZMp1V8ZFcPG5dIWnQLr3NSI1MiCU7UETdS/A0G8V/XWHvJv3ZsFqutJn1Y5RPmAPX6F3BiE397OqveU/9NCuIA==}
-
-  '@jridgewell/sourcemap-codec@1.5.5':
-    resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
 
   '@jridgewell/sourcemap-codec@1.6.0':
     resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
@@ -5377,11 +5374,11 @@ packages:
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
 
-  stripe@20.4.1:
-    resolution: {integrity: sha512-axCguHItc8Sxt0HC6aSkdVRPffjYPV7EQqZRb2GkIa8FzWDycE7nHJM19C6xAIynH1Qp1/BHiopSi96jGBxT0w==}
-    engines: {node: '>=16'}
+  stripe@22.3.1:
+    resolution: {integrity: sha512-6XSLN0KK0IdfXqDHqMg6CDoO3eO62ye9dhzw0fZp55AUOzHR1YRJOqYHTsuCi4QJ4Ni/usEmXtq69c9ghKDmYw==}
+    engines: {node: '>=18'}
     peerDependencies:
-      '@types/node': '>=16'
+      '@types/node': '>=18'
     peerDependenciesMeta:
       '@types/node':
         optional: true
@@ -6995,7 +6992,7 @@ snapshots:
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
       '@jridgewell/trace-mapping': 0.3.31
 
   '@jridgewell/remapping@2.3.5':
@@ -7009,8 +7006,6 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
-
-  '@jridgewell/sourcemap-codec@1.5.5': {}
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
 
@@ -7784,7 +7779,7 @@ snapshots:
       detect-libc: 2.1.2
       is-glob: 4.0.3
       node-addon-api: 7.1.1
-      picomatch: 4.0.4
+      picomatch: 4.0.7
     optionalDependencies:
       '@parcel/watcher-android-arm64': 2.5.6
       '@parcel/watcher-darwin-arm64': 2.5.6
@@ -9473,6 +9468,10 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.4
 
+  fdir@6.5.0(picomatch@4.0.7):
+    optionalDependencies:
+      picomatch: 4.0.7
+
   file-uri-to-path@1.0.0: {}
 
   fill-range@7.1.1:
@@ -11091,7 +11090,7 @@ snapshots:
   rollup-plugin-visualizer@7.0.1(rollup@4.60.4):
     dependencies:
       open: 11.0.0
-      picomatch: 4.0.4
+      picomatch: 4.0.7
       source-map: 0.7.6
       yargs: 18.0.0
     optionalDependencies:
@@ -11372,7 +11371,7 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
 
-  stripe@20.4.1(@types/node@24.13.3):
+  stripe@22.3.1(@types/node@24.13.3):
     optionalDependencies:
       '@types/node': 24.13.3
 
@@ -11474,8 +11473,8 @@ snapshots:
 
   tinyglobby@0.2.17:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.4)
-      picomatch: 4.0.4
+      fdir: 6.5.0(picomatch@4.0.7)
+      picomatch: 4.0.7
 
   tinyrainbow@3.2.0: {}
 
@@ -11729,8 +11728,8 @@ snapshots:
   vite@7.3.5(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.48.0)(tsx@4.23.0)(yaml@2.9.0):
     dependencies:
       esbuild: 0.27.7
-      fdir: 6.5.0(picomatch@4.0.4)
-      picomatch: 4.0.4
+      fdir: 6.5.0(picomatch@4.0.7)
+      picomatch: 4.0.7
       postcss: 8.5.15
       rollup: 4.60.4
       tinyglobby: 0.2.17
