@@ -1,5 +1,11 @@
 # Facturation Henrri — questions pour le client et son comptable
 
+> **Réponses du client (2026-10-12)** : toutes les recommandations sont
+> retenues, sauf Gun Art (point 6) où le choix est **la facture de SCS
+> Firearms pour le prix total, l'artiste facturant ensuite sa part à SCS
+> Firearms**. L'e-reporting passe **par Henrri**. Les décisions sont
+> reportées dans le BACKLOG (story 12.6).
+
 > Story 12.6. Chaque commande payée sur le site doit devenir une facture dans
 > Henrri, sans ressaisie. Avant d'écrire la moindre ligne de code, neuf points
 > doivent être tranchés. Pour chacun : la question, notre recommandation, et
