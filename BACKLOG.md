@@ -798,14 +798,14 @@
 - ⚠️ La **documentation technique** (adresses, schémas) n'est **pas publique** : elle est dans le compte Henrri. La page d'aide « Avez-vous une API ? » refuse les accès automatiques.
 - Facturation électronique : Henrri annonce la **réception** des e-factures en septembre 2026 et l'**émission** en septembre 2027. Les ventes aux particuliers (B2C) ne sont pas des e-factures, elles relèvent de l'e-reporting : à confirmer avec le comptable.
 
-**Décisions à trancher (avec le client et son comptable) — ne pas coder avant :**
+**Décisions à trancher (avec le client et son comptable) — ne pas coder avant :** questionnaire avec recommandations prêt à envoyer : [`docs/HENRRI_QUESTIONNAIRE.md`](docs/HENRRI_QUESTIONNAIRE.md).
 
 - [ ] **Moment de la facture.** Proposé : quand la commande est **entièrement payée**. Une commande mixte se règle en deux parties (carte pour le libre, virement pour les armes réglementées) : une seule facture à la fin, ou une par paiement ?
 - [ ] **Numérotation : Henrri**, jamais le site. Deux séries parallèles seraient une anomalie comptable. Le site garde sa référence de commande et le numéro Henrri de la facture.
 - [ ] **Contenu.** Proposé : les **lignes de la commande** (désignation, référence, quantité, prix HT, taux de TVA), plus une ligne **frais de port**. Pas de synchronisation du catalogue : des milliers d'articles pour rien.
 - [ ] **Clients.** Créer chaque acheteur dans Henrri (nom, adresse de facturation, e-mail) ? Si oui, Henrri devient **sous-traitant RGPD** : à ajouter à `/confidentialite` et au registre.
 - [ ] **Remboursements → avoirs** dans Henrri (total ou partiel, à partir de la table `refunds`).
-- [ ] **Gun Art** : les tirages sont vendus **pour le compte de l'artiste** (CGV art. 12). Faut-il une facture de mandataire avec mention spécifique, ou une commission ? **À valider par le comptable.**
+- [ ] **Gun Art** : les tirages sont vendus **pour le compte de l'artiste** (CGV art. 13). Faut-il une facture de mandataire avec mention spécifique, ou une commission ? **À valider par le comptable.**
 - [ ] **Envoi au client** : par Henrri (son e-mail), ou par le site (PDF récupéré et joint à un e-mail SCS Firearms, ou disponible dans « Mes commandes ») ?
 - [ ] **Pack** selon le volume de commandes attendu : 25 factures par mois en gratuit, 125 pour 10 €…
 - [ ] **Commandes passées avant la mise en service** : rattrapage ou non.
