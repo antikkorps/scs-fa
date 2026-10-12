@@ -160,8 +160,11 @@ below is the recommended path.
 - [ ] `.env` filled: every secret, `DOMAIN`, `ACME_EMAIL`, `S3_*`, Stripe **live**
       keys, SMTP creds. No placeholder left.
 - [ ] Stack builds & boots on the VM; `migrate` ran; seed ran; `ps` all healthy.
-- [ ] **Stripe live webhook** registered at `https://www.<DOMAIN>/api/...` →
-      `STRIPE_WEBHOOK_SECRET` set. Test one live-mode payment.
+- [ ] **Stripe live webhook** registered at `https://www.<DOMAIN>/api/webhooks/stripe`,
+      subscribed to exactly these five events: `payment_intent.succeeded`,
+      `payment_intent.payment_failed`, `payment_intent.canceled`,
+      `refund.created`, `refund.updated` → `STRIPE_WEBHOOK_SECRET` set.
+      Test one live-mode payment.
 - [ ] Backups verified: on-demand `backup.sh` produces a dump **and** a
       `restore.sh` round-trip works (a backup you've never restored is a hypothesis).
 - [ ] Content parity check with the old OVH site (products, artworks, legal pages).
@@ -284,5 +287,6 @@ docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/med
   workspace incl. `drizzle-kit`); the runtime API image ships prod deps only.
 - Postgres is **not** published to the host — reach it via
   `docker compose … exec postgres` or another service on the `internal` network.
-- Stripe: register the live webhook endpoint at `https://www.<DOMAIN>/api/...`
-  and put the resulting signing secret in `STRIPE_WEBHOOK_SECRET`.
+- Stripe: register the live webhook endpoint at
+  `https://www.<DOMAIN>/api/webhooks/stripe` with the five events listed in the
+  checklist above, and put the resulting signing secret in `STRIPE_WEBHOOK_SECRET`.

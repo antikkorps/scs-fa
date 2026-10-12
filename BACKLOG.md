@@ -777,7 +777,7 @@
 
 **À savoir :** un fournisseur **hors collecte** (Armurerie de Paris, ClearMyVault…) se crée à la main dans Catalogue → Fournisseurs avant son premier import.
 
-**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 📝 **À CADRER** _(créée le 2026-10-08, demande du client)_
+**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 📝 **CADRÉE** (2026-10-12), attend les accès Henrri _(créée le 2026-10-08, demande du client)_
 
 > Besoin : le client facture avec **Henrri** (logiciel gratuit du groupe Rivalis). Chaque commande payée sur le site doit y devenir une facture, sans ressaisie. Henrri a une API publique pensée pour ce cas (« une boutique en ligne peut générer automatiquement la facture d'une commande »).
 
@@ -798,17 +798,26 @@
 - ⚠️ La **documentation technique** (adresses, schémas) n'est **pas publique** : elle est dans le compte Henrri. La page d'aide « Avez-vous une API ? » refuse les accès automatiques.
 - Facturation électronique : Henrri annonce la **réception** des e-factures en septembre 2026 et l'**émission** en septembre 2027. Les ventes aux particuliers (B2C) ne sont pas des e-factures, elles relèvent de l'e-reporting : à confirmer avec le comptable.
 
-**Décisions à trancher (avec le client et son comptable) — ne pas coder avant :**
+**Décisions tranchées (2026-10-12, réponses du client au [questionnaire](docs/HENRRI_QUESTIONNAIRE.md)) :**
 
-- [ ] **Moment de la facture.** Proposé : quand la commande est **entièrement payée**. Une commande mixte se règle en deux parties (carte pour le libre, virement pour les armes réglementées) : une seule facture à la fin, ou une par paiement ?
-- [ ] **Numérotation : Henrri**, jamais le site. Deux séries parallèles seraient une anomalie comptable. Le site garde sa référence de commande et le numéro Henrri de la facture.
-- [ ] **Contenu.** Proposé : les **lignes de la commande** (désignation, référence, quantité, prix HT, taux de TVA), plus une ligne **frais de port**. Pas de synchronisation du catalogue : des milliers d'articles pour rien.
-- [ ] **Clients.** Créer chaque acheteur dans Henrri (nom, adresse de facturation, e-mail) ? Si oui, Henrri devient **sous-traitant RGPD** : à ajouter à `/confidentialite` et au registre.
-- [ ] **Remboursements → avoirs** dans Henrri (total ou partiel, à partir de la table `refunds`).
-- [ ] **Gun Art** : les tirages sont vendus **pour le compte de l'artiste** (CGV art. 12). Faut-il une facture de mandataire avec mention spécifique, ou une commission ? **À valider par le comptable.**
-- [ ] **Envoi au client** : par Henrri (son e-mail), ou par le site (PDF récupéré et joint à un e-mail SCS Firearms, ou disponible dans « Mes commandes ») ?
-- [ ] **Pack** selon le volume de commandes attendu : 25 factures par mois en gratuit, 125 pour 10 €…
-- [ ] **Commandes passées avant la mise en service** : rattrapage ou non.
+- [x] **Moment de la facture** : **une seule facture, quand la commande est entièrement payée** (y compris une commande mixte CB + virement).
+- [x] **Numérotation : Henrri**, jamais le site. Le site garde sa référence de commande et stocke le numéro Henrri de la facture.
+- [x] **Contenu** : les **lignes de la commande** (désignation, référence, quantité, prix HT, taux de TVA) + une ligne **frais de port**, montants figés sur la commande. Pas de synchronisation du catalogue.
+- [x] **Clients** : chaque acheteur est créé dans Henrri (nom, adresse de facturation, e-mail). Henrri devient **sous-traitant RGPD** → l'ajouter à `/confidentialite` et au registre (dans cette story).
+- [x] **Remboursements → avoirs** automatiques (total ou partiel, à partir de la table `refunds`), dès validation dans l'admin.
+- [x] **Gun Art** : **facture de SCS Firearms pour le prix total** ; l'artiste facture ensuite sa part à SCS Firearms (hors site). Pas de facture de mandataire ni de commission.
+- [x] **Envoi au client** : **par le site** — facture disponible dans « Mes commandes » + lien dans un e-mail SCS Firearms, si l'API Henrri permet de récupérer le PDF ; à défaut, envoi par Henrri.
+- [x] **Pack** : **gratuit au démarrage** (25 factures / mois), montée de palier selon le volume ; un manque de crédits met la facture en attente sans bloquer la vente.
+- [x] **Commandes antérieures** : Henrri mis en service **avant l'ouverture** de la boutique, rien à rattraper.
+- [x] **E-reporting** : **par Henrri**.
+
+**Points restants (à lever avec la documentation de l'API, pas avec le client) :**
+
+- [ ] Un avoir consomme-t-il des crédits ?
+- [ ] L'API permet-elle de récupérer le PDF de la facture (conditionne l'envoi par le site) ?
+- [ ] Facture d'acompte pour un acheteur professionnel qui paie avant livraison : non retenue (« une facture à la fin »), à reconfirmer avec le comptable si un client pro le demande.
+
+**Accès** : en attente, transmis par Fred (bac à sable `clientId` / `clientSecret` + lien vers la documentation). **Le code démarre à leur réception.**
 
 **Conception proposée (à confirmer une fois la documentation lue) :**
 
