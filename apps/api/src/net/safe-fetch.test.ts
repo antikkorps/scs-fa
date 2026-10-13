@@ -27,15 +27,12 @@ describe("isPublicAddress", () => {
     expect(isPublicAddress(ip)).toBe(false)
   })
 
-  it.each([
-    "8.8.8.8",
-    "151.101.1.1",
-    "172.32.0.1",
-    "2a00:1450:4007:80b::200e",
-    "::ffff:8.8.8.8",
-  ])("accepts %s", (ip) => {
-    expect(isPublicAddress(ip)).toBe(true)
-  })
+  it.each(["8.8.8.8", "151.101.1.1", "172.32.0.1", "2a00:1450:4007:80b::200e", "::ffff:8.8.8.8"])(
+    "accepts %s",
+    (ip) => {
+      expect(isPublicAddress(ip)).toBe(true)
+    },
+  )
 })
 
 describe("safeGet", () => {
