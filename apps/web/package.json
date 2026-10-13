@@ -17,15 +17,15 @@
   "dependencies": {
     "@armurier/shared": "workspace:*",
     "@nuxt/fonts": "0.14.0",
-    "@stripe/stripe-js": "9.9.0",
-    "@tiptap/extension-image": "3.27.3",
-    "@tiptap/extension-link": "3.27.3",
-    "@tiptap/pm": "3.27.3",
-    "@tiptap/starter-kit": "3.27.3",
-    "@tiptap/vue-3": "3.27.3",
+    "@stripe/stripe-js": "9.10.0",
+    "@tiptap/extension-image": "3.27.4",
+    "@tiptap/extension-link": "3.27.4",
+    "@tiptap/pm": "3.27.4",
+    "@tiptap/starter-kit": "3.27.4",
+    "@tiptap/vue-3": "3.27.4",
     "nuxt": "^4.4.7",
     "vue": "3.5.39",
-    "vue-router": "5.1.0"
+    "vue-router": "5.2.0"
   },
   "devDependencies": {
     "@nuxt/devtools": "3.2.4",
