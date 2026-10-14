@@ -12,7 +12,7 @@ import { EDITORIAL_PAGES } from "#shared/utils/editorialPages"
  * flipped there, the page shows a draft notice, is noindex and is not in the sitemap.
  */
 const REVIEWED = EDITORIAL_PAGES.confidentialite.reviewed
-const UPDATED_ON = "24 septembre 2026"
+const UPDATED_ON = "14 octobre 2026"
 
 usePageSeo({
   title: "Politique de confidentialité",
@@ -183,6 +183,10 @@ usePageSeo({
       </li>
       <li><strong>Scaleway</strong> — stockage des fichiers et des sauvegardes (France) ;</li>
       <li><strong>Stripe</strong> — paiement par carte bancaire ;</li>
+      <li>
+        <strong>Henrri</strong> (groupe Rivalis) — établissement et conservation de nos factures et avoirs : vos nom,
+        adresse de facturation et e-mail, le détail de la commande et son règlement ;
+      </li>
       <li><strong>Brevo</strong> — envoi de la lettre d'information, si vous y êtes abonné ;</li>
       <li>
         <mark class="todo">[À compléter : prestataire d'envoi des e-mails de service (confirmation, réinitialisation

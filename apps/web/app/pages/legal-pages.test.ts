@@ -5,6 +5,7 @@ import { mountSuspended } from "@nuxt/test-utils/runtime"
 import { describe, expect, it } from "vitest"
 import { formatDate } from "~/utils/format"
 import Cgv from "./cgv.vue"
+import Confidentialite from "./confidentialite.vue"
 import MentionsLegales from "./mentions-legales.vue"
 
 describe("legal pages (story 12.1)", () => {
@@ -31,5 +32,11 @@ describe("legal pages (story 12.1)", () => {
     const wrapper = await mountSuspended(MentionsLegales)
     expect(wrapper.text()).toContain(SITE_HOST.name)
     expect(wrapper.text()).toContain(SITE_HOST.address)
+  })
+
+  it("names Henrri among the processors, with what it receives (story 12.6)", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const processors = wrapper.findAll("li").map((item) => item.text())
+    expect(processors).toContainEqual(expect.stringMatching(/^Henrri .*factures.*avoirs.*adresse de facturation/))
   })
 })
