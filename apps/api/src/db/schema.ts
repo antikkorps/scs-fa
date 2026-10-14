@@ -42,6 +42,15 @@ export interface OrderAddressSnapshot {
   phone: string | null
 }
 
+// One share of the delivery at one VAT rate, frozen onto an order (story 12.6):
+// the invoice bills it as is, without recomputing the split of story 12.3.
+export interface OrderShippingPortion {
+  amountTtc: number
+  priceHt: number
+  vatAmount: number
+  vatPct: number
+}
+
 // ============================================================================
 // ENUMS (Catégories légales FR, rôles, statuts, etc.)
 // ============================================================================
@@ -1371,6 +1380,10 @@ export const orders = pgTable(
           tags?: string[]
           legalCategory?: string | null
           requiresPaymentVirement: boolean
+          // VAT rate and VIP discount (HT, whole line) at purchase time (story 12.6).
+          // Absent on older orders, which therefore cannot be invoiced.
+          vatPct?: number
+          discountHt?: number
         }>
       >()
       .notNull()
@@ -1405,6 +1418,9 @@ export const orders = pgTable(
     shippingAddressStreet: varchar("shipping_address_street", { length: 255 }),
     shippingAddressPostal: varchar("shipping_address_postal", { length: 10 }),
     shippingAddressCity: varchar("shipping_address_city", { length: 100 }),
+    // Story 12.6 : répartition des frais de port entre taux de TVA, figée pour la
+    // facture. Nulle sur les commandes antérieures (non facturables).
+    shippingPortions: jsonb("shipping_portions").$type<OrderShippingPortion[]>(),
 
     // Immutable address snapshots taken from the address book at order time
     shippingAddress: jsonb("shipping_address").$type<OrderAddressSnapshot>(),
