@@ -832,6 +832,12 @@
 - **Paiement enregistré dans Henrri** (CB / virement), sinon Henrri relancerait un client qui a payé. Paiement mixte : mécanique à vérifier sur le bac à sable.
 - **Deux PR** : (1) snapshot enrichi + schéma + client Henrri simulé ; (2) file de traitement, admin, « Mes commandes », e-mail, RGPD, passe réelle sur le bac à sable.
 
+**Avancement :**
+
+- [x] **PR 1** (`feat/story-12.6-henrri-foundation`, 2026-10-14) : spec versionnée, snapshot enrichi (migration 0018), `henrri_documents` + `users.henrri_customer_id` (0019 suppressions, 0020 création), constructeurs de facture et d'avoir (fonctions pures), client HTTP Henrri (jeton, erreurs, clients, documents, lignes, PDF), configuration facultative, `pnpm henrri:check` (lecture seule, aucun crédit).
+- [ ] **PR 2** : file de traitement (déclencheur « commande entièrement payée » + avoir à la validation du remboursement), paiement enregistré, admin (statut, numéro, « Relancer »), « Mes commandes » (PDF à la demande), e-mail, `/confidentialite` + registre RGPD, passe réelle sur le bac à sable.
+- ⚠️ **À vérifier sur le bac à sable** : Henrri ne facture que des **articles de son catalogue** ; chaque ligne porte son article « en ligne » (référence + désignation, uniques chez Henrri). Henrri crée donc les articles **au fil des ventes** (pas de synchronisation du catalogue) ; reste à confirmer qu'il réutilise un article existant au lieu de refuser le doublon. Aussi : ligne de remise VIP à prix négatif acceptée ? arrondi de la TVA identique au nôtre (sinon `blocked`) ? montants positifs sur un avoir ?
+
 **Conception (rappel) :**
 
 - **File d'attente avec relances**, sur le modèle de l'e-mail de confirmation (`confirmation_sent_at`, `ORDER_CONFIRMATION_RETRY_MINUTES`). Une facture Henrri qui échoue (API indisponible, crédits épuisés) **ne bloque jamais une vente**. Elle repart plus tard, et un compteur dans le tableau de bord signale les factures en souffrance.
