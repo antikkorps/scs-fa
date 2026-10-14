@@ -279,7 +279,13 @@ describe("admin orders dashboard API (Story 7.1)", () => {
       const stalled = await insertOrder(customerId, { paymentStatus: "received" })
       const unpaid = await insertOrder(customerId, { paymentStatus: "received" })
       await db.insert(henrriDocuments).values([
-        { orderId: stalled, kind: "invoice", status: "pending", expectedTotalTtc: "240.00", createdAt: sql`now() - interval '2 hours'` },
+        {
+          orderId: stalled,
+          kind: "invoice",
+          status: "pending",
+          expectedTotalTtc: "240.00",
+          createdAt: sql`now() - interval '2 hours'`,
+        },
         {
           orderId: unpaid,
           kind: "invoice",

@@ -578,7 +578,12 @@ describe("Henrri client — remaining branches (audit 2026-10-14)", () => {
       }
       return new Response("<html>Bad gateway</html>", { status: 502 })
     }
-    const client = createHenrriClient({ baseUrl: BASE_URL, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, fetchImpl })
+    const client = createHenrriClient({
+      baseUrl: BASE_URL,
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      fetchImpl,
+    })
     const error = await client.getDocument(5).catch((caught: unknown) => caught)
     expect(error).toMatchObject({ code: "Http502", status: 502, retryable: true })
   })
