@@ -777,7 +777,7 @@
 
 **À savoir :** un fournisseur **hors collecte** (Armurerie de Paris, ClearMyVault…) se crée à la main dans Catalogue → Fournisseurs avant son premier import.
 
-**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 📝 **CADRÉE** (2026-10-12), attend les accès Henrri _(créée le 2026-10-08, demande du client)_
+**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 🚧 **EN COURS** (2026-10-14), cadrée le 2026-10-12 _(créée le 2026-10-08, demande du client)_
 
 > Besoin : le client facture avec **Henrri** (logiciel gratuit du groupe Rivalis). Chaque commande payée sur le site doit y devenir une facture, sans ressaisie. Henrri a une API publique pensée pour ce cas (« une boutique en ligne peut générer automatiquement la facture d'une commande »).
 
@@ -811,20 +811,33 @@
 - [x] **Commandes antérieures** : Henrri mis en service **avant l'ouverture** de la boutique, rien à rattraper.
 - [x] **E-reporting** : **par Henrri**.
 
-**Points restants (à lever avec la documentation de l'API, pas avec le client) :**
+**Points levés par la documentation de l'API (2026-10-14, spec versionnée dans [`docs/henrri/`](docs/henrri/README.md)) :**
 
-- [ ] Un avoir consomme-t-il des crédits ?
-- [ ] L'API permet-elle de récupérer le PDF de la facture (conditionne l'envoi par le site) ?
+- [x] **Un avoir coûte 8 crédits**, comme une facture (tout document comptable finalisé). Brouillons, modifications et lectures sont gratuits.
+- [x] **PDF récupérable** (`POST /documents/{id}/pdf/url`, URL valable 10 min) → **envoi par le site** confirmé ; PDF demandé à Henrri au clic, jamais stocké.
+- [x] **Flux en trois temps** : brouillon vide, puis une requête par ligne, puis finalisation (le numéro naît là). **Aucun champ de référence externe** sur un document : l'idempotence repose sur l'id du brouillon, enregistré chez nous dès sa création.
+- [x] **Chronologie imposée** : un document comptable daté avant le dernier finalisé est refusé → la file traite dans l'ordre, à la date du jour.
+- [x] **Webhooks signés** (HMAC-SHA256) : non nécessaires au départ.
 - [ ] Facture d'acompte pour un acheteur professionnel qui paie avant livraison : non retenue (« une facture à la fin »), à reconfirmer avec le comptable si un client pro le demande.
+- [ ] `FIRST_ACCOUNTING_DOCUMENT_MONTH` (premier document du mois à confirmer) : drapeau absent de la spec, à vérifier sur le bac à sable.
 
-**Accès** : en attente, transmis par Fred (bac à sable `clientId` / `clientSecret` + lien vers la documentation). **Le code démarre à leur réception.**
+**Accès (2026-10-14)** : bac à sable ouvert, clé API « site internet » créée (`clientId`). ⚠️ **`clientSecret` introuvable** : le seul secret obtenu est celui du webhook (HMAC), refusé par `POST /v1/users/authenticate` (401 / `invalid_client`). Question posée à Henrri / Fred. **Le code avance sans** ; seule la passe réelle en dépend.
 
-**Conception proposée (à confirmer une fois la documentation lue) :**
+**Décisions de conception (2026-10-14, validées par Franck) :**
+
+- **Snapshot de commande enrichi** : `items_json` ne portait ni le taux de TVA ni la remise VIP par ligne, et la répartition des frais de port entre taux n'était pas gardée. Ajout de `vatPct` + `discountHt` par ligne et d'une colonne `shipping_portions`. Une commande sans ces champs est **non facturable** (jamais une facture fausse) ; rien à rattraper en production.
+- **Schéma** : colonnes `henrri_*` de `orders` et table `invoices` (inutilisées, vides) **supprimées**, remplacées par **`henrri_documents`** (une ligne par facture **ou** avoir : `kind`, `refund_id`, `status` pending / draft / finalized / blocked, `henrri_document_id`, `henrri_number`, `expected_total_ttc`, relances) + `users.henrri_customer_id`. Tous les acheteurs sont `individual` (pas de raison sociale ni de SIRET dans nos adresses).
+- **Garde-fou au centime** : Henrri recalcule la TVA ; si son total diffère du nôtre, la facture n'est **pas finalisée** (`blocked`, visible dans l'admin) — avant de coûter 8 crédits ou de figer un document faux.
+- **Avoir partiel** sur une commande à plusieurs taux : **réparti au prorata des taux de la facture** (avoir total = facture à l'identique). À faire confirmer par le comptable à l'occasion.
+- **Paiement enregistré dans Henrri** (CB / virement), sinon Henrri relancerait un client qui a payé. Paiement mixte : mécanique à vérifier sur le bac à sable.
+- **Deux PR** : (1) snapshot enrichi + schéma + client Henrri simulé ; (2) file de traitement, admin, « Mes commandes », e-mail, RGPD, passe réelle sur le bac à sable.
+
+**Conception (rappel) :**
 
 - **File d'attente avec relances**, sur le modèle de l'e-mail de confirmation (`confirmation_sent_at`, `ORDER_CONFIRMATION_RETRY_MINUTES`). Une facture Henrri qui échoue (API indisponible, crédits épuisés) **ne bloque jamais une vente**. Elle repart plus tard, et un compteur dans le tableau de bord signale les factures en souffrance.
-- **Idempotence** : l'identifiant et le numéro de la facture Henrri sont stockés sur la commande (migration). Une relance ne crée jamais de doublon : elle vérifie d'abord ce qui existe chez Henrri, ce qui ne coûte rien puisque les lectures sont gratuites.
-- **Secrets** dans `.env` (`HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`, `HENRRI_BASE_URL` pour basculer entre bac à sable et production). Jeton gardé en mémoire et renouvelé avant expiration. Jamais journalisé.
-- **Admin** : sur la fiche commande, le numéro de facture Henrri avec un lien, son statut et un bouton « Relancer la facture ».
+- **Idempotence** : une relance lit d'abord le brouillon chez Henrri (gratuit) ; déjà finalisé → on récupère le numéro ; sinon il est supprimé et recréé. Aucun doublon possible sur un document finalisé.
+- **Secrets** dans `.env` (`HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`, `HENRRI_WEBHOOK_SECRET`, `HENRRI_BASE_URL` = `https://api-sandbox.henrri.io` ou `https://api.henrri.io`). Jeton gardé en mémoire et renouvelé avant expiration. Jamais journalisé.
+- **Admin** : sur la fiche commande, le numéro de facture Henrri, son statut et un bouton « Relancer la facture ».
 - **Tests** : client HTTP Henrri simulé dans la CI ; passe réelle sur le bac à sable avant la production.
 
 **Attendu du client :**
