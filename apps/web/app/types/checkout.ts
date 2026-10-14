@@ -57,6 +57,14 @@ export interface CustomerShipment {
   items: Array<{ label: string; qty: number; part: number; parts: number }>
 }
 
+export interface OrderInvoice {
+  id: string
+  kind: "invoice" | "credit_note"
+  number: string
+  amountTtc: number
+  issuedAt: string
+}
+
 export interface OrderDetail {
   id: string
   createdAt: string
@@ -76,6 +84,8 @@ export interface OrderDetail {
   billingAddress: unknown
   shippingStatus: string
   shipments: CustomerShipment[]
+  /** Invoice and credit notes Henrri has issued on the order (story 12.6). */
+  invoices: OrderInvoice[]
   payment: {
     carte: { status: string; amountTtc: number } | null
     virement: {

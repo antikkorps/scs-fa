@@ -354,6 +354,12 @@ export const uuidParamSchema = z.object({
   id: z.string().uuid(),
 })
 
+// Story 12.6: an invoice or credit note of an order.
+export const orderDocumentParamSchema = z.object({
+  id: z.string().uuid(),
+  documentId: z.string().uuid(),
+})
+
 export type UuidParam = z.infer<typeof uuidParamSchema>
 
 // Story 6.1 — initiate a Stripe card payment for an order

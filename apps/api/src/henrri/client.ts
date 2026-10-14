@@ -184,8 +184,14 @@ export function createHenrriClient(options: HenrriClientOptions) {
   let paymentModes: Promise<Map<string, number>> | null = null
   const articleIds = new Map<string, Promise<number>>()
 
-  async function send(method: string, path: string, body: unknown, bearer: string | null): Promise<Response> {
-    const headers: Record<string, string> = { accept: "application/json" }
+  async function send(
+    method: string,
+    path: string,
+    body: unknown,
+    bearer: string | null,
+    accept = "application/json",
+  ): Promise<Response> {
+    const headers: Record<string, string> = { accept }
     if (body !== undefined) headers["content-type"] = "application/json"
     if (bearer) headers.authorization = `Bearer ${bearer}`
     try {
@@ -223,13 +229,17 @@ export function createHenrriClient(options: HenrriClientOptions) {
     return token.value
   }
 
+  /** Sends with the bearer token, renewing it once if Henrri rejects it. */
+  async function authorized(method: string, path: string, body?: unknown, accept?: string): Promise<Response> {
+    const response = await send(method, path, body, await validToken(), accept)
+    if (response.status !== 401) return response
+    token = null
+    return send(method, path, body, await validToken(), accept)
+  }
+
   /** Calls the API; `null` on a 404, so callers can tell "gone" from "failed". */
   async function call<T>(method: string, path: string, body?: unknown): Promise<T | null> {
-    let response = await send(method, path, body, await validToken())
-    if (response.status === 401) {
-      token = null
-      response = await send(method, path, body, await validToken())
-    }
+    const response = await authorized(method, path, body)
     if (response.status === 404) return null
     const payload = await readJson(response)
     if (!response.ok) throw errorFrom(response.status, payload)
@@ -398,6 +408,13 @@ export function createHenrriClient(options: HenrriClientOptions) {
         date: payment.date,
         ...remainder,
       })
+    },
+
+    /** The document rendered as a PDF, as Henrri locked it at finalization. */
+    async pdf(documentId: number): Promise<Uint8Array> {
+      const response = await authorized("GET", `/v1/documents/${documentId}/pdf`, undefined, "application/pdf")
+      if (!response.ok) throw errorFrom(response.status, await readJson(response))
+      return new Uint8Array(await response.arrayBuffer())
     },
 
     async pdfLink(documentId: number): Promise<HenrriPdfLink> {

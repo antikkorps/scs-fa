@@ -4,6 +4,7 @@ import {
   calculateOrderPaymentSplit,
   createOrderSchema,
   isDeliverableAddress,
+  orderDocumentParamSchema,
   paginationSchema,
   requiresVirement,
   round2,
@@ -28,6 +29,7 @@ import {
   productVariants,
 } from "../db/schema.js"
 import { env } from "../env.js"
+import { issuedDocument, issuedDocumentsOfOrder, pdfFileName } from "../henrri/customer.js"
 import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
 import { customerShipments } from "../shipments/service.js"
@@ -411,6 +413,35 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     })
   })
 
+  // GET /api/orders/:id/invoices/:documentId/pdf — an invoice or credit note
+  // Henrri issued on the customer's order (story 12.6), as Henrri locked it.
+  fastify.get("/:id/invoices/:documentId/pdf", async (request, reply) => {
+    const params = orderDocumentParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const [owned] = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(and(eq(orders.id, params.data.id), eq(orders.userId, request.user.sub)))
+      .limit(1)
+    const document = owned ? await issuedDocument(owned.id, params.data.documentId) : null
+    if (!document) {
+      return reply.code(404).send({ error: "NotFound", message: "Invoice not found" })
+    }
+    if (!fastify.henrri) {
+      return reply.code(503).send({ error: "InvoiceUnavailable", message: "Invoices cannot be fetched right now" })
+    }
+
+    const pdf = await fastify.henrri.pdf(document.henrriDocumentId)
+    return reply
+      .code(200)
+      .header("content-type", "application/pdf")
+      .header("content-disposition", `attachment; filename="${pdfFileName(document)}"`)
+      .header("cache-control", "private, no-store")
+      .send(Buffer.from(pdf))
+  })
+
   // GET /api/orders/:id — a single order owned by the authenticated user
   fastify.get("/:id", async (request, reply) => {
     const params = uuidParamSchema.safeParse(request.params)
@@ -470,6 +501,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       .where(eq(paymentVirement.orderId, order.id))
       .limit(1)
 
+    const invoices = await issuedDocumentsOfOrder(order.id)
+
     return reply.code(200).send({
       data: {
         ...order,
@@ -495,6 +528,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
               }
             : null,
         },
+        invoices,
       },
     })
   })

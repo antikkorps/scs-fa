@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { henrriBlockReason, henrriDocumentLabel, henrriDocumentStatus } from "./henrri.js"
+import { henrriBlockReason, henrriDocumentLabel, henrriDocumentStatus, invoiceDownloadUrl } from "./henrri.js"
 
 describe("henrriDocumentStatus (story 12.6)", () => {
   it("reads an issued document as done, a blocked one as needing action", () => {
@@ -41,5 +41,11 @@ describe("henrriBlockReason", () => {
 
   it("says nothing when there is nothing wrong", () => {
     expect(henrriBlockReason(null)).toBe("")
+  })
+})
+
+describe("invoiceDownloadUrl", () => {
+  it("goes through the same-origin proxy, which carries the session cookie", () => {
+    expect(invoiceDownloadUrl("o-1", "d-2")).toBe("/bff/api/orders/o-1/invoices/d-2/pdf")
   })
 })

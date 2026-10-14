@@ -21,7 +21,8 @@ import { blogRoutes } from "./blog/index.js"
 import { cartRoutes } from "./cart/index.js"
 import { adminCatalogImportRoutes } from "./catalog-import/admin.js"
 import { env } from "./env.js"
-import { startHenrriScheduler } from "./henrri/queue.js"
+import type { HenrriClient } from "./henrri/client.js"
+import { henrriClientFromEnv, startHenrriScheduler } from "./henrri/queue.js"
 import { legalCategoryRoutes } from "./legal-categories/index.js"
 import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
@@ -49,13 +50,30 @@ import { adminSupplierRoutes } from "./suppliers/admin.js"
 import { adminTagRoutes } from "./tags/admin.js"
 import { tagRoutes } from "./tags/index.js"
 
-export async function buildApp(): Promise<FastifyInstance> {
+export interface BuildAppOptions {
+  /**
+   * The Henrri client (story 12.6). Defaults to the configured one — none under
+   * test, where suites pass the in-memory fake instead.
+   */
+  henrri?: HenrriClient | null
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    /** Henrri invoicing, or null while it is not configured (story 12.6). */
+    henrri: HenrriClient | null
+  }
+}
+
+export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: buildLoggerOptions(env),
     genReqId: (req) => genReqId(req),
     // One hop, and only a private one: see src/net/client-ip.ts.
     trustProxy: trustDirectPrivatePeer,
   })
+
+  fastify.decorate("henrri", options.henrri === undefined ? henrriClientFromEnv() : options.henrri)
 
   // Centralised error handling + throttled admin alerting on 5xx (Story 7.2).
   setupErrorAlerting(fastify, env)

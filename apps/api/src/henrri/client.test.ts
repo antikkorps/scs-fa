@@ -476,3 +476,41 @@ describe("Henrri client — payments", () => {
     expect(fake.apiCalls()[0].body).toEqual({ paymentModeId: 4, date: "2026-10-14" })
   })
 })
+
+describe("Henrri client — PDF", () => {
+  it("downloads the document's PDF with its name", async () => {
+    const bytes = new TextEncoder().encode("%PDF-1.7 fake")
+    let accept: string | null = null
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const path = new URL(String(input)).pathname
+      if (path === "/v1/users/authenticate") {
+        return Response.json({ access_token: "token-1", expires_in: 600 })
+      }
+      accept = new Headers(init?.headers).get("accept")
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          "content-type": "application/pdf",
+          "content-disposition": 'attachment; filename="FACTURE 26-10-1 Tireur.pdf"',
+        },
+      })
+    }
+    const client = createHenrriClient({
+      baseUrl: BASE_URL,
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      fetchImpl,
+    })
+    const pdf = await client.pdf(42)
+    expect(accept).toBe("application/pdf")
+    expect(new TextDecoder().decode(pdf)).toBe("%PDF-1.7 fake")
+  })
+
+  it("fails like any other call when Henrri refuses", async () => {
+    const fake = fakeHenrri({ "GET /v1/documents/42/pdf": () => ({ status: 503 }) })
+    const error = await clientFor(fake)
+      .pdf(42)
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ status: 503, retryable: true })
+  })
+})

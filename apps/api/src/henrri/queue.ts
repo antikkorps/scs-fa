@@ -351,7 +351,7 @@ export function henrriClientFromEnv(): HenrriClient | null {
 export function startHenrriScheduler(app: FastifyInstance): void {
   const minutes = env.HENRRI_SYNC_INTERVAL_MINUTES
   if (env.NODE_ENV === "test" || minutes <= 0) return
-  const client = henrriClientFromEnv()
+  const client = app.henrri
   if (!client) {
     app.log.info("Henrri not configured — invoices wait in the queue")
     return

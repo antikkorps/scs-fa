@@ -106,6 +106,11 @@ export function createFakeHenrri() {
       document.milestones = [{ id: nextId, amount: totalOf(document), paid: false, paymentModeId: null }]
       return view(document)
     },
+    async pdf(documentId) {
+      track("pdf")
+      const document = documentOf(documentId)
+      return new TextEncoder().encode(`%PDF fake ${document.number ?? "draft"}`)
+    },
     async pdfLink(documentId) {
       track("pdfLink")
       return { url: `https://henrri.test/files/${documentId}`, expiresAt: "2026-10-14T20:10:00Z", fileName: "F.pdf" }

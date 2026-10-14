@@ -11,7 +11,7 @@ import {
   ordersNeedingAttention,
   retryOrderDocuments,
 } from "../henrri/admin.js"
-import { henrriClientFromEnv, processHenrriDocument } from "../henrri/queue.js"
+import { processHenrriDocument } from "../henrri/queue.js"
 import { validationError } from "../http.js"
 import { adminShippingView } from "../shipments/service.js"
 
@@ -196,7 +196,7 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
       newValue: { reset },
     })
 
-    const client = henrriClientFromEnv()
+    const client = fastify.henrri
     if (client) {
       for (const document of await henrriDocumentsOfOrder(order.id)) {
         await processHenrriDocument(client, document.id, request.log)

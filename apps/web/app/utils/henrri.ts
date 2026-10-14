@@ -46,3 +46,8 @@ export function henrriBlockReason(lastError: string | null): string {
   }
   return `Refus de Henrri — ${lastError}`
 }
+
+/** Where a customer downloads an issued invoice or credit note (the BFF adds the session). */
+export function invoiceDownloadUrl(orderId: string, documentId: string): string {
+  return `/bff/api/orders/${encodeURIComponent(orderId)}/invoices/${encodeURIComponent(documentId)}/pdf`
+}
