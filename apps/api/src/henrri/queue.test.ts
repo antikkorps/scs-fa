@@ -593,6 +593,40 @@ describe("Henrri queue (story 12.6)", () => {
       expect((await creditNoteOf(orderId)).paymentRecordedAt).toBeNull()
     })
 
+    it("credits a returned article on its own line, then a goodwill gesture on what is left", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      await db.insert(refunds).values({
+        orderId,
+        channel: "carte",
+        kind: "goods_return",
+        lines: [{ item: 0, qty: 1 }],
+        amountTtc: "60.00",
+        status: "succeeded",
+      })
+      await sync()
+
+      const creditNote = henrri.finalizedDocuments().find((document) => document.documentTypeId === 2)
+      // One of the two mats: 100 HT net / 2.
+      expect(creditNote?.lines).toEqual([
+        expect.objectContaining({ designation: "Retour — Tapis de tir", unitPrice: 50, vatPct: 20 }),
+      ])
+      expect(await creditNoteOf(orderId)).toMatchObject({ status: "finalized", expectedTotalTtc: "60.00" })
+    })
+
+    it("issues no credit note for an overpayment refund", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      const [overpayment] = await db
+        .insert(refunds)
+        .values({ orderId, channel: "virement", kind: "overpayment", amountTtc: "5.00", status: "succeeded" })
+        .returning({ id: refunds.id })
+      await enqueueCreditNote(overpayment.id)
+      await sync()
+
+      expect(await creditNoteOf(orderId)).toBeUndefined()
+    })
+
     it("waits for an invoice that is still on its way", async () => {
       const { orderId } = await createPaidOrder()
       await enqueueInvoice(orderId)

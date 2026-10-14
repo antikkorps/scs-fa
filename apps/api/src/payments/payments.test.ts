@@ -1299,6 +1299,96 @@ describe("payments — Stripe card (Story 6.1)", () => {
       })
     })
 
+    describe("refund kinds (story 12.6, decisions 2026-10-14)", () => {
+      // 100 HT at 20 % (120) + an Estampe 100 HT at 5.5 % (105.50), all by card: 225.50.
+      const snapshotItems = [
+        { ...CARD_ITEM, vatPct: 20, discountHt: 0 },
+        { ...CARD_ITEM, name: "Estampe", sku: `${PREFIX}print`, vatPct: 5.5, discountHt: 0 },
+      ]
+
+      async function snapshotCardOrder(intentId: string) {
+        const orderId = await seedPaidCardOrder(userId, "225.50", snapshotItems, intentId)
+        await db.update(orders).set({ shippingPortions: [] }).where(eq(orders.id, orderId))
+        await enqueueInvoice(orderId)
+        return orderId
+      }
+
+      async function overpaidTransferOrder() {
+        // 120 due, 130 received and accepted.
+        const orderId = await seedPaidVirementOrder(userId, "120.00", [
+          { ...FIREARM_ITEM, priceHt: 100, vatPct: 20, discountHt: 0 },
+        ])
+        await db.update(orders).set({ shippingPortions: [] }).where(eq(orders.id, orderId))
+        await db
+          .update(paymentVirement)
+          .set({ amountReceivedTtc: "130.00" })
+          .where(eq(paymentVirement.orderId, orderId))
+        await enqueueInvoice(orderId)
+        return orderId
+      }
+
+      const creditNotesOf = async (orderId: string) =>
+        (await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))).filter(
+          (document) => document.kind === "credit_note",
+        )
+
+      it("refunds a returned article at its credit note's amount, computed from the lines", async () => {
+        const orderId = await snapshotCardOrder("pi_kind_ret")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_kind_ret", status: "succeeded" } as never)
+
+        const res = await refund(orderId, { kind: "goods_return", channel: "carte", lines: [{ item: 1, qty: 1 }] })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data).toMatchObject({ amountTtc: "105.50", kind: "goods_return" })
+        expect(vi.mocked(createRefund)).toHaveBeenCalledWith(expect.objectContaining({ amount: 10550 }))
+        const [row] = await db.select().from(refunds).where(eq(refunds.orderId, orderId))
+        expect(row).toMatchObject({ kind: "goods_return", lines: [{ item: 1, qty: 1 }], includesShipping: false })
+        expect(await creditNotesOf(orderId)).toEqual([expect.objectContaining({ expectedTotalTtc: "105.50" })])
+      })
+
+      it("refuses to return more than was bought, before calling Stripe", async () => {
+        const orderId = await snapshotCardOrder("pi_kind_over")
+        const res = await refund(orderId, { kind: "goods_return", channel: "carte", lines: [{ item: 1, qty: 2 }] })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({ error: "ReturnExceedsOrder" })
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+      })
+
+      it("previews what a return would refund, and what the channel can still refund", async () => {
+        const orderId = await snapshotCardOrder("pi_kind_prev")
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/orders/${orderId}/refunds/preview`,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: { kind: "goods_return", channel: "carte", lines: [{ item: 1, qty: 1 }], includesShipping: false },
+        })
+        expect(res.statusCode).toBe(200)
+        expect(res.json().data).toEqual({ amountTtc: 105.5, refundableTtc: 225.5, remainingToCreditTtc: 225.5 })
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+      })
+
+      it("refunds an overpaid transfer's excess without any credit note", async () => {
+        const orderId = await overpaidTransferOrder()
+        const res = await refund(orderId, { kind: "overpayment", channel: "virement", amount: 10 })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data).toMatchObject({ kind: "overpayment", amountTtc: "10.00" })
+        expect(await creditNotesOf(orderId)).toEqual([])
+      })
+
+      it("refunds no more as overpayment than was paid in excess", async () => {
+        const orderId = await overpaidTransferOrder()
+        const res = await refund(orderId, { kind: "overpayment", channel: "virement", amount: 10.01 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({ error: "ExceedsOverpayment" })
+      })
+
+      it("never lets credit notes exceed the invoice, even when the channel holds more", async () => {
+        const orderId = await overpaidTransferOrder()
+        const res = await refund(orderId, { kind: "goodwill", channel: "virement", amount: 125 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({ error: "ExceedsInvoice" })
+      })
+    })
+
     describe("bank-transfer refunds (manual) + VIP cascade", () => {
       it("full refund revokes VIP earned from that order (no Stripe call)", async () => {
         const vipUser = await insertCustomer("rvip1")

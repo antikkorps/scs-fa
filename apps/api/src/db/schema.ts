@@ -109,6 +109,9 @@ export const refundChannelEnum = pgEnum("refund_channel", ["carte", "virement"])
 // A card refund may settle asynchronously (pending → succeeded via webhook); a
 // manually-recorded virement refund is asserted succeeded by the admin.
 export const refundStatusEnum = pgEnum("refund_status", ["pending", "succeeded", "failed", "cancelled"])
+// Story 12.6 — ce que rembourse un remboursement décide de son avoir (décisions
+// 2026-10-14) : retour d'articles, geste commercial, ou trop-perçu (sans avoir).
+export const refundKindEnum = pgEnum("refund_kind", ["goods_return", "goodwill", "overpayment"])
 // Story 12.6 — documents comptables poussés dans Henrri. `blocked` attend un humain
 // (commande non facturable, total Henrri différent du nôtre, refus métier).
 export const henrriDocumentKindEnum = pgEnum("henrri_document_kind", ["invoice", "credit_note"])
@@ -1813,6 +1816,11 @@ export const refunds = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     orderId: uuid("order_id").notNull(),
     channel: refundChannelEnum("channel").notNull(),
+    // Les remboursements antérieurs à la 12.6 sont des gestes : un montant, au prorata.
+    kind: refundKindEnum("kind").notNull().default("goodwill"),
+    // Retour d'articles : index de l'article dans le snapshot de la commande, et quantité revenue.
+    lines: jsonb("lines").$type<Array<{ item: number; qty: number }>>(),
+    includesShipping: boolean("includes_shipping").notNull().default(false),
     amountTtc: decimal("amount_ttc", { precision: 10, scale: 2 }).notNull(),
     currency: varchar("currency", { length: 3 }).default("EUR"),
     reason: varchar("reason", { length: 255 }),

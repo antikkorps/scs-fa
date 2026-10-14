@@ -22,7 +22,8 @@ import { henrriDocuments, orders, paymentCarte, paymentVirement, refunds, users 
 import { sendInvoiceAvailableEmail } from "../email.js"
 import { env } from "../env.js"
 import { type HenrriBuyer, type HenrriClient, HenrriError, henrriClientFromConfig } from "./client.js"
-import { buildCreditNoteDraft, buildInvoiceDraft, type DocumentDraft, type DraftResult } from "./documents.js"
+import { creditNoteFor, type RefundRecord } from "./credit-notes.js"
+import { buildInvoiceDraft, type DocumentDraft, type DraftResult } from "./documents.js"
 
 type Logger = Pick<FastifyBaseLogger, "info" | "warn" | "error">
 type HenrriDocumentRow = typeof henrriDocuments.$inferSelect
@@ -60,11 +61,12 @@ export async function enqueueInvoice(orderId: string): Promise<void> {
  */
 export async function enqueueCreditNote(refundId: string): Promise<void> {
   const [refund] = await db
-    .select({ orderId: refunds.orderId, amountTtc: refunds.amountTtc })
+    .select({ orderId: refunds.orderId, amountTtc: refunds.amountTtc, kind: refunds.kind })
     .from(refunds)
     .where(eq(refunds.id, refundId))
     .limit(1)
-  if (!refund) return
+  // Money paid in excess going back does not reduce the sale: no credit note (decision 2026-10-14).
+  if (!refund || refund.kind === "overpayment") return
   const [invoice] = await db
     .select({ id: henrriDocuments.id })
     .from(henrriDocuments)
@@ -98,6 +100,7 @@ export async function enqueueMissingDocuments(): Promise<void> {
     INSERT INTO henrri_documents (order_id, refund_id, kind, expected_total_ttc)
     SELECT r.order_id, r.id, 'credit_note', r.amount_ttc FROM refunds r
     WHERE r.status = 'succeeded'
+      AND r.kind <> 'overpayment'
       AND EXISTS (SELECT 1 FROM henrri_documents d WHERE d.order_id = r.order_id AND d.kind = 'invoice')
       AND NOT EXISTS (SELECT 1 FROM henrri_documents d WHERE d.refund_id = r.id)
     ON CONFLICT DO NOTHING`)
@@ -377,9 +380,31 @@ async function recordPayment(client: HenrriClient, henrriDocumentId: number, con
   return `PaymentMismatch: received ${euros(receivedCents)}, invoiced ${euros(invoicedCents)}`
 }
 
+/** Refunds that hold money count for the credit notes after them (as when they were planned). */
+const CREDITED_REFUND_STATUSES = ["pending", "succeeded"] as const
+
+/** The credit note of the document's refund, built on the order's earlier refunds. */
+async function creditNoteDraft(document: HenrriDocumentRow, context: OrderContext): Promise<DraftResult> {
+  const rows = await db
+    .select({
+      id: refunds.id,
+      kind: refunds.kind,
+      amountTtc: refunds.amountTtc,
+      lines: refunds.lines,
+      includesShipping: refunds.includesShipping,
+    })
+    .from(refunds)
+    .where(and(eq(refunds.orderId, context.orderId), inArray(refunds.status, CREDITED_REFUND_STATUSES)))
+    .orderBy(asc(refunds.createdAt), asc(refunds.id))
+  const records: RefundRecord[] = rows.map(({ id: _id, ...row }) => ({ ...row, amountTtc: Number(row.amountTtc) }))
+  const index = rows.findIndex((row) => row.id === document.refundId)
+  if (index < 0) return { ok: false, reason: "NothingToCredit" }
+  return creditNoteFor(context.source, records[index], records.slice(0, index), orderReference(context.orderId))
+}
+
 async function draftFor(document: HenrriDocumentRow, context: OrderContext): Promise<DraftResult> {
   if (document.kind === "invoice") return buildInvoiceDraft(context.source)
-  return buildCreditNoteDraft(context.source, Number(document.expectedTotalTtc), orderReference(context.orderId))
+  return creditNoteDraft(document, context)
 }
 
 /** Whether a credit note can go: its order's invoice must be out first. */
