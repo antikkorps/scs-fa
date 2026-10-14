@@ -1094,6 +1094,21 @@ describe("payments — Stripe card (Story 6.1)", () => {
     }
 
     describe("card refunds (Stripe)", () => {
+      it("refuses, before calling Stripe, an amount Henrri could not issue a credit note for", async () => {
+        // An order carrying the 12.6 snapshot: 100 HT at 20 % → 120 TTC.
+        const orderId = await seedPaidCardOrder(userId, "120.00", [{ ...CARD_ITEM, vatPct: 20, discountHt: 0 }], "pi_rf_x")
+        await db.update(orders).set({ shippingPortions: [] }).where(eq(orders.id, orderId))
+
+        const res = await refund(orderId, { channel: "carte", amount: 33.33 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({
+          error: "InexpressibleRefundAmount",
+          suggestions: { below: 33.32, above: 33.34 },
+        })
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+        expect(await db.select().from(refunds).where(eq(refunds.orderId, orderId))).toEqual([])
+      })
+
       it("partial refund flags the order partially_refunded and calls Stripe with the cents amount", async () => {
         const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_rf_p1")
         vi.mocked(createRefund).mockResolvedValue({ id: "re_p1", status: "succeeded" } as never)

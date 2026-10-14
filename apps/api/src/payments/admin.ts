@@ -161,7 +161,7 @@ export const adminPaymentRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(201).send({ data: result })
     } catch (err) {
       if (err instanceof PaymentError) {
-        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message })
+        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message, ...err.details })
       }
       throw err
     }

@@ -35,6 +35,8 @@ export class PaymentError extends Error {
     readonly statusCode: number,
     readonly errorCode: string,
     message: string,
+    /** Extra fields sent alongside the error, for the client to act on. */
+    readonly details: Record<string, unknown> = {},
   ) {
     super(message)
   }

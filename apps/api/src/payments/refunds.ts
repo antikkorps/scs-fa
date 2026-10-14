@@ -1,4 +1,4 @@
-import { type CreateRefundInput, PAID_PAYMENT_STATUSES, type RefundChannel } from "@armurier/shared"
+import { type CreateRefundInput, orderReference, PAID_PAYMENT_STATUSES, type RefundChannel } from "@armurier/shared"
 import { and, eq, inArray, ne, sql } from "drizzle-orm"
 import { db } from "../db/client.js"
 import {
@@ -10,6 +10,7 @@ import {
   productVariants,
   refunds,
 } from "../db/schema.js"
+import { buildCreditNoteDraft, buildInvoiceDraft, nearestExpressibleRefunds } from "../henrri/documents.js"
 import { enqueueCreditNote } from "../henrri/queue.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
 import { recomputeVipStatus } from "../vip/service.js"
@@ -68,6 +69,32 @@ async function channelState(orderId: string, channel: RefundChannel): Promise<Ch
   return { paidTtc, refundedTtc, refundableTtc: paidTtc - refundedTtc }
 }
 
+/**
+ * Henrri rounds HT and VAT apart, so some amounts have no credit note that adds
+ * up to them (story 12.6, decision 2026-10-14). Checked before any money moves:
+ * the admin is offered the closest amounts that do. Orders that are not
+ * invoiced through Henrri (placed before the 12.6 snapshot) are not checked.
+ */
+async function assertCreditNoteExpressible(orderId: string, amount: number): Promise<void> {
+  const [order] = await db
+    .select({ itemsJson: orders.itemsJson, shippingPortions: orders.shippingPortions, totalTtc: orders.totalTtc })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1)
+  if (!order) return
+  const source = { ...order, totalTtc: Number(order.totalTtc) }
+  if (!buildInvoiceDraft(source).ok) return
+
+  const creditNote = buildCreditNoteDraft(source, amount, orderReference(orderId))
+  if (creditNote.ok || creditNote.reason !== "InexpressibleAmount") return
+  throw new PaymentError(
+    400,
+    "InexpressibleRefundAmount",
+    `No credit note can add up to ${amount.toFixed(2)} €: Henrri rounds HT and VAT apart`,
+    { suggestions: nearestExpressibleRefunds(source, amount) },
+  )
+}
+
 export interface RefundResult {
   id: string
   orderId: string
@@ -116,6 +143,8 @@ export async function createOrderRefund(
       `Refundable amount on this channel is ${state.refundableTtc.toFixed(2)}`,
     )
   }
+
+  await assertCreditNoteExpressible(orderId, input.amount)
 
   const amountTtc = input.amount.toFixed(2)
   let status: "pending" | "succeeded" | "failed" | "cancelled" = "succeeded"

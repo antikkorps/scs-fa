@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AdminOrderDetail } from "~/types/admin"
 import { formatDateTime, formatEuros } from "~/utils/format"
+import { refundFailure } from "~/utils/refund"
 import { legalStatus, paymentStatus, refundStatus, shippingStatus } from "~/utils/status"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
@@ -49,9 +50,11 @@ const refundAmount = ref<number | null>(null)
 const refundReason = ref("")
 const refundBusy = ref(false)
 const refundError = ref("")
+const refundSuggestions = ref<number[]>([])
 
 function openRefund() {
   refundError.value = ""
+  refundSuggestions.value = []
   refundChannel.value = refundable.value.carte > 0 ? "carte" : "virement"
   refundAmount.value = refundable.value[refundChannel.value]
   refundReason.value = ""
@@ -68,6 +71,7 @@ async function submitRefund() {
   }
   refundBusy.value = true
   refundError.value = ""
+  refundSuggestions.value = []
   try {
     await api(`/admin/payments/orders/${id}/refunds`, {
       method: "POST",
@@ -80,10 +84,18 @@ async function submitRefund() {
     showRefund.value = false
     await refresh()
   } catch (err) {
-    refundError.value = (err as { data?: { message?: string } })?.data?.message ?? "Le remboursement a échoué."
+    const failure = refundFailure(err)
+    refundError.value = failure.message
+    refundSuggestions.value = failure.suggestions
   } finally {
     refundBusy.value = false
   }
+}
+
+function pickSuggestion(amount: number) {
+  refundAmount.value = amount
+  refundError.value = ""
+  refundSuggestions.value = []
 }
 
 function num(v: unknown): number | null {
@@ -219,6 +231,17 @@ function num(v: unknown): number | null {
             <input v-model="refundReason" type="text" maxlength="255" class="ctl" />
           </label>
           <p v-if="refundError" class="modal__error" role="alert">{{ refundError }}</p>
+          <div v-if="refundSuggestions.length" class="modal__suggestions">
+            <button
+              v-for="amount in refundSuggestions"
+              :key="amount"
+              type="button"
+              class="btn btn-ghost"
+              @click="pickSuggestion(amount)"
+            >
+              {{ formatEuros(amount) }}
+            </button>
+          </div>
           <div class="modal__actions">
             <button type="submit" class="btn btn-primary" :disabled="refundBusy">
               {{ refundBusy ? "En cours…" : "Confirmer le remboursement" }}
@@ -438,6 +461,11 @@ function num(v: unknown): number | null {
   color: var(--danger);
   font-size: var(--fs-sm);
   margin: 0 0 1rem;
+}
+.modal__suggestions {
+  display: flex;
+  gap: 0.5rem;
+  margin: -0.5rem 0 1rem;
 }
 .modal__actions {
   display: flex;
