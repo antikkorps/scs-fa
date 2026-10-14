@@ -208,7 +208,7 @@ describe("Henrri client — errors", () => {
     const error = await clientFor(fake)
       .getDocument(5)
       .catch((caught: unknown) => caught)
-    expect(error).toMatchObject({ status, retryable: true })
+    expect(error).toMatchObject({ code: `Http${status}`, status, retryable: true })
   })
 
   it("treats a network failure as retryable", async () => {
@@ -532,6 +532,90 @@ describe("Henrri client — resilience (audit 2026-10-14)", () => {
     })
     const error = await client.pdf(42).catch((caught: unknown) => caught)
     expect(error).toMatchObject({ code: "PdfTooLarge" })
+  })
+})
+
+describe("Henrri client — remaining branches (audit 2026-10-14)", () => {
+  it("asks again for a lookup that failed, instead of caching the failure", async () => {
+    let failed = false
+    const fake = fakeHenrri({
+      "GET /v1/documenttypes": () => {
+        if (!failed) {
+          failed = true
+          return { status: 503 }
+        }
+        return documentTypes
+      },
+    })
+    const client = clientFor(fake)
+    await expect(client.documentTypeId("invoice")).rejects.toMatchObject({ status: 503 })
+    expect(await client.documentTypeId("invoice")).toBe(3)
+  })
+
+  it("surfaces the duplicate refusal when the re-search still finds nothing", async () => {
+    const fake = fakeHenrri({
+      "GET /v1/documentlinetypes": () => lineTypes,
+      "GET /v1/itemcategories": () => itemCategories,
+      "GET /v1/items": () => ({ status: 200, body: { elements: [] } }),
+      "POST /v1/items": () => ({ status: 400, body: { title: "Item already exists", errorCode: "ITEM_DUPLICATE" } }),
+    })
+    const error = await clientFor(fake)
+      .addLine(42, {
+        designation: "Tapis",
+        article: { reference: "TAP-1", description: "Tapis" },
+        quantity: 1,
+        unitPrice: 50,
+        vatPct: 20,
+      })
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: "ITEM_DUPLICATE", retryable: false })
+  })
+
+  it("reads an error page that is not JSON as a plain HTTP failure", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      if (new URL(String(input)).pathname === "/v1/users/authenticate") {
+        return Response.json({ access_token: "token-1", expires_in: 600 })
+      }
+      return new Response("<html>Bad gateway</html>", { status: 502 })
+    }
+    const client = createHenrriClient({ baseUrl: BASE_URL, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, fetchImpl })
+    const error = await client.getDocument(5).catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: "Http502", status: 502, retryable: true })
+  })
+
+  it("treats deleting a draft already gone as done", async () => {
+    const fake = fakeHenrri({})
+    await expect(clientFor(fake).deleteDocument(42)).resolves.toBeUndefined()
+  })
+
+  it("trims a trailing slash from the base URL", async () => {
+    const fake = fakeHenrri({ "GET /v1/documents/5": () => ({ status: 200, body: { id: 5 } }) })
+    const client = createHenrriClient({
+      baseUrl: `${BASE_URL}/`,
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      fetchImpl: fake.fetchImpl,
+    })
+    await client.getDocument(5)
+    expect(fake.apiCalls()[0].path).toBe("/v1/documents/5")
+  })
+
+  it("encodes a reference with special characters in the search", async () => {
+    const fake = fakeHenrri({
+      "GET /v1/documentlinetypes": () => lineTypes,
+      "GET /v1/items": () => ({ status: 200, body: { elements: [{ id: 7, reference: "A&B 1" }] } }),
+      "POST /v1/documents/42/lines": () => ({ status: 201, body: { id: 1 } }),
+    })
+    await clientFor(fake).addLine(42, {
+      designation: "A&B",
+      article: { reference: "A&B 1", description: "A&B" },
+      quantity: 1,
+      unitPrice: 1,
+      vatPct: 20,
+    })
+    expect(fake.apiCalls().find((call) => call.path.startsWith("/v1/items"))?.path).toBe(
+      "/v1/items?search=A%26B%201&limit=100&page=1",
+    )
   })
 })
 

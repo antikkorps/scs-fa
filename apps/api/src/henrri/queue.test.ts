@@ -1,5 +1,5 @@
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
-import { eq, inArray, like } from "drizzle-orm"
+import { eq, inArray, like, sql } from "drizzle-orm"
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "../db/client.js"
 import {
@@ -528,6 +528,67 @@ describe("Henrri queue (story 12.6)", () => {
 
       expect(await invoiceOf(orderId)).toMatchObject({ status: "pending", attempts: 0 })
       expect(henrri.calls).toEqual([])
+    })
+  })
+
+  describe("edge cases (audit 2026-10-14)", () => {
+    it("blocks an order without a billing address, without calling Henrri", async () => {
+      const { orderId } = await createPaidOrder()
+      await db.update(orders).set({ billingAddress: null, shippingAddress: null }).where(eq(orders.id, orderId))
+      await enqueueInvoice(orderId)
+      await sync()
+
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "blocked", lastError: "MissingBillingAddress" })
+      expect(henrri.calls).toEqual([])
+    })
+
+    it("takes over a claim abandoned for more than ten minutes", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      await db
+        .update(henrriDocuments)
+        .set({ claimedAt: sql`now() - interval '11 minutes'`, claimToken: "00000000-0000-4000-8000-000000000001" })
+        .where(eq(henrriDocuments.orderId, orderId))
+      await sync()
+
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "finalized", claimToken: null })
+    })
+
+    it("issues invoices before credit notes, whatever order they were queued in", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      const [refund] = await db
+        .insert(refunds)
+        .values({ orderId, channel: "carte", amountTtc: "50.00", status: "succeeded" })
+        .returning({ id: refunds.id })
+      await enqueueCreditNote(refund.id)
+      // The credit note row is older than the invoice row.
+      await db
+        .update(henrriDocuments)
+        .set({ createdAt: sql`now() - interval '1 day'` })
+        .where(eq(henrriDocuments.refundId, refund.id))
+      await sync()
+
+      // One pass did both: had the credit note gone first, it would have waited.
+      const statuses = (await documentsOf(orderId)).map((document) => [document.kind, document.status])
+      expect(statuses).toEqual(
+        expect.arrayContaining([
+          ["invoice", "finalized"],
+          ["credit_note", "finalized"],
+        ]),
+      )
+    })
+
+    it("tells the buyer of a credit note as such", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      await db.insert(refunds).values({ orderId, channel: "carte", amountTtc: "50.00", status: "succeeded" })
+      await sync()
+
+      expect(vi.mocked(sendInvoiceAvailableEmail)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ kind: "credit_note", number: "26-10-2", amountTtc: 50 }),
+      )
     })
   })
 

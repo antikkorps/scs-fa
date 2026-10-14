@@ -1381,6 +1381,31 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(res.json()).toMatchObject({ error: "ExceedsOverpayment" })
       })
 
+      it("leaves an order invoiced before line-by-line invoicing free of the credit-note checks", async () => {
+        // No 12.6 snapshot: any goodwill amount the channel allows.
+        const orderId = await seedPaidCardOrder(userId, "120.00", [CARD_ITEM], "pi_kind_legacy")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_kind_legacy", status: "succeeded" } as never)
+        const res = await refund(orderId, { kind: "goodwill", channel: "carte", amount: 33.33 })
+        expect(res.statusCode).toBe(201)
+      })
+
+      it("refuses a goods return on such an order, pointing to a goodwill gesture", async () => {
+        const orderId = await seedPaidCardOrder(userId, "120.00", [CARD_ITEM], "pi_kind_legacy2")
+        const res = await refund(orderId, { kind: "goods_return", channel: "carte", lines: [{ item: 0, qty: 1 }] })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({ error: "ReturnNeedsSnapshot" })
+      })
+
+      it("checks an amount on the transfer channel too", async () => {
+        const orderId = await overpaidTransferOrder()
+        const res = await refund(orderId, { kind: "goodwill", channel: "virement", amount: 33.33 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({
+          error: "InexpressibleRefundAmount",
+          suggestions: { below: 33.32, above: 33.34 },
+        })
+      })
+
       it("never lets credit notes exceed the invoice, even when the channel holds more", async () => {
         const orderId = await overpaidTransferOrder()
         const res = await refund(orderId, { kind: "goodwill", channel: "virement", amount: 125 })

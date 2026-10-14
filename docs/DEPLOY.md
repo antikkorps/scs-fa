@@ -292,10 +292,23 @@ docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/med
 - ⚠️ **Getting the API secret**: in the Henrri account, the client secret is generated **together
   with the webhook** (a callback URL is required): use
   `https://www.<DOMAIN>/api/webhooks/henrri`, copy the secret when it is shown, and do not press
-  "Test" before that route exists. A 401 / `invalid_client` from `pnpm henrri:check` means the
-  pair is wrong.
+  "Test": **that route does not exist yet** — the site does not use Henrri's webhooks, the URL is
+  only how Henrri hands out the secret (subscribe to no event). A 401 / `invalid_client` from
+  `pnpm henrri:check` means the pair is wrong.
+- Henrri allows about **100 API calls an hour** (one invoice ≈ 10–20 calls). A pass stops at the
+  first refusal, slowness or outage and resumes on the next one; a backlog drains over a few hours,
+  never by hammering Henrri. Each call gives up after 30 s.
 - Checks, from `apps/api`: `pnpm henrri:check` (read-only, spends no credit) and `pnpm henrri:sync`
   (one queue pass, for a system cron instead of the in-process timer).
+- Refunds (admin order screen): a **goods return** picks the articles that came back — the credit
+  note carries their own VAT rate; a **goodwill gesture** is an amount, spread over what is left to
+  credit; an **overpayment** refund (transfer only) returns money paid in excess and gets no credit
+  note. Credit notes never exceed the invoice; an amount Henrri cannot express is refused before
+  any money moves, with the closest ones offered.
+- An issued invoice whose payment Henrri refuses, or whose payments do not add up (a short transfer
+  accepted), stays issued and is held for an admin: record the payment by hand in Henrri, or fix
+  the cause and use « Relancer la facturation ». An order with Henrri documents cannot be deleted
+  (accounting records are kept 10 years).
 - Credits: each finalized invoice or credit note costs 8 credits (free pack: 200 a month, i.e. 25
   documents). Out of credits, documents wait; the admin dashboard counts the ones needing attention
   (« Factures à traiter »), and the order screen has « Relancer la facturation ».

@@ -141,3 +141,53 @@ describe("buildInvoiceDraft", () => {
     expect(buildInvoiceDraft(order({ totalTtc: 1336.01 }))).toEqual({ ok: false, reason: "SnapshotMismatch" })
   })
 })
+
+describe("against the real Henrri (sandbox, 2026-10-14)", () => {
+  // Totals Henrri itself computed for these orders: our check must agree with
+  // them, not merely with our own VAT function (audit 2026-10-14).
+  const line = (sku: string, qty: number, priceHt: number, vatPct: number, discountHt = 0) => ({
+    variantId: sku,
+    qty,
+    priceHt,
+    name: sku,
+    sku,
+    category: "accessoire-tireur",
+    requiresPaymentVirement: false,
+    vatPct,
+    discountHt,
+  })
+
+  it("agrees with invoice 26-10-5: three 0.33 lines, a VIP discount and two parcels → 1 337.18", () => {
+    const sandboxOrder = {
+      itemsJson: [
+        line("CAR", 1, 1000, 20),
+        line("PAS-1", 1, 0.33, 20),
+        line("PAS-2", 1, 0.33, 20),
+        line("PAS-3", 1, 0.33, 20),
+        line("TAP", 2, 50, 20, 15),
+      ],
+      shippingPortions: [
+        { amountTtc: 25, priceHt: 20.83, vatAmount: 4.17, vatPct: 20 },
+        { amountTtc: 9, priceHt: 7.5, vatAmount: 1.5, vatPct: 20 },
+      ],
+      totalTtc: 1337.18,
+    }
+    expect(buildInvoiceDraft(sandboxOrder).ok).toBe(true)
+  })
+
+  it("agrees with invoice 26-10-2: two rates, rounded by rate → 120.62", () => {
+    const sandboxOrder = {
+      itemsJson: [
+        line("PAS-1", 1, 0.33, 20),
+        line("PAS-2", 1, 0.33, 20),
+        line("PAS-3", 1, 0.33, 20),
+        line("LIV", 1, 7.99, 5.5),
+        line("TAP", 2, 50, 20, 15),
+      ],
+      shippingPortions: [{ amountTtc: 9, priceHt: 7.5, vatAmount: 1.5, vatPct: 20 }],
+      totalTtc: 120.62,
+    }
+    expect(buildInvoiceDraft(sandboxOrder).ok).toBe(true)
+    expect(buildInvoiceDraft({ ...sandboxOrder, totalTtc: 120.63 })).toEqual({ ok: false, reason: "SnapshotMismatch" })
+  })
+})

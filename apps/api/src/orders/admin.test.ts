@@ -1,11 +1,12 @@
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
-import { and, eq, inArray, like } from "drizzle-orm"
+import { and, eq, inArray, like, sql } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, henrriDocuments, orders, paymentCarte, refunds, users } from "../db/schema.js"
+import { createFakeHenrri } from "../test/henrri-fake.js"
 
 const PREFIX = "ADMORD-"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -271,6 +272,45 @@ describe("admin orders dashboard API (Story 7.1)", () => {
       const ids = res.json().data.map((row: { id: string }) => row.id)
       expect(ids).toContain(troubled)
       expect(ids).not.toContain(fine)
+    })
+
+    it("counts a document still on its way an hour on, and an invoice whose payment is stuck", async () => {
+      const before = (await adminGet("/api/admin/orders/summary")).json().data.invoicesNeedingAttention
+      const stalled = await insertOrder(customerId, { paymentStatus: "received" })
+      const unpaid = await insertOrder(customerId, { paymentStatus: "received" })
+      await db.insert(henrriDocuments).values([
+        { orderId: stalled, kind: "invoice", status: "pending", expectedTotalTtc: "240.00", createdAt: sql`now() - interval '2 hours'` },
+        {
+          orderId: unpaid,
+          kind: "invoice",
+          status: "finalized",
+          expectedTotalTtc: "240.00",
+          finalizedAt: sql`now() - interval '2 hours'`,
+        },
+      ])
+      const after = (await adminGet("/api/admin/orders/summary")).json().data.invoicesNeedingAttention
+      expect(after).toBe(before + 2)
+    })
+
+    it("runs the retried documents at once when Henrri is configured", async () => {
+      const henrri = createFakeHenrri()
+      const configured = await buildApp({ henrri: henrri.client })
+      await configured.ready()
+      try {
+        const orderId = await orderWithDocuments()
+        const res = await configured.inject({
+          method: "POST",
+          url: `/api/admin/orders/${orderId}/henrri/retry`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        })
+        expect(res.statusCode).toBe(200)
+        // The order is a legacy one: the retried credit note goes straight back to blocked.
+        expect(res.json().data).toEqual(
+          expect.arrayContaining([expect.objectContaining({ kind: "credit_note", status: "blocked" })]),
+        )
+      } finally {
+        await configured.close()
+      }
     })
 
     it("counts the documents that need attention on the dashboard", async () => {
