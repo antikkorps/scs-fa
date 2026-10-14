@@ -512,6 +512,61 @@ describe("orders (POST /api/orders)", () => {
     }
   })
 
+  // --- Story 12.6: what the Henrri invoice is built from ---
+
+  async function storedSnapshot(orderId: string) {
+    const [row] = await db
+      .select({ itemsJson: orders.itemsJson, shippingPortions: orders.shippingPortions, shippingHt: orders.shippingHt })
+      .from(orders)
+      .where(eq(orders.id, orderId))
+    return row
+  }
+
+  it("freezes each line's VAT rate and VIP discount, so the invoice never recomputes them", async () => {
+    await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    await addToCart(token, { printId, qty: 1 })
+    const { data } = (await createOrder()).json()
+
+    const { itemsJson } = await storedSnapshot(data.id)
+    expect(itemsJson).toHaveLength(3)
+    for (const line of itemsJson) {
+      expect(line).toMatchObject({ vatPct: 20, discountHt: 0 })
+    }
+  })
+
+  it("freezes the VIP discount of each line", async () => {
+    await db.update(users).set({ vipActive: true }).where(eq(users.id, userId))
+    try {
+      // Default margin 30 % → VIP discount 15 % of the 2 × 50 HT line.
+      await addToCart(token, { variantId: accessoryVariantId, qty: 2 })
+      const { data } = (await createOrder()).json()
+
+      const { itemsJson } = await storedSnapshot(data.id)
+      expect(itemsJson[0]).toMatchObject({ priceHt: 50, qty: 2, vatPct: 20, discountHt: 15 })
+    } finally {
+      await db.update(users).set({ vipActive: false }).where(eq(users.id, userId))
+    }
+  })
+
+  it("freezes how the delivery splits between VAT rates", async () => {
+    await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+    await addToCart(token, { printId, qty: 1 })
+    const { data } = (await createOrder()).json()
+
+    const { shippingPortions, shippingHt } = await storedSnapshot(data.id)
+    // Firearm parcel 25 + print 15, both at 20 %.
+    expect(shippingPortions).toHaveLength(2)
+    for (const portion of shippingPortions ?? []) {
+      expect(Object.keys(portion).sort()).toEqual(["amountTtc", "priceHt", "vatAmount", "vatPct"])
+      expect(portion.vatPct).toBe(20)
+    }
+    const sumCents = (key: "amountTtc" | "priceHt") =>
+      (shippingPortions ?? []).reduce((sum, portion) => sum + Math.round(portion[key] * 100), 0)
+    expect(sumCents("amountTtc")).toBe(4000)
+    expect(sumCents("priceHt")).toBe(Math.round(Number(shippingHt) * 100))
+  })
+
   it("ships small parcels free from the threshold", async () => {
     // 3 × 60 = 180 TTC of accessories ≥ 150.
     await addToCart(token, { variantId: accessoryVariantId, qty: 3 })

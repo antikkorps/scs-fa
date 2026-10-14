@@ -172,6 +172,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         tags: l.tagSlugs,
         legalCategory: l.legalCategory,
         requiresPaymentVirement: requiresVirement(l.legalCategory),
+        vatPct: l.vatPct,
+        discountHt: l.discountAmount,
       })),
       ...cart.artworkItems.map((l) => ({
         printId: l.printId,
@@ -181,8 +183,17 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         sku: l.printDesignation,
         category: "gun-art",
         requiresPaymentVirement: false,
+        vatPct: l.vatPct,
+        discountHt: l.discountAmount,
       })),
     ]
+    // The invoice bills the delivery exactly as it was split here (story 12.6).
+    const shippingPortions = cart.summary.shipping.portions.map(({ amountTtc, priceHt, vatAmount, vatPct }) => ({
+      amountTtc,
+      priceHt,
+      vatAmount,
+      vatPct,
+    }))
 
     let orderId: string
     try {
@@ -206,6 +217,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
             ).toFixed(2),
             shippingCost: cart.summary.shipping.totalTtc.toFixed(2),
             shippingHt: cart.summary.shipping.totalHt.toFixed(2),
+            shippingPortions,
             shippingAddress: shippingSnapshot,
             billingAddress: billingSnapshot,
             shippingAddressStreet: shippingSnapshot.line1,

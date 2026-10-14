@@ -9,3 +9,72 @@ export function round2(n: number): number {
 export function computePriceTtc(priceHt: number, vatPct: number): number {
   return round2(priceHt * (1 + vatPct / 100))
 }
+
+export interface TaxableAmount {
+  priceHt: number
+  vatPct: number
+}
+
+export interface VatRateTotal {
+  vatPct: number
+  totalHt: number
+  vatAmount: number
+}
+
+export interface VatTotals {
+  totalHt: number
+  vatAmount: number
+  totalTtc: number
+  /** One entry per VAT rate, in the order the rates first appear. */
+  byRate: VatRateTotal[]
+}
+
+/**
+ * VAT of a whole order the way an invoice computes it, and the way Henrri does
+ * (story 12.6): the HT of each rate is added up first, then its VAT is rounded
+ * once, half a cent going up. Integer cents and basis points, so binary floating
+ * point never tips a rounding.
+ */
+export function computeVatTotals(amounts: TaxableAmount[]): VatTotals {
+  const htCentsByRate = new Map<number, number>()
+  for (const { priceHt, vatPct } of amounts) {
+    htCentsByRate.set(vatPct, (htCentsByRate.get(vatPct) ?? 0) + Math.round(priceHt * 100))
+  }
+
+  let totalHtCents = 0
+  let vatCents = 0
+  const byRate: VatRateTotal[] = []
+  for (const [vatPct, htCents] of htCentsByRate) {
+    const rateVatCents = vatCentsOf(htCents, vatPct)
+    totalHtCents += htCents
+    vatCents += rateVatCents
+    byRate.push({ vatPct, totalHt: htCents / 100, vatAmount: rateVatCents / 100 })
+  }
+  return {
+    totalHt: totalHtCents / 100,
+    vatAmount: vatCents / 100,
+    totalTtc: (totalHtCents + vatCents) / 100,
+    byRate,
+  }
+}
+
+/** VAT in cents of `htCents` at `vatPct`, half a cent rounded away from zero. */
+function vatCentsOf(htCents: number, vatPct: number): number {
+  const basisPoints = Math.round(vatPct * 100)
+  const magnitude = Math.floor((Math.abs(htCents) * basisPoints + 5_000) / 10_000)
+  return htCents < 0 ? -magnitude : magnitude
+}
+
+/**
+ * The HT, in cents, whose VAT-inclusive total is exactly `ttcCents` once Henrri
+ * rounds the VAT (half a cent up), or null when none does: at 20 %, about one TTC
+ * amount in six has no such HT (33.33 € sits between 27.77 → 33.32 and 27.78 →
+ * 33.34). Used to enter a refund's credit note in HT (story 12.6).
+ */
+export function htCentsForTtc(ttcCents: number, vatPct: number): number | null {
+  const estimate = Math.round(ttcCents / (1 + vatPct / 100))
+  for (const htCents of [estimate, estimate - 1, estimate + 1]) {
+    if (htCents + vatCentsOf(htCents, vatPct) === ttcCents) return htCents
+  }
+  return null
+}

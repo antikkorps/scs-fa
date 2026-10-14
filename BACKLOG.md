@@ -777,7 +777,7 @@
 
 **À savoir :** un fournisseur **hors collecte** (Armurerie de Paris, ClearMyVault…) se crée à la main dans Catalogue → Fournisseurs avant son premier import.
 
-**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 📝 **CADRÉE** (2026-10-12), attend les accès Henrri _(créée le 2026-10-08, demande du client)_
+**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 🚧 **EN COURS** (2026-10-14), cadrée le 2026-10-12 _(créée le 2026-10-08, demande du client)_
 
 > Besoin : le client facture avec **Henrri** (logiciel gratuit du groupe Rivalis). Chaque commande payée sur le site doit y devenir une facture, sans ressaisie. Henrri a une API publique pensée pour ce cas (« une boutique en ligne peut générer automatiquement la facture d'une commande »).
 
@@ -811,20 +811,50 @@
 - [x] **Commandes antérieures** : Henrri mis en service **avant l'ouverture** de la boutique, rien à rattraper.
 - [x] **E-reporting** : **par Henrri**.
 
-**Points restants (à lever avec la documentation de l'API, pas avec le client) :**
+**Points levés par la documentation de l'API (2026-10-14, spec versionnée dans [`docs/henrri/`](docs/henrri/README.md)) :**
 
-- [ ] Un avoir consomme-t-il des crédits ?
-- [ ] L'API permet-elle de récupérer le PDF de la facture (conditionne l'envoi par le site) ?
+- [x] **Un avoir coûte 8 crédits**, comme une facture (tout document comptable finalisé). Brouillons, modifications et lectures sont gratuits.
+- [x] **PDF récupérable** (`POST /documents/{id}/pdf/url`, URL valable 10 min) → **envoi par le site** confirmé ; PDF demandé à Henrri au clic, jamais stocké.
+- [x] **Flux en trois temps** : brouillon vide, puis une requête par ligne, puis finalisation (le numéro naît là). **Aucun champ de référence externe** sur un document : l'idempotence repose sur l'id du brouillon, enregistré chez nous dès sa création.
+- [x] **Chronologie imposée** : un document comptable daté avant le dernier finalisé est refusé → la file traite dans l'ordre, à la date du jour.
+- [x] **Webhooks signés** (HMAC-SHA256) : non nécessaires au départ.
 - [ ] Facture d'acompte pour un acheteur professionnel qui paie avant livraison : non retenue (« une facture à la fin »), à reconfirmer avec le comptable si un client pro le demande.
+- [ ] `FIRST_ACCOUNTING_DOCUMENT_MONTH` (premier document du mois à confirmer) : drapeau absent de la spec, à vérifier sur le bac à sable.
 
-**Accès** : en attente, transmis par Fred (bac à sable `clientId` / `clientSecret` + lien vers la documentation). **Le code démarre à leur réception.**
+**Accès (2026-10-14)** : bac à sable ouvert, clé API « site internet » créée (`clientId`). ⚠️ **`clientSecret` introuvable** : le seul secret obtenu est celui du webhook (HMAC), refusé par `POST /v1/users/authenticate` (401 / `invalid_client`). Question posée à Henrri / Fred. **Le code avance sans** ; seule la passe réelle en dépend.
 
-**Conception proposée (à confirmer une fois la documentation lue) :**
+**Décisions de conception (2026-10-14, validées par Franck) :**
+
+- **Snapshot de commande enrichi** : `items_json` ne portait ni le taux de TVA ni la remise VIP par ligne, et la répartition des frais de port entre taux n'était pas gardée. Ajout de `vatPct` + `discountHt` par ligne et d'une colonne `shipping_portions`. Une commande sans ces champs est **non facturable** (jamais une facture fausse) ; rien à rattraper en production.
+- **Schéma** : colonnes `henrri_*` de `orders` et table `invoices` (inutilisées, vides) **supprimées**, remplacées par **`henrri_documents`** (une ligne par facture **ou** avoir : `kind`, `refund_id`, `status` pending / draft / finalized / blocked, `henrri_document_id`, `henrri_number`, `expected_total_ttc`, relances) + `users.henrri_customer_id`. Tous les acheteurs sont `individual` (pas de raison sociale ni de SIRET dans nos adresses).
+- **Garde-fou au centime** : Henrri recalcule la TVA ; si son total diffère du nôtre, la facture n'est **pas finalisée** (`blocked`, visible dans l'admin) — avant de coûter 8 crédits ou de figer un document faux.
+- **Avoir partiel** sur une commande à plusieurs taux : **réparti au prorata des taux de la facture** (avoir total = facture à l'identique). À faire confirmer par le comptable à l'occasion.
+- **Paiement enregistré dans Henrri** (CB / virement), sinon Henrri relancerait un client qui a payé. Paiement mixte : mécanique à vérifier sur le bac à sable.
+- **Deux PR** : (1) snapshot enrichi + schéma + client Henrri simulé ; (2) file de traitement, admin, « Mes commandes », e-mail, RGPD, passe réelle sur le bac à sable.
+
+**Avancement :**
+
+- [x] **PR 1** (`feat/story-12.6-henrri-foundation`, 2026-10-14) : spec versionnée, snapshot enrichi (migration 0018), `henrri_documents` + `users.henrri_customer_id` (0019 suppressions, 0020 création), constructeurs de facture et d'avoir (fonctions pures), client HTTP Henrri (jeton, erreurs, clients, documents, lignes, PDF), configuration facultative, `pnpm henrri:check` (lecture seule, aucun crédit).
+- [ ] **PR 2** : file de traitement (déclencheur « commande entièrement payée » + avoir à la validation du remboursement), formulaire de remboursement qui propose le montant exprimable le plus proche, paiement enregistré après finalisation, admin (statut, numéro, « Relancer »), « Mes commandes » (PDF à la demande), e-mail, `/confidentialite` + registre RGPD, passe réelle sur le bac à sable.
+- ✅ **Accès API obtenus** (2026-10-14) : `clientSecret` généré avec le webhook (le secret de 88 caractères affiché d'abord était celui du webhook seul). `pnpm henrri:check` vert. Bac à sable : facture = type 1, avoir = type 2, ligne « Article » = 3, CB = mode 3, virement = mode 4, crédits illimités.
+
+**Passe sur le bac à sable (2026-10-14)** — documents de test finalisés 26-10-1 à 26-10-4 (indélébiles, compte de test seulement), client fictif « Bac à sable » :
+
+- [x] **Articles** : Henrri ne facture que des articles de son catalogue, **ne réutilise jamais un article donné « en ligne »** (refus `ITEM_DUPLICATE`) et exige une **catégorie**. → le client cherche l'article par référence exacte (recherche floue côté Henrri) ou le crée une fois dans la catégorie « Produits » par défaut, puis facture par `itemId`. Lignes sans SKU : articles fixes `PORT`, `REMISE-VIP`, `REMBOURSEMENT`. Une ligne garde **son** libellé, son prix et son taux, quel que soit l'article.
+- [x] **Remise VIP en ligne négative** : acceptée.
+- [x] **Paiement mixte** : payer l'échéance du montant CB avec `ecartDueDate` crée une échéance du reste, payée ensuite par virement → facture `paid` (visible via `GET /documents/{id}/all-included`, pas via `GET /documents/{id}`). ⚠️ Un paiement enregistré sur un **brouillon** le rend **non supprimable** → n'enregistrer un paiement qu'après la finalisation.
+- [x] **Premier document du mois** : aucune confirmation demandée (`confirmFirstOfMonth` n'existe pas). Numérotation `AA-MM-n`.
+- [x] **Erreurs** : le code métier arrive dans `errorCode` ; les erreurs de validation listent les champs.
+- [x] **Mode TTC inutilisable par l'API** (le prix d'une ligne est lu HT même sur un document TTC). Henrri garde en revanche le **HT à 8 décimales** → avoirs saisis en HT = TTC / (1 + taux) : un avoir partiel de 100 € sur deux taux tombe juste.
+- [x] **Arrondi de la TVA — DÉCIDÉ (Franck, 2026-10-14) : le site calcule la TVA par taux**, comme Henrri (somme des HT du taux, TVA arrondie une fois, demi-centime vers le haut — vérifié sur le bac à sable). `computeVatTotals` (partagé) sert au total du panier, à la répartition CB / virement (le virement est calculé sur ses lignes, la CB prend le reste : les deux font toujours le total de la facture — ils pouvaient déjà différer d'un centime) et à la vérification de la facture. Le TTC affiché par ligne reste indicatif.
+- [x] **Montants de remboursement — DÉCIDÉ (Franck, 2026-10-14)** : Henrri arrondit HT et TVA séparément, donc à 20 % environ un montant TTC sur six n'a aucun HT correspondant (33,33 €). L'avoir est saisi au HT **en centimes** qui retombe pile sur la part remboursée (`htCentsForTtc`), un centime passant d'un taux à l'autre si besoin ; un montant inexprimable est refusé et **`nearestExpressibleRefunds` donne les montants valides les plus proches, que le formulaire de remboursement proposera (PR 2)**. Vérifié sur le bac à sable (1,02 € et 33,33 € sur deux taux, 50 € et 33,34 € sur un).
+
+**Conception (rappel) :**
 
 - **File d'attente avec relances**, sur le modèle de l'e-mail de confirmation (`confirmation_sent_at`, `ORDER_CONFIRMATION_RETRY_MINUTES`). Une facture Henrri qui échoue (API indisponible, crédits épuisés) **ne bloque jamais une vente**. Elle repart plus tard, et un compteur dans le tableau de bord signale les factures en souffrance.
-- **Idempotence** : l'identifiant et le numéro de la facture Henrri sont stockés sur la commande (migration). Une relance ne crée jamais de doublon : elle vérifie d'abord ce qui existe chez Henrri, ce qui ne coûte rien puisque les lectures sont gratuites.
-- **Secrets** dans `.env` (`HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`, `HENRRI_BASE_URL` pour basculer entre bac à sable et production). Jeton gardé en mémoire et renouvelé avant expiration. Jamais journalisé.
-- **Admin** : sur la fiche commande, le numéro de facture Henrri avec un lien, son statut et un bouton « Relancer la facture ».
+- **Idempotence** : une relance lit d'abord le brouillon chez Henrri (gratuit) ; déjà finalisé → on récupère le numéro ; sinon il est supprimé et recréé. Aucun doublon possible sur un document finalisé.
+- **Secrets** dans `.env` (`HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`, `HENRRI_WEBHOOK_SECRET`, `HENRRI_BASE_URL` = `https://api-sandbox.henrri.io` ou `https://api.henrri.io`). Jeton gardé en mémoire et renouvelé avant expiration. Jamais journalisé.
+- **Admin** : sur la fiche commande, le numéro de facture Henrri, son statut et un bouton « Relancer la facture ».
 - **Tests** : client HTTP Henrri simulé dans la CI ; passe réelle sur le bac à sable avant la production.
 
 **Attendu du client :**

@@ -127,6 +127,27 @@
       "when": 1791400571106,
       "tag": "0017_story_12_4_catalog_round_trip",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792007062983,
+      "tag": "0018_story_12_6_invoice_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792007141660,
+      "tag": "0019_story_12_6_drop_unused_henrri",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792007142429,
+      "tag": "0020_story_12_6_henrri_documents",
+      "breakpoints": true
     }
   ]
 }
