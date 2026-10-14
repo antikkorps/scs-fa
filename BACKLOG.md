@@ -836,7 +836,18 @@
 
 - [x] **PR 1** (`feat/story-12.6-henrri-foundation`, 2026-10-14) : spec versionnée, snapshot enrichi (migration 0018), `henrri_documents` + `users.henrri_customer_id` (0019 suppressions, 0020 création), constructeurs de facture et d'avoir (fonctions pures), client HTTP Henrri (jeton, erreurs, clients, documents, lignes, PDF), configuration facultative, `pnpm henrri:check` (lecture seule, aucun crédit).
 - [ ] **PR 2** : file de traitement (déclencheur « commande entièrement payée » + avoir à la validation du remboursement), paiement enregistré, admin (statut, numéro, « Relancer »), « Mes commandes » (PDF à la demande), e-mail, `/confidentialite` + registre RGPD, passe réelle sur le bac à sable.
-- ⚠️ **À vérifier sur le bac à sable** : Henrri ne facture que des **articles de son catalogue** ; chaque ligne porte son article « en ligne » (référence + désignation, uniques chez Henrri). Henrri crée donc les articles **au fil des ventes** (pas de synchronisation du catalogue) ; reste à confirmer qu'il réutilise un article existant au lieu de refuser le doublon. Aussi : ligne de remise VIP à prix négatif acceptée ? arrondi de la TVA identique au nôtre (sinon `blocked`) ? montants positifs sur un avoir ?
+- ✅ **Accès API obtenus** (2026-10-14) : `clientSecret` généré avec le webhook (le secret de 88 caractères affiché d'abord était celui du webhook seul). `pnpm henrri:check` vert. Bac à sable : facture = type 1, avoir = type 2, ligne « Article » = 3, CB = mode 3, virement = mode 4, crédits illimités.
+
+**Passe sur le bac à sable (2026-10-14)** — documents de test finalisés 26-10-1 à 26-10-4 (indélébiles, compte de test seulement), client fictif « Bac à sable » :
+
+- [x] **Articles** : Henrri ne facture que des articles de son catalogue, **ne réutilise jamais un article donné « en ligne »** (refus `ITEM_DUPLICATE`) et exige une **catégorie**. → le client cherche l'article par référence exacte (recherche floue côté Henrri) ou le crée une fois dans la catégorie « Produits » par défaut, puis facture par `itemId`. Lignes sans SKU : articles fixes `PORT`, `REMISE-VIP`, `REMBOURSEMENT`. Une ligne garde **son** libellé, son prix et son taux, quel que soit l'article.
+- [x] **Remise VIP en ligne négative** : acceptée.
+- [x] **Paiement mixte** : payer l'échéance du montant CB avec `ecartDueDate` crée une échéance du reste, payée ensuite par virement → facture `paid` (visible via `GET /documents/{id}/all-included`, pas via `GET /documents/{id}`). ⚠️ Un paiement enregistré sur un **brouillon** le rend **non supprimable** → n'enregistrer un paiement qu'après la finalisation.
+- [x] **Premier document du mois** : aucune confirmation demandée (`confirmFirstOfMonth` n'existe pas). Numérotation `AA-MM-n`.
+- [x] **Erreurs** : le code métier arrive dans `errorCode` ; les erreurs de validation listent les champs.
+- [x] **Mode TTC inutilisable par l'API** (le prix d'une ligne est lu HT même sur un document TTC). Henrri garde en revanche le **HT à 8 décimales** → avoirs saisis en HT = TTC / (1 + taux) : un avoir partiel de 100 € sur deux taux tombe juste.
+- ⚠️ **Arrondi de la TVA — décision à prendre** : Henrri calcule la TVA **par taux** (somme des HT du taux, puis arrondi), le site la calcule **ligne par ligne**. Trois lignes à 0,33 € HT : 1,20 € chez nous, 1,19 € chez Henrri (facture de test 26-10-2 à 120,62 € au lieu de 120,63 €). Le garde-fou bloquerait ces factures. **Recommandation : aligner le site sur le calcul par taux** (pratique comptable courante, et le total de la facture Henrri devient toujours exact).
+- ⚠️ **Montants de remboursement inexprimables** : Henrri arrondit séparément HT et TVA ; à un seul taux, environ un montant TTC sur six n'a aucun HT correspondant (33,33 € à 20 % : 33,32 ou 33,34). **Recommandation : le formulaire de remboursement propose le montant exprimable le plus proche** (au centime), plutôt qu'un avoir qui ne correspondrait pas au remboursement.
 
 **Conception (rappel) :**
 
