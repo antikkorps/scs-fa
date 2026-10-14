@@ -423,6 +423,31 @@ describe("Henrri client — customers", () => {
     expect(body).not.toHaveProperty("contacts")
     expect(body).not.toHaveProperty("links")
   })
+
+  it("leaves out the empty fields Henrri reads back but refuses to write (sandbox, 2026-10-14)", async () => {
+    const stored = {
+      id: 9,
+      name: "Jean Tireur",
+      type: "individual",
+      vatNumber: "",
+      siret: "",
+      tradeName: "",
+      accountingNumber: null,
+      companyIdentifierType: "unknown",
+      address: { id: 5, address: "x", postCode: "75001", city: "Paris", country: "France" },
+    }
+    const fake = fakeHenrri({
+      "GET /v1/customers/9": () => ({ status: 200, body: stored }),
+      "PUT /v1/customers/9": () => ({ status: 200, body: { id: 9 } }),
+    })
+    await clientFor(fake).updateCustomer(9, buyer)
+    const body = fake.apiCalls().find((call) => call.method === "PUT")?.body as Record<string, unknown>
+    expect(body).not.toHaveProperty("vatNumber")
+    expect(body).not.toHaveProperty("siret")
+    expect(body).not.toHaveProperty("tradeName")
+    expect(body).not.toHaveProperty("accountingNumber")
+    expect(body).toMatchObject({ companyIdentifierType: "unknown" })
+  })
 })
 
 describe("Henrri client — resilience (audit 2026-10-14)", () => {

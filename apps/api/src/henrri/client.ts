@@ -381,7 +381,10 @@ export function createHenrriClient(options: HenrriClientOptions) {
         links: _links,
         ...stored
       } = await required<Record<string, unknown>>("GET", `/v1/customers/${customerId}`)
-      await required("PUT", `/v1/customers/${customerId}`, { ...stored, id: customerId, ...customerBody(buyer) })
+      // Henrri reads empty fields back ("" for a VAT number) but refuses to write
+      // them (sandbox, 2026-10-14): only the filled ones are sent back.
+      const filled = Object.fromEntries(Object.entries(stored).filter(([, value]) => value !== "" && value !== null))
+      await required("PUT", `/v1/customers/${customerId}`, { ...filled, id: customerId, ...customerBody(buyer) })
     },
 
     async createDocument(input: { documentTypeId: number; customerId: number; title: string }): Promise<number> {
