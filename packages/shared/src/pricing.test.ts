@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { computeVatTotals } from "./pricing.js"
+import { computeVatTotals, htCentsForTtc } from "./pricing.js"
 
 describe("computeVatTotals", () => {
   it("adds the HT of each rate before computing its VAT, as Henrri does", () => {
@@ -44,5 +44,25 @@ describe("computeVatTotals", () => {
 
   it("returns zeros for nothing", () => {
     expect(computeVatTotals([])).toEqual({ totalHt: 0, vatAmount: 0, totalTtc: 0, byRate: [] })
+  })
+})
+
+describe("htCentsForTtc", () => {
+  it.each([
+    [10_000, 20, 8_333],
+    [340, 5.5, 322],
+    [5_000, 20, 4_167],
+    [120, 20, 100],
+  ])("finds the HT whose VAT-inclusive total is %s cents at %s %%", (ttcCents, vatPct, htCents) => {
+    expect(htCentsForTtc(ttcCents, vatPct)).toBe(htCents)
+  })
+
+  it("returns null when no HT lands on that TTC, as Henrri rounds HT and VAT apart", () => {
+    // 27.77 HT → 33.32 ; 27.78 HT → 33.34 : nothing gives 33.33 at 20 %.
+    expect(htCentsForTtc(3_333, 20)).toBeNull()
+  })
+
+  it("prices everything at a zero rate", () => {
+    expect(htCentsForTtc(1_234, 0)).toBe(1_234)
   })
 })

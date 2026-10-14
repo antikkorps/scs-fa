@@ -64,3 +64,17 @@ function vatCentsOf(htCents: number, vatPct: number): number {
   const magnitude = Math.floor((Math.abs(htCents) * basisPoints + 5_000) / 10_000)
   return htCents < 0 ? -magnitude : magnitude
 }
+
+/**
+ * The HT, in cents, whose VAT-inclusive total is exactly `ttcCents` once Henrri
+ * rounds the VAT (half a cent up), or null when none does: at 20 %, about one TTC
+ * amount in six has no such HT (33.33 € sits between 27.77 → 33.32 and 27.78 →
+ * 33.34). Used to enter a refund's credit note in HT (story 12.6).
+ */
+export function htCentsForTtc(ttcCents: number, vatPct: number): number | null {
+  const estimate = Math.round(ttcCents / (1 + vatPct / 100))
+  for (const htCents of [estimate, estimate - 1, estimate + 1]) {
+    if (htCents + vatCentsOf(htCents, vatPct) === ttcCents) return htCents
+  }
+  return null
+}

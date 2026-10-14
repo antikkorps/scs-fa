@@ -3,7 +3,7 @@
 // draft into API calls; Henrri then recomputes the totals, and the caller only
 // finalizes when they match `expectedTotalTtc` to the cent.
 
-import { computeVatTotals, round2 } from "@armurier/shared"
+import { computeVatTotals, htCentsForTtc, round2 } from "@armurier/shared"
 import type { orders } from "../db/schema.js"
 
 type OrderRow = typeof orders.$inferSelect
@@ -35,7 +35,7 @@ export interface DocumentDraft {
   expectedTotalTtc: number
 }
 
-export type DraftRefusal = "LegacySnapshot" | "SnapshotMismatch" | "InvalidRefundAmount"
+export type DraftRefusal = "LegacySnapshot" | "SnapshotMismatch" | "InvalidRefundAmount" | "InexpressibleAmount"
 
 export type DraftResult = { ok: true; draft: DocumentDraft } | { ok: false; reason: DraftRefusal }
 
@@ -60,14 +60,6 @@ function toCents(amount: number): number {
 
 function fromCents(cents: number): number {
   return cents / 100
-}
-
-// Henrri keeps HT prices to 8 decimals (sandbox, 2026-10-14).
-const HENRRI_PRICE_DECIMALS = 1e8
-
-/** The HT price whose VAT-inclusive value is exactly `ttc`, at Henrri's precision. */
-function htFromTtc(ttc: number, vatPct: number): number {
-  return Math.round((ttc / (1 + vatPct / 100)) * HENRRI_PRICE_DECIMALS) / HENRRI_PRICE_DECIMALS
 }
 
 /** The snapshot lines, or null when the order predates the VAT-carrying snapshot. */
@@ -187,7 +179,9 @@ export function buildInvoiceDraft(source: InvoiceSource): DraftResult {
  * The credit note of a refund. A full refund mirrors the invoice; a partial one
  * is split between VAT rates in proportion to what each weighed on the order
  * (decision 2026-10-14). Henrri's tax-included mode does not work through the API,
- * so each share is entered HT at 8 decimals: its TTC is then the refunded cents.
+ * so each share is entered at the HT whose VAT-inclusive total, as Henrri rounds
+ * it, is the share — moving a cent between rates when a share has none. An amount
+ * no split can express is refused: see `nearestExpressibleRefunds`.
  */
 export function buildCreditNoteDraft(source: InvoiceSource, refundTtc: number, orderRef: string): DraftResult {
   const invoice = checkedInvoiceLines(source)
@@ -198,13 +192,83 @@ export function buildCreditNoteDraft(source: InvoiceSource, refundTtc: number, o
   if (refundCents <= 0 || refundCents > totalCents) return { ok: false, reason: "InvalidRefundAmount" }
   if (refundCents === totalCents) return { ok: true, draft: { lines: invoice, expectedTotalTtc: source.totalTtc } }
 
-  const shares = allocateCents(refundCents, ttcCentsByRate(invoice))
-  const lines = [...shares].map(([vatPct, cents]) => ({
+  const shares = expressibleShares(allocateCents(refundCents, ttcCentsByRate(invoice)))
+  if (!shares) return { ok: false, reason: "InexpressibleAmount" }
+  const lines = shares.map(({ vatPct, htCents }) => ({
     designation: `Remboursement partiel de la commande ${orderRef}`,
     article: REFUND_ARTICLE,
     quantity: 1,
-    unitPrice: htFromTtc(fromCents(cents), vatPct),
+    unitPrice: fromCents(htCents),
     vatPct,
   }))
   return { ok: true, draft: { lines, expectedTotalTtc: fromCents(refundCents) } }
+}
+
+interface ExpressibleShare {
+  vatPct: number
+  htCents: number
+}
+
+/** Each TTC share priced HT, or null when one has no HT that Henrri lands on. */
+function pricedShares(ttcSharesByRate: Map<number, number>): ExpressibleShare[] | null {
+  const priced: ExpressibleShare[] = []
+  for (const [vatPct, ttcCents] of ttcSharesByRate) {
+    const htCents = htCentsForTtc(ttcCents, vatPct)
+    if (htCents === null) return null
+    priced.push({ vatPct, htCents })
+  }
+  return priced
+}
+
+// One or two cents moved between two rates always suffice in practice: at most
+// one TTC amount in a row is unreachable at the rates in force.
+const CENT_SHIFTS = [1, -1, 2, -2]
+
+/**
+ * Prices the TTC shares HT; when one has no exact HT, moves a cent or two from
+ * one rate to another (the refunded total is unchanged) until all do.
+ */
+function expressibleShares(ttcSharesByRate: Map<number, number>): ExpressibleShare[] | null {
+  const direct = pricedShares(ttcSharesByRate)
+  if (direct) return direct
+  const rates = [...ttcSharesByRate.keys()]
+  for (const shift of CENT_SHIFTS) {
+    for (const from of rates) {
+      for (const to of rates) {
+        if (from === to) continue
+        const shifted = new Map(ttcSharesByRate)
+        shifted.set(from, (shifted.get(from) ?? 0) - shift)
+        shifted.set(to, (shifted.get(to) ?? 0) + shift)
+        if ([...shifted.values()].some((cents) => cents <= 0)) continue
+        const priced = pricedShares(shifted)
+        if (priced) return priced
+      }
+    }
+  }
+  return null
+}
+
+// How far the admin form looks for an amount Henrri can express.
+const NEAREST_SEARCH_CENTS = 10
+
+/**
+ * The closest refund amounts, below and above `refundTtc`, for which a credit
+ * note can be issued (decision 2026-10-14: the refund form offers them rather
+ * than issuing a credit note that does not match the refund). Null on a side
+ * with none within ten cents, or beyond the order total.
+ */
+export function nearestExpressibleRefunds(
+  source: InvoiceSource,
+  refundTtc: number,
+): { below: number | null; above: number | null } {
+  const refundCents = toCents(refundTtc)
+  const expressible = (cents: number) => buildCreditNoteDraft(source, fromCents(cents), "").ok
+  const search = (direction: 1 | -1) => {
+    for (let step = 1; step <= NEAREST_SEARCH_CENTS; step += 1) {
+      const cents = refundCents + direction * step
+      if (expressible(cents)) return fromCents(cents)
+    }
+    return null
+  }
+  return { below: search(-1), above: search(1) }
 }
