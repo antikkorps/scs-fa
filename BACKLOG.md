@@ -777,7 +777,7 @@
 
 **À savoir :** un fournisseur **hors collecte** (Armurerie de Paris, ClearMyVault…) se crée à la main dans Catalogue → Fournisseurs avant son premier import.
 
-**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — 🚧 **EN COURS** (2026-10-14), cadrée le 2026-10-12 _(créée le 2026-10-08, demande du client)_
+**Story 12.6** — Facturation dans Henrri (logiciel de facturation du client) — ✅ **LIVRÉE** (2026-10-14, reste la mise en production), cadrée le 2026-10-12 _(créée le 2026-10-08, demande du client)_
 
 > Besoin : le client facture avec **Henrri** (logiciel gratuit du groupe Rivalis). Chaque commande payée sur le site doit y devenir une facture, sans ressaisie. Henrri a une API publique pensée pour ce cas (« une boutique en ligne peut générer automatiquement la facture d'une commande »).
 
@@ -835,7 +835,10 @@
 **Avancement :**
 
 - [x] **PR 1** (`feat/story-12.6-henrri-foundation`, 2026-10-14) : spec versionnée, snapshot enrichi (migration 0018), `henrri_documents` + `users.henrri_customer_id` (0019 suppressions, 0020 création), constructeurs de facture et d'avoir (fonctions pures), client HTTP Henrri (jeton, erreurs, clients, documents, lignes, PDF), configuration facultative, `pnpm henrri:check` (lecture seule, aucun crédit).
-- [ ] **PR 2** : file de traitement (déclencheur « commande entièrement payée » + avoir à la validation du remboursement), formulaire de remboursement qui propose le montant exprimable le plus proche, paiement enregistré après finalisation, admin (statut, numéro, « Relancer »), « Mes commandes » (PDF à la demande), e-mail, `/confidentialite` + registre RGPD, passe réelle sur le bac à sable.
+- [x] **PR 1 mergée** (#128, 2026-10-14).
+- [x] **PR 2** (`feat/story-12.6-henrri-invoicing`, 2026-10-14) : file de traitement (`henrri_documents`, migrations 0021–0022 `payment_recorded_at` / `customer_notified_at`) déclenchée par la commande entièrement payée et par le remboursement abouti ; avoir après la facture ; paiement enregistré après finalisation (CB puis virement) ; garde-fou au centime ; reprise d'un brouillon abandonné sans double facture ; formulaire de remboursement qui propose le montant exprimable le plus proche ; admin (documents, cause du blocage en clair, « Relancer la facturation », carte « Factures à traiter » + filtre `?invoices=attention`) ; « Mes commandes » (PDF à la demande via Henrri) ; e-mail « facture / avoir disponible » ; Henrri dans `/confidentialite` ; `pnpm henrri:sync` ; `DEPLOY.md`. **Passe réelle sur le bac à sable réussie** : facture 26-10-5 à 1 337,18 € au centime (3 lignes à 0,33 €, remise VIP, port), paiement mixte 112,18 € CB + 1 225 € virement, avoir 26-10-6 de 50 €, PDF réels, e-mail, 3ᵉ passe sans effet.
+- [ ] **Registre des traitements** (tenu par le client, hors dépôt) : ajouter Henrri comme sous-traitant — « Facturation : établissement et conservation des factures et avoirs ; données : nom, adresse de facturation, e-mail, détail de la commande et règlement ; sous-traitant : Henrri (groupe Rivalis) ; durée : 10 ans (L123-22 C. com.) ».
+- [ ] **Production** : clé API Henrri de production + choix du pack (client).
 - ✅ **Accès API obtenus** (2026-10-14) : `clientSecret` généré avec le webhook (le secret de 88 caractères affiché d'abord était celui du webhook seul). `pnpm henrri:check` vert. Bac à sable : facture = type 1, avoir = type 2, ligne « Article » = 3, CB = mode 3, virement = mode 4, crédits illimités.
 
 **Passe sur le bac à sable (2026-10-14)** — documents de test finalisés 26-10-1 à 26-10-4 (indélébiles, compte de test seulement), client fictif « Bac à sable » :
