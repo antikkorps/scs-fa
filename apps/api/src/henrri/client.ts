@@ -22,6 +22,22 @@ export interface HenrriBuyer {
   address: { line1: string; line2: string | null; postal: string; city: string; country: string }
 }
 
+export type HenrriPaymentModeType = "bankCard" | "transfer"
+
+export interface HenrriMilestone {
+  id: number
+  amount: number
+  paid: boolean
+}
+
+export interface HenrriPayment {
+  paymentModeId: number
+  /** yyyy-MM-dd */
+  date: string
+  /** Less than the milestone: the remainder becomes a new milestone due the same day. */
+  amount?: number
+}
+
 export interface HenrriPdfLink {
   url: string
   expiresAt: string
@@ -165,6 +181,7 @@ export function createHenrriClient(options: HenrriClientOptions) {
   let documentTypes: Promise<Map<string, number>> | null = null
   let itemLineTypeId: Promise<number> | null = null
   let productCategoryId: Promise<number> | null = null
+  let paymentModes: Promise<Map<string, number>> | null = null
   const articleIds = new Map<string, Promise<number>>()
 
   async function send(method: string, path: string, body: unknown, bearer: string | null): Promise<Response> {
@@ -346,6 +363,41 @@ export function createHenrriClient(options: HenrriClientOptions) {
 
     async finalizeDocument(documentId: number): Promise<HenrriDocument> {
       return toDocument(await required<RawDocument>("POST", `/v1/documents/${documentId}/finalize`))
+    },
+
+    async paymentModeId(type: HenrriPaymentModeType): Promise<number> {
+      paymentModes ??= forgetOnFailure(
+        required<ListResponse<{ id: number; type: string }>>("GET", "/v1/paymentmodes").then(
+          (list) => new Map((list.elements ?? []).map((mode) => [mode.type, mode.id])),
+        ),
+        () => {
+          paymentModes = null
+        },
+      )
+      const id = (await paymentModes).get(type)
+      if (id === undefined) throw new HenrriError("MissingPaymentMode", null, `Henrri lists no ${type} payment mode`)
+      return id
+    },
+
+    async paymentMilestones(documentId: number): Promise<HenrriMilestone[]> {
+      const list = await required<ListResponse<{ id: number; amount: number | null; isPaid: boolean }>>(
+        "GET",
+        `/v1/documents/${documentId}/paymentmilestones`,
+      )
+      return (list.elements ?? []).map((milestone) => ({
+        id: milestone.id,
+        amount: milestone.amount ?? 0,
+        paid: milestone.isPaid,
+      }))
+    },
+
+    async payMilestone(milestoneId: number, payment: HenrriPayment): Promise<void> {
+      const remainder = payment.amount === undefined ? {} : { amount: payment.amount, ecartDueDate: payment.date }
+      await required("POST", `/v1/paymentmilestones/${milestoneId}/pay`, {
+        paymentModeId: payment.paymentModeId,
+        date: payment.date,
+        ...remainder,
+      })
     },
 
     async pdfLink(documentId: number): Promise<HenrriPdfLink> {

@@ -1874,6 +1874,9 @@ export const henrriDocuments = pgTable(
     lastError: text("last_error"),
     claimedAt: timestamp("claimed_at"),
     finalizedAt: timestamp("finalized_at"),
+    // Facture seulement : le règlement (CB / virement) enregistré chez Henrri,
+    // après la finalisation — jamais sur un brouillon (il deviendrait indélébile).
+    paymentRecordedAt: timestamp("payment_recorded_at"),
 
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),

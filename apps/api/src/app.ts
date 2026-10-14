@@ -21,6 +21,7 @@ import { blogRoutes } from "./blog/index.js"
 import { cartRoutes } from "./cart/index.js"
 import { adminCatalogImportRoutes } from "./catalog-import/admin.js"
 import { env } from "./env.js"
+import { startHenrriScheduler } from "./henrri/queue.js"
 import { legalCategoryRoutes } from "./legal-categories/index.js"
 import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
@@ -143,6 +144,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)
   startOrderConfirmationScheduler(fastify)
+  startHenrriScheduler(fastify)
   startShipmentTrackingScheduler(fastify)
 
   return fastify

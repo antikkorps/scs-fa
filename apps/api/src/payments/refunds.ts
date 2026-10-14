@@ -10,6 +10,7 @@ import {
   productVariants,
   refunds,
 } from "../db/schema.js"
+import { enqueueCreditNote } from "../henrri/queue.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import { PaymentError } from "./service.js"
@@ -167,9 +168,10 @@ export async function createOrderRefund(
     newValue: { orderId, channel: input.channel, amountTtc, stripeRefundId },
   })
 
-  // A refund that is already settled moves the order; a pending card refund waits
-  // for the webhook before any order-level effect.
+  // A refund that is already settled moves the order and gets its credit note; a
+  // pending card refund waits for the webhook before any of it.
   const orderPaymentStatus = settledNow ? await applyRefundEffects(orderId) : order.paymentStatus
+  if (settledNow) await enqueueCreditNote(row.id)
 
   return {
     id: row.id,
@@ -282,6 +284,7 @@ export async function settleStripeRefund(stripeRefundId: string, stripeStatus: s
       .set({ status: "succeeded", processedAt: new Date(), failureReason: null, updatedAt: new Date() })
       .where(eq(refunds.id, row.id))
     await applyRefundEffects(row.orderId)
+    await enqueueCreditNote(row.id)
     return
   }
 

@@ -428,3 +428,51 @@ describe("henrriClientFromConfig", () => {
     expect(henrriClientFromConfig(config)).toBeNull()
   })
 })
+
+describe("Henrri client — payments", () => {
+  it("resolves the card and transfer payment modes by type, asking Henrri once", async () => {
+    const fake = fakeHenrri({
+      "GET /v1/paymentmodes": () => ({
+        status: 200,
+        body: {
+          elements: [
+            { id: 1, type: "cash" },
+            { id: 3, type: "bankCard" },
+            { id: 4, type: "transfer" },
+          ],
+        },
+      }),
+    })
+    const client = clientFor(fake)
+    expect(await client.paymentModeId("bankCard")).toBe(3)
+    expect(await client.paymentModeId("transfer")).toBe(4)
+    expect(fake.apiCalls()).toHaveLength(1)
+  })
+
+  it("lists a document's payment milestones", async () => {
+    const fake = fakeHenrri({
+      "GET /v1/documents/42/paymentmilestones": () => ({
+        status: 200,
+        body: { elements: [{ id: 9, amount: 1336, isPaid: false, documentId: 42 }] },
+      }),
+    })
+    expect(await clientFor(fake).paymentMilestones(42)).toEqual([{ id: 9, amount: 1336, paid: false }])
+  })
+
+  it("pays a milestone, carrying any remainder over to a new milestone due the same day", async () => {
+    const fake = fakeHenrri({ "POST /v1/paymentmilestones/9/pay": () => ({ status: 201, body: { id: 215 } }) })
+    await clientFor(fake).payMilestone(9, { paymentModeId: 3, date: "2026-10-14", amount: 111 })
+    expect(fake.apiCalls()[0].body).toEqual({
+      paymentModeId: 3,
+      date: "2026-10-14",
+      amount: 111,
+      ecartDueDate: "2026-10-14",
+    })
+  })
+
+  it("pays a milestone in full when no amount is given", async () => {
+    const fake = fakeHenrri({ "POST /v1/paymentmilestones/9/pay": () => ({ status: 201, body: { id: 216 } }) })
+    await clientFor(fake).payMilestone(9, { paymentModeId: 4, date: "2026-10-14" })
+    expect(fake.apiCalls()[0].body).toEqual({ paymentModeId: 4, date: "2026-10-14" })
+  })
+})

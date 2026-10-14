@@ -11,6 +11,7 @@ import {
   artworks,
   auditLogs,
   cartItems,
+  henrriDocuments,
   legalCategories,
   orders,
   paymentCarte,
@@ -462,6 +463,9 @@ describe("payments — Stripe card (Story 6.1)", () => {
       expect(carte.processedAt).not.toBeNull()
       const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
       expect(order.paymentStatus).toBe("received")
+      // Fully paid: its Henrri invoice is queued (story 12.6).
+      const queued = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
+      expect(queued).toEqual([expect.objectContaining({ kind: "invoice", status: "pending" })])
     })
 
     it("still settles the payment when the charge lookup fails (card details left empty)", async () => {
@@ -1106,6 +1110,11 @@ describe("payments — Stripe card (Story 6.1)", () => {
         )
         const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(order.paymentStatus).toBe("partially_refunded")
+        // A settled refund queues its credit note (story 12.6).
+        const queued = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
+        expect(queued).toEqual([
+          expect.objectContaining({ kind: "credit_note", refundId: res.json().data.id, expectedTotalTtc: "40.00" }),
+        ])
       })
 
       it("full refund flips the order to refunded", async () => {
@@ -1232,6 +1241,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(res.json().data).toMatchObject({ status: "pending", orderPaymentStatus: "received" })
         const [pending] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(pending.paymentStatus).toBe("received") // not refunded until confirmed
+        expect(await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))).toEqual([])
 
         vi.mocked(constructWebhookEvent).mockReturnValue({
           type: "refund.updated",
@@ -1254,6 +1264,9 @@ describe("payments — Stripe card (Story 6.1)", () => {
         const settledRefunds = await db.select().from(refunds).where(eq(refunds.stripeRefundId, "re_async"))
         expect(settledRefunds).toHaveLength(1)
         expect(settledRefunds[0].status).toBe("succeeded")
+        // Confirmed, then replayed: one credit note.
+        const queued = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
+        expect(queued).toEqual([expect.objectContaining({ kind: "credit_note", expectedTotalTtc: "100.00" })])
       })
     })
 
