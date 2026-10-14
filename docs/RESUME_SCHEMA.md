@@ -22,7 +22,7 @@
 | **Produits**     | products, productVariants, ancient_weapons        | SKU + variants        |
 | **Gun Art**      | artworks, artworkPrints                           | Max 25 tirages/format |
 | **Commandes**    | orders, orderItems, paymentVirement, paymentCarte | Split automatique     |
-| **Factures**     | invoices                                          | Henrri sync           |
+| **Factures**     | henrri_documents (factures + avoirs)              | Henrri (story 12.6)   |
 | **Stock**        | stockMovements                                    | Trail complet         |
 | **Blog**         | blogPosts                                         | SEO + tags            |
 | **Audit**        | auditLogs                                         | RGPD compliance       |

@@ -109,6 +109,10 @@ export const refundChannelEnum = pgEnum("refund_channel", ["carte", "virement"])
 // A card refund may settle asynchronously (pending → succeeded via webhook); a
 // manually-recorded virement refund is asserted succeeded by the admin.
 export const refundStatusEnum = pgEnum("refund_status", ["pending", "succeeded", "failed", "cancelled"])
+// Story 12.6 — documents comptables poussés dans Henrri. `blocked` attend un humain
+// (commande non facturable, total Henrri différent du nôtre, refus métier).
+export const henrriDocumentKindEnum = pgEnum("henrri_document_kind", ["invoice", "credit_note"])
+export const henrriDocumentStatusEnum = pgEnum("henrri_document_status", ["pending", "draft", "finalized", "blocked"])
 export const printStatusEnum = pgEnum("print_status", [
   "available",
   "in_cart",
@@ -162,6 +166,9 @@ export const users = pgTable(
     vipDiscountPct: decimal("vip_discount_pct", { precision: 5, scale: 2 }).default("0"),
     vipEligibleSince: timestamp("vip_eligible_since"), // date du 1er achat arme neuve
     vipActive: boolean("vip_active").default(false),
+
+    // Client Henrri de l'acheteur (story 12.6), créé à sa première facture.
+    henrriCustomerId: integer("henrri_customer_id").unique(),
 
     // Adresse
     addressStreet: varchar("address_street", { length: 255 }),
@@ -1430,12 +1437,6 @@ export const orders = pgTable(
     // `recomputeOrderShippingStatus` seulement. Stocké pour filtrer la liste admin.
     shippingStatus: orderShippingStatusEnum("shipping_status").notNull().default("unshipped"),
 
-    // Henrri
-    henrriInvoiceId: varchar("henrri_invoice_id", { length: 100 }).unique(),
-    henrriSyncAt: timestamp("henrri_sync_at"),
-    henrriSyncStatus: varchar("henrri_sync_status", { length: 50 }), // pending, synced, failed
-    henrriErrorMsg: text("henrri_error_msg"),
-
     // Métadonnées
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -1445,7 +1446,6 @@ export const orders = pgTable(
      index("idx_orders_legal_status").on(t.legalVerificationStatus),
      index("idx_orders_payment_status").on(t.paymentStatus),
      index("idx_orders_created").on(t.createdAt),
-     index("idx_orders_henrri").on(t.henrriInvoiceId),
      index("idx_orders_shipping_status").on(t.shippingStatus),
      foreignKey({
       columns: [t.userId],
@@ -1472,7 +1472,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   shipments: many(shipments),
   paymentVirement: one(paymentVirement),
   paymentCarte: one(paymentCarte),
-  invoice: one(invoices),
+  henrriDocuments: many(henrriDocuments),
   prints: many(artworkPrints),
   auditLogs: many(auditLogs),
 }))
@@ -1846,46 +1846,59 @@ export const refundsRelations = relations(refunds, ({ one }) => ({
 }))
 
 // ============================================================================
-// 9. FACTURES (Henrri)
+// 9. FACTURES & AVOIRS (Henrri)
 // ============================================================================
 
-export const invoices = pgTable(
-  "invoices",
+// Une ligne par document comptable Henrri (story 12.6) : la facture d'une commande
+// payée, ou l'avoir d'un remboursement. Henrri numérote ; le site ne garde que
+// l'id du brouillon (posé dès sa création, c'est l'idempotence : l'API n'a aucun
+// champ de référence externe) et le numéro définitif. Pas d'URL de PDF : Henrri
+// la régénère à la demande, valable 10 minutes.
+export const henrriDocuments = pgTable(
+  "henrri_documents",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     orderId: uuid("order_id").notNull(),
+    // Null pour la facture, renseigné pour l'avoir du remboursement.
+    refundId: uuid("refund_id").unique(),
+    kind: henrriDocumentKindEnum("kind").notNull(),
+    status: henrriDocumentStatusEnum("status").notNull().default("pending"),
 
-    // Henrri
-    henrriInvoiceNumber: varchar("henrri_invoice_number", { length: 50 })
-      .notNull()
-      .unique(),
-    henrriSyncStatus: varchar("henrri_sync_status", { length: 50 }).default("pending"),
+    henrriDocumentId: integer("henrri_document_id").unique(),
+    henrriNumber: varchar("henrri_number", { length: 50 }).unique(),
+    // Montant TTC figé par le site : jamais finalisé si le total Henrri diffère.
+    expectedTotalTtc: decimal("expected_total_ttc", { precision: 10, scale: 2 }).notNull(),
 
-    // PDF
-    pdfUrl: varchar("pdf_url", { length: 512 }),
-    pdfGeneratedAt: timestamp("pdf_generated_at"),
-
-    // Dates
-    issuedAt: timestamp("issued_at"),
-    dueDate: date("due_date"),
+    // File de traitement, sur le modèle de `orders.confirmation_sent_at`.
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    claimedAt: timestamp("claimed_at"),
+    finalizedAt: timestamp("finalized_at"),
 
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },
   (t) => [
-     index("idx_invoices_order").on(t.orderId),
-     index("idx_invoices_henrri_number").on(t.henrriInvoiceNumber),
-     foreignKey({
-      columns: [t.orderId],
-      foreignColumns: [orders.id],
-    }).onDelete("cascade"),
+    index("idx_henrri_documents_order").on(t.orderId),
+    index("idx_henrri_documents_status").on(t.status),
+    // Une seule facture par commande ; les avoirs, eux, sont un par remboursement.
+    uniqueIndex("uq_henrri_documents_order_invoice")
+      .on(t.orderId)
+      .where(sql`${t.kind} = 'invoice'`),
+    check("henrri_documents_refund_matches_kind", sql`(${t.kind} = 'invoice') = (${t.refundId} IS NULL)`),
+    foreignKey({ columns: [t.orderId], foreignColumns: [orders.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.refundId], foreignColumns: [refunds.id] }).onDelete("cascade"),
   ],
 )
 
-export const invoicesRelations = relations(invoices, ({ one }) => ({
+export const henrriDocumentsRelations = relations(henrriDocuments, ({ one }) => ({
   order: one(orders, {
-    fields: [invoices.orderId],
+    fields: [henrriDocuments.orderId],
     references: [orders.id],
+  }),
+  refund: one(refunds, {
+    fields: [henrriDocuments.refundId],
+    references: [refunds.id],
   }),
 }))
 
