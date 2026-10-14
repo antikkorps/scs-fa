@@ -148,7 +148,8 @@ describe("Henrri client — authentication", () => {
       .getDocument(5)
       .catch((caught: unknown) => caught)
     expect(error).toBeInstanceOf(HenrriError)
-    expect(error).toMatchObject({ code: "AuthenticationFailed", status: 401, retryable: false })
+    // Retryable: a rotated or mistyped secret must leave the queue waiting, not block it (audit 2026-10-14).
+    expect(error).toMatchObject({ code: "AuthenticationFailed", status: 401, retryable: true })
     expect(JSON.stringify(error)).not.toContain(CLIENT_SECRET)
     expect(String((error as Error).message)).not.toContain(CLIENT_SECRET)
   })
@@ -275,7 +276,9 @@ describe("Henrri client — documents", () => {
     ])
     await clientFor(fake).addLine(42, matLine)
 
-    expect(fake.apiCalls().find((call) => call.path.startsWith("/v1/items"))?.path).toBe("/v1/items?search=TAP-1")
+    expect(fake.apiCalls().find((call) => call.path.startsWith("/v1/items"))?.path).toBe(
+      "/v1/items?search=TAP-1&limit=100&page=1",
+    )
     expect(fake.apiCalls().at(-1)?.body).toEqual({
       typeId: 12,
       itemId: 71,
@@ -363,37 +366,23 @@ describe("Henrri client — documents", () => {
     await clientFor(fake).deleteDocument(42)
     expect(fake.apiCalls()[0]).toMatchObject({ method: "DELETE", path: "/v1/documents/42" })
   })
-
-  it("asks for a temporary PDF link", async () => {
-    const fake = fakeHenrri({
-      "POST /v1/documents/42/pdf/url": () => ({
-        status: 200,
-        body: { downloadUrl: "https://henrri.test/files/abc", expiresAt: "2026-10-14T20:10:00Z", fileName: "F.pdf" },
-      }),
-    })
-    expect(await clientFor(fake).pdfLink(42)).toEqual({
-      url: "https://henrri.test/files/abc",
-      expiresAt: "2026-10-14T20:10:00Z",
-      fileName: "F.pdf",
-    })
-  })
 })
 
 describe("Henrri client — customers", () => {
   const buyer = {
     firstName: "Jean",
     lastName: "Tireur",
-    email: "jean@example.test",
     address: { line1: "1 rue du Tir", line2: null, postal: "75001", city: "Paris", country: "FR" },
   }
 
-  it("creates an individual customer with a single contact and the billing address", async () => {
+  it("creates an individual customer with a single contact and the billing address, without the e-mail", async () => {
     const fake = fakeHenrri({ "POST /v1/customers": () => ({ status: 201, body: { id: 9 } }) })
     expect(await clientFor(fake).createCustomer(buyer)).toBe(9)
+    // Decision 2026-10-14: the e-mail is not needed on an invoice, and the site mails the buyer itself.
     expect(fake.apiCalls()[0].body).toEqual({
       name: "Jean Tireur",
       type: "individual",
-      contacts: [{ firstName: "Jean", lastName: "Tireur", email: "jean@example.test", isPrimary: true }],
+      contacts: [{ firstName: "Jean", lastName: "Tireur", isPrimary: true }],
       address: { address: "1 rue du Tir", postCode: "75001", city: "Paris", country: "France" },
     })
   })
@@ -404,12 +393,145 @@ describe("Henrri client — customers", () => {
     expect(fake.apiCalls()[0].body).toMatchObject({ address: { address: "1 rue du Tir\nBâtiment B" } })
   })
 
-  it("updates the name and billing address of an existing customer, never its contacts", async () => {
-    const fake = fakeHenrri({ "PUT /v1/customers/9": () => ({ status: 200, body: { id: 9 } }) })
+  it("updates only the name and address, keeping what the accountant set in Henrri", async () => {
+    // A customer PUT replaces the whole record: read it first, change only our fields.
+    const stored = {
+      id: 9,
+      name: "Jean Ancien",
+      type: "individual",
+      accountingNumber: "411TIREUR",
+      vatNumber: "",
+      comment: "Client fidèle",
+      address: { id: 5, address: "Ancienne adresse", postCode: "69002", city: "Lyon", country: "France" },
+      contacts: [{ id: 3, lastName: "Tireur" }],
+      links: [],
+    }
+    const fake = fakeHenrri({
+      "GET /v1/customers/9": () => ({ status: 200, body: stored }),
+      "PUT /v1/customers/9": () => ({ status: 200, body: { id: 9 } }),
+    })
     await clientFor(fake).updateCustomer(9, buyer)
-    const body = fake.apiCalls()[0].body as Record<string, unknown>
-    expect(body).toMatchObject({ id: 9, name: "Jean Tireur", type: "individual" })
+    const body = fake.apiCalls().find((call) => call.method === "PUT")?.body as Record<string, unknown>
+    expect(body).toMatchObject({
+      id: 9,
+      name: "Jean Tireur",
+      type: "individual",
+      accountingNumber: "411TIREUR",
+      comment: "Client fidèle",
+      address: { address: "1 rue du Tir", postCode: "75001", city: "Paris", country: "France" },
+    })
     expect(body).not.toHaveProperty("contacts")
+    expect(body).not.toHaveProperty("links")
+  })
+})
+
+describe("Henrri client — resilience (audit 2026-10-14)", () => {
+  it("gives up on a call that hangs, as a retryable timeout", async () => {
+    const hanging: typeof fetch = (input, init) =>
+      new Promise((resolve, reject) => {
+        if (new URL(String(input)).pathname === "/v1/users/authenticate") {
+          resolve(Response.json({ access_token: "token-1", expires_in: 600 }))
+          return
+        }
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason))
+      })
+    const client = createHenrriClient({
+      baseUrl: BASE_URL,
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      fetchImpl: hanging,
+      timeoutMs: 20,
+    })
+    const error = await client.getDocument(5).catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: "Timeout", status: null, retryable: true })
+  })
+
+  it("reads the monthly quota refusal, retryable", async () => {
+    const fake = fakeHenrri({
+      "POST /v1/documents/5/finalize": () => ({
+        status: 429,
+        body: { code: "QUOTA_EXCEEDED", message: "You have exceeded your monthly Quota of 200 API calls." },
+      }),
+    })
+    const error = await clientFor(fake)
+      .finalizeDocument(5)
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({
+      code: "QUOTA_EXCEEDED",
+      status: 429,
+      retryable: true,
+      message: "You have exceeded your monthly Quota of 200 API calls.",
+    })
+  })
+
+  it("treats a refused permission as retryable, so the queue waits for a fix", async () => {
+    const fake = fakeHenrri({ "GET /v1/documents/5": () => ({ status: 403 }) })
+    const error = await clientFor(fake)
+      .getDocument(5)
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ status: 403, retryable: true })
+  })
+
+  it("never retries a configuration problem on our side", async () => {
+    const fake = fakeHenrri({ "GET /v1/paymentmodes": () => ({ status: 200, body: { elements: [] } }) })
+    const error = await clientFor(fake)
+      .paymentModeId("bankCard")
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: "MissingPaymentMode", retryable: false })
+  })
+
+  it("accepts the token in camelCase too, as the spec's schema writes it", async () => {
+    const calls: string[] = []
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const path = new URL(String(input)).pathname
+      if (path === "/v1/users/authenticate") return Response.json({ accessToken: "token-camel", expiresIn: 600 })
+      calls.push(new Headers(init?.headers).get("authorization") ?? "")
+      return Response.json({ id: 5, finalized: false })
+    }
+    const client = createHenrriClient({
+      baseUrl: BASE_URL,
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      fetchImpl,
+    })
+    await client.getDocument(5)
+    expect(calls).toEqual(["Bearer token-camel"])
+  })
+
+  it("finds an article beyond the first page of Henrri's fuzzy search", async () => {
+    const fake = fakeHenrri({
+      "GET /v1/documentlinetypes": () => lineTypes,
+      "GET /v1/items": (call) =>
+        call.path.includes("page=1")
+          ? { status: 200, body: { elements: [{ id: 1, reference: "SUPPORT" }], meta: { hasNext: true } } }
+          : { status: 200, body: { elements: [{ id: 2, reference: "PORT" }], meta: { hasNext: false } } },
+      "POST /v1/documents/42/lines": () => ({ status: 201, body: { id: 1 } }),
+    })
+    await clientFor(fake).addLine(42, {
+      designation: "Frais de port",
+      article: { reference: "PORT", description: "Frais de port" },
+      quantity: 1,
+      unitPrice: 20.83,
+      vatPct: 20,
+    })
+    expect(fake.apiCalls().at(-1)?.body).toMatchObject({ itemId: 2 })
+  })
+
+  it("refuses a PDF larger than any invoice could be", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      if (new URL(String(input)).pathname === "/v1/users/authenticate") {
+        return Response.json({ access_token: "token-1", expires_in: 600 })
+      }
+      return new Response("x", { status: 200, headers: { "content-length": String(50 * 1024 * 1024) } })
+    }
+    const client = createHenrriClient({
+      baseUrl: BASE_URL,
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      fetchImpl,
+    })
+    const error = await client.pdf(42).catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: "PdfTooLarge" })
   })
 })
 

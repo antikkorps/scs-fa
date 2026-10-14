@@ -15,10 +15,10 @@ export interface HenrriDocument {
   totalTtc: number
 }
 
+/** Who the invoice is made out to. No e-mail: not needed on an invoice (decision 2026-10-14). */
 export interface HenrriBuyer {
   firstName: string
   lastName: string
-  email: string
   address: { line1: string; line2: string | null; postal: string; city: string; country: string }
 }
 
@@ -38,12 +38,6 @@ export interface HenrriPayment {
   amount?: number
 }
 
-export interface HenrriPdfLink {
-  url: string
-  expiresAt: string
-  fileName: string | null
-}
-
 export interface HenrriClientOptions {
   baseUrl: string
   clientId: string
@@ -51,12 +45,17 @@ export interface HenrriClientOptions {
   fetchImpl?: typeof fetch
   /** Milliseconds clock, injectable for tests. */
   now?: () => number
+  /** Per-call limit: a call that hangs becomes a retryable `Timeout` (default 30 s). */
+  timeoutMs?: number
 }
 
 /**
  * A failed Henrri call. `code` is Henrri's business error code (e.g.
  * `LINES_MISSING`) when it sent one, otherwise a local code. `retryable` tells
- * the queue whether trying again later can help.
+ * the queue whether trying again later can help: Henrri unreachable, slow,
+ * rate-limited, out of credits, or refusing our credentials all wait for a later
+ * pass; a refusal of the document itself, or a configuration gap on our side
+ * (`Missing…`), needs a human.
  */
 export class HenrriError extends Error {
   constructor(
@@ -69,14 +68,20 @@ export class HenrriError extends Error {
   }
 
   get retryable(): boolean {
+    if (this.code.startsWith("Missing")) return false
     if (this.status === null) return true
-    return this.status === 429 || this.status >= 500
+    return this.status === 401 || this.status === 403 || this.status === 429 || this.status >= 500
   }
 }
 
 // Renew this long before Henrri's expiry, so a token never dies mid-request.
 const TOKEN_RENEWAL_MARGIN_MS = 60_000
 const BUSINESS_ERROR_CODE = /^[A-Z][A-Z0-9_]+$/
+const DEFAULT_TIMEOUT_MS = 30_000
+// An invoice PDF weighs tens of kilobytes; anything far beyond is not one.
+const MAX_PDF_BYTES = 10 * 1024 * 1024
+// Item search is fuzzy and paged: how many pages to read before giving up.
+const MAX_SEARCH_PAGES = 10
 const COUNTRY_NAMES = new Intl.DisplayNames(["fr"], { type: "region" })
 
 interface CachedToken {
@@ -86,6 +91,9 @@ interface CachedToken {
 
 interface ProblemDetails {
   errorCode?: string | null
+  /** The quota refusal uses `code` / `message` instead of the ProblemDetails fields. */
+  code?: string | null
+  message?: string | null
   title?: string | null
   detail?: string | null
   /** ASP.NET validation failures: field → messages. */
@@ -101,6 +109,14 @@ interface RawDocument {
 
 interface ListResponse<T> {
   elements: T[] | null
+  meta?: { hasNext?: boolean } | null
+}
+
+interface TokenBody {
+  access_token?: string
+  accessToken?: string
+  expires_in?: number
+  expiresIn?: number
 }
 
 function toDocument(raw: RawDocument): HenrriDocument {
@@ -128,9 +144,9 @@ function errorFrom(status: number, body: unknown): HenrriError {
     const fields = Object.entries(problem.errors).map(([field, messages]) => `${field}: ${messages.join(" ")}`)
     return new HenrriError("ValidationError", status, [problem.title, ...fields].filter(Boolean).join(" "))
   }
-  const candidate = problem.errorCode ?? ""
+  const candidate = problem.errorCode ?? problem.code ?? ""
   const code = BUSINESS_ERROR_CODE.test(candidate) ? candidate : `Http${status}`
-  const message = problem.detail ?? problem.title ?? `Henrri answered ${status}`
+  const message = problem.detail ?? problem.message ?? problem.title ?? `Henrri answered ${status}`
   return new HenrriError(code, status, message)
 }
 
@@ -175,6 +191,7 @@ export function createHenrriClient(options: HenrriClientOptions) {
   const baseUrl = options.baseUrl.replace(/\/+$/, "")
   const fetchImpl = options.fetchImpl ?? fetch
   const now = options.now ?? Date.now
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   let token: CachedToken | null = null
   let pendingToken: Promise<CachedToken> | null = null
@@ -194,13 +211,16 @@ export function createHenrriClient(options: HenrriClientOptions) {
     const headers: Record<string, string> = { accept }
     if (body !== undefined) headers["content-type"] = "application/json"
     if (bearer) headers.authorization = `Bearer ${bearer}`
+    const signal = AbortSignal.timeout(timeoutMs)
     try {
       return await fetchImpl(`${baseUrl}${path}`, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
       })
     } catch {
+      if (signal.aborted) throw new HenrriError("Timeout", null, `Henrri took over ${timeoutMs} ms (${method} ${path})`)
       throw new HenrriError("NetworkError", null, `Henrri unreachable (${method} ${path})`)
     }
   }
@@ -215,9 +235,11 @@ export function createHenrriClient(options: HenrriClientOptions) {
     if (response.status === 401 || response.status === 403) {
       throw new HenrriError("AuthenticationFailed", response.status, "Henrri refused the API credentials")
     }
-    const body = (await readJson(response)) as { access_token?: string; expires_in?: number } | null
-    if (!response.ok || !body?.access_token) throw errorFrom(response.status, body)
-    return { value: body.access_token, expiresAt: now() + (body.expires_in ?? 600) * 1000 }
+    // The quickstart answers in snake_case, the spec's schema in camelCase: take either.
+    const body = (await readJson(response)) as TokenBody | null
+    const value = body?.access_token ?? body?.accessToken
+    if (!response.ok || !value) throw errorFrom(response.status, body)
+    return { value, expiresAt: now() + (body?.expires_in ?? body?.expiresIn ?? 600) * 1000 }
   }
 
   async function validToken(): Promise<string> {
@@ -274,13 +296,21 @@ export function createHenrriClient(options: HenrriClientOptions) {
     return category.id
   }
 
-  /** Henrri's search is fuzzy: only an exact reference match counts. */
+  /**
+   * Henrri's search is fuzzy and paged: "PORT" also matches "SUPPORT", "TRANSPORT"…
+   * Only an exact reference counts, possibly beyond the first page.
+   */
   async function findArticle(reference: string): Promise<number | null> {
-    const list = await required<ListResponse<{ id: number; reference: string | null }>>(
-      "GET",
-      `/v1/items?search=${encodeURIComponent(reference)}`,
-    )
-    return (list.elements ?? []).find((item) => item.reference === reference)?.id ?? null
+    for (let page = 1; page <= MAX_SEARCH_PAGES; page += 1) {
+      const list = await required<ListResponse<{ id: number; reference: string | null }>>(
+        "GET",
+        `/v1/items?search=${encodeURIComponent(reference)}&limit=100&page=${page}`,
+      )
+      const match = (list.elements ?? []).find((item) => item.reference === reference)
+      if (match) return match.id
+      if (!list.meta?.hasNext) return null
+    }
+    return null
   }
 
   async function createArticle(article: DraftArticle, line: DraftLine): Promise<number> {
@@ -334,14 +364,24 @@ export function createHenrriClient(options: HenrriClientOptions) {
     async createCustomer(buyer: HenrriBuyer): Promise<number> {
       const created = await required<{ id: number }>("POST", "/v1/customers", {
         ...customerBody(buyer),
-        contacts: [{ firstName: buyer.firstName, lastName: buyer.lastName, email: buyer.email, isPrimary: true }],
+        contacts: [{ firstName: buyer.firstName, lastName: buyer.lastName, isPrimary: true }],
       })
       return created.id
     },
 
-    /** Contacts cannot travel in a customer PUT (Henrri: PUT_WITH_CUSTOMER). */
+    /**
+     * A customer PUT replaces the whole record, so the stored one is read first and
+     * only the name and address change: what the accountant set in Henrri (account
+     * number, VAT number, comment…) is kept. Contacts cannot travel in a PUT
+     * (PUT_WITH_CUSTOMER), nor links.
+     */
     async updateCustomer(customerId: number, buyer: HenrriBuyer): Promise<void> {
-      await required("PUT", `/v1/customers/${customerId}`, { id: customerId, ...customerBody(buyer) })
+      const {
+        contacts: _contacts,
+        links: _links,
+        ...stored
+      } = await required<Record<string, unknown>>("GET", `/v1/customers/${customerId}`)
+      await required("PUT", `/v1/customers/${customerId}`, { ...stored, id: customerId, ...customerBody(buyer) })
     },
 
     async createDocument(input: { documentTypeId: number; customerId: number; title: string }): Promise<number> {
@@ -414,15 +454,14 @@ export function createHenrriClient(options: HenrriClientOptions) {
     async pdf(documentId: number): Promise<Uint8Array> {
       const response = await authorized("GET", `/v1/documents/${documentId}/pdf`, undefined, "application/pdf")
       if (!response.ok) throw errorFrom(response.status, await readJson(response))
-      return new Uint8Array(await response.arrayBuffer())
-    },
-
-    async pdfLink(documentId: number): Promise<HenrriPdfLink> {
-      const link = await required<{ downloadUrl: string; expiresAt: string; fileName?: string | null }>(
-        "POST",
-        `/v1/documents/${documentId}/pdf/url`,
-      )
-      return { url: link.downloadUrl, expiresAt: link.expiresAt, fileName: link.fileName ?? null }
+      if (Number(response.headers.get("content-length") ?? 0) > MAX_PDF_BYTES) {
+        throw new HenrriError("PdfTooLarge", response.status, "Henrri sent a PDF far larger than an invoice")
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      if (bytes.byteLength > MAX_PDF_BYTES) {
+        throw new HenrriError("PdfTooLarge", response.status, "Henrri sent a PDF far larger than an invoice")
+      }
+      return bytes
     },
   }
 }

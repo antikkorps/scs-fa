@@ -1,6 +1,6 @@
 // Story 12.6 — what the back-office sees of the Henrri queue, and how it nudges it.
 
-import { and, asc, count, eq, inArray, isNull, lt, or, sql } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm"
 import { db } from "../db/client.js"
 import { henrriDocuments } from "../db/schema.js"
 
@@ -22,6 +22,7 @@ export async function henrriDocumentsOfOrder(orderId: string) {
     amountTtc: Number(row.expectedTotalTtc),
     refundId: row.refundId,
     lastError: row.lastError,
+    held: row.heldAt !== null,
     attempts: row.attempts,
     finalizedAt: row.finalizedAt,
     paymentRecordedAt: row.paymentRecordedAt,
@@ -29,14 +30,22 @@ export async function henrriDocumentsOfOrder(orderId: string) {
   }))
 }
 
-/** Puts an order's blocked documents back in the queue. Returns how many. */
+/**
+ * Puts an order's blocked documents back in the queue, and releases the issued
+ * ones held for an admin (their payment is tried again). Returns how many.
+ */
 export async function retryOrderDocuments(orderId: string): Promise<number> {
-  const reset = await db
+  const blocked = await db
     .update(henrriDocuments)
-    .set({ status: "pending", lastError: null, claimedAt: null, updatedAt: new Date() })
+    .set({ status: "pending", lastError: null, claimedAt: null, claimToken: null, updatedAt: new Date() })
     .where(and(eq(henrriDocuments.orderId, orderId), eq(henrriDocuments.status, "blocked")))
     .returning({ id: henrriDocuments.id })
-  return reset.length
+  const held = await db
+    .update(henrriDocuments)
+    .set({ heldAt: null, lastError: null, claimedAt: null, claimToken: null, updatedAt: new Date() })
+    .where(and(eq(henrriDocuments.orderId, orderId), isNotNull(henrriDocuments.heldAt)))
+    .returning({ id: henrriDocuments.id })
+  return blocked.length + held.length
 }
 
 /**
@@ -58,6 +67,7 @@ function needsAttention() {
   const stalledSince = sql`now() - make_interval(mins => ${STALLED_AFTER_MINUTES})`
   return or(
     eq(henrriDocuments.status, "blocked"),
+    isNotNull(henrriDocuments.heldAt),
     and(inArray(henrriDocuments.status, ["pending", "draft"]), lt(henrriDocuments.createdAt, stalledSince)),
     and(
       eq(henrriDocuments.status, "finalized"),

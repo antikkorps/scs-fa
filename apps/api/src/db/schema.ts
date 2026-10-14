@@ -169,6 +169,8 @@ export const users = pgTable(
 
     // Client Henrri de l'acheteur (story 12.6), créé à sa première facture.
     henrriCustomerId: integer("henrri_customer_id").unique(),
+    // Empreinte du nom + adresse envoyés à Henrri : la fiche n'est réécrite que s'ils changent.
+    henrriCustomerFingerprint: text("henrri_customer_fingerprint"),
 
     // Adresse
     addressStreet: varchar("address_street", { length: 255 }),
@@ -1873,6 +1875,12 @@ export const henrriDocuments = pgTable(
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error"),
     claimedAt: timestamp("claimed_at"),
+    // Jeton de la passe qui détient la ligne : toute écriture le vérifie, une passe
+    // périmée (Henrri lent, réservation reprise) ne peut donc rien écraser.
+    claimToken: uuid("claim_token"),
+    // Document émis mais en attente d'un humain (règlement refusé ou incohérent) :
+    // il reste émis, la file ne le reprend plus tant qu'un admin ne le relance pas.
+    heldAt: timestamp("held_at"),
     finalizedAt: timestamp("finalized_at"),
     // Facture seulement : le règlement (CB / virement) enregistré chez Henrri,
     // après la finalisation — jamais sur un brouillon (il deviendrait indélébile).
@@ -1891,8 +1899,10 @@ export const henrriDocuments = pgTable(
       .on(t.orderId)
       .where(sql`${t.kind} = 'invoice'`),
     check("henrri_documents_refund_matches_kind", sql`(${t.kind} = 'invoice') = (${t.refundId} IS NULL)`),
-    foreignKey({ columns: [t.orderId], foreignColumns: [orders.id] }).onDelete("cascade"),
-    foreignKey({ columns: [t.refundId], foreignColumns: [refunds.id] }).onDelete("cascade"),
+    // Pièces comptables conservées 10 ans : leur commande ou leur remboursement ne
+    // peut pas être supprimé tant qu'elles existent.
+    foreignKey({ columns: [t.orderId], foreignColumns: [orders.id] }).onDelete("restrict"),
+    foreignKey({ columns: [t.refundId], foreignColumns: [refunds.id] }).onDelete("restrict"),
   ],
 )
 

@@ -10,7 +10,7 @@ if (!client) {
 try {
   const result = await processPendingHenrriDocuments(client, console)
   console.info(
-    `✅ Henrri sync: ${result.queued} queued, ${result.finalized} done, ${result.retry} to retry, ${result.blocked} blocked, ${result.waiting} waiting`,
+    `✅ Henrri sync: ${result.queued} queued, ${result.finalized} done, ${result.held} held, ${result.blocked} blocked, ${result.waiting} waiting${result.halted ? " — stopped early, Henrri unavailable" : ""}`,
   )
   process.exit(0)
 } catch (err) {

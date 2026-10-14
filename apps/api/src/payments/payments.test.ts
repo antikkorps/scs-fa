@@ -33,6 +33,7 @@ vi.mock("./stripe.js", () => ({
   constructWebhookEvent: vi.fn(),
 }))
 
+import { enqueueInvoice } from "../henrri/queue.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import {
   constructWebhookEvent,
@@ -101,6 +102,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
 
     await db.delete(auditLogs).where(inArray(auditLogs.entityId, carteIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
+    await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, orderIds))
     await db.delete(refunds).where(inArray(refunds.orderId, orderIds))
     // Prints still attached to a test order must be released before the order is
     // deleted (orderId FK has no cascade); released/seeded prints go with the
@@ -1116,6 +1118,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
 
       it("partial refund flags the order partially_refunded and calls Stripe with the cents amount", async () => {
         const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_rf_p1")
+        await enqueueInvoice(orderId)
         vi.mocked(createRefund).mockResolvedValue({ id: "re_p1", status: "succeeded" } as never)
 
         const res = await refund(orderId, { channel: "carte", amount: 40 })
@@ -1131,9 +1134,11 @@ describe("payments — Stripe card (Story 6.1)", () => {
         const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(order.paymentStatus).toBe("partially_refunded")
         // A settled refund queues its credit note (story 12.6).
-        const queued = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
-        expect(queued).toEqual([
-          expect.objectContaining({ kind: "credit_note", refundId: res.json().data.id, expectedTotalTtc: "40.00" }),
+        const creditNotes = (
+          await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
+        ).filter((document) => document.kind === "credit_note")
+        expect(creditNotes).toEqual([
+          expect.objectContaining({ refundId: res.json().data.id, expectedTotalTtc: "40.00" }),
         ])
       })
 
@@ -1254,6 +1259,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
 
       it("settles a pending card refund only when the webhook confirms it (idempotent)", async () => {
         const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_async")
+        await enqueueInvoice(orderId)
         vi.mocked(createRefund).mockResolvedValue({ id: "re_async", status: "pending" } as never)
 
         const res = await refund(orderId, { channel: "carte", amount: 100 })
@@ -1261,7 +1267,11 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(res.json().data).toMatchObject({ status: "pending", orderPaymentStatus: "received" })
         const [pending] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(pending.paymentStatus).toBe("received") // not refunded until confirmed
-        expect(await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))).toEqual([])
+        const creditNotesOf = async () =>
+          (await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))).filter(
+            (document) => document.kind === "credit_note",
+          )
+        expect(await creditNotesOf()).toEqual([])
 
         vi.mocked(constructWebhookEvent).mockReturnValue({
           type: "refund.updated",
@@ -1285,8 +1295,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(settledRefunds).toHaveLength(1)
         expect(settledRefunds[0].status).toBe("succeeded")
         // Confirmed, then replayed: one credit note.
-        const queued = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
-        expect(queued).toEqual([expect.objectContaining({ kind: "credit_note", expectedTotalTtc: "100.00" })])
+        expect(await creditNotesOf()).toEqual([expect.objectContaining({ expectedTotalTtc: "100.00" })])
       })
     })
 

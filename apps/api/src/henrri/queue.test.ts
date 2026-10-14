@@ -93,7 +93,16 @@ async function createBuyer(henrriCustomerId: number | null = null) {
 }
 
 /** A paid order: card-only (mat, 120 + 9 shipping) or mixed (rifle by transfer, mat by card). */
-async function createPaidOrder(options: { mixed?: boolean; legacy?: boolean; userId?: string } = {}) {
+async function createPaidOrder(
+  options: {
+    mixed?: boolean
+    legacy?: boolean
+    userId?: string
+    cardPaidAt?: Date
+    transferReceived?: string
+    billingCity?: string
+  } = {},
+) {
   const userId = options.userId ?? (await createBuyer())
   const smallParcel = { amountTtc: 9, priceHt: 7.5, vatAmount: 1.5, vatPct: 20 }
   const items = options.mixed ? [rifle, mat] : [mat]
@@ -113,19 +122,24 @@ async function createPaidOrder(options: { mixed?: boolean; legacy?: boolean; use
       shippingCost: "9.00",
       shippingHt: "7.50",
       shippingAddress: address,
-      billingAddress: address,
+      billingAddress: options.billingCity ? { ...address, city: options.billingCity } : address,
     })
     .returning({ id: orders.id })
-  await db
-    .insert(paymentCarte)
-    .values({ orderId: order.id, amountTtc: "129.00", paymentStatus: "received", currency: "EUR" })
+  await db.insert(paymentCarte).values({
+    orderId: order.id,
+    amountTtc: "129.00",
+    paymentStatus: "received",
+    currency: "EUR",
+    processedAt: options.cardPaidAt ?? null,
+  })
   if (options.mixed) {
     await db.insert(paymentVirement).values({
       orderId: order.id,
       amountExpectedTtc: "1200.00",
-      amountReceivedTtc: "1200.00",
+      amountReceivedTtc: options.transferReceived ?? "1200.00",
       ibanRecipient: "FR7630006000011234567890189",
       paymentStatus: "reconciled",
+      receivedAt: new Date("2026-10-12T09:00:00Z"),
     })
   }
   return { orderId: order.id, userId }
@@ -166,6 +180,7 @@ describe("Henrri queue (story 12.6)", () => {
 
     it("queues one credit note per refund, at the refunded amount", async () => {
       const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
       const [refund] = await db
         .insert(refunds)
         .values({ orderId, channel: "carte", amountTtc: "50.00", status: "succeeded" })
@@ -206,7 +221,7 @@ describe("Henrri queue (story 12.6)", () => {
       expect(document.milestones).toEqual([expect.objectContaining({ paid: true, paymentModeId: FAKE_MODES.bankCard })])
     })
 
-    it("updates a buyer Henrri already knows instead of creating a second one", async () => {
+    it("reuses the buyer Henrri already knows, without rewriting an unchanged record", async () => {
       const userId = await createBuyer()
       const { orderId: first } = await createPaidOrder({ userId })
       await enqueueInvoice(first)
@@ -215,8 +230,68 @@ describe("Henrri queue (story 12.6)", () => {
       await enqueueInvoice(second)
       await sync()
 
+      // Henrri allows 100 calls an hour: an unchanged buyer costs none.
       expect(henrri.calls.filter((call) => call === "createCustomer")).toHaveLength(1)
+      expect(henrri.calls.filter((call) => call === "updateCustomer")).toHaveLength(0)
+    })
+
+    it("updates the buyer's record when the billing address changed", async () => {
+      const userId = await createBuyer()
+      const { orderId: first } = await createPaidOrder({ userId })
+      await enqueueInvoice(first)
+      await sync()
+      const { orderId: second } = await createPaidOrder({ userId, billingCity: "Lyon" })
+      await enqueueInvoice(second)
+      await sync()
+
       expect(henrri.calls.filter((call) => call === "updateCustomer")).toHaveLength(1)
+      expect([...henrri.customers.values()].at(-1)?.address.city).toBe("Lyon")
+    })
+
+    it("creates the buyer again when Henrri no longer knows them", async () => {
+      const userId = await createBuyer(999_999)
+      await db.update(users).set({ henrriCustomerFingerprint: "stale" }).where(eq(users.id, userId))
+      const { orderId } = await createPaidOrder({ userId })
+      await enqueueInvoice(orderId)
+      await sync()
+
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "finalized" })
+      const [buyer] = await db
+        .select({ henrriCustomerId: users.henrriCustomerId })
+        .from(users)
+        .where(eq(users.id, userId))
+      expect(buyer.henrriCustomerId).not.toBe(999_999)
+    })
+
+    it("dates each payment on the day the money came in", async () => {
+      const { orderId } = await createPaidOrder({ mixed: true, cardPaidAt: new Date("2026-10-11T22:30:00Z") })
+      await enqueueInvoice(orderId)
+      await sync()
+
+      const [document] = henrri.finalizedDocuments()
+      // 22:30 UTC on the 11th is already the 12th in Paris.
+      expect(document.milestones.map((milestone) => milestone.date)).toEqual(["2026-10-12", "2026-10-12"])
+    })
+
+    it("holds an issued invoice whose payments do not add up, instead of marking it paid", async () => {
+      // The admin accepted a transfer 5 € short.
+      const { orderId } = await createPaidOrder({ mixed: true, transferReceived: "1195.00" })
+      await enqueueInvoice(orderId)
+      await sync()
+
+      const invoice = await invoiceOf(orderId)
+      expect(invoice).toMatchObject({
+        status: "finalized",
+        paymentRecordedAt: null,
+        lastError: "PaymentMismatch: received 1324.00, invoiced 1329.00",
+      })
+      expect(invoice.heldAt).toBeInstanceOf(Date)
+      const [document] = henrri.finalizedDocuments()
+      expect(document.milestones).toEqual([
+        expect.objectContaining({ amount: 129, paid: true }),
+        expect.objectContaining({ amount: 1195, paid: true }),
+        expect.objectContaining({ amount: 5, paid: false }),
+      ])
     })
 
     it("records a mixed payment: the card share first, then the transfer for the rest", async () => {
@@ -295,7 +370,7 @@ describe("Henrri queue (story 12.6)", () => {
   })
 
   describe("retries", () => {
-    it("waits when Henrri is down, then rebuilds the abandoned draft rather than adding to it", async () => {
+    it("waits when Henrri is down, then finalizes the draft it left, already complete", async () => {
       const { orderId } = await createPaidOrder()
       await enqueueInvoice(orderId)
       henrri.failNext("finalizeDocument", new HenrriError("Http503", 503, "Unavailable"))
@@ -307,14 +382,113 @@ describe("Henrri queue (story 12.6)", () => {
         attempts: 1,
         lastError: "Http503: Unavailable",
         claimedAt: null,
+        claimToken: null,
       })
-      const abandonedDraft = stalled.henrriDocumentId
 
       await sync()
       const invoice = await invoiceOf(orderId)
       expect(invoice).toMatchObject({ status: "finalized", attempts: 2, lastError: null })
-      expect(henrri.documents.has(abandonedDraft ?? -1)).toBe(false)
+      // Its total matched to the cent: finalized as is, not rebuilt (calls are rationed).
+      expect(invoice.henrriDocumentId).toBe(stalled.henrriDocumentId)
+      expect(henrri.calls.filter((call) => call === "createDocument")).toHaveLength(1)
       expect(henrri.finalizedDocuments()).toHaveLength(1)
+    })
+
+    it("rebuilds a draft left incomplete", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      // The shipping line never made it.
+      henrri.failNext("addLine", new HenrriError("Timeout", null, "Slow"))
+      await sync()
+      const stalled = await invoiceOf(orderId)
+      expect(stalled.status).toBe("draft")
+
+      await sync()
+      const invoice = await invoiceOf(orderId)
+      expect(invoice.status).toBe("finalized")
+      expect(henrri.documents.has(stalled.henrriDocumentId ?? -1)).toBe(false)
+      expect(henrri.finalizedDocuments()).toHaveLength(1)
+    })
+
+    it("stops the pass at the first sign of trouble, sparing Henrri's rationed calls", async () => {
+      const first = await createPaidOrder()
+      const second = await createPaidOrder()
+      await enqueueInvoice(first.orderId)
+      await enqueueInvoice(second.orderId)
+      henrri.failNext("createDocument", new HenrriError("Http429", 429, "Too many requests"))
+      const result = await sync()
+
+      expect(result).toMatchObject({ halted: true })
+      expect(henrri.calls.filter((call) => call === "createDocument")).toHaveLength(1)
+      expect(await invoiceOf(second.orderId)).toMatchObject({ status: "pending", attempts: 0 })
+    })
+
+    it("waits, rather than blocks, when Henrri refuses our credentials", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      henrri.failNext("createCustomer", new HenrriError("AuthenticationFailed", 401, "Refused"))
+      await sync()
+
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "pending", lastError: "AuthenticationFailed: Refused" })
+    })
+
+    it("asks again for a number Henrri gave without sending it", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      henrri.withholdNextNumber()
+      await sync()
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "draft", henrriNumber: null })
+
+      await sync()
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "finalized", henrriNumber: "26-10-1" })
+      expect(henrri.finalizedDocuments()).toHaveLength(1)
+    })
+
+    it("keeps an issued invoice issued when Henrri refuses its payment, held for an admin", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      henrri.failNext("payMilestone", new HenrriError("PAYMENT_DATE_REQUIRED", 400, "Date required"))
+      await sync()
+
+      const invoice = await invoiceOf(orderId)
+      expect(invoice).toMatchObject({
+        status: "finalized",
+        henrriNumber: "26-10-1",
+        paymentRecordedAt: null,
+        lastError: "PAYMENT_DATE_REQUIRED: Date required",
+      })
+      expect(invoice.heldAt).toBeInstanceOf(Date)
+
+      // Held: later passes leave it alone until an admin retries.
+      await sync()
+      expect(henrri.calls.filter((call) => call === "payMilestone")).toHaveLength(1)
+    })
+
+    it("never lets a pass that lost its claim overwrite the pass that took over", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      // While the first pass waits on Henrri, its claim expires and another pass takes the row.
+      henrri.beforeNext("finalizeDocument", async () => {
+        await db
+          .update(henrriDocuments)
+          .set({ claimToken: "00000000-0000-4000-8000-000000000000", status: "blocked", lastError: "other pass" })
+          .where(eq(henrriDocuments.orderId, orderId))
+      })
+      const result = await sync()
+
+      expect(result.skipped).toBe(1)
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "blocked", lastError: "other pass" })
+    })
+
+    it("records a generic code, not the raw text, for an unexpected error", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      henrri.beforeNext("createCustomer", async () => {
+        throw new Error("duplicate key value violates unique constraint (email)=(jean@example.test)")
+      })
+      await sync()
+
+      expect((await invoiceOf(orderId)).lastError).toBe("InternalError")
     })
 
     it("picks up an invoice finalized just before a crash, without issuing a second one", async () => {
@@ -354,6 +528,40 @@ describe("Henrri queue (story 12.6)", () => {
 
       expect(await invoiceOf(orderId)).toMatchObject({ status: "pending", attempts: 0 })
       expect(henrri.calls).toEqual([])
+    })
+  })
+
+  describe("catching up", () => {
+    it("queues the invoice of a paid order that never got one", async () => {
+      const { orderId } = await createPaidOrder()
+      await sync()
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "finalized" })
+    })
+
+    it("leaves orders placed before the invoice snapshot out of the catch-up", async () => {
+      const { orderId } = await createPaidOrder({ legacy: true })
+      await sync()
+      expect(await documentsOf(orderId)).toEqual([])
+    })
+
+    it("queues a credit note only once the order has an invoice", async () => {
+      const { orderId } = await createPaidOrder()
+      const [refund] = await db
+        .insert(refunds)
+        .values({ orderId, channel: "carte", amountTtc: "50.00", status: "succeeded" })
+        .returning({ id: refunds.id })
+      await enqueueCreditNote(refund.id)
+      expect(await documentsOf(orderId)).toEqual([])
+
+      await sync()
+      await sync()
+      const kinds = (await documentsOf(orderId)).map((document) => [document.kind, document.status])
+      expect(kinds).toEqual(
+        expect.arrayContaining([
+          ["invoice", "finalized"],
+          ["credit_note", "finalized"],
+        ]),
+      )
     })
   })
 

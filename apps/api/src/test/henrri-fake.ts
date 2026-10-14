@@ -15,7 +15,7 @@ interface FakeDocument {
   lines: DraftLine[]
   finalized: boolean
   number: string | null
-  milestones: Array<HenrriMilestone & { paymentModeId: number | null }>
+  milestones: Array<HenrriMilestone & { paymentModeId: number | null; date: string | null }>
 }
 
 type Method = keyof HenrriClient
@@ -27,14 +27,18 @@ export function createFakeHenrri() {
   const customers = new Map<number, HenrriBuyer>()
   const documents = new Map<number, FakeDocument>()
   const failures = new Map<Method, HenrriError[]>()
+  const hooks = new Map<Method, Array<() => Promise<void>>>()
+  let withheldNumbers = 0
   const calls: Method[] = []
   let nextId = 100
   let sequence = 0
   /** Added to every document total, to simulate Henrri disagreeing with us. */
   let totalSkew = 0
 
-  function track(method: Method) {
+  async function track(method: Method) {
     calls.push(method)
+    const hook = hooks.get(method)?.shift()
+    if (hook) await hook()
     const queued = failures.get(method)
     const failure = queued?.shift()
     if (failure) throw failure
@@ -59,84 +63,92 @@ export function createFakeHenrri() {
 
   const client: HenrriClient = {
     async documentTypeId(kind) {
-      track("documentTypeId")
+      await track("documentTypeId")
       return FAKE_TYPES[kind]
     },
     async createCustomer(buyer) {
-      track("createCustomer")
+      await track("createCustomer")
       nextId += 1
       customers.set(nextId, buyer)
       return nextId
     },
     async updateCustomer(customerId, buyer) {
-      track("updateCustomer")
+      await track("updateCustomer")
+      if (!customers.has(customerId)) throw new HenrriError("NotFound", 404, `No customer ${customerId}`)
       customers.set(customerId, buyer)
     },
     async createDocument(input) {
-      track("createDocument")
+      await track("createDocument")
       nextId += 1
       documents.set(nextId, { id: nextId, ...input, lines: [], finalized: false, number: null, milestones: [] })
       return nextId
     },
     async addLine(documentId, line) {
-      track("addLine")
+      await track("addLine")
       const document = documentOf(documentId)
       if (document.finalized) throw new HenrriError("DOCUMENT_FINALIZED", 400, "Finalized")
       document.lines.push(line)
     },
     async getDocument(documentId) {
-      track("getDocument")
+      await track("getDocument")
       const document = documents.get(documentId)
       return document ? view(document) : null
     },
     async deleteDocument(documentId) {
-      track("deleteDocument")
-      const document = documentOf(documentId)
+      await track("deleteDocument")
+      // The real client ignores a 404: deleting what is already gone is fine.
+      const document = documents.get(documentId)
+      if (!document) return
       if (document.finalized) throw new HenrriError("ACCOUNTING_DOCUMENT", 400, "Finalized documents stay")
       documents.delete(documentId)
     },
     async finalizeDocument(documentId) {
-      track("finalizeDocument")
+      await track("finalizeDocument")
       const document = documentOf(documentId)
       if (document.lines.length === 0) throw new HenrriError("LINES_MISSING", 400, "No lines")
       sequence += 1
       document.finalized = true
       document.number = `26-10-${sequence}`
+      if (withheldNumbers > 0) {
+        withheldNumbers -= 1
+        return { ...view(document), number: null }
+      }
       nextId += 1
-      document.milestones = [{ id: nextId, amount: totalOf(document), paid: false, paymentModeId: null }]
+      document.milestones = [{ id: nextId, amount: totalOf(document), paid: false, paymentModeId: null, date: null }]
       return view(document)
     },
     async pdf(documentId) {
-      track("pdf")
+      await track("pdf")
       const document = documentOf(documentId)
       return new TextEncoder().encode(`%PDF fake ${document.number ?? "draft"}`)
     },
-    async pdfLink(documentId) {
-      track("pdfLink")
-      return { url: `https://henrri.test/files/${documentId}`, expiresAt: "2026-10-14T20:10:00Z", fileName: "F.pdf" }
-    },
     async paymentModeId(type) {
-      track("paymentModeId")
+      await track("paymentModeId")
       return FAKE_MODES[type]
     },
     async paymentMilestones(documentId) {
-      track("paymentMilestones")
+      await track("paymentMilestones")
       return documentOf(documentId).milestones.map(({ id, amount, paid }) => ({ id, amount, paid }))
     },
     async payMilestone(milestoneId: number, payment: HenrriPayment) {
-      track("payMilestone")
+      await track("payMilestone")
       for (const document of documents.values()) {
         const milestone = document.milestones.find((candidate) => candidate.id === milestoneId)
         if (!milestone) continue
         if (milestone.paid) throw new HenrriError("MILESTONE_ALREADY_PAID", 400, "Paid")
+        if (payment.amount !== undefined && payment.amount > milestone.amount) {
+          // As the sandbox answers an overpayment without a retention type.
+          throw new HenrriError("ECART_RETENTION_TYPE_REQUIRED", 400, "Retention type required")
+        }
         const paid = payment.amount ?? milestone.amount
         const rest = Math.round((milestone.amount - paid) * 100) / 100
         milestone.amount = paid
         milestone.paid = true
         milestone.paymentModeId = payment.paymentModeId
+        milestone.date = payment.date
         if (rest > 0) {
           nextId += 1
-          document.milestones.push({ id: nextId, amount: rest, paid: false, paymentModeId: null })
+          document.milestones.push({ id: nextId, amount: rest, paid: false, paymentModeId: null, date: null })
         }
         return
       }
@@ -149,6 +161,14 @@ export function createFakeHenrri() {
     customers,
     documents,
     calls,
+    /** Runs `hook` when `method` is next called, before it answers (e.g. another pass taking over). */
+    beforeNext(method: Method, hook: () => Promise<void>) {
+      hooks.set(method, [...(hooks.get(method) ?? []), hook])
+    },
+    /** The next finalization answers without the number (Henrri still assigned one). */
+    withholdNextNumber() {
+      withheldNumbers += 1
+    },
     /** The next call to `method` fails with `error`. */
     failNext(method: Method, error: HenrriError) {
       failures.set(method, [...(failures.get(method) ?? []), error])
