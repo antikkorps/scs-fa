@@ -11,6 +11,7 @@ import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
 import { db } from "../db/client.js"
 import { henrriDocuments, orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
+import { sendInvoiceAvailableEmail } from "../email.js"
 import { env } from "../env.js"
 import { type HenrriBuyer, type HenrriClient, HenrriError, henrriClientFromConfig } from "./client.js"
 import { buildCreditNoteDraft, buildInvoiceDraft, type DocumentDraft, type DraftResult } from "./documents.js"
@@ -56,7 +57,7 @@ function toCents(amount: number | string): number {
   return Math.round(Number(amount) * 100)
 }
 
-/** The rows a pass works on: never-finished documents and unrecorded payments. */
+/** The rows a pass works on: unfinished documents, unrecorded payments, untold buyers. */
 function workToDo() {
   return or(
     inArray(henrriDocuments.status, ["pending", "draft"]),
@@ -65,6 +66,7 @@ function workToDo() {
       eq(henrriDocuments.kind, "invoice"),
       isNull(henrriDocuments.paymentRecordedAt),
     ),
+    and(eq(henrriDocuments.status, "finalized"), isNull(henrriDocuments.customerNotifiedAt)),
   )
 }
 
@@ -251,7 +253,7 @@ async function invoiceGate(orderId: string): Promise<"ready" | "waiting" | "bloc
   return invoice.status === "finalized" ? "ready" : "waiting"
 }
 
-async function runSteps(client: HenrriClient, document: HenrriDocumentRow): Promise<ProcessOutcome> {
+async function runSteps(client: HenrriClient, document: HenrriDocumentRow, log: Logger): Promise<ProcessOutcome> {
   const context = await loadOrder(document.orderId)
   if (!context) return block(document.id, "OrderNotFound")
 
@@ -272,16 +274,33 @@ async function runSteps(client: HenrriClient, document: HenrriDocumentRow): Prom
     await update(document.id, { status: "finalized", henrriNumber: number, finalizedAt: new Date(), lastError: null })
   }
 
-  if (document.kind === "invoice") {
-    const [current] = await db
-      .select({ henrriDocumentId: henrriDocuments.henrriDocumentId })
-      .from(henrriDocuments)
-      .where(eq(henrriDocuments.id, document.id))
-    if (current?.henrriDocumentId != null) await recordPayment(client, current.henrriDocumentId, context)
+  const [issued] = await db.select().from(henrriDocuments).where(eq(henrriDocuments.id, document.id))
+  if (issued.kind === "invoice" && issued.paymentRecordedAt === null) {
+    if (issued.henrriDocumentId !== null) await recordPayment(client, issued.henrriDocumentId, context)
     await update(document.id, { paymentRecordedAt: new Date() })
   }
   await update(document.id, { claimedAt: null, lastError: null })
+  if (issued.customerNotifiedAt === null && issued.henrriNumber) await notifyBuyer(issued, context, log)
   return "finalized"
+}
+
+/**
+ * "Your invoice / credit note is available". A mail failure is no Henrri
+ * failure: the document stays issued and the next pass tries the mail again.
+ */
+async function notifyBuyer(document: HenrriDocumentRow, context: OrderContext, log: Logger) {
+  try {
+    await sendInvoiceAvailableEmail(context.email, {
+      orderId: context.orderId,
+      orderRef: orderReference(context.orderId),
+      kind: document.kind,
+      number: document.henrriNumber ?? "",
+      amountTtc: Number(document.expectedTotalTtc),
+    })
+    await update(document.id, { customerNotifiedAt: new Date() })
+  } catch (err) {
+    log.warn({ err, documentId: document.id }, "Invoice e-mail failed — retried on the next pass")
+  }
 }
 
 /** One document, as far as it can go. Never throws: failures are recorded on the row. */
@@ -301,7 +320,7 @@ export async function processHenrriDocument(
   const document = await claim(documentId)
   if (!document) return "skipped"
   try {
-    return await runSteps(client, document)
+    return await runSteps(client, document, log)
   } catch (error) {
     const henrriError = error instanceof HenrriError ? error : null
     const reason = henrriError ? `${henrriError.code}: ${henrriError.message}` : String(error)

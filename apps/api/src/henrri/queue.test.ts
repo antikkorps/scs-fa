@@ -1,6 +1,6 @@
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { eq, inArray, like } from "drizzle-orm"
-import { afterAll, beforeEach, describe, expect, it } from "vitest"
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "../db/client.js"
 import {
   henrriDocuments,
@@ -11,9 +11,15 @@ import {
   refunds,
   users,
 } from "../db/schema.js"
+import { sendInvoiceAvailableEmail } from "../email.js"
 import { createFakeHenrri, FAKE_MODES, type FakeHenrri } from "../test/henrri-fake.js"
 import { HenrriError } from "./client.js"
 import { enqueueCreditNote, enqueueInvoice, henrriClientFromEnv, processPendingHenrriDocuments } from "./queue.js"
+
+vi.mock("../email.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../email.js")>()),
+  sendInvoiceAvailableEmail: vi.fn(),
+}))
 
 const EMAIL_PREFIX = "henrri-queue-test"
 const silentLog = { info: () => {}, warn: () => {}, error: () => {} }
@@ -140,6 +146,7 @@ describe("Henrri queue (story 12.6)", () => {
   beforeEach(async () => {
     await cleanup()
     henrri = createFakeHenrri()
+    vi.mocked(sendInvoiceAvailableEmail).mockReset().mockResolvedValue(undefined)
   })
 
   afterAll(cleanup)
@@ -255,6 +262,35 @@ describe("Henrri queue (story 12.6)", () => {
         status: "blocked",
         lastError: "NUMBERING_ERROR: Numbering failed",
       })
+    })
+  })
+
+  describe("telling the buyer", () => {
+    it("e-mails the buyer once the invoice is issued, and only once", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      await sync()
+      await sync()
+
+      expect(vi.mocked(sendInvoiceAvailableEmail)).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(sendInvoiceAvailableEmail)).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^${EMAIL_PREFIX}`)),
+        { orderId, orderRef: orderId.slice(0, 8).toUpperCase(), kind: "invoice", number: "26-10-1", amountTtc: 129 },
+      )
+      expect((await invoiceOf(orderId)).customerNotifiedAt).toBeInstanceOf(Date)
+    })
+
+    it("tries the e-mail again on the next pass when it fails, without touching Henrri", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      vi.mocked(sendInvoiceAvailableEmail).mockRejectedValueOnce(new Error("SMTP down"))
+      await sync()
+      expect(await invoiceOf(orderId)).toMatchObject({ status: "finalized", customerNotifiedAt: null, lastError: null })
+
+      const henrriCallsBefore = henrri.calls.length
+      await sync()
+      expect((await invoiceOf(orderId)).customerNotifiedAt).toBeInstanceOf(Date)
+      expect(henrri.calls.length).toBe(henrriCallsBefore)
     })
   })
 
