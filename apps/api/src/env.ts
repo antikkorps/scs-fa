@@ -59,6 +59,16 @@ const envSchema = z.object({
   // tests regardless). External cron can call the orders:confirmations CLI instead.
   ORDER_CONFIRMATION_RETRY_MINUTES: z.coerce.number().int().min(0).default(15),
 
+  // Henrri invoicing (story 12.6). OPTIONAL like the carriers below: with no
+  // credentials, paid orders simply queue their invoice until Henrri is set up,
+  // so a laptop and CI boot unchanged. Sandbox: https://api-sandbox.henrri.io,
+  // production: https://api.henrri.io. The webhook secret verifies the HMAC
+  // signature of the events Henrri POSTs us.
+  HENRRI_BASE_URL: z.string().url().optional(),
+  HENRRI_CLIENT_ID: z.string().optional(),
+  HENRRI_CLIENT_SECRET: z.string().optional(),
+  HENRRI_WEBHOOK_SECRET: z.string().optional(),
+
   // Automatic carrier tracking (Story 11.9b). Both providers are OPTIONAL: with
   // no credentials the sync simply does nothing and "delivered" stays a manual
   // admin action, exactly as before — a laptop, CI and a launch without carrier

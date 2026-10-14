@@ -165,6 +165,26 @@ describe("calculateOrderPaymentSplit", () => {
     expect(split.virement.amountTtc).toBe(1200)
     expect(split.carte.amountTtc).toBe(180)
   })
+
+  it("computes the VAT by rate over the whole order, the way the invoice does (story 12.6)", () => {
+    const split = calculateOrderPaymentSplit([
+      { priceHt: 0.33, vatPct: 20, requiresPaymentVirement: false },
+      { priceHt: 0.33, vatPct: 20, requiresPaymentVirement: false },
+      { priceHt: 0.33, vatPct: 20, requiresPaymentVirement: false },
+    ])
+    // 0.99 HT × 20 % = 0.198 → 0.20, not 3 × 0.066 → 3 × 0.07.
+    expect(split.carte).toEqual({ amountHt: 0.99, vat: 0.2, amountTtc: 1.19 })
+  })
+
+  it("lets the card take what the transfer leaves, so the two always add up to the invoice", () => {
+    const split = calculateOrderPaymentSplit([
+      { priceHt: 0.33, vatPct: 20, requiresPaymentVirement: true },
+      { priceHt: 0.33, vatPct: 20, requiresPaymentVirement: false },
+    ])
+    // Whole order: 0.66 HT → 0.13 VAT → 0.79. Transfer alone: 0.33 → 0.07 → 0.40.
+    expect(split.virement).toEqual({ amountHt: 0.33, vat: 0.07, amountTtc: 0.4 })
+    expect(split.carte).toEqual({ amountHt: 0.33, vat: 0.06, amountTtc: 0.39 })
+  })
 })
 
 describe("orderReference", () => {

@@ -2,6 +2,7 @@ import {
   calculateVipDiscount,
   computePriceTtc,
   computeShippingCost,
+  computeVatTotals,
   requiresVirement,
   round2,
   type ShippableLine,
@@ -235,13 +236,19 @@ export async function loadCart(userId: string): Promise<CartView> {
   const allLines = [...items, ...artworkItems]
   const subtotalHt = round2(allLines.reduce((sum, l) => sum + l.lineHt, 0))
   const vipDiscountAmount = round2(allLines.reduce((sum, l) => sum + l.discountAmount, 0))
-  const goodsTtc = round2(allLines.reduce((sum, l) => sum + l.lineTtc, 0))
-  const goodsVat = round2(goodsTtc - (subtotalHt - vipDiscountAmount))
   const itemCount = items.reduce((sum, l) => sum + l.qty, 0) + artworkItems.length
 
   // Priced on the net (VIP-discounted) lines, but the discount itself never
   // touches shipping (story 12.3).
   const shipping = computeShippingCost(shippableLinesOf(items, artworkItems), await loadShippingRates())
+
+  // The VAT is computed by rate over the whole cart, the way the Henrri invoice
+  // computes it (story 12.6): `lineTtc` is shown per line, but the total may
+  // differ from their sum by a cent.
+  const totals = computeVatTotals([
+    ...allLines.map((l) => ({ priceHt: round2(l.lineHt - l.discountAmount), vatPct: l.vatPct })),
+    ...shipping.portions,
+  ])
 
   return {
     isVip,
@@ -251,8 +258,8 @@ export async function loadCart(userId: string): Promise<CartView> {
       itemCount,
       subtotalHt,
       vipDiscountAmount,
-      vatAmount: round2(goodsVat + shipping.vatAmount),
-      totalTtc: round2(goodsTtc + shipping.totalTtc),
+      vatAmount: totals.vatAmount,
+      totalTtc: totals.totalTtc,
       shipping,
     },
   }

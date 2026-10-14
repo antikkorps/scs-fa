@@ -1,5 +1,5 @@
 import { normaliseHeader, parseCsv } from "./csv.js"
-import { round2 } from "./pricing.js"
+import { computeVatTotals, round2 } from "./pricing.js"
 
 // How an order must be paid, depending on what it contains.
 export const PAYMENT_SPLIT = {
@@ -188,12 +188,6 @@ export function amountsMatchToCent(a: number, b: number): boolean {
 export interface PaymentSplitItem {
   priceHt: number
   vatPct: number
-  /**
-   * The VAT already settled for this item, when it was derived from a TTC amount
-   * (a shipping slice, story 12.3): recomputing it from the rounded HT could
-   * drift a cent away from the price the customer was shown.
-   */
-  vatAmount?: number
   requiresPaymentVirement: boolean
 }
 
@@ -203,33 +197,23 @@ export interface PaymentSplit {
   carte: { amountHt: number; vat: number; amountTtc: number }
 }
 
-/** Split order line amounts into a bank-transfer bucket and a card bucket. */
+/**
+ * Split order line amounts into a bank-transfer bucket and a card bucket.
+ *
+ * The VAT is computed by rate over the whole order, the way the Henrri invoice
+ * computes it (story 12.6). The transfer bucket is priced on its own lines and
+ * the card takes what is left, so the two always add up to the invoice total.
+ */
 export function calculateOrderPaymentSplit(items: PaymentSplitItem[]): PaymentSplit {
-  let virementHt = 0
-  let carteHt = 0
-  let virementVat = 0
-  let carteVat = 0
-
-  for (const item of items) {
-    const itemVat = item.vatAmount ?? item.priceHt * (item.vatPct / 100)
-    if (item.requiresPaymentVirement) {
-      virementHt += item.priceHt
-      virementVat += itemVat
-    } else {
-      carteHt += item.priceHt
-      carteVat += itemVat
-    }
-  }
-
-  virementHt = round2(virementHt)
-  carteHt = round2(carteHt)
-  virementVat = round2(virementVat)
-  carteVat = round2(carteVat)
+  const order = computeVatTotals(items)
+  const virement = computeVatTotals(items.filter((item) => item.requiresPaymentVirement))
+  const carteHt = round2(order.totalHt - virement.totalHt)
+  const carteVat = round2(order.vatAmount - virement.vatAmount)
 
   let splitType: PaymentSplitType
-  if (virementHt > 0 && carteHt === 0) {
+  if (virement.totalHt > 0 && carteHt === 0) {
     splitType = PAYMENT_SPLIT.VIREMENT_ONLY
-  } else if (virementHt === 0 && carteHt > 0) {
+  } else if (virement.totalHt === 0 && carteHt > 0) {
     splitType = PAYMENT_SPLIT.CARTE_ONLY
   } else {
     splitType = PAYMENT_SPLIT.MIXED
@@ -237,16 +221,8 @@ export function calculateOrderPaymentSplit(items: PaymentSplitItem[]): PaymentSp
 
   return {
     splitType,
-    virement: {
-      amountHt: virementHt,
-      vat: virementVat,
-      amountTtc: round2(virementHt + virementVat),
-    },
-    carte: {
-      amountHt: carteHt,
-      vat: carteVat,
-      amountTtc: round2(carteHt + carteVat),
-    },
+    virement: { amountHt: virement.totalHt, vat: virement.vatAmount, amountTtc: virement.totalTtc },
+    carte: { amountHt: carteHt, vat: carteVat, amountTtc: round2(order.totalTtc - virement.totalTtc) },
   }
 }
 
