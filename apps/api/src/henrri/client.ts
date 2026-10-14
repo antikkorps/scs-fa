@@ -132,10 +132,10 @@ function customerBody(buyer: HenrriBuyer) {
   }
 }
 
-function lineBody(typeId: number, itemId: number, line: DraftLine, taxIncluded: boolean) {
+function lineBody(typeId: number, itemId: number, line: DraftLine) {
   // The line keeps its own text, price and VAT rate whatever the article says
-  // (checked on the sandbox, 2026-10-14). On a tax-included document Henrri reads
-  // `sellingPriceWithoutTax` as the TTC price.
+  // (checked on the sandbox, 2026-10-14). Always HT: Henrri's tax-included mode
+  // reads the price as HT anyway through the API.
   return {
     typeId,
     itemId,
@@ -143,7 +143,7 @@ function lineBody(typeId: number, itemId: number, line: DraftLine, taxIncluded: 
     quantity: line.quantity,
     sellingPriceWithoutTax: line.unitPrice,
     vatPercent: line.vatPct,
-    isTaxIncluded: taxIncluded,
+    isTaxIncluded: false,
   }
 }
 
@@ -317,26 +317,21 @@ export function createHenrriClient(options: HenrriClientOptions) {
       await required("PUT", `/v1/customers/${customerId}`, { id: customerId, ...customerBody(buyer) })
     },
 
-    async createDocument(input: {
-      documentTypeId: number
-      customerId: number
-      title: string
-      taxIncluded: boolean
-    }): Promise<number> {
+    async createDocument(input: { documentTypeId: number; customerId: number; title: string }): Promise<number> {
       const created = await required<RawDocument>("POST", "/v1/documents", {
         documentTypeId: input.documentTypeId,
         customerId: input.customerId,
         title: input.title,
-        isTaxIncludedMode: input.taxIncluded,
+        isTaxIncludedMode: false,
       })
       return created.id
     },
 
-    async addLine(documentId: number, line: DraftLine, taxIncluded: boolean): Promise<void> {
+    async addLine(documentId: number, line: DraftLine): Promise<void> {
       itemLineTypeId ??= forgetOnFailure(loadItemLineTypeId(), () => {
         itemLineTypeId = null
       })
-      const body = lineBody(await itemLineTypeId, await articleId(line), line, taxIncluded)
+      const body = lineBody(await itemLineTypeId, await articleId(line), line)
       await required("POST", `/v1/documents/${documentId}/lines`, body)
     },
 

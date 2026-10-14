@@ -239,7 +239,6 @@ describe("Henrri client — documents", () => {
       documentTypeId: 3,
       customerId: 9,
       title: "Commande ABCD1234",
-      taxIncluded: false,
     })
     expect(id).toBe(42)
     expect(fake.apiCalls()[0].body).toEqual({
@@ -274,7 +273,7 @@ describe("Henrri client — documents", () => {
       { id: 70, reference: "TAP-10" },
       { id: 71, reference: "TAP-1" },
     ])
-    await clientFor(fake).addLine(42, matLine, false)
+    await clientFor(fake).addLine(42, matLine)
 
     expect(fake.apiCalls().find((call) => call.path.startsWith("/v1/items"))?.path).toBe("/v1/items?search=TAP-1")
     expect(fake.apiCalls().at(-1)?.body).toEqual({
@@ -291,8 +290,8 @@ describe("Henrri client — documents", () => {
   it("creates a missing article once, in the default product category", async () => {
     const fake = catalogRoutes([], { "POST /v1/items": () => ({ status: 201, body: { id: 80 } }) })
     const client = clientFor(fake)
-    await client.addLine(42, matLine, false)
-    await client.addLine(42, { ...matLine, quantity: 1 }, false)
+    await client.addLine(42, matLine)
+    await client.addLine(42, { ...matLine, quantity: 1 })
 
     const created = fake.apiCalls().filter((call) => call.method === "POST" && call.path === "/v1/items")
     expect(created).toHaveLength(1)
@@ -320,28 +319,8 @@ describe("Henrri client — documents", () => {
         body: { title: "Item already exists", status: 400, errorCode: "ITEM_DUPLICATE" },
       }),
     })
-    await clientFor(fake).addLine(42, matLine, false)
+    await clientFor(fake).addLine(42, matLine)
     expect(fake.apiCalls().at(-1)?.body).toMatchObject({ itemId: 90 })
-  })
-
-  it("sends the line price as TTC on a tax-included document", async () => {
-    const fake = catalogRoutes([{ id: 72, reference: "REMBOURSEMENT" }])
-    await clientFor(fake).addLine(
-      42,
-      {
-        designation: "Remboursement partiel",
-        article: { reference: "REMBOURSEMENT", description: "Remboursement" },
-        quantity: 1,
-        unitPrice: 96.6,
-        vatPct: 20,
-      },
-      true,
-    )
-    expect(fake.apiCalls().at(-1)?.body).toMatchObject({
-      itemId: 72,
-      isTaxIncluded: true,
-      sellingPriceWithoutTax: 96.6,
-    })
   })
 
   it("reads a document's number, state and Henrri's own total", async () => {

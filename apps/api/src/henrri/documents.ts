@@ -25,14 +25,12 @@ export interface DraftLine {
   designation: string
   article: DraftArticle
   quantity: number
-  /** HT or TTC, depending on the draft's `taxIncluded`. */
+  /** HT, at up to 8 decimals (Henrri's precision). */
   unitPrice: number
   vatPct: number
 }
 
 export interface DocumentDraft {
-  /** Henrri's document-wide mode: every line price is TTC when true, HT otherwise. */
-  taxIncluded: boolean
   lines: DraftLine[]
   expectedTotalTtc: number
 }
@@ -62,6 +60,14 @@ function toCents(amount: number): number {
 
 function fromCents(cents: number): number {
   return cents / 100
+}
+
+// Henrri keeps HT prices to 8 decimals (sandbox, 2026-10-14).
+const HENRRI_PRICE_DECIMALS = 1e8
+
+/** The HT price whose VAT-inclusive value is exactly `ttc`, at Henrri's precision. */
+function htFromTtc(ttc: number, vatPct: number): number {
+  return Math.round((ttc / (1 + vatPct / 100)) * HENRRI_PRICE_DECIMALS) / HENRRI_PRICE_DECIMALS
 }
 
 /** The snapshot lines, or null when the order predates the VAT-carrying snapshot. */
@@ -182,7 +188,6 @@ export function buildInvoiceDraft(source: InvoiceSource): DraftResult {
   return {
     ok: true,
     draft: {
-      taxIncluded: false,
       lines: invoiceLines(snapshot.lines, snapshot.shipping),
       expectedTotalTtc: source.totalTtc,
     },
@@ -192,7 +197,8 @@ export function buildInvoiceDraft(source: InvoiceSource): DraftResult {
 /**
  * The credit note of a refund. A full refund mirrors the invoice; a partial one
  * is split between VAT rates in proportion to what each weighed on the order
- * (decision 2026-10-14), priced TTC so the refunded amount stays exact.
+ * (decision 2026-10-14). Henrri's tax-included mode does not work through the API,
+ * so each share is entered HT at 8 decimals: its TTC is then the refunded cents.
  */
 export function buildCreditNoteDraft(source: InvoiceSource, refundTtc: number, orderRef: string): DraftResult {
   const snapshot = checkedSnapshot(source)
@@ -208,8 +214,8 @@ export function buildCreditNoteDraft(source: InvoiceSource, refundTtc: number, o
     designation: `Remboursement partiel de la commande ${orderRef}`,
     article: REFUND_ARTICLE,
     quantity: 1,
-    unitPrice: fromCents(cents),
+    unitPrice: htFromTtc(fromCents(cents), vatPct),
     vatPct,
   }))
-  return { ok: true, draft: { taxIncluded: true, lines, expectedTotalTtc: fromCents(refundCents) } }
+  return { ok: true, draft: { lines, expectedTotalTtc: fromCents(refundCents) } }
 }

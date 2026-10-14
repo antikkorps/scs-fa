@@ -45,11 +45,10 @@ function order(overrides: Partial<InvoiceSource> = {}): InvoiceSource {
 }
 
 describe("buildInvoiceDraft", () => {
-  it("bills each line at its frozen HT price and VAT rate, in HT mode", () => {
+  it("bills each line at its frozen HT price and VAT rate", () => {
     const result = buildInvoiceDraft(order())
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.draft.taxIncluded).toBe(false)
     expect(result.draft.lines.slice(0, 2)).toEqual([
       {
         designation: "Carabine",
@@ -152,21 +151,23 @@ describe("buildCreditNoteDraft", () => {
     })
     const result = buildCreditNoteDraft(withBook, 100, "ABCD1234")
     if (!result.ok) throw new Error(result.reason)
-    expect(result.draft.taxIncluded).toBe(true)
-    // 100 × 1200 / 1242.20 = 96.60 ; 100 × 42.20 / 1242.20 = 3.40
+    // Henrri's tax-included mode does not work through the API (sandbox,
+    // 2026-10-14): the credit note is entered HT, at the 8 decimals Henrri keeps,
+    // so that HT + VAT lands exactly on the refunded TTC.
+    // TTC 100 × 1200 / 1242.20 = 96.60 → 80.50 HT ; 100 × 42.20 / 1242.20 = 3.40 → 3.22274882 HT
     expect(result.draft.lines).toEqual([
       {
         designation: "Remboursement partiel de la commande ABCD1234",
         article: REFUND,
         quantity: 1,
-        unitPrice: 96.6,
+        unitPrice: 80.5,
         vatPct: 20,
       },
       {
         designation: "Remboursement partiel de la commande ABCD1234",
         article: REFUND,
         quantity: 1,
-        unitPrice: 3.4,
+        unitPrice: 3.22274882,
         vatPct: 5.5,
       },
     ])
@@ -184,8 +185,9 @@ describe("buildCreditNoteDraft", () => {
     })
     const result = buildCreditNoteDraft(thirds, 10, "ABCD1234")
     if (!result.ok) throw new Error(result.reason)
-    const refundedCents = result.draft.lines.reduce((sum, line) => sum + Math.round(line.unitPrice * 100), 0)
-    expect(refundedCents).toBe(1000)
+    const ttcCents = (line: { unitPrice: number; vatPct: number }) =>
+      Math.round(line.unitPrice * (1 + line.vatPct / 100) * 100)
+    expect(result.draft.lines.reduce((sum, line) => sum + ttcCents(line), 0)).toBe(1000)
   })
 
   it("keeps a single line when the order has a single VAT rate", () => {
@@ -196,7 +198,7 @@ describe("buildCreditNoteDraft", () => {
         designation: "Remboursement partiel de la commande ABCD1234",
         article: REFUND,
         quantity: 1,
-        unitPrice: 50,
+        unitPrice: 41.66666667,
         vatPct: 20,
       },
     ])
