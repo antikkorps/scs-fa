@@ -1,10 +1,17 @@
 import { adminOrderQuerySchema, uuidParamSchema } from "@armurier/shared"
-import { and, count, desc, eq, ilike, sql } from "drizzle-orm"
+import { and, count, desc, eq, ilike, inArray, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
+import { auditLogs, orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
+import {
+  countDocumentsNeedingAttention,
+  henrriDocumentsOfOrder,
+  ordersNeedingAttention,
+  retryOrderDocuments,
+} from "../henrri/admin.js"
+import { henrriClientFromEnv, processHenrriDocument } from "../henrri/queue.js"
 import { validationError } from "../http.js"
 import { adminShippingView } from "../shipments/service.js"
 
@@ -34,13 +41,14 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /api/admin/orders/summary — headline counts for the dashboard overview.
   // Declared before `/:id` so "summary" is never parsed as an order id.
   fastify.get("/summary", async (_request, reply) => {
-    const [[{ total }], byPayment, byLegal] = await Promise.all([
+    const [[{ total }], byPayment, byLegal, invoicesNeedingAttention] = await Promise.all([
       db.select({ total: count() }).from(orders),
       db.select({ status: orders.paymentStatus, n: count() }).from(orders).groupBy(orders.paymentStatus),
       db
         .select({ status: orders.legalVerificationStatus, n: count() })
         .from(orders)
         .groupBy(orders.legalVerificationStatus),
+      countDocumentsNeedingAttention(),
     ])
 
     const countWhere = (rows: Array<{ status: string; n: number }>, statuses: string[]) =>
@@ -54,6 +62,7 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
         refunded: countWhere(byPayment, ["refunded"]),
         docsToReview: countWhere(byLegal, ["pending", "docs_verifying"]),
         docsRejected: countWhere(byLegal, ["docs_rejected"]),
+        invoicesNeedingAttention,
         byPaymentStatus: Object.fromEntries(byPayment.map((r) => [r.status, r.n])),
         byLegalStatus: Object.fromEntries(byLegal.map((r) => [r.status, r.n])),
       },
@@ -66,12 +75,13 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) {
       return reply.code(400).send(validationError(parsed.error.issues))
     }
-    const { paymentStatus, legalStatus, shippingStatus, search, page, limit } = parsed.data
+    const { paymentStatus, legalStatus, shippingStatus, invoices, search, page, limit } = parsed.data
 
     const conditions = [
       paymentStatus ? eq(orders.paymentStatus, paymentStatus) : undefined,
       legalStatus ? eq(orders.legalVerificationStatus, legalStatus) : undefined,
       shippingStatus ? eq(orders.shippingStatus, shippingStatus) : undefined,
+      invoices === "attention" ? inArray(orders.id, ordersNeedingAttention()) : undefined,
       search ? ilike(users.email, `%${search}%`) : undefined,
     ].filter(Boolean)
     const where = conditions.length ? and(...conditions) : undefined
@@ -158,8 +168,40 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
         shippingCost: Number(order.shippingCost),
         shippingHt: Number(order.shippingHt),
         payment: { carte: carte ?? null, virement: virement ?? null, refunds: orderRefunds },
+        henrri: await henrriDocumentsOfOrder(order.id),
         ...shipping,
       },
     })
+  })
+
+  // POST /api/admin/orders/:id/henrri/retry — put the order's blocked invoice or
+  // credit notes back in the Henrri queue (story 12.6), and run them now when
+  // Henrri is configured, so the admin sees the outcome straight away.
+  fastify.post("/:id/henrri/retry", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, params.data.id)).limit(1)
+    if (!order) {
+      return reply.code(404).send({ error: "NotFound", message: "Order not found" })
+    }
+
+    const reset = await retryOrderDocuments(order.id)
+    await db.insert(auditLogs).values({
+      userId: request.user.sub,
+      entityType: "order",
+      entityId: order.id,
+      action: "henrri.retry",
+      newValue: { reset },
+    })
+
+    const client = henrriClientFromEnv()
+    if (client) {
+      for (const document of await henrriDocumentsOfOrder(order.id)) {
+        await processHenrriDocument(client, document.id, request.log)
+      }
+    }
+    return reply.code(200).send({ data: await henrriDocumentsOfOrder(order.id) })
   })
 }

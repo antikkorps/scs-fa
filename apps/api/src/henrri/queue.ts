@@ -333,8 +333,13 @@ export async function processPendingHenrriDocuments(client: HenrriClient, log: L
   return { queued: queued.length, ...outcomes }
 }
 
-/** The configured client, or null while Henrri is not set up. */
+/**
+ * The configured client, or null while Henrri is not set up — and always null
+ * under test: apps/api/.env may hold real sandbox credentials, and no test may
+ * ever reach Henrri (tests use the in-memory fake).
+ */
 export function henrriClientFromEnv(): HenrriClient | null {
+  if (env.NODE_ENV === "test") return null
   return henrriClientFromConfig({
     baseUrl: env.HENRRI_BASE_URL,
     clientId: env.HENRRI_CLIENT_ID,

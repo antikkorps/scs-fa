@@ -442,6 +442,8 @@ export const adminOrderQuerySchema = z.object({
   paymentStatus: z.enum(ORDER_PAYMENT_STATUSES).optional(),
   legalStatus: z.enum(ORDER_LEGAL_STATUSES).optional(),
   shippingStatus: z.enum(ORDER_SHIPPING_STATUSES).optional(),
+  // Story 12.6: orders whose Henrri invoice or credit notes need an admin.
+  invoices: z.enum(["attention"]).optional(),
   search: z.string().trim().min(1).max(255).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),

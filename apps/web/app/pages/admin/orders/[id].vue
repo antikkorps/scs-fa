@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AdminOrderDetail } from "~/types/admin"
 import { formatDateTime, formatEuros } from "~/utils/format"
+import { henrriBlockReason, henrriDocumentLabel, henrriDocumentStatus } from "~/utils/henrri"
 import { refundFailure } from "~/utils/refund"
 import { legalStatus, paymentStatus, refundStatus, shippingStatus } from "~/utils/status"
 
@@ -89,6 +90,24 @@ async function submitRefund() {
     refundSuggestions.value = failure.suggestions
   } finally {
     refundBusy.value = false
+  }
+}
+
+// Henrri (story 12.6): put blocked documents back in the queue.
+const henrriBusy = ref(false)
+const henrriError = ref("")
+const canRetryHenrri = computed(() => order.value?.henrri.some((document) => document.status === "blocked") ?? false)
+
+async function retryHenrri() {
+  henrriBusy.value = true
+  henrriError.value = ""
+  try {
+    await api(`/admin/orders/${id}/henrri/retry`, { method: "POST" })
+    await refresh()
+  } catch {
+    henrriError.value = "La relance a échoué."
+  } finally {
+    henrriBusy.value = false
   }
 }
 
@@ -194,6 +213,35 @@ function num(v: unknown): number | null {
 
           <button v-if="canRefund" type="button" class="btn btn-ghost refund-btn" @click="openRefund">
             Rembourser
+          </button>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel__title">Facturation (Henrri)</h2>
+          <p v-if="!order.henrri.length" class="kv">Aucune facture : elle part quand la commande est entièrement payée.</p>
+          <div v-for="document in order.henrri" :key="document.id" class="henrri-doc">
+            <div class="bucket">
+              <span class="bucket__label">{{ henrriDocumentLabel(document) }}</span>
+              <span class="bucket__amt">{{ formatEuros(document.amountTtc) }}</span>
+              <AdminStatusTag v-bind="henrriDocumentStatus(document.status)" />
+            </div>
+            <p v-if="document.lastError" class="henrri-doc__reason">{{ henrriBlockReason(document.lastError) }}</p>
+            <p
+              v-if="document.kind === 'invoice' && document.status === 'finalized' && !document.paymentRecordedAt"
+              class="henrri-doc__reason"
+            >
+              Règlement pas encore enregistré dans Henrri.
+            </p>
+          </div>
+          <p v-if="henrriError" class="modal__error" role="alert">{{ henrriError }}</p>
+          <button
+            v-if="canRetryHenrri"
+            type="button"
+            class="btn btn-ghost refund-btn"
+            :disabled="henrriBusy"
+            @click="retryHenrri"
+          >
+            {{ henrriBusy ? "Relance…" : "Relancer la facturation" }}
           </button>
         </section>
       </div>
@@ -373,6 +421,11 @@ function num(v: unknown): number | null {
   margin-top: 1rem;
   color: var(--danger);
   font-size: var(--fs-sm);
+}
+.henrri-doc__reason {
+  color: var(--paper-faint);
+  font-size: var(--fs-sm);
+  margin: 0.25rem 0 0.75rem;
 }
 .bucket {
   display: flex;

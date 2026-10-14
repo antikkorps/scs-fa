@@ -1,11 +1,11 @@
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
-import { inArray, like } from "drizzle-orm"
+import { and, eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { auditLogs, orders, paymentCarte, refunds, users } from "../db/schema.js"
+import { auditLogs, henrriDocuments, orders, paymentCarte, refunds, users } from "../db/schema.js"
 
 const PREFIX = "ADMORD-"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -33,6 +33,7 @@ describe("admin orders dashboard API (Story 7.1)", () => {
   async function cleanup() {
     const userIds = db.select({ id: users.id }).from(users).where(like(users.email, "admord-%"))
     const orderIds = db.select({ id: orders.id }).from(orders).where(inArray(orders.userId, userIds))
+    await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, orderIds))
     await db.delete(refunds).where(inArray(refunds.orderId, orderIds))
     await db.delete(paymentCarte).where(inArray(paymentCarte.orderId, orderIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
@@ -176,6 +177,107 @@ describe("admin orders dashboard API (Story 7.1)", () => {
 
     it("returns 400 for a malformed id", async () => {
       expect((await adminGet("/api/admin/orders/not-a-uuid")).statusCode).toBe(400)
+    })
+  })
+
+  describe("Henrri documents (story 12.6)", () => {
+    const adminPost = (url: string, token = adminToken) =>
+      app.inject({ method: "POST", url, headers: { authorization: `Bearer ${token}` } })
+
+    let henrriId = 7000
+    async function orderWithDocuments() {
+      henrriId += 1
+      const orderId = await insertOrder(customerId, { paymentStatus: "partially_refunded" })
+      const [refund] = await db
+        .insert(refunds)
+        .values({ orderId, channel: "carte", amountTtc: "33.33", status: "succeeded", currency: "EUR" })
+        .returning({ id: refunds.id })
+      await db.insert(henrriDocuments).values([
+        {
+          orderId,
+          kind: "invoice",
+          status: "finalized",
+          henrriDocumentId: henrriId,
+          henrriNumber: `26-10-${orderId.slice(0, 6)}`,
+          expectedTotalTtc: "240.00",
+          attempts: 1,
+          finalizedAt: new Date(),
+          paymentRecordedAt: new Date(),
+        },
+        {
+          orderId,
+          refundId: refund.id,
+          kind: "credit_note",
+          status: "blocked",
+          expectedTotalTtc: "33.33",
+          attempts: 1,
+          lastError: "InexpressibleAmount",
+          claimedAt: new Date(),
+        },
+      ])
+      return orderId
+    }
+
+    it("shows each invoice and credit note with its state on the order", async () => {
+      const orderId = await orderWithDocuments()
+      const { data } = (await adminGet(`/api/admin/orders/${orderId}`)).json()
+      expect(data.henrri).toEqual([
+        expect.objectContaining({ kind: "invoice", status: "finalized", number: `26-10-${orderId.slice(0, 6)}` }),
+        expect.objectContaining({
+          kind: "credit_note",
+          status: "blocked",
+          number: null,
+          amountTtc: 33.33,
+          lastError: "InexpressibleAmount",
+        }),
+      ])
+      expect(data.henrri[0]).not.toHaveProperty("henrriDocumentId")
+    })
+
+    it("puts blocked documents back in the queue on retry, and leaves issued ones alone", async () => {
+      const orderId = await orderWithDocuments()
+      const res = await adminPost(`/api/admin/orders/${orderId}/henrri/retry`)
+      expect(res.statusCode).toBe(200)
+
+      const rows = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
+      expect(rows.find((row) => row.kind === "credit_note")).toMatchObject({
+        status: "pending",
+        lastError: null,
+        claimedAt: null,
+      })
+      expect(rows.find((row) => row.kind === "invoice")).toMatchObject({ status: "finalized" })
+      expect(res.json().data).toEqual(expect.arrayContaining([expect.objectContaining({ status: "pending" })]))
+
+      const [audit] = await db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.entityId, orderId), eq(auditLogs.action, "henrri.retry")))
+      expect(audit).toBeDefined()
+    })
+
+    it("refuses the retry to a customer, and for an unknown order", async () => {
+      const orderId = await orderWithDocuments()
+      expect((await adminPost(`/api/admin/orders/${orderId}/henrri/retry`, customerToken)).statusCode).toBe(403)
+      expect((await adminPost("/api/admin/orders/00000000-0000-0000-0000-000000000000/henrri/retry")).statusCode).toBe(
+        404,
+      )
+    })
+
+    it("lists only the orders whose documents need attention", async () => {
+      const troubled = await orderWithDocuments()
+      const fine = await insertOrder(customerId, { paymentStatus: "received" })
+      const res = await adminGet("/api/admin/orders?invoices=attention&limit=100")
+      expect(res.statusCode).toBe(200)
+      const ids = res.json().data.map((row: { id: string }) => row.id)
+      expect(ids).toContain(troubled)
+      expect(ids).not.toContain(fine)
+    })
+
+    it("counts the documents that need attention on the dashboard", async () => {
+      const before = (await adminGet("/api/admin/orders/summary")).json().data.invoicesNeedingAttention
+      await orderWithDocuments()
+      const after = (await adminGet("/api/admin/orders/summary")).json().data.invoicesNeedingAttention
+      expect(after).toBe(before + 1)
     })
   })
 

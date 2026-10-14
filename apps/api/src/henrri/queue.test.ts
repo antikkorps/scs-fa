@@ -13,7 +13,7 @@ import {
 } from "../db/schema.js"
 import { createFakeHenrri, FAKE_MODES, type FakeHenrri } from "../test/henrri-fake.js"
 import { HenrriError } from "./client.js"
-import { enqueueCreditNote, enqueueInvoice, processPendingHenrriDocuments } from "./queue.js"
+import { enqueueCreditNote, enqueueInvoice, henrriClientFromEnv, processPendingHenrriDocuments } from "./queue.js"
 
 const EMAIL_PREFIX = "henrri-queue-test"
 const silentLog = { info: () => {}, warn: () => {}, error: () => {} }
@@ -378,5 +378,11 @@ describe("Henrri queue (story 12.6)", () => {
 
       expect(await creditNoteOf(orderId)).toMatchObject({ status: "blocked", lastError: "InexpressibleAmount" })
     })
+  })
+})
+
+describe("henrriClientFromEnv", () => {
+  it("never reaches the real Henrri from the test suite, even with credentials in .env", () => {
+    expect(henrriClientFromEnv()).toBeNull()
   })
 })

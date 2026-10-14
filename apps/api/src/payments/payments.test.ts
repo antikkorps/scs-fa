@@ -1096,7 +1096,12 @@ describe("payments — Stripe card (Story 6.1)", () => {
     describe("card refunds (Stripe)", () => {
       it("refuses, before calling Stripe, an amount Henrri could not issue a credit note for", async () => {
         // An order carrying the 12.6 snapshot: 100 HT at 20 % → 120 TTC.
-        const orderId = await seedPaidCardOrder(userId, "120.00", [{ ...CARD_ITEM, vatPct: 20, discountHt: 0 }], "pi_rf_x")
+        const orderId = await seedPaidCardOrder(
+          userId,
+          "120.00",
+          [{ ...CARD_ITEM, vatPct: 20, discountHt: 0 }],
+          "pi_rf_x",
+        )
         await db.update(orders).set({ shippingPortions: [] }).where(eq(orders.id, orderId))
 
         const res = await refund(orderId, { channel: "carte", amount: 33.33 })
