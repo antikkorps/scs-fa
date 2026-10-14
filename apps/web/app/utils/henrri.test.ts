@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest"
 import { henrriBlockReason, henrriDocumentLabel, henrriDocumentStatus, invoiceDownloadUrl } from "./henrri.js"
 
 describe("henrriDocumentStatus (story 12.6)", () => {
+  it("reads an issued document held for an admin as needing action", () => {
+    expect(henrriDocumentStatus("finalized", true)).toEqual({ label: "Émise — à vérifier", severity: "warn" })
+  })
+
   it("reads an issued document as done, a blocked one as needing action", () => {
     expect(henrriDocumentStatus("finalized")).toEqual({ label: "Émise", severity: "ok" })
     expect(henrriDocumentStatus("pending")).toEqual({ label: "En file", severity: "warn" })
@@ -31,6 +35,37 @@ describe("henrriBlockReason", () => {
     expect(henrriBlockReason("TotalMismatch: Henrri 129.01, expected 129.00")).toBe(
       "Le total calculé par Henrri (129.01 €) diffère de celui de la commande (129.00 €) : rien n'a été émis.",
     )
+  })
+
+  it.each([
+    "Http503: Unavailable",
+    "Timeout: Henrri took over 30000 ms",
+    "NetworkError: Henrri unreachable",
+    "Http429: Too many requests",
+    "QUOTA_EXCEEDED: You have exceeded your monthly Quota",
+    "AuthenticationFailed: Henrri refused the API credentials",
+    "NumberPending: Henrri finalized the document without its number",
+  ])("reads %s as a passing incident the queue retries on its own", (lastError) => {
+    expect(henrriBlockReason(lastError)).toMatch(/^Henrri .* nouvel essai automatique/)
+  })
+
+  it("explains the monthly quota and credentials, which need someone to act", () => {
+    expect(henrriBlockReason("QUOTA_EXCEEDED: You have exceeded your monthly Quota")).toBe(
+      "Henrri : crédits du mois épuisés (changer de pack ou attendre le mois prochain) — nouvel essai automatique.",
+    )
+    expect(henrriBlockReason("AuthenticationFailed: Henrri refused the API credentials")).toBe(
+      "Henrri refuse les identifiants de l'API (clé à vérifier) — nouvel essai automatique.",
+    )
+  })
+
+  it("explains a payment Henrri could not settle", () => {
+    expect(henrriBlockReason("PaymentMismatch: received 1324.00, invoiced 1329.00")).toBe(
+      "Facture émise, mais les règlements reçus (1324.00 €) ne couvrent pas la facture (1329.00 €) : règlement à enregistrer à la main dans Henrri.",
+    )
+  })
+
+  it("keeps an internal error vague, its detail being in the server log", () => {
+    expect(henrriBlockReason("InternalError")).toBe("Erreur interne : voir les journaux du serveur.")
   })
 
   it("passes Henrri's own refusal through", () => {

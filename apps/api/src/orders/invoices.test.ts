@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, henrriDocuments, orders, refunds, users } from "../db/schema.js"
+import { HenrriError } from "../henrri/client.js"
 import { createFakeHenrri } from "../test/henrri-fake.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
@@ -167,6 +168,13 @@ describe("customer invoices (story 12.6)", () => {
     expect((await get(`/api/orders/${orderId}/invoices/${pendingId}/pdf`, ownerToken)).statusCode).toBe(404)
     expect((await get(`/api/orders/${orderId}/invoices/${invoiceId}/pdf`, otherToken)).statusCode).toBe(404)
     expect((await get(`/api/orders/${orderId}/invoices/${invoiceId}/pdf`, null)).statusCode).toBe(401)
+  })
+
+  it("answers 503, not a server error, when Henrri cannot hand the PDF over", async () => {
+    henrri.failNext("pdf", new HenrriError("Timeout", null, "Slow"))
+    const res = await get(`/api/orders/${orderId}/invoices/${invoiceId}/pdf`, ownerToken)
+    expect(res.statusCode).toBe(503)
+    expect(res.json()).toEqual({ error: "InvoiceUnavailable", message: "Invoices cannot be fetched right now" })
   })
 
   it("answers 503 while Henrri is not configured", async () => {

@@ -64,7 +64,12 @@ const envSchema = z.object({
   // so a laptop and CI boot unchanged. Sandbox: https://api-sandbox.henrri.io,
   // production: https://api.henrri.io. The webhook secret verifies the HMAC
   // signature of the events Henrri POSTs us.
-  HENRRI_BASE_URL: z.string().url().optional(),
+  // https only: the client secret travels in the authentication call.
+  HENRRI_BASE_URL: z
+    .string()
+    .url()
+    .refine((url) => url.startsWith("https://"), "HENRRI_BASE_URL must be an https:// URL")
+    .optional(),
   HENRRI_CLIENT_ID: z.string().optional(),
   HENRRI_CLIENT_SECRET: z.string().optional(),
   HENRRI_WEBHOOK_SECRET: z.string().optional(),

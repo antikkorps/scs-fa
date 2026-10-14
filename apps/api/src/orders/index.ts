@@ -29,6 +29,7 @@ import {
   productVariants,
 } from "../db/schema.js"
 import { env } from "../env.js"
+import { HenrriError } from "../henrri/client.js"
 import { issuedDocument, issuedDocumentsOfOrder, pdfFileName } from "../henrri/customer.js"
 import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
@@ -429,11 +430,19 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!document) {
       return reply.code(404).send({ error: "NotFound", message: "Invoice not found" })
     }
-    if (!fastify.henrri) {
-      return reply.code(503).send({ error: "InvoiceUnavailable", message: "Invoices cannot be fetched right now" })
-    }
+    const unavailable = () =>
+      reply.code(503).send({ error: "InvoiceUnavailable", message: "Invoices cannot be fetched right now" })
+    if (!fastify.henrri) return unavailable()
 
-    const pdf = await fastify.henrri.pdf(document.henrriDocumentId)
+    let pdf: Uint8Array
+    try {
+      pdf = await fastify.henrri.pdf(document.henrriDocumentId)
+    } catch (err) {
+      // Henrri down, slow or refusing: the customer gets a clean "try later", the log the cause.
+      if (!(err instanceof HenrriError)) throw err
+      request.log.warn({ err, documentId: params.data.documentId }, "Invoice PDF unavailable from Henrri")
+      return unavailable()
+    }
     return reply
       .code(200)
       .header("content-type", "application/pdf")

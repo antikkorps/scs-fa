@@ -184,8 +184,8 @@ usePageSeo({
       <li><strong>Scaleway</strong> — stockage des fichiers et des sauvegardes (France) ;</li>
       <li><strong>Stripe</strong> — paiement par carte bancaire ;</li>
       <li>
-        <strong>Henrri</strong> (groupe Rivalis) — établissement et conservation de nos factures et avoirs : vos nom,
-        adresse de facturation et e-mail, le détail de la commande et son règlement ;
+        <strong>Henrri</strong> (groupe Rivalis) — établissement et conservation de nos factures et avoirs : vos nom
+        et adresse de facturation, le détail de la commande et son règlement ;
       </li>
       <li><strong>Brevo</strong> — envoi de la lettre d'information, si vous y êtes abonné ;</li>
       <li>

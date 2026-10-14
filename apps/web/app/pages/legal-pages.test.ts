@@ -38,5 +38,7 @@ describe("legal pages (story 12.1)", () => {
     const wrapper = await mountSuspended(Confidentialite)
     const processors = wrapper.findAll("li").map((item) => item.text())
     expect(processors).toContainEqual(expect.stringMatching(/^Henrri .*factures.*avoirs.*adresse de facturation/))
+    // Decision 2026-10-14: the e-mail is not sent to Henrri.
+    expect(processors.find((item) => item.startsWith("Henrri"))).not.toMatch(/e-mail/)
   })
 })

@@ -162,6 +162,8 @@ export interface HenrriDocumentRow {
   amountTtc: number
   refundId: string | null
   lastError: string | null
+  /** Issued, but held for an admin (payment refused or short). */
+  held: boolean
   attempts: number
   finalizedAt: string | null
   paymentRecordedAt: string | null

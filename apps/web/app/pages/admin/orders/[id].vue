@@ -96,7 +96,9 @@ async function submitRefund() {
 // Henrri (story 12.6): put blocked documents back in the queue.
 const henrriBusy = ref(false)
 const henrriError = ref("")
-const canRetryHenrri = computed(() => order.value?.henrri.some((document) => document.status === "blocked") ?? false)
+const canRetryHenrri = computed(
+  () => order.value?.henrri.some((document) => document.status === "blocked" || document.held) ?? false,
+)
 
 async function retryHenrri() {
   henrriBusy.value = true
@@ -223,7 +225,7 @@ function num(v: unknown): number | null {
             <div class="bucket">
               <span class="bucket__label">{{ henrriDocumentLabel(document) }}</span>
               <span class="bucket__amt">{{ formatEuros(document.amountTtc) }}</span>
-              <AdminStatusTag v-bind="henrriDocumentStatus(document.status)" />
+              <AdminStatusTag v-bind="henrriDocumentStatus(document.status, document.held)" />
             </div>
             <p v-if="document.lastError" class="henrri-doc__reason">{{ henrriBlockReason(document.lastError) }}</p>
             <p
