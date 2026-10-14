@@ -95,6 +95,10 @@ export interface AddressSnapshot {
 export interface RefundRow {
   id: string
   channel: "carte" | "virement"
+  /** Story 12.6: what was refunded decides the credit note. */
+  kind: "goods_return" | "goodwill" | "overpayment"
+  lines: Array<{ item: number; qty: number }> | null
+  includesShipping: boolean
   amountTtc: string
   status: string
   reason: string | null

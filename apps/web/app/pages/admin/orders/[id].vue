@@ -2,7 +2,15 @@
 import type { AdminOrderDetail } from "~/types/admin"
 import { formatDateTime, formatEuros } from "~/utils/format"
 import { henrriBlockReason, henrriDocumentLabel, henrriDocumentStatus } from "~/utils/henrri"
-import { refundFailure } from "~/utils/refund"
+import {
+  REFUND_KIND_OPTIONS,
+  type RefundForm,
+  type RefundKind,
+  refundFailure,
+  refundRequestBody,
+  returnableQuantities,
+  shippingRefunded,
+} from "~/utils/refund"
 import { legalStatus, paymentStatus, refundStatus, shippingStatus } from "~/utils/status"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
@@ -44,29 +52,74 @@ const refundable = computed(() => {
 })
 const canRefund = computed(() => refundable.value.carte > 0 || refundable.value.virement > 0)
 
-// Refund modal
+// Refund modal (story 12.6): a goods return picks the articles that came back
+// (the API computes the amount), a goodwill gesture or an overpayment is an amount.
 const showRefund = ref(false)
+const refundKind = ref<RefundKind>("goods_return")
 const refundChannel = ref<"carte" | "virement">("carte")
 const refundAmount = ref<number | null>(null)
+const refundQuantities = ref<number[]>([])
+const refundShipping = ref(false)
 const refundReason = ref("")
 const refundBusy = ref(false)
 const refundError = ref("")
 const refundSuggestions = ref<number[]>([])
+const refundPreview = ref<number | null>(null)
+
+const returnable = computed(() =>
+  order.value ? returnableQuantities(order.value.items, order.value.payment.refunds) : [],
+)
+const deliveryRefunded = computed(() => (order.value ? shippingRefunded(order.value.payment.refunds) : true))
+
+function refundForm(): RefundForm {
+  return {
+    kind: refundKind.value,
+    channel: refundChannel.value,
+    quantities: refundQuantities.value,
+    includesShipping: refundShipping.value,
+    amount: refundAmount.value,
+    reason: refundReason.value,
+  }
+}
 
 function openRefund() {
   refundError.value = ""
   refundSuggestions.value = []
+  refundPreview.value = null
+  refundKind.value = "goods_return"
   refundChannel.value = refundable.value.carte > 0 ? "carte" : "virement"
-  refundAmount.value = refundable.value[refundChannel.value]
+  refundAmount.value = null
+  refundQuantities.value = returnable.value.map(() => 0)
+  refundShipping.value = false
   refundReason.value = ""
   showRefund.value = true
 }
-watch(refundChannel, (c) => {
-  refundAmount.value = refundable.value[c]
+watch(refundKind, (kind) => {
+  if (kind === "overpayment") refundChannel.value = "virement"
+  refundError.value = ""
+  refundSuggestions.value = []
 })
 
+// A return's amount is the credit note's: asked of the API as the selection changes.
+async function previewReturn() {
+  refundPreview.value = null
+  const body = refundRequestBody(refundForm())
+  if (body.kind !== "goods_return" || (body.lines.length === 0 && !body.includesShipping)) return
+  try {
+    const { data } = await api<{ data: { amountTtc: number } }>(`/admin/payments/orders/${id}/refunds/preview`, {
+      method: "POST",
+      body,
+    })
+    refundPreview.value = data.amountTtc
+    refundError.value = ""
+  } catch (err) {
+    refundError.value = refundFailure(err).message
+  }
+}
+watch([refundKind, refundChannel, refundQuantities, refundShipping], previewReturn, { deep: true })
+
 async function submitRefund() {
-  if (!refundAmount.value || refundAmount.value <= 0) {
+  if (refundKind.value !== "goods_return" && (!refundAmount.value || refundAmount.value <= 0)) {
     refundError.value = "Montant invalide."
     return
   }
@@ -74,14 +127,7 @@ async function submitRefund() {
   refundError.value = ""
   refundSuggestions.value = []
   try {
-    await api(`/admin/payments/orders/${id}/refunds`, {
-      method: "POST",
-      body: {
-        channel: refundChannel.value,
-        amount: refundAmount.value,
-        ...(refundReason.value.trim() ? { reason: refundReason.value.trim() } : {}),
-      },
-    })
+    await api(`/admin/payments/orders/${id}/refunds`, { method: "POST", body: refundRequestBody(refundForm()) })
     showRefund.value = false
     await refresh()
   } catch (err) {
@@ -257,6 +303,14 @@ function num(v: unknown): number | null {
         <h2 class="modal__title">Rembourser</h2>
         <form @submit.prevent="submitRefund">
           <label class="field">
+            <span>Nature</span>
+            <select v-model="refundKind" class="ctl">
+              <option v-for="option in REFUND_KIND_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label v-if="refundKind !== 'overpayment'" class="field">
             <span>Canal</span>
             <select v-model="refundChannel" class="ctl">
               <option v-if="refundable.carte > 0" value="carte">Carte (max {{ formatEuros(refundable.carte) }})</option>
@@ -265,7 +319,30 @@ function num(v: unknown): number | null {
               </option>
             </select>
           </label>
-          <label class="field">
+          <fieldset v-if="refundKind === 'goods_return'" class="field returns">
+            <legend>Articles retournés</legend>
+            <label v-for="(item, index) in order.items" :key="index" class="returns__row">
+              <span>{{ item.name }}</span>
+              <input
+                v-model.number="refundQuantities[index]"
+                type="number"
+                min="0"
+                :max="returnable[index]"
+                :disabled="returnable[index] === 0"
+                class="ctl returns__qty"
+                :aria-label="`Quantité retournée — ${item.name}`"
+              />
+              <span class="returns__max">/ {{ returnable[index] }}</span>
+            </label>
+            <label class="returns__row">
+              <input v-model="refundShipping" type="checkbox" :disabled="deliveryRefunded" />
+              <span>Rembourser les frais de port{{ deliveryRefunded ? " (déjà remboursés)" : "" }}</span>
+            </label>
+            <p class="returns__amount">
+              Montant remboursé : <strong>{{ refundPreview === null ? "—" : formatEuros(refundPreview) }}</strong>
+            </p>
+          </fieldset>
+          <label v-else class="field">
             <span>Montant (€)</span>
             <input
               v-model.number="refundAmount"
@@ -516,6 +593,30 @@ function num(v: unknown): number | null {
   color: var(--danger);
   font-size: var(--fs-sm);
   margin: 0 0 1rem;
+}
+.returns {
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+.returns__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+}
+.returns__row > span:first-child {
+  flex: 1;
+}
+.returns__qty {
+  width: 4.5rem;
+}
+.returns__max {
+  color: var(--paper-faint);
+  font-size: var(--fs-sm);
+}
+.returns__amount {
+  margin: 0.75rem 0 0;
 }
 .modal__suggestions {
   display: flex;
