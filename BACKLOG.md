@@ -863,6 +863,23 @@
 - les réponses aux décisions ci-dessus, Gun Art et e-reporting avec son **comptable** ;
 - plus tard, les identifiants de **production** et le choix du pack.
 
+**Story 12.7** — Journalisation pour diagnostiquer les remontées de Fred et Stéphane — 📝 **À CADRER** _(créée le 2026-10-15, demande de Franck)_
+
+> Besoin : quand Fred ou Stéphane remontent un problème (« Mme X n'a pas reçu son e-mail », « le paiement de la commande 0B7D1F3E est resté bloqué », « la facture n'est pas partie »), pouvoir **retrouver vite et sûrement ce qui s'est passé**, pour cette commande ou ce client, sans fouiller des logs bruts sur le serveur.
+
+**Existant (story 7.2)** : logs Pino JSON sur stdout (`service`, `env`, `reqId` propagé depuis `x-request-id`), redaction des secrets, alerte e-mail throttlée sur les 5xx, `auditLogs` pour certaines actions admin. **Manques** : les logs vivent dans la sortie des conteneurs (perdus à la rotation ou à la recréation, illisibles pour Fred et Stéphane) ; pas de recherche par commande, client ou e-mail ; pas de fil des événements métier d'une commande (paiement, Stripe, virement, documents légaux, expédition, e-mails envoyés ou échoués, facturation Henrri) ; erreurs du navigateur invisibles.
+
+**À cadrer avec Franck avant de coder (décisions structurantes) :**
+
+- [ ] **Où vont les logs** : agrégateur auto-hébergé sur le serveur (Loki + Grafana, prévu « Phase 8 » en 7.2), service géré (Better Stack, Axiom…, compte au nom du client), ou simple fichier tournant. Coût, RGPD (données hébergées en UE), durée de conservation.
+- [ ] **Journal métier d'une commande** : une table d'événements (`order_events` : quoi, quand, par qui, résultat, `reqId`) alimentée aux points clés, et un **onglet « Historique » sur la fiche commande admin** lisible par Fred et Stéphane, plutôt que de leur ouvrir un outil de logs.
+- [ ] **Recherche** : par référence de commande, e-mail client, `reqId` ; quels rôles y ont accès.
+- [ ] **E-mails** : tracer chaque envoi (type, destinataire, succès ou échec, identifiant du fournisseur) pour répondre à « je n'ai rien reçu ».
+- [ ] **Erreurs côté navigateur** (tunnel d'achat, paiement Stripe) : les remonter à l'API (point d'entrée limité en débit) ou non.
+- [ ] **RGPD** : minimisation (pas de contenu de documents ni de données bancaires), durée de conservation des journaux (à inscrire dans `/confidentialite` et au registre), droit d'accès et d'effacement.
+
+**Pistes techniques (une fois cadré)** : un logger d'événements unique (`logEvent(orderId, type, details)`) appelé depuis les services existants ; le `reqId` repris dans chaque événement pour relier l'historique aux logs techniques ; niveaux de log revus (les passes Henrri, Stripe et le suivi colis loggent déjà en `warn`/`info`) ; un guide « que regarder quand on me remonte… » dans `docs/`.
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
