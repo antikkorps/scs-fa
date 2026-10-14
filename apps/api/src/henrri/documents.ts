@@ -3,7 +3,7 @@
 // draft into API calls; Henrri then recomputes the totals, and the caller only
 // finalizes when they match `expectedTotalTtc` to the cent.
 
-import { computePriceTtc, round2 } from "@armurier/shared"
+import { computeVatTotals, round2 } from "@armurier/shared"
 import type { orders } from "../db/schema.js"
 
 type OrderRow = typeof orders.$inferSelect
@@ -87,11 +87,6 @@ function pricedLines(source: InvoiceSource): PricedLine[] | null {
   return lines
 }
 
-/** TTC of a line, rounded the way the cart rounded it (net HT, then VAT). */
-function lineTtc(line: PricedLine): number {
-  return computePriceTtc(round2(line.priceHt * line.qty - line.discountHt), line.vatPct)
-}
-
 /** Adds `cents` to the bucket of `vatPct`, keeping first-seen order. */
 function addToBucket(buckets: Map<number, number>, vatPct: number, cents: number) {
   buckets.set(vatPct, (buckets.get(vatPct) ?? 0) + cents)
@@ -134,12 +129,16 @@ function invoiceLines(lines: PricedLine[], shipping: NonNullable<InvoiceSource["
   return draftLines
 }
 
-/** TTC cents carried by each VAT rate of the order, goods and delivery together. */
-function ttcCentsByRate(lines: PricedLine[], shipping: NonNullable<InvoiceSource["shippingPortions"]>) {
-  const buckets = new Map<number, number>()
-  for (const line of lines) addToBucket(buckets, line.vatPct, toCents(lineTtc(line)))
-  for (const portion of shipping) addToBucket(buckets, portion.vatPct, toCents(portion.amountTtc))
-  return buckets
+/** The totals Henrri will compute for these lines: VAT by rate, as the cart did. */
+function totalsOf(lines: DraftLine[]) {
+  return computeVatTotals(
+    lines.map((line) => ({ priceHt: round2(line.unitPrice * line.quantity), vatPct: line.vatPct })),
+  )
+}
+
+/** TTC cents carried by each VAT rate of the invoice. */
+function ttcCentsByRate(lines: DraftLine[]): Map<number, number> {
+  return new Map(totalsOf(lines).byRate.map((rate) => [rate.vatPct, toCents(rate.totalHt + rate.vatAmount)]))
 }
 
 function sumOf(values: Iterable<number>): number {
@@ -168,30 +167,20 @@ function allocateCents(amountCents: number, weights: Map<number, number>): Map<n
   return new Map(shares.filter((share) => share.cents > 0).map((share) => [share.key, share.cents]))
 }
 
-interface CheckedSnapshot {
-  lines: PricedLine[]
-  shipping: NonNullable<InvoiceSource["shippingPortions"]>
-}
-
-function checkedSnapshot(source: InvoiceSource): CheckedSnapshot | DraftRefusal {
+/** The invoice lines, once checked to add up to the order total the way Henrri adds them. */
+function checkedInvoiceLines(source: InvoiceSource): DraftLine[] | DraftRefusal {
   const lines = pricedLines(source)
   if (lines === null || source.shippingPortions === null) return "LegacySnapshot"
-  const shipping = source.shippingPortions
-  if (sumOf(ttcCentsByRate(lines, shipping).values()) !== toCents(source.totalTtc)) return "SnapshotMismatch"
-  return { lines, shipping }
+  const draftLines = invoiceLines(lines, source.shippingPortions)
+  if (toCents(totalsOf(draftLines).totalTtc) !== toCents(source.totalTtc)) return "SnapshotMismatch"
+  return draftLines
 }
 
 /** The invoice of a fully paid order: its lines, VIP discounts and delivery, in HT. */
 export function buildInvoiceDraft(source: InvoiceSource): DraftResult {
-  const snapshot = checkedSnapshot(source)
-  if (typeof snapshot === "string") return { ok: false, reason: snapshot }
-  return {
-    ok: true,
-    draft: {
-      lines: invoiceLines(snapshot.lines, snapshot.shipping),
-      expectedTotalTtc: source.totalTtc,
-    },
-  }
+  const lines = checkedInvoiceLines(source)
+  if (typeof lines === "string") return { ok: false, reason: lines }
+  return { ok: true, draft: { lines, expectedTotalTtc: source.totalTtc } }
 }
 
 /**
@@ -201,15 +190,15 @@ export function buildInvoiceDraft(source: InvoiceSource): DraftResult {
  * so each share is entered HT at 8 decimals: its TTC is then the refunded cents.
  */
 export function buildCreditNoteDraft(source: InvoiceSource, refundTtc: number, orderRef: string): DraftResult {
-  const snapshot = checkedSnapshot(source)
-  if (typeof snapshot === "string") return { ok: false, reason: snapshot }
+  const invoice = checkedInvoiceLines(source)
+  if (typeof invoice === "string") return { ok: false, reason: invoice }
 
   const refundCents = toCents(refundTtc)
   const totalCents = toCents(source.totalTtc)
   if (refundCents <= 0 || refundCents > totalCents) return { ok: false, reason: "InvalidRefundAmount" }
-  if (refundCents === totalCents) return buildInvoiceDraft(source)
+  if (refundCents === totalCents) return { ok: true, draft: { lines: invoice, expectedTotalTtc: source.totalTtc } }
 
-  const shares = allocateCents(refundCents, ttcCentsByRate(snapshot.lines, snapshot.shipping))
+  const shares = allocateCents(refundCents, ttcCentsByRate(invoice))
   const lines = [...shares].map(([vatPct, cents]) => ({
     designation: `Remboursement partiel de la commande ${orderRef}`,
     article: REFUND_ARTICLE,

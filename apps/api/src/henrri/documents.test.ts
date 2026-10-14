@@ -130,6 +130,14 @@ describe("buildInvoiceDraft", () => {
     expect(buildInvoiceDraft(order({ shippingPortions: null }))).toEqual({ ok: false, reason: "LegacySnapshot" })
   })
 
+  it("checks the total the way Henrri computes it: VAT by rate, not line by line", () => {
+    const pastille = (sku: string) => ({ ...mat, sku, qty: 1, priceHt: 0.33, discountHt: 0 })
+    const cheap = order({ itemsJson: [pastille("P-1"), pastille("P-2"), pastille("P-3")], shippingPortions: [] })
+    // 0.99 HT at 20 % → 0.20 VAT: 1.19, where three lines of 0.40 would make 1.20.
+    expect(buildInvoiceDraft({ ...cheap, totalTtc: 1.19 }).ok).toBe(true)
+    expect(buildInvoiceDraft({ ...cheap, totalTtc: 1.2 })).toEqual({ ok: false, reason: "SnapshotMismatch" })
+  })
+
   it("refuses a snapshot whose lines do not add up to the order total", () => {
     expect(buildInvoiceDraft(order({ totalTtc: 1336.01 }))).toEqual({ ok: false, reason: "SnapshotMismatch" })
   })

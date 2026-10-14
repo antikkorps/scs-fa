@@ -265,6 +265,42 @@ describe("cart (/api/cart)", () => {
     })
   })
 
+  it("computes the VAT by rate over the whole cart, the way the invoice does (story 12.6)", async () => {
+    const [cheap] = await db
+      .insert(products)
+      .values({
+        sku: `${PREFIX}cheap`,
+        slug: `${PREFIX}cheap`,
+        name: "Pastille",
+        categoryId: await categoryId("accessoire-tireur"),
+        priceHt: "0.33",
+        requiresLegalVerification: false,
+        published: true,
+      })
+      .returning({ id: products.id })
+    const cheapVariants = await db
+      .insert(productVariants)
+      .values([
+        { productId: cheap.id, skuVariant: `${PREFIX}cheap-red`, couleur: "Rouge", stockQty: 5 },
+        { productId: cheap.id, skuVariant: `${PREFIX}cheap-blue`, couleur: "Bleu", stockQty: 5 },
+      ])
+      .returning({ id: productVariants.id })
+    for (const cheapVariant of cheapVariants) {
+      await app.inject({
+        method: "POST",
+        url: "/api/cart/items",
+        headers: await authHeaders(),
+        payload: { variantId: cheapVariant.id, qty: 1 },
+      })
+    }
+
+    const { data } = (await app.inject({ method: "GET", url: "/api/cart", headers: await authHeaders() })).json()
+    // Each line shows 0.40 TTC, but 0.66 HT of goods + 7.50 HT of small parcel
+    // = 8.16 HT at 20 % → 1.63 VAT (1.632), so 9.79 — not 0.40 + 0.40 + 9.00.
+    expect(data.items.map((line: { lineTtc: number }) => line.lineTtc)).toEqual([0.4, 0.4])
+    expect(data.summary).toMatchObject({ subtotalHt: 0.66, vatAmount: 1.63, totalTtc: 9.79 })
+  })
+
   it("increments quantity when the same variant is added twice", async () => {
     await app.inject({
       method: "POST",
