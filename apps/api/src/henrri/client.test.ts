@@ -68,6 +68,15 @@ const documentTypes = {
     ],
   },
 }
+const itemCategories = {
+  status: 200,
+  body: {
+    elements: [
+      { id: 2223, label: "Services", isDefault: true, type: { itemCategoryKind: "service" } },
+      { id: 2222, label: "Produits", isDefault: true, type: { itemCategoryKind: "product" } },
+    ],
+  },
+}
 const lineTypes = {
   status: 200,
   body: {
@@ -150,13 +159,47 @@ describe("Henrri client — errors", () => {
     const fake = fakeHenrri({
       "POST /v1/documents/5/finalize": () => ({
         status: 400,
-        body: { type: "LINES_MISSING", title: "Lines missing", status: 400, detail: "The document must contain…" },
+        // As the sandbox answers (2026-10-14): the code travels in `errorCode`.
+        body: {
+          type: "https://api-sandbox.henrri.io/scalar/#tag/businesserrors",
+          title: "Lines missing",
+          status: 400,
+          detail: "The document must contain at least one line to be finalized.",
+          errorCode: "LINES_MISSING",
+        },
       }),
     })
     const error = await clientFor(fake)
       .finalizeDocument(5)
       .catch((caught: unknown) => caught)
-    expect(error).toMatchObject({ code: "LINES_MISSING", status: 400, retryable: false })
+    expect(error).toMatchObject({
+      code: "LINES_MISSING",
+      status: 400,
+      retryable: false,
+      message: "The document must contain at least one line to be finalized.",
+    })
+  })
+
+  it("names the fields Henrri's validation refused", async () => {
+    const fake = fakeHenrri({
+      "POST /v1/documents/5/finalize": () => ({
+        status: 400,
+        body: {
+          title: "One or more validation errors occurred.",
+          status: 400,
+          errors: { "Item.itemCategoryId": ["If itemCategoryId is null, then itemCategory cannot be null."] },
+        },
+      }),
+    })
+    const error = await clientFor(fake)
+      .finalizeDocument(5)
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({
+      code: "ValidationError",
+      status: 400,
+      message:
+        "One or more validation errors occurred. Item.itemCategoryId: If itemCategoryId is null, then itemCategory cannot be null.",
+    })
   })
 
   it.each([429, 500, 503])("treats a %s as retryable", async (status) => {
@@ -207,48 +250,97 @@ describe("Henrri client — documents", () => {
     })
   })
 
-  it("adds a billable line with its article inline, in the document's tax mode", async () => {
-    const fake = fakeHenrri({
+  const matLine = {
+    designation: "Tapis de tir",
+    article: { reference: "TAP-1", description: "Tapis de tir" },
+    quantity: 2,
+    unitPrice: 50,
+    vatPct: 20,
+  }
+
+  function catalogRoutes(items: Array<{ id: number; reference: string }>, extra: Record<string, Handler> = {}) {
+    return fakeHenrri({
       "GET /v1/documentlinetypes": () => lineTypes,
+      "GET /v1/itemcategories": () => itemCategories,
+      "GET /v1/items": () => ({ status: 200, body: { elements: items } }),
       "POST /v1/documents/42/lines": () => ({ status: 201, body: { id: 1 } }),
+      ...extra,
     })
-    await clientFor(fake).addLine(
-      42,
-      { designation: "Tapis de tir", reference: "TAP-1", quantity: 2, unitPrice: 50, vatPct: 20 },
-      false,
-    )
+  }
+
+  it("bills an existing article by its id, with the line's own text, price and VAT", async () => {
+    // Henrri's search is fuzzy: only the exact reference counts.
+    const fake = catalogRoutes([
+      { id: 70, reference: "TAP-10" },
+      { id: 71, reference: "TAP-1" },
+    ])
+    await clientFor(fake).addLine(42, matLine, false)
+
+    expect(fake.apiCalls().find((call) => call.path.startsWith("/v1/items"))?.path).toBe("/v1/items?search=TAP-1")
     expect(fake.apiCalls().at(-1)?.body).toEqual({
       typeId: 12,
-      reference: "TAP-1",
+      itemId: 71,
       description: "Tapis de tir",
       quantity: 2,
       sellingPriceWithoutTax: 50,
       vatPercent: 20,
       isTaxIncluded: false,
-      item: {
-        reference: "TAP-1",
-        description: "Tapis de tir",
-        vatPercent: 20,
-        isTaxIncluded: false,
-        sellingPriceWithoutTax: 50,
-      },
     })
   })
 
-  it("prices the inline article TTC on a tax-included document", async () => {
-    const fake = fakeHenrri({
-      "GET /v1/documentlinetypes": () => lineTypes,
-      "POST /v1/documents/42/lines": () => ({ status: 201, body: { id: 1 } }),
+  it("creates a missing article once, in the default product category", async () => {
+    const fake = catalogRoutes([], { "POST /v1/items": () => ({ status: 201, body: { id: 80 } }) })
+    const client = clientFor(fake)
+    await client.addLine(42, matLine, false)
+    await client.addLine(42, { ...matLine, quantity: 1 }, false)
+
+    const created = fake.apiCalls().filter((call) => call.method === "POST" && call.path === "/v1/items")
+    expect(created).toHaveLength(1)
+    expect(created[0].body).toEqual({
+      reference: "TAP-1",
+      description: "Tapis de tir",
+      vatPercent: 20,
+      isTaxIncluded: false,
+      sellingPriceWithoutTax: 50,
+      itemCategoryId: 2222,
     })
+    expect(fake.apiCalls().filter((call) => call.path.startsWith("/v1/items?"))).toHaveLength(1)
+    expect(fake.apiCalls().at(-1)?.body).toMatchObject({ itemId: 80, quantity: 1 })
+  })
+
+  it("picks up the article another process created in the meantime", async () => {
+    let searches = 0
+    const fake = catalogRoutes([], {
+      "GET /v1/items": () => {
+        searches += 1
+        return { status: 200, body: { elements: searches === 1 ? [] : [{ id: 90, reference: "TAP-1" }] } }
+      },
+      "POST /v1/items": () => ({
+        status: 400,
+        body: { title: "Item already exists", status: 400, errorCode: "ITEM_DUPLICATE" },
+      }),
+    })
+    await clientFor(fake).addLine(42, matLine, false)
+    expect(fake.apiCalls().at(-1)?.body).toMatchObject({ itemId: 90 })
+  })
+
+  it("sends the line price as TTC on a tax-included document", async () => {
+    const fake = catalogRoutes([{ id: 72, reference: "REMBOURSEMENT" }])
     await clientFor(fake).addLine(
       42,
-      { designation: "Remboursement", reference: null, quantity: 1, unitPrice: 96.6, vatPct: 20 },
+      {
+        designation: "Remboursement partiel",
+        article: { reference: "REMBOURSEMENT", description: "Remboursement" },
+        quantity: 1,
+        unitPrice: 96.6,
+        vatPct: 20,
+      },
       true,
     )
     expect(fake.apiCalls().at(-1)?.body).toMatchObject({
+      itemId: 72,
       isTaxIncluded: true,
       sellingPriceWithoutTax: 96.6,
-      item: { isTaxIncluded: true, sellingPriceWithTax: 96.6 },
     })
   })
 

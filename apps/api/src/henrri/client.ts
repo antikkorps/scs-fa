@@ -2,7 +2,7 @@
 // Holds the short-lived JWT in memory and renews it before it expires. Neither the
 // client secret nor the token ever reaches an error message or a log.
 
-import type { DraftLine } from "./documents.js"
+import type { DraftArticle, DraftLine } from "./documents.js"
 
 export type HenrriDocumentKind = "invoice" | "creditNote"
 
@@ -69,10 +69,11 @@ interface CachedToken {
 }
 
 interface ProblemDetails {
-  type?: string | null
-  code?: string | null
+  errorCode?: string | null
   title?: string | null
   detail?: string | null
+  /** ASP.NET validation failures: field → messages. */
+  errors?: Record<string, string[]> | null
 }
 
 interface RawDocument {
@@ -107,7 +108,11 @@ async function readJson(response: Response): Promise<unknown> {
 
 function errorFrom(status: number, body: unknown): HenrriError {
   const problem = (body ?? {}) as ProblemDetails
-  const candidate = problem.code ?? problem.type ?? ""
+  if (problem.errors && Object.keys(problem.errors).length > 0) {
+    const fields = Object.entries(problem.errors).map(([field, messages]) => `${field}: ${messages.join(" ")}`)
+    return new HenrriError("ValidationError", status, [problem.title, ...fields].filter(Boolean).join(" "))
+  }
+  const candidate = problem.errorCode ?? ""
   const code = BUSINESS_ERROR_CODE.test(candidate) ? candidate : `Http${status}`
   const message = problem.detail ?? problem.title ?? `Henrri answered ${status}`
   return new HenrriError(code, status, message)
@@ -127,27 +132,27 @@ function customerBody(buyer: HenrriBuyer) {
   }
 }
 
-function lineBody(typeId: number, line: DraftLine, taxIncluded: boolean) {
-  const price = taxIncluded ? { sellingPriceWithTax: line.unitPrice } : { sellingPriceWithoutTax: line.unitPrice }
+function lineBody(typeId: number, itemId: number, line: DraftLine, taxIncluded: boolean) {
+  // The line keeps its own text, price and VAT rate whatever the article says
+  // (checked on the sandbox, 2026-10-14). On a tax-included document Henrri reads
+  // `sellingPriceWithoutTax` as the TTC price.
   return {
     typeId,
-    reference: line.reference,
+    itemId,
     description: line.designation,
     quantity: line.quantity,
-    // On a tax-included document Henrri reads this price as TTC (see `isTaxIncluded`).
     sellingPriceWithoutTax: line.unitPrice,
     vatPercent: line.vatPct,
     isTaxIncluded: taxIncluded,
-    // Henrri bills catalog articles only: the article is given inline and Henrri
-    // matches it on reference + description (unique across the catalog).
-    item: {
-      reference: line.reference,
-      description: line.designation,
-      vatPercent: line.vatPct,
-      isTaxIncluded: taxIncluded,
-      ...price,
-    },
   }
+}
+
+/** A cached lookup that is dropped when it fails, so the next call asks again. */
+function forgetOnFailure<T>(lookup: Promise<T>, forget: () => void): Promise<T> {
+  return lookup.catch((error: unknown) => {
+    forget()
+    throw error
+  })
 }
 
 export function createHenrriClient(options: HenrriClientOptions) {
@@ -159,6 +164,8 @@ export function createHenrriClient(options: HenrriClientOptions) {
   let pendingToken: Promise<CachedToken> | null = null
   let documentTypes: Promise<Map<string, number>> | null = null
   let itemLineTypeId: Promise<number> | null = null
+  let productCategoryId: Promise<number> | null = null
+  const articleIds = new Map<string, Promise<number>>()
 
   async function send(method: string, path: string, body: unknown, bearer: string | null): Promise<Response> {
     const headers: Record<string, string> = { accept: "application/json" }
@@ -230,11 +237,67 @@ export function createHenrriClient(options: HenrriClientOptions) {
     return itemType.id
   }
 
+  async function loadProductCategoryId(): Promise<number> {
+    const list = await required<
+      ListResponse<{ id: number; isDefault?: boolean; type?: { itemCategoryKind?: string } }>
+    >("GET", "/v1/itemcategories")
+    const products = (list.elements ?? []).filter((category) => category.type?.itemCategoryKind === "product")
+    const category = products.find((candidate) => candidate.isDefault) ?? products[0]
+    if (!category) throw new HenrriError("MissingItemCategory", null, "Henrri lists no product category")
+    return category.id
+  }
+
+  /** Henrri's search is fuzzy: only an exact reference match counts. */
+  async function findArticle(reference: string): Promise<number | null> {
+    const list = await required<ListResponse<{ id: number; reference: string | null }>>(
+      "GET",
+      `/v1/items?search=${encodeURIComponent(reference)}`,
+    )
+    return (list.elements ?? []).find((item) => item.reference === reference)?.id ?? null
+  }
+
+  async function createArticle(article: DraftArticle, line: DraftLine): Promise<number> {
+    productCategoryId ??= forgetOnFailure(loadProductCategoryId(), () => {
+      productCategoryId = null
+    })
+    try {
+      const created = await required<{ id: number }>("POST", "/v1/items", {
+        reference: article.reference,
+        description: article.description,
+        vatPercent: line.vatPct,
+        isTaxIncluded: false,
+        sellingPriceWithoutTax: line.unitPrice,
+        itemCategoryId: await productCategoryId,
+      })
+      return created.id
+    } catch (error) {
+      // Another process created it in the meantime: Henrri never reuses an
+      // article given inline, it refuses the duplicate.
+      if (!(error instanceof HenrriError) || error.code !== "ITEM_DUPLICATE") throw error
+      const existing = await findArticle(article.reference)
+      if (existing === null) throw error
+      return existing
+    }
+  }
+
+  /** The article id, found or created once per process for each reference. */
+  function articleId(line: DraftLine): Promise<number> {
+    const { article } = line
+    let pending = articleIds.get(article.reference)
+    if (!pending) {
+      pending = forgetOnFailure(
+        findArticle(article.reference).then((found) => found ?? createArticle(article, line)),
+        () => articleIds.delete(article.reference),
+      )
+      articleIds.set(article.reference, pending)
+    }
+    return pending
+  }
+
   return {
     async documentTypeId(kind: HenrriDocumentKind): Promise<number> {
-      documentTypes ??= loadDocumentTypes().catch((error: unknown) => {
+      documentTypes ??= forgetOnFailure(loadDocumentTypes(), () => {
         documentTypes = null
-        throw error
       })
       const id = (await documentTypes).get(kind)
       if (id === undefined) throw new HenrriError("MissingDocumentType", null, `Henrri lists no ${kind} type`)
@@ -270,11 +333,11 @@ export function createHenrriClient(options: HenrriClientOptions) {
     },
 
     async addLine(documentId: number, line: DraftLine, taxIncluded: boolean): Promise<void> {
-      itemLineTypeId ??= loadItemLineTypeId().catch((error: unknown) => {
+      itemLineTypeId ??= forgetOnFailure(loadItemLineTypeId(), () => {
         itemLineTypeId = null
-        throw error
       })
-      await required("POST", `/v1/documents/${documentId}/lines`, lineBody(await itemLineTypeId, line, taxIncluded))
+      const body = lineBody(await itemLineTypeId, await articleId(line), line, taxIncluded)
+      await required("POST", `/v1/documents/${documentId}/lines`, body)
     },
 
     async getDocument(documentId: number): Promise<HenrriDocument | null> {

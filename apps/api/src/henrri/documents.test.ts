@@ -34,6 +34,8 @@ const book = {
   vatPct: 5.5,
   discountHt: 0,
 }
+const PORT = { reference: "PORT", description: "Frais de port" }
+const REFUND = { reference: "REMBOURSEMENT", description: "Remboursement" }
 const rifleParcel = { amountTtc: 25, priceHt: 20.83, vatAmount: 4.17, vatPct: 20 }
 const smallParcel = { amountTtc: 9, priceHt: 7.5, vatAmount: 1.5, vatPct: 20 }
 
@@ -49,8 +51,20 @@ describe("buildInvoiceDraft", () => {
     if (!result.ok) return
     expect(result.draft.taxIncluded).toBe(false)
     expect(result.draft.lines.slice(0, 2)).toEqual([
-      { designation: "Carabine", reference: "CAR-1", quantity: 1, unitPrice: 1000, vatPct: 20 },
-      { designation: "Tapis de tir", reference: "TAP-1", quantity: 2, unitPrice: 50, vatPct: 20 },
+      {
+        designation: "Carabine",
+        article: { reference: "CAR-1", description: "Carabine" },
+        quantity: 1,
+        unitPrice: 1000,
+        vatPct: 20,
+      },
+      {
+        designation: "Tapis de tir",
+        article: { reference: "TAP-1", description: "Tapis de tir" },
+        quantity: 2,
+        unitPrice: 50,
+        vatPct: 20,
+      },
     ])
   })
 
@@ -59,7 +73,7 @@ describe("buildInvoiceDraft", () => {
     if (!result.ok) throw new Error(result.reason)
     expect(result.draft.lines[2]).toEqual({
       designation: "Remise VIP — Tapis de tir",
-      reference: null,
+      article: { reference: "REMISE-VIP", description: "Remise VIP" },
       quantity: 1,
       unitPrice: -15,
       vatPct: 20,
@@ -76,8 +90,8 @@ describe("buildInvoiceDraft", () => {
     const result = buildInvoiceDraft(withBook)
     if (!result.ok) throw new Error(result.reason)
     expect(result.draft.lines.filter((line) => line.designation === "Frais de port")).toEqual([
-      { designation: "Frais de port", reference: null, quantity: 1, unitPrice: 20.83, vatPct: 20 },
-      { designation: "Frais de port", reference: null, quantity: 1, unitPrice: 8.53, vatPct: 5.5 },
+      { designation: "Frais de port", article: PORT, quantity: 1, unitPrice: 20.83, vatPct: 20 },
+      { designation: "Frais de port", article: PORT, quantity: 1, unitPrice: 8.53, vatPct: 5.5 },
     ])
   })
 
@@ -86,7 +100,7 @@ describe("buildInvoiceDraft", () => {
     if (!result.ok) throw new Error(result.reason)
     expect(result.draft.lines.at(-1)).toEqual({
       designation: "Frais de port",
-      reference: null,
+      article: PORT,
       quantity: 1,
       unitPrice: 28.33,
       vatPct: 20,
@@ -143,14 +157,14 @@ describe("buildCreditNoteDraft", () => {
     expect(result.draft.lines).toEqual([
       {
         designation: "Remboursement partiel de la commande ABCD1234",
-        reference: null,
+        article: REFUND,
         quantity: 1,
         unitPrice: 96.6,
         vatPct: 20,
       },
       {
         designation: "Remboursement partiel de la commande ABCD1234",
-        reference: null,
+        article: REFUND,
         quantity: 1,
         unitPrice: 3.4,
         vatPct: 5.5,
@@ -180,7 +194,7 @@ describe("buildCreditNoteDraft", () => {
     expect(result.draft.lines).toEqual([
       {
         designation: "Remboursement partiel de la commande ABCD1234",
-        reference: null,
+        article: REFUND,
         quantity: 1,
         unitPrice: 50,
         vatPct: 20,

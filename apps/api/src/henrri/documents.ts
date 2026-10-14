@@ -14,9 +14,16 @@ export interface InvoiceSource {
   totalTtc: number
 }
 
+/** The Henrri catalog article a line bills: Henrri invoices articles only. */
+export interface DraftArticle {
+  reference: string
+  description: string
+}
+
 export interface DraftLine {
+  /** What the line reads on the invoice; may differ from the article's description. */
   designation: string
-  reference: string | null
+  article: DraftArticle
   quantity: number
   /** HT or TTC, depending on the draft's `taxIncluded`. */
   unitPrice: number
@@ -43,7 +50,11 @@ interface PricedLine {
   discountHt: number
 }
 
-const SHIPPING_DESIGNATION = "Frais de port"
+// Lines without a product SKU bill these fixed articles, at any VAT rate (the
+// line carries its own rate and price).
+const SHIPPING_ARTICLE: DraftArticle = { reference: "PORT", description: "Frais de port" }
+const VIP_DISCOUNT_ARTICLE: DraftArticle = { reference: "REMISE-VIP", description: "Remise VIP" }
+const REFUND_ARTICLE: DraftArticle = { reference: "REMBOURSEMENT", description: "Remboursement" }
 
 function toCents(amount: number): number {
   return Math.round(amount * 100)
@@ -85,7 +96,7 @@ function invoiceLines(lines: PricedLine[], shipping: NonNullable<InvoiceSource["
   for (const line of lines) {
     draftLines.push({
       designation: line.name,
-      reference: line.sku,
+      article: { reference: line.sku, description: line.name },
       quantity: line.qty,
       unitPrice: line.priceHt,
       vatPct: line.vatPct,
@@ -93,7 +104,7 @@ function invoiceLines(lines: PricedLine[], shipping: NonNullable<InvoiceSource["
     if (line.discountHt > 0) {
       draftLines.push({
         designation: `Remise VIP — ${line.name}`,
-        reference: null,
+        article: VIP_DISCOUNT_ARTICLE,
         quantity: 1,
         unitPrice: -line.discountHt,
         vatPct: line.vatPct,
@@ -107,8 +118,8 @@ function invoiceLines(lines: PricedLine[], shipping: NonNullable<InvoiceSource["
   }
   for (const [vatPct, htCents] of shippingHtCentsByRate) {
     draftLines.push({
-      designation: SHIPPING_DESIGNATION,
-      reference: null,
+      designation: SHIPPING_ARTICLE.description,
+      article: SHIPPING_ARTICLE,
       quantity: 1,
       unitPrice: fromCents(htCents),
       vatPct,
@@ -195,7 +206,7 @@ export function buildCreditNoteDraft(source: InvoiceSource, refundTtc: number, o
   const shares = allocateCents(refundCents, ttcCentsByRate(snapshot.lines, snapshot.shipping))
   const lines = [...shares].map(([vatPct, cents]) => ({
     designation: `Remboursement partiel de la commande ${orderRef}`,
-    reference: null,
+    article: REFUND_ARTICLE,
     quantity: 1,
     unitPrice: fromCents(cents),
     vatPct,
