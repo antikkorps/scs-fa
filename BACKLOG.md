@@ -878,22 +878,32 @@
 - les réponses aux décisions ci-dessus, Gun Art et e-reporting avec son **comptable** ;
 - plus tard, les identifiants de **production** et le choix du pack.
 
-**Story 12.7** — Journalisation pour diagnostiquer les remontées de Fred et Stéphane — 📝 **À CADRER** _(créée le 2026-10-15, demande de Franck)_
+**Story 12.7** — Journalisation pour diagnostiquer les remontées de Fred et Stéphane — 📐 **CADRÉE** (2026-10-15), à coder _(créée le 2026-10-15, demande de Franck)_
 
 > Besoin : quand Fred ou Stéphane remontent un problème (« Mme X n'a pas reçu son e-mail », « le paiement de la commande 0B7D1F3E est resté bloqué », « la facture n'est pas partie »), pouvoir **retrouver vite et sûrement ce qui s'est passé**, pour cette commande ou ce client, sans fouiller des logs bruts sur le serveur.
 
 **Existant (story 7.2)** : logs Pino JSON sur stdout (`service`, `env`, `reqId` propagé depuis `x-request-id`), redaction des secrets, alerte e-mail throttlée sur les 5xx, `auditLogs` pour certaines actions admin. **Manques** : les logs vivent dans la sortie des conteneurs (perdus à la rotation ou à la recréation, illisibles pour Fred et Stéphane) ; pas de recherche par commande, client ou e-mail ; pas de fil des événements métier d'une commande (paiement, Stripe, virement, documents légaux, expédition, e-mails envoyés ou échoués, facturation Henrri) ; erreurs du navigateur invisibles.
 
-**À cadrer avec Franck avant de coder (décisions structurantes) :**
+**Décisions tranchées avec Franck (2026-10-15) :**
 
-- [ ] **Où vont les logs** : agrégateur auto-hébergé sur le serveur (Loki + Grafana, prévu « Phase 8 » en 7.2), service géré (Better Stack, Axiom…, compte au nom du client), ou simple fichier tournant. Coût, RGPD (données hébergées en UE), durée de conservation.
-- [ ] **Journal métier d'une commande** : une table d'événements (`order_events` : quoi, quand, par qui, résultat, `reqId`) alimentée aux points clés, et un **onglet « Historique » sur la fiche commande admin** lisible par Fred et Stéphane, plutôt que de leur ouvrir un outil de logs.
-- [ ] **Recherche** : par référence de commande, e-mail client, `reqId` ; quels rôles y ont accès.
-- [ ] **E-mails** : tracer chaque envoi (type, destinataire, succès ou échec, identifiant du fournisseur) pour répondre à « je n'ai rien reçu ».
-- [ ] **Erreurs côté navigateur** (tunnel d'achat, paiement Stripe) : les remonter à l'API (point d'entrée limité en débit) ou non.
-- [ ] **RGPD** : minimisation (pas de contenu de documents ni de données bancaires), durée de conservation des journaux (à inscrire dans `/confidentialite` et au registre), droit d'accès et d'effacement.
+- **Logs techniques → journald du serveur.** Driver de logs Docker `journald` sur les services de `docker-compose.prod.yml` : les logs survivent aux recréations de conteneurs (aujourd'hui perdus à chaque déploiement), recherche par `reqId` avec `journalctl`. Conservation **14 jours** (`MaxRetentionSec` + plafond de taille dans `journald.conf`). 0 €, aucun nouveau service, données sur le serveur en UE. Réservés à Franck ; Loki + Grafana et les services gérés (Better Stack, Axiom) écartés pour l'instant.
+- **Historique de commande → on étend `audit_logs`, pas de table `order_events`.** `audit_logs` trace déjà `order.created`, `payment.stripe.init`, virement déclaré / rapproché, expédition, documents validés / rejetés, remboursements, `henrri.retry`, mais rattachés au paiement, à l'envoi ou au document. Ajout des colonnes **`order_id`** et **`req_id`** (indexées) et d'un **résultat** (succès / échec), reprise des lignes existantes quand l'`order_id` se déduit de l'entité, puis branchement des événements manquants (webhooks Stripe, e-mails, facture / avoir Henrri émis, changements de statut). Un seul journal, aucune écriture en double.
+- **Onglet « Historique » sur la fiche commande admin**, visible par **tous les admins** (Fred et Stéphane le sont ; pas de nouveau rôle). Fil chronologique lisible (quoi, quand, par qui, résultat), avec le `reqId` affiché pour remonter aux logs techniques. Pas de suivi côté client pour l'instant.
+- **E-mails → envois tracés + webhook Brevo.** Chaque envoi est journalisé (type, destinataire, succès ou échec, `messageId` renvoyé par le SMTP Brevo), rattaché à la commande ou à l'utilisateur. Un **webhook Brevo** (authentifié, idempotent) remonte les rejets définitifs, le spam et les blocages, retrouvés par `messageId`, pour répondre « parti, mais refusé par sa boîte mail ».
+- **Erreurs du navigateur → oui, panier, tunnel et paiement seulement.** Point d'entrée public **limité en débit**, sans authentification, charge utile bornée et validée, valeurs de formulaire jamais envoyées ; les erreurs atterrissent dans les logs techniques avec le `reqId`.
+- **RGPD : conservation par catégorie**, appliquée par une **purge quotidienne** :
+  - logs techniques : **14 jours** ;
+  - historique d'une commande (e-mails compris) : **conservé avec la commande, 10 ans**, **sans IP ni user-agent** ;
+  - connexions, sécurité et e-mails hors commande : **1 an** (fourchette CNIL de 6 mois à 1 an).
+  - Minimisation : jamais de contenu de document, de données bancaires ni de mot de passe ou jeton. Les durées vont dans `/confidentialite` (ligne « Journal des opérations sensibles », encore « À compléter ») et au registre.
 
-**Pistes techniques (une fois cadré)** : un logger d'événements unique (`logEvent(orderId, type, details)`) appelé depuis les services existants ; le `reqId` repris dans chaque événement pour relier l'historique aux logs techniques ; niveaux de log revus (les passes Henrri, Stripe et le suivi colis loggent déjà en `warn`/`info`) ; un guide « que regarder quand on me remonte… » dans `docs/`.
+**Découpage :**
+
+- [ ] **12.7a — Logs techniques persistants** : driver `journald` en prod, rétention 14 jours, revue des niveaux de log (Henrri, Stripe, suivi colis).
+- [ ] **12.7b — Historique de commande** : migration `audit_logs` (`order_id`, `req_id`, résultat) + reprise de l'existant, un helper unique d'écriture d'événement appelé depuis les services, événements manquants, onglet « Historique » admin.
+- [ ] **12.7c — E-mails** : journalisation de chaque envoi + webhook Brevo (rejets, spam, blocages).
+- [ ] **12.7d — Erreurs navigateur** : point d'entrée limité en débit + capture sur panier, tunnel et paiement.
+- [ ] **12.7e — Conservation et documentation** : purge quotidienne, durées dans `/confidentialite`, guide « que regarder quand on me remonte… » dans `docs/`.
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
