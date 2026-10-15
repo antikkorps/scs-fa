@@ -11,6 +11,7 @@ import type { FastifyBaseLogger } from "fastify"
 import type Stripe from "stripe"
 import { db } from "../db/client.js"
 import { auditLogs, orders, paymentCarte, paymentVirement } from "../db/schema.js"
+import { enqueueInvoice } from "../henrri/queue.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
 import { recomputeVipStatus } from "../vip/service.js"
@@ -34,6 +35,8 @@ export class PaymentError extends Error {
     readonly statusCode: number,
     readonly errorCode: string,
     message: string,
+    /** Extra fields sent alongside the error, for the client to act on. */
+    readonly details: Record<string, unknown> = {},
   ) {
     super(message)
   }
@@ -614,6 +617,9 @@ export async function recomputeOrderPaymentStatus(orderId: string): Promise<void
 
   // The money landed: what was owed becomes due (story 11.10).
   await settlePayoutsForOrder(orderId)
+
+  // Fully paid: one invoice, issued in Henrri by the queue (story 12.6).
+  await enqueueInvoice(orderId)
 
   // Paid order → may unlock VIP and advance the legal workflow.
   await recomputeVipStatus(order.userId)

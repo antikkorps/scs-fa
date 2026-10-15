@@ -369,3 +369,41 @@ export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmatio
       `<hr><h2>Conditions générales de vente</h2><p>${escapeHtml(termsIntro)}</p>${renderTermsHtml(site)}`,
   })
 }
+
+export interface InvoiceAvailableEmail {
+  orderId: string
+  orderRef: string
+  kind: "invoice" | "credit_note"
+  number: string
+  amountTtc: number
+}
+
+/**
+ * "Your invoice is available" (story 12.6): sent by SCS Firearms once Henrri has
+ * issued the invoice — or the credit note of a refund. The PDF is not attached:
+ * it is downloaded from the order page, behind the customer's session.
+ * Idempotence is the queue's job (`henrri_documents.customer_notified_at`).
+ */
+export async function sendInvoiceAvailableEmail(to: string, d: InvoiceAvailableEmail): Promise<void> {
+  const orderUrl = `${env.WEB_BASE_URL}/compte/commandes/${d.orderId}`
+  const document = d.kind === "invoice" ? `Votre facture ${d.number}` : `Votre avoir ${d.number}`
+  const context =
+    d.kind === "invoice"
+      ? `pour la commande ${d.orderRef} est disponible.`
+      : `suite au remboursement de la commande ${d.orderRef} est disponible.`
+  const amount = EUROS.format(d.amountTtc)
+
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: `${document} est disponible — commande ${d.orderRef}`,
+    text:
+      `${document} ${context}\n\n` +
+      `Montant : ${amount}\n\n` +
+      `Téléchargez-la depuis votre espace client : ${orderUrl}`,
+    html:
+      `<p>${escapeHtml(document)} ${escapeHtml(context)}</p>` +
+      `<p>Montant : <strong>${escapeHtml(amount)}</strong></p>` +
+      `<p><a href="${orderUrl}">Télécharger depuis mon espace client</a></p>`,
+  })
+}

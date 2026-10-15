@@ -3,6 +3,7 @@ import { orderReference } from "@armurier/shared"
 import type { OrderAddressSnapshot, OrderLegal, OrderLineItem, RequiredDoc } from "~/types/account"
 import type { OrderDetail } from "~/types/checkout"
 import { formatDate, formatDateTime, formatEuros, formatPercent } from "~/utils/format"
+import { henrriDocumentLabel, invoiceDownloadUrl } from "~/utils/henrri"
 import { needsUpload, requiredDocStatusLabel, requiredDocTone } from "~/utils/legal"
 import {
   legalStatusLabel,
@@ -281,6 +282,19 @@ function toggleUpload(docType: string) {
         </section>
 
         <!-- Addresses -->
+        <section v-if="order.invoices.length" class="block" aria-labelledby="invoices-h">
+          <h2 id="invoices-h" class="block__h">Factures</h2>
+          <ul class="invoices">
+            <li v-for="document in order.invoices" :key="document.id" class="invoices__row">
+              <span>{{ henrriDocumentLabel(document) }} — {{ formatDate(document.issuedAt) }}</span>
+              <span class="invoices__amount">{{ formatEuros(document.amountTtc) }}</span>
+              <a :href="invoiceDownloadUrl(order.id, document.id)" class="invoices__link" download>
+                Télécharger le PDF
+              </a>
+            </li>
+          </ul>
+        </section>
+
         <section class="block addresses" aria-labelledby="addr-h">
           <h2 id="addr-h" class="block__h">Livraison &amp; facturation</h2>
           <div class="addr-grid">
@@ -550,6 +564,29 @@ function toggleUpload(docType: string) {
   font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
   color: var(--paper);
+}
+.invoices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.invoices__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--ink-line);
+}
+.invoices__row:last-child {
+  border-bottom: none;
+}
+.invoices__amount {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.invoices__link {
+  color: var(--brass);
 }
 .addr-grid {
   display: grid;

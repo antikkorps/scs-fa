@@ -165,6 +165,9 @@ below is the recommended path.
       `payment_intent.payment_failed`, `payment_intent.canceled`,
       `refund.created`, `refund.updated` → `STRIPE_WEBHOOK_SECRET` set.
       Test one live-mode payment.
+- [ ] **Henrri production** API key in `.env` (`HENRRI_BASE_URL=https://api.henrri.io`,
+      `HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`) → `pnpm henrri:check` green. See the
+      Henrri section below.
 - [ ] Backups verified: on-demand `backup.sh` produces a dump **and** a
       `restore.sh` round-trip works (a backup you've never restored is a hypothesis).
 - [ ] Content parity check with the old OVH site (products, artworks, legal pages).
@@ -276,6 +279,41 @@ docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/med
 - Watermark and public resolution are set through `ARTWORK_WATERMARK_*` / `ARTWORK_PUBLIC_MAX_WIDTH` in `.env` — changing the look is a config change plus a restart, no deploy of code.
 - ⚠️ The watermark is SVG text rendered by sharp: the API image installs `fonts-dejavu-core` for it. If you ever rebuild the image from a different base, **check a published visual actually carries the mark** — a font-less runtime renders it empty, silently.
 - Print-grade originals live under `gun-art/originals/` in the bucket and are served by **no public route**. Keep them in the backup scope: they are the only copy the workshop can print from.
+
+## Henrri invoicing (story 12.6)
+
+- Every fully paid order becomes a Henrri invoice, every succeeded refund a credit note, through a
+  queue (`henrri_documents`). A Henrri outage never blocks a sale: documents wait and the next pass
+  resumes them. Reference contract: `docs/henrri/`.
+- `.env`: `HENRRI_BASE_URL` (sandbox `https://api-sandbox.henrri.io`, production
+  `https://api.henrri.io`), `HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`, `HENRRI_WEBHOOK_SECRET`,
+  `HENRRI_SYNC_INTERVAL_MINUTES` (default 5; 0 disables the in-process pass). Without credentials,
+  invoices simply wait in the queue.
+- ⚠️ **Getting the API secret**: in the Henrri account, the client secret is generated **together
+  with the webhook** (a callback URL is required): use
+  `https://www.<DOMAIN>/api/webhooks/henrri`, copy the secret when it is shown, and do not press
+  "Test": **that route does not exist yet** — the site does not use Henrri's webhooks, the URL is
+  only how Henrri hands out the secret (subscribe to no event). A 401 / `invalid_client` from
+  `pnpm henrri:check` means the pair is wrong.
+- Henrri allows about **100 API calls an hour** (one invoice ≈ 10–20 calls). A pass stops at the
+  first refusal, slowness or outage and resumes on the next one; a backlog drains over a few hours,
+  never by hammering Henrri. Each call gives up after 30 s.
+- Checks, from `apps/api`: `pnpm henrri:check` (read-only, spends no credit) and `pnpm henrri:sync`
+  (one queue pass, for a system cron instead of the in-process timer).
+- Refunds (admin order screen): a **goods return** picks the articles that came back — the credit
+  note carries their own VAT rate; a **goodwill gesture** is an amount, spread over what is left to
+  credit; an **overpayment** refund (transfer only) returns money paid in excess and gets no credit
+  note. Credit notes never exceed the invoice; an amount Henrri cannot express is refused before
+  any money moves, with the closest ones offered.
+- An issued invoice whose payment Henrri refuses, or whose payments do not add up (a short transfer
+  accepted), stays issued and is held for an admin: record the payment by hand in Henrri, or fix
+  the cause and use « Relancer la facturation ». An order with Henrri documents cannot be deleted
+  (accounting records are kept 10 years).
+- Credits: each finalized invoice or credit note costs 8 credits (free pack: 200 a month, i.e. 25
+  documents). Out of credits, documents wait; the admin dashboard counts the ones needing attention
+  (« Factures à traiter »), and the order screen has « Relancer la facturation ».
+- Henrri numbering must follow the order of sales: never issue an invoice by hand in Henrri for an
+  order the site will invoice, and never backdate one.
 
 ## Notes / gotchas
 

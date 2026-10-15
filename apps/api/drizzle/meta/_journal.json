@@ -148,6 +148,34 @@
       "when": 1792007142429,
       "tag": "0020_story_12_6_henrri_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792009609596,
+      "tag": "0021_story_12_6_payment_recorded",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792010677710,
+      "tag": "0022_story_12_6_customer_notified",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792012101165,
+      "tag": "0023_story_12_6_audit_queue",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792012835944,
+      "tag": "0024_story_12_6_refund_kinds",
+      "breakpoints": true
     }
   ]
 }

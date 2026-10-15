@@ -6,6 +6,7 @@ import {
   cartItemSchema,
   createAncientWeaponSchema,
   createOrderSchema,
+  createRefundSchema,
   createSupplierSchema,
   loginSchema,
   newsletterSubscribeSchema,
@@ -277,5 +278,41 @@ describe("supplier schemas (story 12.5)", () => {
   it("patches any field, but never with nothing", () => {
     expect(updateSupplierSchema.parse({ contactEmail: "contact@toro.fr" })).toEqual({ contactEmail: "contact@toro.fr" })
     expect(updateSupplierSchema.safeParse({}).success).toBe(false)
+  })
+})
+
+describe("createRefundSchema (story 12.6, decisions 2026-10-14)", () => {
+  it("reads a goods return: the articles and quantities that came back, the delivery maybe", () => {
+    expect(
+      createRefundSchema.parse({
+        kind: "goods_return",
+        channel: "carte",
+        lines: [{ item: 2, qty: 1 }],
+        includesShipping: true,
+      }),
+    ).toEqual({ kind: "goods_return", channel: "carte", lines: [{ item: 2, qty: 1 }], includesShipping: true })
+  })
+
+  it("reads a goodwill gesture as an amount, and an older call without a kind as one", () => {
+    expect(createRefundSchema.parse({ channel: "carte", amount: 40 })).toEqual({
+      kind: "goodwill",
+      channel: "carte",
+      amount: 40,
+    })
+  })
+
+  it("accepts an overpayment refund on the bank transfer only", () => {
+    expect(createRefundSchema.safeParse({ kind: "overpayment", channel: "virement", amount: 5 }).success).toBe(true)
+    expect(createRefundSchema.safeParse({ kind: "overpayment", channel: "carte", amount: 5 }).success).toBe(false)
+  })
+
+  it.each([
+    { kind: "goods_return", channel: "carte", lines: [{ item: 0, qty: 0 }] },
+    { kind: "goods_return", channel: "carte", lines: [{ item: -1, qty: 1 }] },
+    { kind: "goods_return", channel: "carte", lines: [{ item: 0, qty: 1.5 }] },
+    { kind: "goods_return", channel: "carte", lines: [{ item: 0, qty: 1 }], amount: 10 },
+    { kind: "goodwill", channel: "carte" },
+  ])("refuses %o", (input) => {
+    expect(createRefundSchema.safeParse(input).success).toBe(false)
   })
 })

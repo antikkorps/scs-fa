@@ -354,6 +354,12 @@ export const uuidParamSchema = z.object({
   id: z.string().uuid(),
 })
 
+// Story 12.6: an invoice or credit note of an order.
+export const orderDocumentParamSchema = z.object({
+  id: z.string().uuid(),
+  documentId: z.string().uuid(),
+})
+
 export type UuidParam = z.infer<typeof uuidParamSchema>
 
 // Story 6.1 — initiate a Stripe card payment for an order
@@ -426,14 +432,57 @@ export type ImportBankStatementInput = z.infer<typeof importBankStatementSchema>
 // Story 6.4 — admin issues a refund on a paid order, per channel (card/transfer).
 // `amount` is the gross (TTC) amount to return; the service caps it at what is
 // still refundable on that channel.
-export const createRefundSchema = z
-  .object({
-    channel: z.enum(REFUND_CHANNELS),
-    amount: moneyAmountSchema,
-    reason: z.string().trim().min(1).max(255).optional(),
-    notes: z.string().trim().max(1000).optional(),
-  })
-  .strict()
+// Story 12.6 (decisions 2026-10-14): what a refund is decides its credit note.
+// A goods return names the articles (index in the order snapshot) and quantities
+// that came back — its amount follows from them; a goodwill gesture is an amount;
+// an overpayment refund returns money paid in excess, by transfer, with no credit note.
+export const REFUND_KINDS = ["goods_return", "goodwill", "overpayment"] as const
+export type RefundKindValue = (typeof REFUND_KINDS)[number]
+
+const refundCommonFields = {
+  reason: z.string().trim().min(1).max(255).optional(),
+  notes: z.string().trim().max(1000).optional(),
+}
+
+export const returnedLineSchema = z.object({
+  item: z.number().int().min(0),
+  qty: z.number().int().positive(),
+})
+
+const refundKindsSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("goods_return"),
+      channel: z.enum(REFUND_CHANNELS),
+      lines: z.array(returnedLineSchema).max(200),
+      includesShipping: z.boolean().default(false),
+      ...refundCommonFields,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("goodwill"),
+      channel: z.enum(REFUND_CHANNELS),
+      amount: moneyAmountSchema,
+      ...refundCommonFields,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("overpayment"),
+      channel: z.literal("virement"),
+      amount: moneyAmountSchema,
+      ...refundCommonFields,
+    })
+    .strict(),
+])
+
+/** A call without a kind (before story 12.6) is a goodwill gesture. */
+export const createRefundSchema = z.preprocess(
+  (input) =>
+    input !== null && typeof input === "object" && !("kind" in input) ? { ...input, kind: "goodwill" } : input,
+  refundKindsSchema,
+)
 
 export type CreateRefundInput = z.infer<typeof createRefundSchema>
 
@@ -442,6 +491,8 @@ export const adminOrderQuerySchema = z.object({
   paymentStatus: z.enum(ORDER_PAYMENT_STATUSES).optional(),
   legalStatus: z.enum(ORDER_LEGAL_STATUSES).optional(),
   shippingStatus: z.enum(ORDER_SHIPPING_STATUSES).optional(),
+  // Story 12.6: orders whose Henrri invoice or credit notes need an admin.
+  invoices: z.enum(["attention"]).optional(),
   search: z.string().trim().min(1).max(255).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
