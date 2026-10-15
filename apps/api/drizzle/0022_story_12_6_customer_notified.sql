@@ -1,0 +1,1 @@
+ALTER TABLE "henrri_documents" ADD COLUMN "customer_notified_at" timestamp;

@@ -40,6 +40,13 @@ const cards = computed(() => {
       tone: "bad",
     },
     {
+      label: "Factures à traiter",
+      value: s.invoicesNeedingAttention,
+      hint: "Henrri : bloquées ou en retard",
+      to: "/admin/orders?invoices=attention",
+      tone: s.invoicesNeedingAttention > 0 ? "bad" : "ok",
+    },
+    {
       label: "Remboursées",
       value: s.refunded,
       hint: "totalement",

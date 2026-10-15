@@ -21,6 +21,8 @@ const router = useRouter()
 const paymentFilter = ref((route.query.paymentStatus as string) || "")
 const legalFilter = ref((route.query.legalStatus as string) || "")
 const shippingFilter = ref((route.query.shippingStatus as string) || "")
+// Story 12.6: "attention" lists the orders whose Henrri documents need an admin.
+const invoicesFilter = ref((route.query.invoices as string) || "")
 const search = ref((route.query.search as string) || "")
 const page = ref(Number(route.query.page) || 1)
 
@@ -29,6 +31,7 @@ const query = computed(() => {
   if (paymentFilter.value) p.set("paymentStatus", paymentFilter.value)
   if (legalFilter.value) p.set("legalStatus", legalFilter.value)
   if (shippingFilter.value) p.set("shippingStatus", shippingFilter.value)
+  if (invoicesFilter.value) p.set("invoices", invoicesFilter.value)
   if (search.value.trim()) p.set("search", search.value.trim())
   p.set("page", String(page.value))
   p.set("limit", "20")
@@ -52,6 +55,7 @@ function resetFilters() {
   paymentFilter.value = ""
   legalFilter.value = ""
   shippingFilter.value = ""
+  invoicesFilter.value = ""
   search.value = ""
   page.value = 1
   syncUrl()
@@ -62,6 +66,7 @@ function syncUrl() {
       ...(paymentFilter.value ? { paymentStatus: paymentFilter.value } : {}),
       ...(legalFilter.value ? { legalStatus: legalFilter.value } : {}),
       ...(shippingFilter.value ? { shippingStatus: shippingFilter.value } : {}),
+      ...(invoicesFilter.value ? { invoices: invoicesFilter.value } : {}),
       ...(search.value.trim() ? { search: search.value.trim() } : {}),
       ...(page.value > 1 ? { page: String(page.value) } : {}),
     },
@@ -81,6 +86,7 @@ watch(
     paymentFilter.value = (q.paymentStatus as string) || ""
     legalFilter.value = (q.legalStatus as string) || ""
     shippingFilter.value = (q.shippingStatus as string) || ""
+    invoicesFilter.value = (q.invoices as string) || ""
     search.value = (q.search as string) || ""
     page.value = Number(q.page) || 1
   },
@@ -107,6 +113,10 @@ watch(
       <select v-model="shippingFilter" class="ctl" @change="applyFilters">
         <option value="">Toutes expéditions</option>
         <option v-for="o in SHIPPING_STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+      </select>
+      <select v-model="invoicesFilter" class="ctl" @change="applyFilters">
+        <option value="">Toutes factures</option>
+        <option value="attention">Factures à traiter</option>
       </select>
       <button type="submit" class="btn btn-ghost">Filtrer</button>
       <button type="button" class="btn btn-ghost" @click="resetFilters">Réinitialiser</button>

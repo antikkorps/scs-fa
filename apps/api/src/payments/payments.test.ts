@@ -11,6 +11,7 @@ import {
   artworks,
   auditLogs,
   cartItems,
+  henrriDocuments,
   legalCategories,
   orders,
   paymentCarte,
@@ -32,6 +33,7 @@ vi.mock("./stripe.js", () => ({
   constructWebhookEvent: vi.fn(),
 }))
 
+import { enqueueInvoice } from "../henrri/queue.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import {
   constructWebhookEvent,
@@ -100,6 +102,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
 
     await db.delete(auditLogs).where(inArray(auditLogs.entityId, carteIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
+    await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, orderIds))
     await db.delete(refunds).where(inArray(refunds.orderId, orderIds))
     // Prints still attached to a test order must be released before the order is
     // deleted (orderId FK has no cascade); released/seeded prints go with the
@@ -462,6 +465,9 @@ describe("payments — Stripe card (Story 6.1)", () => {
       expect(carte.processedAt).not.toBeNull()
       const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
       expect(order.paymentStatus).toBe("received")
+      // Fully paid: its Henrri invoice is queued (story 12.6).
+      const queued = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
+      expect(queued).toEqual([expect.objectContaining({ kind: "invoice", status: "pending" })])
     })
 
     it("still settles the payment when the charge lookup fails (card details left empty)", async () => {
@@ -1090,8 +1096,29 @@ describe("payments — Stripe card (Story 6.1)", () => {
     }
 
     describe("card refunds (Stripe)", () => {
+      it("refuses, before calling Stripe, an amount Henrri could not issue a credit note for", async () => {
+        // An order carrying the 12.6 snapshot: 100 HT at 20 % → 120 TTC.
+        const orderId = await seedPaidCardOrder(
+          userId,
+          "120.00",
+          [{ ...CARD_ITEM, vatPct: 20, discountHt: 0 }],
+          "pi_rf_x",
+        )
+        await db.update(orders).set({ shippingPortions: [] }).where(eq(orders.id, orderId))
+
+        const res = await refund(orderId, { channel: "carte", amount: 33.33 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({
+          error: "InexpressibleRefundAmount",
+          suggestions: { below: 33.32, above: 33.34 },
+        })
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+        expect(await db.select().from(refunds).where(eq(refunds.orderId, orderId))).toEqual([])
+      })
+
       it("partial refund flags the order partially_refunded and calls Stripe with the cents amount", async () => {
         const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_rf_p1")
+        await enqueueInvoice(orderId)
         vi.mocked(createRefund).mockResolvedValue({ id: "re_p1", status: "succeeded" } as never)
 
         const res = await refund(orderId, { channel: "carte", amount: 40 })
@@ -1106,6 +1133,13 @@ describe("payments — Stripe card (Story 6.1)", () => {
         )
         const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(order.paymentStatus).toBe("partially_refunded")
+        // A settled refund queues its credit note (story 12.6).
+        const creditNotes = (
+          await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
+        ).filter((document) => document.kind === "credit_note")
+        expect(creditNotes).toEqual([
+          expect.objectContaining({ refundId: res.json().data.id, expectedTotalTtc: "40.00" }),
+        ])
       })
 
       it("full refund flips the order to refunded", async () => {
@@ -1225,6 +1259,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
 
       it("settles a pending card refund only when the webhook confirms it (idempotent)", async () => {
         const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_async")
+        await enqueueInvoice(orderId)
         vi.mocked(createRefund).mockResolvedValue({ id: "re_async", status: "pending" } as never)
 
         const res = await refund(orderId, { channel: "carte", amount: 100 })
@@ -1232,6 +1267,11 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(res.json().data).toMatchObject({ status: "pending", orderPaymentStatus: "received" })
         const [pending] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(pending.paymentStatus).toBe("received") // not refunded until confirmed
+        const creditNotesOf = async () =>
+          (await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))).filter(
+            (document) => document.kind === "credit_note",
+          )
+        expect(await creditNotesOf()).toEqual([])
 
         vi.mocked(constructWebhookEvent).mockReturnValue({
           type: "refund.updated",
@@ -1254,6 +1294,123 @@ describe("payments — Stripe card (Story 6.1)", () => {
         const settledRefunds = await db.select().from(refunds).where(eq(refunds.stripeRefundId, "re_async"))
         expect(settledRefunds).toHaveLength(1)
         expect(settledRefunds[0].status).toBe("succeeded")
+        // Confirmed, then replayed: one credit note.
+        expect(await creditNotesOf()).toEqual([expect.objectContaining({ expectedTotalTtc: "100.00" })])
+      })
+    })
+
+    describe("refund kinds (story 12.6, decisions 2026-10-14)", () => {
+      // 100 HT at 20 % (120) + an Estampe 100 HT at 5.5 % (105.50), all by card: 225.50.
+      const snapshotItems = [
+        { ...CARD_ITEM, vatPct: 20, discountHt: 0 },
+        { ...CARD_ITEM, name: "Estampe", sku: `${PREFIX}print`, vatPct: 5.5, discountHt: 0 },
+      ]
+
+      async function snapshotCardOrder(intentId: string) {
+        const orderId = await seedPaidCardOrder(userId, "225.50", snapshotItems, intentId)
+        await db.update(orders).set({ shippingPortions: [] }).where(eq(orders.id, orderId))
+        await enqueueInvoice(orderId)
+        return orderId
+      }
+
+      async function overpaidTransferOrder() {
+        // 120 due, 130 received and accepted.
+        const orderId = await seedPaidVirementOrder(userId, "120.00", [
+          { ...FIREARM_ITEM, priceHt: 100, vatPct: 20, discountHt: 0 },
+        ])
+        await db.update(orders).set({ shippingPortions: [] }).where(eq(orders.id, orderId))
+        await db
+          .update(paymentVirement)
+          .set({ amountReceivedTtc: "130.00" })
+          .where(eq(paymentVirement.orderId, orderId))
+        await enqueueInvoice(orderId)
+        return orderId
+      }
+
+      const creditNotesOf = async (orderId: string) =>
+        (await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))).filter(
+          (document) => document.kind === "credit_note",
+        )
+
+      it("refunds a returned article at its credit note's amount, computed from the lines", async () => {
+        const orderId = await snapshotCardOrder("pi_kind_ret")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_kind_ret", status: "succeeded" } as never)
+
+        const res = await refund(orderId, { kind: "goods_return", channel: "carte", lines: [{ item: 1, qty: 1 }] })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data).toMatchObject({ amountTtc: "105.50", kind: "goods_return" })
+        expect(vi.mocked(createRefund)).toHaveBeenCalledWith(expect.objectContaining({ amount: 10550 }))
+        const [row] = await db.select().from(refunds).where(eq(refunds.orderId, orderId))
+        expect(row).toMatchObject({ kind: "goods_return", lines: [{ item: 1, qty: 1 }], includesShipping: false })
+        expect(await creditNotesOf(orderId)).toEqual([expect.objectContaining({ expectedTotalTtc: "105.50" })])
+      })
+
+      it("refuses to return more than was bought, before calling Stripe", async () => {
+        const orderId = await snapshotCardOrder("pi_kind_over")
+        const res = await refund(orderId, { kind: "goods_return", channel: "carte", lines: [{ item: 1, qty: 2 }] })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({ error: "ReturnExceedsOrder" })
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+      })
+
+      it("previews what a return would refund, and what the channel can still refund", async () => {
+        const orderId = await snapshotCardOrder("pi_kind_prev")
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/orders/${orderId}/refunds/preview`,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: { kind: "goods_return", channel: "carte", lines: [{ item: 1, qty: 1 }], includesShipping: false },
+        })
+        expect(res.statusCode).toBe(200)
+        expect(res.json().data).toEqual({ amountTtc: 105.5, refundableTtc: 225.5, remainingToCreditTtc: 225.5 })
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+      })
+
+      it("refunds an overpaid transfer's excess without any credit note", async () => {
+        const orderId = await overpaidTransferOrder()
+        const res = await refund(orderId, { kind: "overpayment", channel: "virement", amount: 10 })
+        expect(res.statusCode).toBe(201)
+        expect(res.json().data).toMatchObject({ kind: "overpayment", amountTtc: "10.00" })
+        expect(await creditNotesOf(orderId)).toEqual([])
+      })
+
+      it("refunds no more as overpayment than was paid in excess", async () => {
+        const orderId = await overpaidTransferOrder()
+        const res = await refund(orderId, { kind: "overpayment", channel: "virement", amount: 10.01 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({ error: "ExceedsOverpayment" })
+      })
+
+      it("leaves an order invoiced before line-by-line invoicing free of the credit-note checks", async () => {
+        // No 12.6 snapshot: any goodwill amount the channel allows.
+        const orderId = await seedPaidCardOrder(userId, "120.00", [CARD_ITEM], "pi_kind_legacy")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_kind_legacy", status: "succeeded" } as never)
+        const res = await refund(orderId, { kind: "goodwill", channel: "carte", amount: 33.33 })
+        expect(res.statusCode).toBe(201)
+      })
+
+      it("refuses a goods return on such an order, pointing to a goodwill gesture", async () => {
+        const orderId = await seedPaidCardOrder(userId, "120.00", [CARD_ITEM], "pi_kind_legacy2")
+        const res = await refund(orderId, { kind: "goods_return", channel: "carte", lines: [{ item: 0, qty: 1 }] })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({ error: "ReturnNeedsSnapshot" })
+      })
+
+      it("checks an amount on the transfer channel too", async () => {
+        const orderId = await overpaidTransferOrder()
+        const res = await refund(orderId, { kind: "goodwill", channel: "virement", amount: 33.33 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({
+          error: "InexpressibleRefundAmount",
+          suggestions: { below: 33.32, above: 33.34 },
+        })
+      })
+
+      it("never lets credit notes exceed the invoice, even when the channel holds more", async () => {
+        const orderId = await overpaidTransferOrder()
+        const res = await refund(orderId, { kind: "goodwill", channel: "virement", amount: 125 })
+        expect(res.statusCode).toBe(400)
+        expect(res.json()).toMatchObject({ error: "ExceedsInvoice" })
       })
     })
 

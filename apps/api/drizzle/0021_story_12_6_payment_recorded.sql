@@ -1,0 +1,1 @@
+ALTER TABLE "henrri_documents" ADD COLUMN "payment_recorded_at" timestamp;

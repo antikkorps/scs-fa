@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import type { AdminOrderDetail } from "~/types/admin"
 import { formatDateTime, formatEuros } from "~/utils/format"
+import { henrriBlockReason, henrriDocumentLabel, henrriDocumentStatus } from "~/utils/henrri"
+import {
+  REFUND_KIND_OPTIONS,
+  type RefundForm,
+  type RefundKind,
+  refundFailure,
+  refundRequestBody,
+  returnableQuantities,
+  shippingRefunded,
+} from "~/utils/refund"
 import { legalStatus, paymentStatus, refundStatus, shippingStatus } from "~/utils/status"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
@@ -42,48 +52,117 @@ const refundable = computed(() => {
 })
 const canRefund = computed(() => refundable.value.carte > 0 || refundable.value.virement > 0)
 
-// Refund modal
+// Refund modal (story 12.6): a goods return picks the articles that came back
+// (the API computes the amount), a goodwill gesture or an overpayment is an amount.
 const showRefund = ref(false)
+const refundKind = ref<RefundKind>("goods_return")
 const refundChannel = ref<"carte" | "virement">("carte")
 const refundAmount = ref<number | null>(null)
+const refundQuantities = ref<number[]>([])
+const refundShipping = ref(false)
 const refundReason = ref("")
 const refundBusy = ref(false)
 const refundError = ref("")
+const refundSuggestions = ref<number[]>([])
+const refundPreview = ref<number | null>(null)
+
+const returnable = computed(() =>
+  order.value ? returnableQuantities(order.value.items, order.value.payment.refunds) : [],
+)
+const deliveryRefunded = computed(() => (order.value ? shippingRefunded(order.value.payment.refunds) : true))
+
+function refundForm(): RefundForm {
+  return {
+    kind: refundKind.value,
+    channel: refundChannel.value,
+    quantities: refundQuantities.value,
+    includesShipping: refundShipping.value,
+    amount: refundAmount.value,
+    reason: refundReason.value,
+  }
+}
 
 function openRefund() {
   refundError.value = ""
+  refundSuggestions.value = []
+  refundPreview.value = null
+  refundKind.value = "goods_return"
   refundChannel.value = refundable.value.carte > 0 ? "carte" : "virement"
-  refundAmount.value = refundable.value[refundChannel.value]
+  refundAmount.value = null
+  refundQuantities.value = returnable.value.map(() => 0)
+  refundShipping.value = false
   refundReason.value = ""
   showRefund.value = true
 }
-watch(refundChannel, (c) => {
-  refundAmount.value = refundable.value[c]
+watch(refundKind, (kind) => {
+  if (kind === "overpayment") refundChannel.value = "virement"
+  refundError.value = ""
+  refundSuggestions.value = []
 })
 
+// A return's amount is the credit note's: asked of the API as the selection changes.
+async function previewReturn() {
+  refundPreview.value = null
+  const body = refundRequestBody(refundForm())
+  if (body.kind !== "goods_return" || (body.lines.length === 0 && !body.includesShipping)) return
+  try {
+    const { data } = await api<{ data: { amountTtc: number } }>(`/admin/payments/orders/${id}/refunds/preview`, {
+      method: "POST",
+      body,
+    })
+    refundPreview.value = data.amountTtc
+    refundError.value = ""
+  } catch (err) {
+    refundError.value = refundFailure(err).message
+  }
+}
+watch([refundKind, refundChannel, refundQuantities, refundShipping], previewReturn, { deep: true })
+
 async function submitRefund() {
-  if (!refundAmount.value || refundAmount.value <= 0) {
+  if (refundKind.value !== "goods_return" && (!refundAmount.value || refundAmount.value <= 0)) {
     refundError.value = "Montant invalide."
     return
   }
   refundBusy.value = true
   refundError.value = ""
+  refundSuggestions.value = []
   try {
-    await api(`/admin/payments/orders/${id}/refunds`, {
-      method: "POST",
-      body: {
-        channel: refundChannel.value,
-        amount: refundAmount.value,
-        ...(refundReason.value.trim() ? { reason: refundReason.value.trim() } : {}),
-      },
-    })
+    await api(`/admin/payments/orders/${id}/refunds`, { method: "POST", body: refundRequestBody(refundForm()) })
     showRefund.value = false
     await refresh()
   } catch (err) {
-    refundError.value = (err as { data?: { message?: string } })?.data?.message ?? "Le remboursement a échoué."
+    const failure = refundFailure(err)
+    refundError.value = failure.message
+    refundSuggestions.value = failure.suggestions
   } finally {
     refundBusy.value = false
   }
+}
+
+// Henrri (story 12.6): put blocked documents back in the queue.
+const henrriBusy = ref(false)
+const henrriError = ref("")
+const canRetryHenrri = computed(
+  () => order.value?.henrri.some((document) => document.status === "blocked" || document.held) ?? false,
+)
+
+async function retryHenrri() {
+  henrriBusy.value = true
+  henrriError.value = ""
+  try {
+    await api(`/admin/orders/${id}/henrri/retry`, { method: "POST" })
+    await refresh()
+  } catch {
+    henrriError.value = "La relance a échoué."
+  } finally {
+    henrriBusy.value = false
+  }
+}
+
+function pickSuggestion(amount: number) {
+  refundAmount.value = amount
+  refundError.value = ""
+  refundSuggestions.value = []
 }
 
 function num(v: unknown): number | null {
@@ -184,6 +263,35 @@ function num(v: unknown): number | null {
             Rembourser
           </button>
         </section>
+
+        <section class="panel">
+          <h2 class="panel__title">Facturation (Henrri)</h2>
+          <p v-if="!order.henrri.length" class="kv">Aucune facture : elle part quand la commande est entièrement payée.</p>
+          <div v-for="document in order.henrri" :key="document.id" class="henrri-doc">
+            <div class="bucket">
+              <span class="bucket__label">{{ henrriDocumentLabel(document) }}</span>
+              <span class="bucket__amt">{{ formatEuros(document.amountTtc) }}</span>
+              <AdminStatusTag v-bind="henrriDocumentStatus(document.status, document.held)" />
+            </div>
+            <p v-if="document.lastError" class="henrri-doc__reason">{{ henrriBlockReason(document.lastError) }}</p>
+            <p
+              v-if="document.kind === 'invoice' && document.status === 'finalized' && !document.paymentRecordedAt"
+              class="henrri-doc__reason"
+            >
+              Règlement pas encore enregistré dans Henrri.
+            </p>
+          </div>
+          <p v-if="henrriError" class="modal__error" role="alert">{{ henrriError }}</p>
+          <button
+            v-if="canRetryHenrri"
+            type="button"
+            class="btn btn-ghost refund-btn"
+            :disabled="henrriBusy"
+            @click="retryHenrri"
+          >
+            {{ henrriBusy ? "Relance…" : "Relancer la facturation" }}
+          </button>
+        </section>
       </div>
 
       <AdminShipmentsPanel :order="order" class="shipping" @changed="refresh" />
@@ -195,6 +303,14 @@ function num(v: unknown): number | null {
         <h2 class="modal__title">Rembourser</h2>
         <form @submit.prevent="submitRefund">
           <label class="field">
+            <span>Nature</span>
+            <select v-model="refundKind" class="ctl">
+              <option v-for="option in REFUND_KIND_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label v-if="refundKind !== 'overpayment'" class="field">
             <span>Canal</span>
             <select v-model="refundChannel" class="ctl">
               <option v-if="refundable.carte > 0" value="carte">Carte (max {{ formatEuros(refundable.carte) }})</option>
@@ -203,7 +319,30 @@ function num(v: unknown): number | null {
               </option>
             </select>
           </label>
-          <label class="field">
+          <fieldset v-if="refundKind === 'goods_return'" class="field returns">
+            <legend>Articles retournés</legend>
+            <label v-for="(item, index) in order.items" :key="index" class="returns__row">
+              <span>{{ item.name }}</span>
+              <input
+                v-model.number="refundQuantities[index]"
+                type="number"
+                min="0"
+                :max="returnable[index]"
+                :disabled="returnable[index] === 0"
+                class="ctl returns__qty"
+                :aria-label="`Quantité retournée — ${item.name}`"
+              />
+              <span class="returns__max">/ {{ returnable[index] }}</span>
+            </label>
+            <label class="returns__row">
+              <input v-model="refundShipping" type="checkbox" :disabled="deliveryRefunded" />
+              <span>Rembourser les frais de port{{ deliveryRefunded ? " (déjà remboursés)" : "" }}</span>
+            </label>
+            <p class="returns__amount">
+              Montant remboursé : <strong>{{ refundPreview === null ? "—" : formatEuros(refundPreview) }}</strong>
+            </p>
+          </fieldset>
+          <label v-else class="field">
             <span>Montant (€)</span>
             <input
               v-model.number="refundAmount"
@@ -219,6 +358,17 @@ function num(v: unknown): number | null {
             <input v-model="refundReason" type="text" maxlength="255" class="ctl" />
           </label>
           <p v-if="refundError" class="modal__error" role="alert">{{ refundError }}</p>
+          <div v-if="refundSuggestions.length" class="modal__suggestions">
+            <button
+              v-for="amount in refundSuggestions"
+              :key="amount"
+              type="button"
+              class="btn btn-ghost"
+              @click="pickSuggestion(amount)"
+            >
+              {{ formatEuros(amount) }}
+            </button>
+          </div>
           <div class="modal__actions">
             <button type="submit" class="btn btn-primary" :disabled="refundBusy">
               {{ refundBusy ? "En cours…" : "Confirmer le remboursement" }}
@@ -351,6 +501,11 @@ function num(v: unknown): number | null {
   color: var(--danger);
   font-size: var(--fs-sm);
 }
+.henrri-doc__reason {
+  color: var(--paper-faint);
+  font-size: var(--fs-sm);
+  margin: 0.25rem 0 0.75rem;
+}
 .bucket {
   display: flex;
   align-items: center;
@@ -438,6 +593,35 @@ function num(v: unknown): number | null {
   color: var(--danger);
   font-size: var(--fs-sm);
   margin: 0 0 1rem;
+}
+.returns {
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+.returns__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+}
+.returns__row > span:first-child {
+  flex: 1;
+}
+.returns__qty {
+  width: 4.5rem;
+}
+.returns__max {
+  color: var(--paper-faint);
+  font-size: var(--fs-sm);
+}
+.returns__amount {
+  margin: 0.75rem 0 0;
+}
+.modal__suggestions {
+  display: flex;
+  gap: 0.5rem;
+  margin: -0.5rem 0 1rem;
 }
 .modal__actions {
   display: flex;

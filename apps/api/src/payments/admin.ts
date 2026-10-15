@@ -13,7 +13,7 @@ import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { orders, paymentVirement, users } from "../db/schema.js"
 import { validationError } from "../http.js"
-import { createOrderRefund, listOrderRefunds } from "./refunds.js"
+import { createOrderRefund, listOrderRefunds, planRefund } from "./refunds.js"
 import { importBankStatement, PaymentError, reconcileVirementManually } from "./service.js"
 
 const orderIdParamSchema = z.object({ orderId: z.string().uuid() })
@@ -161,7 +161,36 @@ export const adminPaymentRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(201).send({ data: result })
     } catch (err) {
       if (err instanceof PaymentError) {
-        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message })
+        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message, ...err.details })
+      }
+      throw err
+    }
+  })
+
+  // POST /api/admin/payments/orders/:orderId/refunds/preview — what a refund would
+  // move, before any money does (story 12.6): the amount a goods return comes to,
+  // what the channel can still refund, what credit notes may still take.
+  fastify.post("/orders/:orderId/refunds/preview", async (request, reply) => {
+    const params = orderIdParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const body = createRefundSchema.safeParse(request.body)
+    if (!body.success) {
+      return reply.code(400).send(validationError(body.error.issues))
+    }
+    try {
+      const plan = await planRefund(params.data.orderId, body.data)
+      return reply.code(200).send({
+        data: {
+          amountTtc: plan.amountTtc,
+          refundableTtc: plan.refundableTtc,
+          remainingToCreditTtc: plan.remainingToCreditTtc,
+        },
+      })
+    } catch (err) {
+      if (err instanceof PaymentError) {
+        return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message, ...err.details })
       }
       throw err
     }

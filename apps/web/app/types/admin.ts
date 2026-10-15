@@ -95,6 +95,10 @@ export interface AddressSnapshot {
 export interface RefundRow {
   id: string
   channel: "carte" | "virement"
+  /** Story 12.6: what was refunded decides the credit note. */
+  kind: "goods_return" | "goodwill" | "overpayment"
+  lines: Array<{ item: number; qty: number }> | null
+  includesShipping: boolean
   amountTtc: string
   status: string
   reason: string | null
@@ -150,6 +154,24 @@ export interface AdminOrderDetail {
     virement: PaymentVirement | null
     refunds: RefundRow[]
   }
+  /** The order's Henrri invoice and credit notes (story 12.6), invoice first. */
+  henrri: HenrriDocumentRow[]
+}
+
+export interface HenrriDocumentRow {
+  id: string
+  kind: "invoice" | "credit_note"
+  status: "pending" | "draft" | "finalized" | "blocked"
+  number: string | null
+  amountTtc: number
+  refundId: string | null
+  lastError: string | null
+  /** Issued, but held for an admin (payment refused or short). */
+  held: boolean
+  attempts: number
+  finalizedAt: string | null
+  paymentRecordedAt: string | null
+  createdAt: string
 }
 
 // Story 6.3/6.4 admin payment actions
@@ -198,6 +220,8 @@ export interface OrdersSummary {
   refunded: number
   docsToReview: number
   docsRejected: number
+  /** Henrri documents blocked, or still on their way an hour on (story 12.6). */
+  invoicesNeedingAttention: number
   byPaymentStatus: Record<string, number>
   byLegalStatus: Record<string, number>
 }
