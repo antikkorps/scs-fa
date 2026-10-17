@@ -13,8 +13,19 @@
 
 name: scs-firearm
 
+# Every container logs to the host's journald (story 12.7a): the logs outlive a
+# recreated container (a deploy), and are searched with journalctl, e.g.
+#   journalctl -t scs-firearm-api-1 -g '<reqId>' --since today
+# Retention (14 days) is set host-side by infra/journald/scs-firearm.conf
+# (docs/DEPLOY.md § Logs). `docker compose logs` keeps working.
+x-logging: &logging
+  driver: journald
+  options:
+    tag: "{{.Name}}" # the container name, e.g. scs-firearm-api-1
+
 services:
   postgres:
+    logging: *logging
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
@@ -40,6 +51,7 @@ services:
   # a no-op and the deployed schema is always a known revision — no destructive
   # diffing against a live database.
   migrate:
+    logging: *logging
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -54,6 +66,7 @@ services:
     networks: [internal]
 
   api:
+    logging: *logging
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -85,6 +98,7 @@ services:
   # The API streams each upload here over TCP (INSTREAM) and gates the document's
   # usability on the verdict. Ships freshclam, which keeps the virus DB current.
   clamav:
+    logging: *logging
     image: clamav/clamav:1.5.2-35
     restart: unless-stopped
     volumes:
@@ -100,6 +114,7 @@ services:
     networks: [internal]
 
   web:
+    logging: *logging
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -135,6 +150,7 @@ services:
   # loads the tracker only after consent.
   # Pinned: 3.2.0 is the newest release past the 90-day dependency quarantine.
   umami:
+    logging: *logging
     image: ghcr.io/umami-software/umami:3.2.0
     restart: unless-stopped
     init: true
@@ -160,6 +176,7 @@ services:
   #   docker compose -f docker-compose.prod.yml run --rm backup backup.sh
   #   docker compose -f docker-compose.prod.yml run --rm backup restore.sh [file]
   backup:
+    logging: *logging
     build:
       context: ./infra/backup
     image: scs-backup:latest
@@ -186,6 +203,7 @@ services:
     networks: [internal]
 
   caddy:
+    logging: *logging
     image: caddy:2-alpine
     restart: unless-stopped
     ports:

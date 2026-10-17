@@ -95,6 +95,8 @@ export const stripeWebhookRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       event = constructWebhookEvent(request.body as Buffer, signature)
     } catch {
+      // A wrong or rotated STRIPE_WEBHOOK_SECRET shows up here, not in Stripe's dashboard alone.
+      request.log.warn("Stripe webhook signature rejected")
       return reply.code(400).send({ error: "InvalidSignature", message: "Webhook signature verification failed" })
     }
 

@@ -451,7 +451,7 @@ export async function importBankStatement(csv: string, adminId: string): Promise
   return { total: lines.length, reconciled, needsReview: lines.length - reconciled, lines }
 }
 
-type Logger = Pick<FastifyBaseLogger, "warn">
+type Logger = Pick<FastifyBaseLogger, "info" | "warn" | "error">
 
 type CardDetails = { last4: string | null; brand: string | null }
 
@@ -484,11 +484,13 @@ async function cardDetails(intent: Stripe.PaymentIntent, log: Logger): Promise<C
  * PaymentIntent id, so a webhook for a superseded intent is safely ignored.
  */
 export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promise<void> {
+  log.info({ eventId: event.id, type: event.type }, "Stripe webhook received")
   switch (event.type) {
     case "payment_intent.succeeded": {
       const intent = event.data.object as Stripe.PaymentIntent
       const { last4, brand } = await cardDetails(intent, log)
       await settleCartePayment(
+        log,
         intent.id,
         {
           paymentStatus: "received",
@@ -506,7 +508,7 @@ export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promi
     }
     case "payment_intent.payment_failed": {
       const intent = event.data.object as Stripe.PaymentIntent
-      await settleCartePayment(intent.id, {
+      await settleCartePayment(log, intent.id, {
         paymentStatus: "failed",
         failureReason: intent.last_payment_error?.message ?? "Card payment failed",
       })
@@ -514,7 +516,7 @@ export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promi
     }
     case "payment_intent.canceled": {
       const intent = event.data.object as Stripe.PaymentIntent
-      await settleCartePayment(intent.id, { paymentStatus: "cancelled" })
+      await settleCartePayment(log, intent.id, { paymentStatus: "cancelled" })
       return
     }
     // `charge.refunded` is deliberately not handled: its charge no longer
@@ -522,7 +524,7 @@ export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promi
     case "refund.updated":
     case "refund.created": {
       const refund = event.data.object as Stripe.Refund
-      await settleStripeRefund(refund.id, refund.status ?? "")
+      await settleStripeRefund(refund.id, refund.status ?? "", log)
       return
     }
     default:
@@ -533,6 +535,7 @@ export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promi
 type CarteUpdate = Partial<typeof paymentCarte.$inferInsert>
 
 async function settleCartePayment(
+  log: Logger,
   paymentIntentId: string,
   update: CarteUpdate,
   paidAmountCents?: number,
@@ -542,7 +545,10 @@ async function settleCartePayment(
     .from(paymentCarte)
     .where(eq(paymentCarte.stripePaymentIntentId, paymentIntentId))
     .limit(1)
-  if (!carte) return // unknown / superseded intent — nothing to do
+  if (!carte) {
+    log.warn({ paymentIntentId }, "Stripe event for an unknown PaymentIntent — ignored")
+    return
+  }
 
   // Guard against settling an order for less than its due amount. If the figure
   // Stripe reports as collected falls short, do NOT mark the order paid: record
@@ -551,6 +557,10 @@ async function settleCartePayment(
   if (update.paymentStatus === "received" && paidAmountCents !== undefined) {
     const expectedCents = Math.round(Number(carte.amountTtc) * 100)
     if (paidAmountCents < expectedCents) {
+      log.error(
+        { orderId: carte.orderId, paymentIntentId, expectedCents, paidAmountCents },
+        "Stripe collected less than the order total — not marked paid",
+      )
       await db.insert(auditLogs).values({
         entityType: "payment_carte",
         entityId: carte.id,
@@ -572,6 +582,7 @@ async function settleCartePayment(
     action: `payment.stripe.${update.paymentStatus}`,
     newValue: { orderId: carte.orderId, paymentIntentId },
   })
+  log.info({ orderId: carte.orderId, paymentIntentId, status: update.paymentStatus }, "Stripe card payment updated")
 
   await recomputeOrderPaymentStatus(carte.orderId)
 }

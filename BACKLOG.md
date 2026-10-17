@@ -899,7 +899,7 @@
 
 **Découpage :**
 
-- [ ] **12.7a — Logs techniques persistants** : driver `journald` en prod, rétention 14 jours, revue des niveaux de log (Henrri, Stripe, suivi colis).
+- [x] **12.7a — Logs techniques persistants** : driver `journald` en prod, rétention 14 jours, revue des niveaux de log (Henrri, Stripe, suivi colis). _Livré 2026-10-17 : ancre `x-logging` sur les 8 services, `infra/journald/scs-firearm.conf` (14 j, plafond 2 Go), `just journal <texte>`, procédure dans `docs/DEPLOY.md` § Logs ; une ligne par document Henrri (émis = info ; bloqué, en attente ou reporté = warn), par événement Stripe reçu, paiement et remboursement mis à jour (montant insuffisant = error, signature refusée ou objet inconnu = warn), par colis livré ou suivi en échec, toujours avec l'`orderId`. Reste en prod : installer le fichier journald (§ Logs)._
 - [ ] **12.7b — Historique de commande** : migration `audit_logs` (`order_id`, `req_id`, résultat) + reprise de l'existant, un helper unique d'écriture d'événement appelé depuis les services, événements manquants, onglet « Historique » admin.
 - [ ] **12.7c — E-mails** : journalisation de chaque envoi + webhook Brevo (rejets, spam, blocages).
 - [ ] **12.7d — Erreurs navigateur** : point d'entrée limité en débit + capture sur panier, tunnel et paiement.

@@ -5,6 +5,7 @@ import {
   type RefundKindValue,
 } from "@armurier/shared"
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm"
+import type { FastifyBaseLogger } from "fastify"
 import { db } from "../db/client.js"
 import {
   artworkPrints,
@@ -412,9 +413,18 @@ async function currentStatus(orderId: string): Promise<string> {
  * status and, when it succeeds, apply the order-level effects. Matched by Stripe
  * refund id, so an event for an unknown refund is a safe no-op. Idempotent.
  */
-export async function settleStripeRefund(stripeRefundId: string, stripeStatus: string): Promise<void> {
+export async function settleStripeRefund(
+  stripeRefundId: string,
+  stripeStatus: string,
+  log: Pick<FastifyBaseLogger, "info" | "warn">,
+): Promise<void> {
   const [row] = await db.select().from(refunds).where(eq(refunds.stripeRefundId, stripeRefundId)).limit(1)
-  if (!row) return
+  if (!row) {
+    log.warn({ stripeRefundId }, "Stripe event for an unknown refund — ignored")
+    return
+  }
+  const logUpdate = () =>
+    log.info({ orderId: row.orderId, stripeRefundId, status: stripeStatus }, "Stripe refund updated")
 
   if (stripeStatus === "succeeded") {
     if (row.status === "succeeded") return // already applied
@@ -424,6 +434,7 @@ export async function settleStripeRefund(stripeRefundId: string, stripeStatus: s
       .where(eq(refunds.id, row.id))
     await applyRefundEffects(row.orderId)
     await enqueueCreditNote(row.id)
+    logUpdate()
     return
   }
 
@@ -436,6 +447,7 @@ export async function settleStripeRefund(stripeRefundId: string, stripeStatus: s
         updatedAt: new Date(),
       })
       .where(eq(refunds.id, row.id))
+    logUpdate()
   }
 }
 

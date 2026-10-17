@@ -718,6 +718,69 @@ describe("Henrri queue (story 12.6)", () => {
       expect(await creditNoteOf(orderId)).toMatchObject({ status: "blocked", lastError: "InexpressibleAmount" })
     })
   })
+
+  // Story 12.7a: one line per document handled, carrying the order, so
+  // "the invoice of order 0B7D1F3E never left" is a single journalctl search.
+  describe("logging", () => {
+    function spyLog() {
+      return { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    }
+
+    it("logs an issued document with its order and Henrri number", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      const log = spyLog()
+      await processPendingHenrriDocuments(henrri.client, log)
+
+      const invoice = await invoiceOf(orderId)
+      expect(log.info).toHaveBeenCalledWith(
+        { documentId: invoice.id, orderId, kind: "invoice", number: "26-10-1" },
+        "Henrri document issued",
+      )
+      expect(log.warn).not.toHaveBeenCalled()
+    })
+
+    it("warns, with the order, when a document is blocked for an admin", async () => {
+      const { orderId } = await createPaidOrder()
+      await db.update(orders).set({ billingAddress: null, shippingAddress: null }).where(eq(orders.id, orderId))
+      await enqueueInvoice(orderId)
+      const log = spyLog()
+      await processPendingHenrriDocuments(henrri.client, log)
+
+      const invoice = await invoiceOf(orderId)
+      expect(log.warn).toHaveBeenCalledTimes(1)
+      expect(log.warn).toHaveBeenCalledWith(
+        { documentId: invoice.id, orderId, kind: "invoice", reason: "MissingBillingAddress" },
+        "Henrri document blocked — waiting for an admin",
+      )
+    })
+
+    it("warns, with the order, when an issued document is held for an admin", async () => {
+      const { orderId } = await createPaidOrder({ mixed: true, transferReceived: "1195.00" })
+      await enqueueInvoice(orderId)
+      const log = spyLog()
+      await processPendingHenrriDocuments(henrri.client, log)
+
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId, reason: "PaymentMismatch: received 1324.00, invoiced 1329.00" }),
+        "Henrri document held — waiting for an admin",
+      )
+    })
+
+    it("warns, with the order, when a document is deferred to the next pass", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      henrri.failNext("finalizeDocument", new HenrriError("Http503", 503, "Unavailable"))
+      const log = spyLog()
+      await processPendingHenrriDocuments(henrri.client, log)
+
+      expect(log.warn).toHaveBeenCalledTimes(1)
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId, reason: "Http503: Unavailable" }),
+        "Henrri document deferred to the next pass",
+      )
+    })
+  })
 })
 
 describe("henrriClientFromEnv", () => {
