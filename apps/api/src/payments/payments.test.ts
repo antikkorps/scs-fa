@@ -35,6 +35,7 @@ vi.mock("./stripe.js", () => ({
 
 import { enqueueInvoice } from "../henrri/queue.js"
 import { recomputeVipStatus } from "../vip/service.js"
+import { handleStripeEvent } from "./service.js"
 import {
   constructWebhookEvent,
   createPaymentIntent,
@@ -578,6 +579,124 @@ describe("payments — Stripe card (Story 6.1)", () => {
         payload: "{}",
       })
       expect(res.statusCode).toBe(400)
+    })
+
+    // Story 12.7a: what Stripe told us, and what we did with it, is in the
+    // logs, so "the payment of order 0B7D1F3E stayed stuck" can be traced.
+    describe("logging", () => {
+      function spyLog() {
+        return { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+
+      it("warns when a webhook signature is rejected (wrong or rotated secret)", async () => {
+        const log = spyLog()
+        const child = vi.spyOn(app.log, "child").mockReturnValue(log as never)
+        vi.mocked(constructWebhookEvent).mockImplementation(() => {
+          throw new Error("bad signature")
+        })
+        try {
+          await app.inject({
+            method: "POST",
+            url: "/api/webhooks/stripe",
+            headers: { "stripe-signature": "bad", "content-type": "application/json" },
+            payload: "{}",
+          })
+        } finally {
+          child.mockRestore()
+        }
+        expect(log.warn).toHaveBeenCalledWith("Stripe webhook signature rejected")
+      })
+
+      it("logs each event received and the payment it settled, with its order", async () => {
+        const orderId = await insertOrder(userId, [CARD_ITEM])
+        await insertCarte(orderId, { intentId: "pi_log_1" })
+        const log = spyLog()
+
+        await handleStripeEvent(
+          { id: "evt_log_1", type: "payment_intent.succeeded", data: { object: { id: "pi_log_1" } } } as never,
+          log,
+        )
+
+        expect(log.info).toHaveBeenCalledWith(
+          { eventId: "evt_log_1", type: "payment_intent.succeeded" },
+          "Stripe webhook received",
+        )
+        expect(log.info).toHaveBeenCalledWith(
+          { orderId, paymentIntentId: "pi_log_1", status: "received" },
+          "Stripe card payment updated",
+        )
+      })
+
+      it("warns about an event for a PaymentIntent we do not know", async () => {
+        const log = spyLog()
+        await handleStripeEvent(
+          { id: "evt_log_2", type: "payment_intent.succeeded", data: { object: { id: "pi_log_unknown" } } } as never,
+          log,
+        )
+        expect(log.warn).toHaveBeenCalledWith(
+          { paymentIntentId: "pi_log_unknown" },
+          "Stripe event for an unknown PaymentIntent — ignored",
+        )
+      })
+
+      it("reports an error when Stripe collected less than the order total", async () => {
+        const orderId = await insertOrder(userId, [CARD_ITEM])
+        await insertCarte(orderId, { intentId: "pi_log_short", amountTtc: "120.00" })
+        const log = spyLog()
+
+        await handleStripeEvent(
+          {
+            id: "evt_log_3",
+            type: "payment_intent.succeeded",
+            data: { object: { id: "pi_log_short", amount_received: 5000 } },
+          } as never,
+          log,
+        )
+
+        expect(log.error).toHaveBeenCalledWith(
+          { orderId, paymentIntentId: "pi_log_short", expectedCents: 12000, paidAmountCents: 5000 },
+          "Stripe collected less than the order total — not marked paid",
+        )
+      })
+
+      it("logs a refund settled from a webhook, and warns about an unknown one", async () => {
+        const orderId = await insertOrder(userId, [CARD_ITEM], "received")
+        await insertCarte(orderId, { intentId: "pi_log_rf", status: "received" })
+        await db.insert(refunds).values({
+          orderId,
+          channel: "carte",
+          amountTtc: "40.00",
+          status: "pending",
+          stripeRefundId: "re_log_1",
+        })
+        const log = spyLog()
+
+        await handleStripeEvent(
+          {
+            id: "evt_log_4",
+            type: "refund.updated",
+            data: { object: { id: "re_log_1", status: "succeeded" } },
+          } as never,
+          log,
+        )
+        await handleStripeEvent(
+          {
+            id: "evt_log_5",
+            type: "refund.updated",
+            data: { object: { id: "re_log_x", status: "succeeded" } },
+          } as never,
+          log,
+        )
+
+        expect(log.info).toHaveBeenCalledWith(
+          { orderId, stripeRefundId: "re_log_1", status: "succeeded" },
+          "Stripe refund updated",
+        )
+        expect(log.warn).toHaveBeenCalledWith(
+          { stripeRefundId: "re_log_x" },
+          "Stripe event for an unknown refund — ignored",
+        )
+      })
     })
   })
 

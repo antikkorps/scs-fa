@@ -423,6 +423,7 @@ async function issueDocument(
   claimed: Claim,
   document: HenrriDocumentRow,
   context: OrderContext,
+  log: Logger,
 ): Promise<"issued" | "blocked"> {
   const draft = await draftFor(document, context)
   if (!draft.ok) {
@@ -444,6 +445,10 @@ async function issueDocument(
     number = issued.number
   }
   await write(claimed, { status: "finalized", henrriNumber: number, finalizedAt: new Date(), lastError: null })
+  log.info(
+    { documentId: document.id, orderId: document.orderId, kind: document.kind, number },
+    "Henrri document issued",
+  )
   return "issued"
 }
 
@@ -456,7 +461,7 @@ async function runSteps(
   const context = await loadOrder(document.orderId)
   if (!context) return block(claimed, "OrderNotFound")
 
-  if (document.status !== "finalized" && (await issueDocument(client, claimed, document, context)) === "blocked") {
+  if (document.status !== "finalized" && (await issueDocument(client, claimed, document, context, log)) === "blocked") {
     return "blocked"
   }
 
@@ -501,7 +506,6 @@ async function recordFailure(claimed: Claim, documentId: string, error: unknown,
   if (!henrriError) log.error({ err: error, documentId }, "Henrri document failed unexpectedly")
 
   if (henrriError && !henrriError.retryable) {
-    log.warn({ documentId, reason }, "Henrri refused the document — waiting for an admin")
     const [current] = await db
       .select({ status: henrriDocuments.status })
       .from(henrriDocuments)
@@ -509,9 +513,25 @@ async function recordFailure(claimed: Claim, documentId: string, error: unknown,
     // An issued document never goes back to blocked: it stays issued, held.
     return current?.status === "finalized" ? hold(claimed, reason) : block(claimed, reason)
   }
-  log.warn({ documentId, reason }, "Henrri document deferred to the next pass")
   await release(claimed, { lastError: reason })
   return "retry"
+}
+
+const OUTCOME_WARNINGS: Partial<Record<ProcessOutcome, string>> = {
+  blocked: "Henrri document blocked — waiting for an admin",
+  held: "Henrri document held — waiting for an admin",
+  retry: "Henrri document deferred to the next pass",
+}
+
+/** A document that stopped short says why, with its order, in one line. */
+async function logStop(documentId: string, outcome: ProcessOutcome, log: Logger) {
+  const message = OUTCOME_WARNINGS[outcome]
+  if (!message) return
+  const [row] = await db
+    .select({ orderId: henrriDocuments.orderId, kind: henrriDocuments.kind, reason: henrriDocuments.lastError })
+    .from(henrriDocuments)
+    .where(eq(henrriDocuments.id, documentId))
+  if (row) log.warn({ documentId, ...row }, message)
 }
 
 /** One document, as far as it can go. Never throws: failures are recorded on the row. */
@@ -520,6 +540,12 @@ export async function processHenrriDocument(
   documentId: string,
   log: Logger,
 ): Promise<ProcessOutcome> {
+  const outcome = await processDocument(client, documentId, log)
+  await logStop(documentId, outcome, log)
+  return outcome
+}
+
+async function processDocument(client: HenrriClient, documentId: string, log: Logger): Promise<ProcessOutcome> {
   const [queued] = await db.select().from(henrriDocuments).where(eq(henrriDocuments.id, documentId)).limit(1)
   if (!queued) return "skipped"
   if (queued.kind === "credit_note" && queued.status !== "finalized") {

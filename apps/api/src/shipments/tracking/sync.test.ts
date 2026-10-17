@@ -206,6 +206,27 @@ describe("carrier tracking sync (story 11.9b)", () => {
     expect(parcel?.trackingLabel).toBeNull()
   })
 
+  // Story 12.7a: a parcel's line carries its order, so "the parcel of order
+  // 0B7D1F3E still shows in transit" is a single journalctl search.
+  it("logs an arrival and a failed check with the parcel's order", async () => {
+    const logger = { info: vi.fn(), warn: vi.fn() }
+    const delivered = await packParcel()
+    fetchStatus.mockResolvedValueOnce({ state: "delivered", label: "Livré", deliveredAt: new Date() })
+    await runShipmentTrackingSync(logger)
+    expect(logger.info).toHaveBeenCalledWith(
+      { shipmentId: delivered, orderId, carrier: "colissimo" },
+      "carrier reported the parcel delivered",
+    )
+
+    const unreachable = await packParcel({ position: 2, trackingNumber: "6A0002" })
+    fetchStatus.mockRejectedValueOnce(new Error("503 Service Unavailable"))
+    await runShipmentTrackingSync(logger)
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ shipmentId: unreachable, orderId, carrier: "colissimo" }),
+      "carrier tracking check failed",
+    )
+  })
+
   it("never touches a parcel that has not left, nor one already delivered", async () => {
     await packParcel({ status: "preparing", shippedAt: null })
     await packParcel({ position: 2, status: "delivered", deliveredAt: new Date(), trackingNumber: "6A0002" })

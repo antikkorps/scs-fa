@@ -55,6 +55,10 @@ ps:
 logs service="api":
     {{ compose }} logs -f {{ service }}
 
+# Search the persisted logs, last 14 days (default: the API) — e.g. `just journal 0b7d1f3e`
+journal pattern container="scs-firearm-api-1":
+    journalctl -t {{ container }} --since "-14d" --no-pager -g '{{ pattern }}'
+
 # Restart a service (default: caddy) — e.g. `just restart api`
 restart service="caddy":
     {{ compose }} restart {{ service }}

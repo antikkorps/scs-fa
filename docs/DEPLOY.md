@@ -38,6 +38,8 @@ ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
 
 Prefer Hetzner Cloud Firewall too (same three ports) as a second layer.
 
+Once the repo is cloned (§3), install the log retention: § 5 › Logs.
+
 ## 2. DNS
 
 Point both records at the VM's public IPv4 (and AAAA for IPv6 if enabled):
@@ -101,7 +103,7 @@ CI (Forgejo Actions) already runs lint + typecheck + tests on every PR/push to
 ## 5. Operations
 
 ```bash
-# Logs (follow one service)
+# Logs (follow one service) — searching them: § Logs below
 docker compose -f docker-compose.prod.yml logs -f api
 
 # Restart / stop
@@ -116,6 +118,38 @@ docker compose -f docker-compose.prod.yml exec postgres psql -U armurier -d armu
 `caddy_data` (TLS certs + ACME account — losing it re-issues certs and can hit
 rate limits). Snapshot the VM from the Hetzner console before risky changes;
 uptime monitoring is **Story 8.5**.
+
+### Logs (story 12.7a)
+
+Every container logs to the host's **journald** (`logging: *logging` in
+`docker-compose.prod.yml`), so the logs survive a deploy that recreates the
+containers. They are kept **14 days**, under a 2 GB cap, then deleted: that is
+the retention in the privacy policy and the RGPD register. One-time setup, as
+`root`:
+
+```bash
+mkdir -p /etc/systemd/journald.conf.d
+cp /home/deploy/scsFirearm/infra/journald/scs-firearm.conf /etc/systemd/journald.conf.d/
+systemctl restart systemd-journald
+usermod -aG systemd-journal deploy   # lets `deploy` read the journal without sudo
+journalctl --disk-usage              # check it took
+```
+
+Each line is tagged with its container name (`scs-firearm-api-1`,
+`scs-firearm-web-1`, …); the API writes one JSON object per line, carrying the
+request id (`reqId`), and the order id (`orderId`) on payment, Henrri and parcel
+lines. Searching:
+
+```bash
+just journal <text>                     # API, last 14 days: a reqId, an orderId, an e-mail…
+just journal <text> scs-firearm-web-1   # another container
+journalctl -t scs-firearm-api-1 -p warning --since today   # today's warnings and errors
+journalctl -t scs-firearm-api-1 -f                         # follow live
+```
+
+The admin shows a short order reference (`0B7D1F3E`, the first 8 characters of
+the id): `just journal 0b7d1f3e` finds its lines too, as a lowercase pattern
+matches regardless of case.
 
 ## 6. Backups (automated)
 

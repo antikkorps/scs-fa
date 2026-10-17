@@ -14,6 +14,7 @@ import { trackedCarriers, trackingProviderFor } from "./index.js"
 const MAX_PARCELS_PER_RUN = 100
 
 interface Logger {
+  info: (obj: object, msg: string) => void
   warn: (obj: object, msg: string) => void
 }
 
@@ -38,7 +39,10 @@ async function checkParcel(parcel: ParcelToCheck, logger?: Logger): Promise<Chec
   } catch (err) {
     // The carrier is down, rate-limiting us, or refusing our key. Leave the
     // parcel exactly as it is: an unanswered question is not an answer.
-    logger?.warn({ err, shipmentId: parcel.id, carrier: parcel.carrier }, "carrier tracking check failed")
+    logger?.warn(
+      { err, shipmentId: parcel.id, orderId: parcel.orderId, carrier: parcel.carrier },
+      "carrier tracking check failed",
+    )
     return "failed"
   }
 
@@ -86,7 +90,12 @@ async function checkParcel(parcel: ParcelToCheck, logger?: Logger): Promise<Chec
   })
 
   // Counted as delivered only once the transaction has actually committed.
-  return recorded ? "delivered" : "checked"
+  if (!recorded) return "checked"
+  logger?.info(
+    { shipmentId: parcel.id, orderId: parcel.orderId, carrier: parcel.carrier },
+    "carrier reported the parcel delivered",
+  )
+  return "delivered"
 }
 
 /**
