@@ -21,6 +21,7 @@ import { adminBlogImageRoutes, blogImageRoutes } from "./blog/images.js"
 import { blogRoutes } from "./blog/index.js"
 import { cartRoutes } from "./cart/index.js"
 import { adminCatalogImportRoutes } from "./catalog-import/admin.js"
+import { clientErrorRoutes } from "./client-errors/index.js"
 import { brevoWebhookRoutes } from "./email-webhook.js"
 import { env } from "./env.js"
 import type { HenrriClient } from "./henrri/client.js"
@@ -144,6 +145,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(paymentRoutes, { prefix: "/api/payments" })
   await fastify.register(stripeWebhookRoutes, { prefix: "/api/webhooks/stripe" })
   await fastify.register(brevoWebhookRoutes, { prefix: "/api/webhooks/brevo" })
+  await fastify.register(clientErrorRoutes, { prefix: "/api/client-errors" })
   await fastify.register(legalDocumentRoutes, { prefix: "/api/legal-documents" })
   await fastify.register(adminLegalDocumentRoutes, { prefix: "/api/admin/legal-documents" })
   await fastify.register(adminPaymentRoutes, { prefix: "/api/admin/payments" })
