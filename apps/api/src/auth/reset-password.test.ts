@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, passwordResetTokens, refreshTokens, users } from "../db/schema.js"
+import { sendPasswordResetEmail } from "../email.js"
 import { generateRefreshToken, hashRefreshToken } from "./tokens.js"
 
 vi.mock("../email.js", () => ({
@@ -101,6 +102,8 @@ describe("forgot-password + reset-password", () => {
       const [audit] = await db.select().from(auditLogs).where(eq(auditLogs.action, "user.password_reset_requested"))
       expect(audit).toBeDefined()
       expect(audit.userId).toBe(userId)
+      // The e-mail's journal line names the account it was for (story 12.7c).
+      expect(sendPasswordResetEmail).toHaveBeenCalledWith(email, expect.any(String), { userId })
     })
 
     it("returns 200 for a non-existent email (no enumeration leak)", async () => {

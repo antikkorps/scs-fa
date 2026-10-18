@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, newsletterContacts, newsletterSubscriptions, newsletterTokens } from "../db/schema.js"
+import { sendNewsletterConfirmationEmail } from "../email.js"
 
 // The confirmation mail is the only way to obtain a token in the real flow, so
 // the suite reads the tokens straight off the (mocked) mailer rather than out of
@@ -96,6 +97,10 @@ describe("Newsletter — double opt-in, segments and GDPR purge (story 11.4)", (
     expect(subs[0]?.confirmedAt).toBeNull()
     expect(subs[0]?.consentSource).toBe("/boutique")
     expect(subs[0]?.consentIp).toBeTruthy()
+    // The e-mail's journal line names the contact it was for (story 12.7c).
+    expect(vi.mocked(sendNewsletterConfirmationEmail)).toHaveBeenLastCalledWith(address, expect.any(Object), {
+      contactId: contact?.id,
+    })
   })
 
   it("normalises the address and refuses an unticked consent box", async () => {

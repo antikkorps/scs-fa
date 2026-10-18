@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const { sendMail } = vi.hoisted(() => ({ sendMail: vi.fn() }))
 vi.mock("nodemailer", () => ({ createTransport: () => ({ sendMail }) }))
+// Rendering only: the journal (story 12.7c) is covered by email-journal.test.ts.
+vi.mock("./audit/record.js", () => ({ recordAuditEvent: vi.fn().mockResolvedValue(undefined) }))
 
 const { sendInvoiceAvailableEmail, sendOrderConfirmationEmail } = await import("./email.js")
 

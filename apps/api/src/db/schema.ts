@@ -1961,6 +1961,8 @@ export const auditLogs = pgTable(
     reqId: varchar("req_id", { length: 200 }),
     result: auditResultEnum("result").notNull().default("success"),
     error: varchar("error", { length: 100 }),
+    // Story 12.7c : l'identifiant SMTP d'un e-mail, pour rattacher les retours Brevo à son envoi.
+    messageId: varchar("message_id", { length: 255 }),
 
     // clock_timestamp(), pas now() : les événements d'une même transaction
     // gardent leur ordre dans l'historique (now() = début de la transaction).
@@ -1973,6 +1975,7 @@ export const auditLogs = pgTable(
     index("idx_audit_created").on(t.createdAt),
     index("idx_audit_order").on(t.orderId, t.createdAt),
     index("idx_audit_req").on(t.reqId),
+    index("idx_audit_message").on(t.messageId),
     foreignKey({
       columns: [t.userId],
       foreignColumns: [users.id],

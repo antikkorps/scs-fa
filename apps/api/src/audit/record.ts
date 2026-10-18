@@ -18,6 +18,8 @@ export interface AuditEvent {
   result?: "success" | "failure"
   /** A short code (`henrri.Timeout`), never a message: messages can carry personal data. */
   error?: string | null
+  /** The SMTP message id of an e-mail (story 12.7c): Brevo's reports name it. */
+  messageId?: string | null
   /** Kept only outside an order — an order's history is kept 10 years without them. */
   ipAddress?: string | null
   userAgent?: string | null
@@ -62,6 +64,7 @@ function toRow(event: AuditEvent): typeof auditLogs.$inferInsert {
     reqId: currentReqId(),
     result: event.result ?? "success",
     error: errorCode(event.error),
+    messageId: event.messageId ?? null,
     ipAddress: orderId ? null : (event.ipAddress ?? null),
     userAgent: orderId ? null : (event.userAgent ?? null),
   }
