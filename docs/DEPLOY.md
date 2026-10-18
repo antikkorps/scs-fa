@@ -199,6 +199,22 @@ below is the recommended path.
       `payment_intent.payment_failed`, `payment_intent.canceled`,
       `refund.created`, `refund.updated` → `STRIPE_WEBHOOK_SECRET` set.
       Test one live-mode payment.
+- [ ] **Brevo delivery reports** (story 12.7c): generate a token
+      (`openssl rand -hex 32`) → `BREVO_WEBHOOK_SECRET` in `.env`, then register
+      the transactional webhook — with the account's API key:
+      ```bash
+      curl -X POST https://api.brevo.com/v3/webhooks \
+        -H "api-key: $BREVO_API_KEY" -H "content-type: application/json" \
+        -d '{"type":"transactional","url":"https://www.<DOMAIN>/api/webhooks/brevo",
+             "events":["delivered","hardBounce","blocked","spam","invalid","error"],
+             "auth":{"type":"bearer","token":"<BREVO_WEBHOOK_SECRET>"}}'
+      ```
+      Check end to end: send a password reset to a non-existent address of a
+      domain you own; the admin history (or `audit_logs`) must show
+      `email.password_reset.hard_bounce` under the same `message_id` as the
+      `…sent` line. If it never arrives, Brevo is not reporting our SMTP
+      Message-ID: look at the webhook payload in the logs (`Brevo report for an
+      e-mail we did not journal`).
 - [ ] **Henrri production** API key in `.env` (`HENRRI_BASE_URL=https://api.henrri.io`,
       `HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`) → `pnpm henrri:check` green. See the
       Henrri section below.

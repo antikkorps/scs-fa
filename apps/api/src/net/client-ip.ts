@@ -1,6 +1,6 @@
-import { timingSafeEqual } from "node:crypto"
 import { BlockList, isIP } from "node:net"
 import type { FastifyRequest } from "fastify"
+import { matchesSecret } from "./shared-secret.js"
 
 /**
  * Who is the client? (story 9.6)
@@ -39,10 +39,5 @@ export function trustDirectPrivatePeer(address: string, hop: number): boolean {
 
 /** Whether the request carries the secret shared with the Nuxt server. Constant-time. */
 export function isInternalCall(request: FastifyRequest, secret: string | undefined): boolean {
-  if (!secret) return false
-  const sent = request.headers["x-internal-auth"]
-  if (typeof sent !== "string") return false
-  const a = Buffer.from(sent)
-  const b = Buffer.from(secret)
-  return a.length === b.length && timingSafeEqual(a, b)
+  return matchesSecret(request.headers["x-internal-auth"], secret)
 }

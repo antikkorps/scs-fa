@@ -68,8 +68,43 @@ function henrriLabel(kind: string, step: string, number: unknown): string | null
   return `${numbered} ${words[kind]}`
 }
 
+// Story 12.7c — customer e-mails, and what Brevo reported about them.
+const EMAIL_NAMES: Record<string, string> = {
+  order_confirmation: "de confirmation de commande",
+  invoice_available: "de facture disponible",
+  shipment_shipped: "d'expédition",
+  password_reset: "de réinitialisation du mot de passe",
+  legal_doc_approved: "de document validé",
+  legal_doc_rejected: "de document refusé",
+  newsletter_confirmation: "de confirmation d'inscription à la newsletter",
+}
+
+/** What became of the e-mail, and the word that introduces its recipient. */
+const EMAIL_OUTCOMES: Record<string, { said: string; before: string }> = {
+  sent: { said: "envoyé", before: "à" },
+  failed: { said: "non envoyé", before: "à" },
+  delivered: { said: "remis à la boîte", before: "de" },
+  hard_bounce: { said: "refusé par la boîte", before: "de" },
+  blocked: { said: "bloqué par Brevo", before: "pour" },
+  invalid_email: { said: "non distribué, adresse invalide", before: "pour" },
+  spam: { said: "signalé comme spam", before: "par" },
+  error: { said: "en erreur chez Brevo", before: "pour" },
+}
+
+function emailLabel(type: string, outcome: string, recipient: unknown): string | null {
+  const name = EMAIL_NAMES[type]
+  const said = EMAIL_OUTCOMES[outcome]
+  if (!name || !said) return null
+  const to = typeof recipient === "string" && recipient ? ` ${said.before} ${recipient}` : ""
+  return `E-mail ${name} ${said.said}${to}`
+}
+
 export function historyEventLabel(event: OrderHistoryEvent): string {
   const [scope = "", kind = "", step = ""] = event.action.split(".")
+  if (scope === "email") {
+    const email = emailLabel(kind, step, fieldOf(event.newValue, "recipient"))
+    if (email) return email
+  }
   if (scope === "order" && ORDER_STATUSES[kind] && step) {
     const status = ORDER_STATUSES[kind]
     return `${status.prefix} : ${status.label(step)}`
@@ -106,11 +141,29 @@ const HENRRI_CODES_ONLY: Record<string, string> = {
   PaymentNotRecorded: "Facture émise, mais son règlement n'a pas pu être enregistré dans Henrri.",
 }
 
+const SMTP_ERRORS: Record<string, string> = {
+  EENVELOPE: "Le serveur d'envoi a refusé l'adresse",
+  ECONNECTION: "Serveur d'envoi injoignable",
+  ETIMEDOUT: "Serveur d'envoi injoignable",
+  ESOCKET: "Serveur d'envoi injoignable",
+  EAUTH: "Le serveur d'envoi refuse nos identifiants",
+}
+
+const BREVO_ERRORS: Record<string, string> = {
+  hard_bounce: "Adresse inexistante ou boîte fermée : rejet définitif",
+  blocked: "Brevo bloque cette adresse après des rejets ou un signalement",
+  spam: "Le destinataire a signalé l'e-mail comme spam",
+  invalid_email: "Adresse e-mail mal formée",
+  error: "Erreur d'envoi chez Brevo",
+}
+
 /** Why an event failed, in plain French; the raw code when it is not one we know. */
 export function historyErrorLabel(error: string | null): string {
   if (!error) return ""
   const [source, ...rest] = error.split(".")
   const code = rest.join(".")
+  if (source === "smtp" && code) return `${SMTP_ERRORS[code] ?? "Échec de l'envoi"} (${code})`
+  if (source === "brevo" && code) return BREVO_ERRORS[code] ?? `Brevo : ${code}`
   if (source === "stripe" && code) return `Stripe : ${STRIPE_ERRORS[code] ?? code}`
   if (source === "henrri" && code) return HENRRI_CODES_ONLY[code] ?? henrriBlockReason(code)
   return error

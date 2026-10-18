@@ -147,6 +147,9 @@ const envSchema = z.object({
   BREVO_LIST_ID_ARMURERIE: z.coerce.number().int().positive().optional(),
   BREVO_LIST_ID_COLLECTION: z.coerce.number().int().positive().optional(),
   BREVO_LIST_ID_GUN_ART: z.coerce.number().int().positive().optional(),
+  // Brevo delivery reports (story 12.7c): the token Brevo sends as
+  // `Authorization: Bearer …`. Unset = the webhook answers 503.
+  BREVO_WEBHOOK_SECRET: z.string().min(24).optional(),
 
   // Gun Art image protection (Story 11.5). The watermark is burnt in server-side
   // — the only measure that survives a screenshot — and the HD original is never

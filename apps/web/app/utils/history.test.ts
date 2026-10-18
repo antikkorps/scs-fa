@@ -50,6 +50,25 @@ describe("historyEventLabel (story 12.7b)", () => {
     expect(historyEventLabel(event("henrri.retry"))).toBe("Facturation relancée")
   })
 
+  it("names e-mails with their recipient, and what became of them (story 12.7c)", () => {
+    const recipient = { recipient: "jean@example.fr" }
+    expect(historyEventLabel(event("email.order_confirmation.sent", { newValue: recipient }))).toBe(
+      "E-mail de confirmation de commande envoyé à jean@example.fr",
+    )
+    expect(historyEventLabel(event("email.invoice_available.failed", { newValue: recipient }))).toBe(
+      "E-mail de facture disponible non envoyé à jean@example.fr",
+    )
+    expect(historyEventLabel(event("email.shipment_shipped.delivered", { newValue: recipient }))).toBe(
+      "E-mail d'expédition remis à la boîte de jean@example.fr",
+    )
+    expect(historyEventLabel(event("email.order_confirmation.hard_bounce", { newValue: recipient }))).toBe(
+      "E-mail de confirmation de commande refusé par la boîte de jean@example.fr",
+    )
+    expect(historyEventLabel(event("email.order_confirmation.spam"))).toBe(
+      "E-mail de confirmation de commande signalé comme spam",
+    )
+  })
+
   it("shows an unknown action as it is, rather than hiding it", () => {
     expect(historyEventLabel(event("something.new"))).toBe("something.new")
   })
@@ -68,6 +87,13 @@ describe("historyErrorLabel", () => {
       "Facture émise, mais les règlements reçus ne couvrent pas la facture : règlement à enregistrer à la main dans Henrri.",
     )
     expect(historyErrorLabel("henrri.NUMBERING_ERROR")).toBe("Refus de Henrri — NUMBERING_ERROR")
+  })
+
+  it("explains e-mail failures", () => {
+    expect(historyErrorLabel("smtp.EENVELOPE")).toBe("Le serveur d'envoi a refusé l'adresse (EENVELOPE)")
+    expect(historyErrorLabel("smtp.ECONNECTION")).toBe("Serveur d'envoi injoignable (ECONNECTION)")
+    expect(historyErrorLabel("brevo.hard_bounce")).toBe("Adresse inexistante ou boîte fermée : rejet définitif")
+    expect(historyErrorLabel("brevo.blocked")).toBe("Brevo bloque cette adresse après des rejets ou un signalement")
   })
 
   it("is empty without an error, and shows any other code as it is", () => {
