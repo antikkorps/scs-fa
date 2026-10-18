@@ -246,7 +246,11 @@ describe("admin legal document validation (/api/admin/legal-documents)", () => {
       userRole: "admin",
     })
 
-    expect(sendLegalDocApprovedEmail).toHaveBeenCalledWith(CUSTOMER_EMAIL, expect.objectContaining({ docType: "cni" }))
+    expect(sendLegalDocApprovedEmail).toHaveBeenCalledWith(
+      CUSTOMER_EMAIL,
+      expect.objectContaining({ docType: "cni" }),
+      { userId: customerId },
+    )
   })
 
   it("refuses to approve a document whose antivirus scan is not clean", async () => {
@@ -281,6 +285,7 @@ describe("admin legal document validation (/api/admin/legal-documents)", () => {
     expect(sendLegalDocRejectedEmail).toHaveBeenCalledWith(
       CUSTOMER_EMAIL,
       expect.objectContaining({ docType: "permis_chasse", reason: "document_expired" }),
+      { userId: customerId },
     )
   })
 

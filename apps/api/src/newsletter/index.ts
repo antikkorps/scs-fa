@@ -171,11 +171,15 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
         })
         const unsubscribeToken = await issueUnsubscribeToken(contact.id)
 
-        await sendNewsletterConfirmationEmail(email, {
-          confirmToken,
-          unsubscribeToken,
-          segmentLabels: pending.map((p) => NEWSLETTER_SEGMENT_LABELS[p.segment]),
-        }).catch((err) => {
+        await sendNewsletterConfirmationEmail(
+          email,
+          {
+            confirmToken,
+            unsubscribeToken,
+            segmentLabels: pending.map((p) => NEWSLETTER_SEGMENT_LABELS[p.segment]),
+          },
+          { contactId: contact.id },
+        ).catch((err) => {
           request.log.error({ err }, "newsletter: failed to send the confirmation email")
         })
       }

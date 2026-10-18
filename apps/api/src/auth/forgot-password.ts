@@ -47,7 +47,7 @@ export const forgotPasswordRoute: FastifyPluginAsync = async (fastify) => {
           expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
         })
 
-        await sendPasswordResetEmail(normalizedEmail, token).catch((err) => {
+        await sendPasswordResetEmail(normalizedEmail, token, { userId: user.id }).catch((err) => {
           request.log.error({ err }, "forgot-password: failed to send email")
         })
 

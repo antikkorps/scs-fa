@@ -192,8 +192,8 @@ export const adminLegalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     await recomputeOrderLegalStatus(doc.user.id)
 
     // Notification is best-effort: the decision is already committed.
-    sendLegalDocApprovedEmail(doc.userEmail, { docType: doc.docType as LegalDocType }).catch((err) =>
-      fastify.log.error({ err, docId: doc.id }, "approval email failed"),
+    sendLegalDocApprovedEmail(doc.userEmail, { docType: doc.docType as LegalDocType }, { userId: doc.user.id }).catch(
+      (err) => fastify.log.error({ err, docId: doc.id }, "approval email failed"),
     )
 
     return reply.code(200).send({ data: updated })
@@ -240,11 +240,11 @@ export const adminLegalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     // Flag the customer's affected orders as docs_rejected
     await recomputeOrderLegalStatus(doc.user.id)
 
-    sendLegalDocRejectedEmail(doc.userEmail, {
-      docType: doc.docType as LegalDocType,
-      reason: reason as LegalDocRejectionReason,
-      notes,
-    }).catch((err) => fastify.log.error({ err, docId: doc.id }, "rejection email failed"))
+    sendLegalDocRejectedEmail(
+      doc.userEmail,
+      { docType: doc.docType as LegalDocType, reason: reason as LegalDocRejectionReason, notes },
+      { userId: doc.user.id },
+    ).catch((err) => fastify.log.error({ err, docId: doc.id }, "rejection email failed"))
 
     return reply.code(200).send({ data: updated })
   })

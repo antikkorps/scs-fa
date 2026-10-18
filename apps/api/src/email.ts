@@ -9,7 +9,8 @@ import {
   renderTermsText,
   type TermsInline,
 } from "@armurier/shared"
-import { createTransport } from "nodemailer"
+import { createTransport, type SendMailOptions } from "nodemailer"
+import { type AuditEvent, recordAuditEvent } from "./audit/record.js"
 import { env } from "./env.js"
 
 const transporter = createTransport({
@@ -18,10 +19,69 @@ const transporter = createTransport({
   auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
 })
 
-export async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
+/** What a customer e-mail is about, for its journal line (story 12.7c). */
+export interface EmailAbout {
+  orderId?: string
+  userId?: string
+  contactId?: string
+}
+
+type EmailType =
+  | "password_reset"
+  | "legal_doc_approved"
+  | "legal_doc_rejected"
+  | "shipment_shipped"
+  | "newsletter_confirmation"
+  | "order_confirmation"
+  | "invoice_available"
+
+/** The order first (its history), else the account, else the newsletter contact. */
+function journalEntity(about: EmailAbout): { entityType: string; entityId: string | null } {
+  if (about.orderId) return { entityType: "order", entityId: about.orderId }
+  if (about.userId) return { entityType: "user", entityId: about.userId }
+  if (about.contactId) return { entityType: "newsletter_contact", entityId: about.contactId }
+  return { entityType: "email", entityId: null }
+}
+
+/** Nodemailer's error code (`EENVELOPE`, `ECONNECTION`…), never its message. */
+function smtpErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown })?.code
+  return `smtp.${typeof code === "string" ? code : "unknown"}`
+}
+
+/**
+ * Send a customer e-mail and journal it: sent with its SMTP message id, or
+ * failed with the SMTP code. A failure still reaches the caller. A journal
+ * line that cannot be written only raises a warning: the e-mail has left,
+ * and failing here would make the caller send it again.
+ */
+async function deliver(type: EmailType, about: EmailAbout, mail: SendMailOptions): Promise<void> {
+  const journal = (event: Pick<AuditEvent, "result" | "error" | "messageId">) =>
+    recordAuditEvent({
+      ...journalEntity(about),
+      userRole: "system",
+      orderId: about.orderId ?? null,
+      action: `email.${type}.${event.result === "failure" ? "failed" : "sent"}`,
+      newValue: { recipient: mail.to },
+      ...event,
+    }).catch((error: unknown) => {
+      process.emitWarning(`E-mail journal line not written (${type}): ${String(error)}`)
+    })
+
+  let info: { messageId?: string } | undefined
+  try {
+    info = await transporter.sendMail(mail)
+  } catch (error) {
+    await journal({ result: "failure", error: smtpErrorCode(error) })
+    throw error
+  }
+  await journal({ result: "success", messageId: info?.messageId ?? null })
+}
+
+export async function sendPasswordResetEmail(to: string, token: string, about: EmailAbout = {}): Promise<void> {
   const resetUrl = `${env.WEB_BASE_URL}/reset-password?token=${token}`
 
-  await transporter.sendMail({
+  await deliver("password_reset", about, {
     from: env.SMTP_FROM,
     to,
     subject: "Reset your password",
@@ -53,9 +113,13 @@ const REJECTION_REASON_LABELS: Record<LegalDocRejectionReason, string> = {
   other: "see the details below",
 }
 
-export async function sendLegalDocApprovedEmail(to: string, doc: { docType: LegalDocType }): Promise<void> {
+export async function sendLegalDocApprovedEmail(
+  to: string,
+  doc: { docType: LegalDocType },
+  about: EmailAbout = {},
+): Promise<void> {
   const label = DOC_TYPE_LABELS[doc.docType]
-  await transporter.sendMail({
+  await deliver("legal_doc_approved", about, {
     from: env.SMTP_FROM,
     to,
     subject: "Your legal document has been approved",
@@ -146,11 +210,12 @@ export async function sendErrorAlertEmail(to: string[], item: ErrorAlertItem): P
 export async function sendLegalDocRejectedEmail(
   to: string,
   doc: { docType: LegalDocType; reason: LegalDocRejectionReason; notes?: string | null },
+  about: EmailAbout = {},
 ): Promise<void> {
   const label = DOC_TYPE_LABELS[doc.docType]
   const reasonLabel = REJECTION_REASON_LABELS[doc.reason]
   const notesText = doc.notes ? `\n\nDetails: ${doc.notes}` : ""
-  await transporter.sendMail({
+  await deliver("legal_doc_rejected", about, {
     from: env.SMTP_FROM,
     to,
     subject: "Your legal document was rejected",
@@ -195,25 +260,29 @@ export async function sendShipmentShippedEmail(to: string, p: ShipmentShippedEma
   const splitNote =
     p.total > 1 ? "Votre commande est expédiée en plusieurs colis : un e-mail vous est envoyé à chaque départ." : ""
 
-  await transporter.sendMail({
-    from: env.SMTP_FROM,
-    to,
-    subject: `${parcel} est en route — commande ${p.orderRef}`,
-    text:
-      `${parcel} de la commande ${p.orderRef} a été remis à ${p.carrierLabel}.\n\n` +
-      `Contenu :\n${p.items.map((i) => `- ${itemLabel(i)}`).join("\n")}\n\n` +
-      (trackingText ? `${trackingText}\n\n` : "") +
-      (splitNote ? `${splitNote}\n\n` : "") +
-      `Le détail de votre commande : ${orderUrl}`,
-    html:
-      `<p>${parcel} de la commande <strong>${escapeHtml(p.orderRef)}</strong> a été remis à ` +
-      `<strong>${escapeHtml(p.carrierLabel)}</strong>.</p>` +
-      `<p>Contenu :</p><ul>${p.items.map((i) => `<li>${escapeHtml(itemLabel(i))}</li>`).join("")}</ul>` +
-      (p.trackingNumber ? `<p>Numéro de suivi : <strong>${escapeHtml(p.trackingNumber)}</strong></p>` : "") +
-      (p.trackingUrl ? `<p><a href="${escapeHtml(p.trackingUrl)}">Suivre le colis</a></p>` : "") +
-      (splitNote ? `<p>${splitNote}</p>` : "") +
-      `<p><a href="${orderUrl}">Voir ma commande</a></p>`,
-  })
+  await deliver(
+    "shipment_shipped",
+    { orderId: p.orderId },
+    {
+      from: env.SMTP_FROM,
+      to,
+      subject: `${parcel} est en route — commande ${p.orderRef}`,
+      text:
+        `${parcel} de la commande ${p.orderRef} a été remis à ${p.carrierLabel}.\n\n` +
+        `Contenu :\n${p.items.map((i) => `- ${itemLabel(i)}`).join("\n")}\n\n` +
+        (trackingText ? `${trackingText}\n\n` : "") +
+        (splitNote ? `${splitNote}\n\n` : "") +
+        `Le détail de votre commande : ${orderUrl}`,
+      html:
+        `<p>${parcel} de la commande <strong>${escapeHtml(p.orderRef)}</strong> a été remis à ` +
+        `<strong>${escapeHtml(p.carrierLabel)}</strong>.</p>` +
+        `<p>Contenu :</p><ul>${p.items.map((i) => `<li>${escapeHtml(itemLabel(i))}</li>`).join("")}</ul>` +
+        (p.trackingNumber ? `<p>Numéro de suivi : <strong>${escapeHtml(p.trackingNumber)}</strong></p>` : "") +
+        (p.trackingUrl ? `<p><a href="${escapeHtml(p.trackingUrl)}">Suivre le colis</a></p>` : "") +
+        (splitNote ? `<p>${splitNote}</p>` : "") +
+        `<p><a href="${orderUrl}">Voir ma commande</a></p>`,
+    },
+  )
 }
 
 /**
@@ -228,13 +297,14 @@ export async function sendShipmentShippedEmail(to: string, p: ShipmentShippedEma
 export async function sendNewsletterConfirmationEmail(
   to: string,
   params: { confirmToken: string; unsubscribeToken: string; segmentLabels: string[] },
+  about: EmailAbout = {},
 ): Promise<void> {
   const confirmUrl = `${env.WEB_BASE_URL}/newsletter/confirmation?token=${params.confirmToken}`
   const unsubscribeUrl = `${env.WEB_BASE_URL}/newsletter/desabonnement?token=${params.unsubscribeToken}`
   const listText = params.segmentLabels.map((label) => `- ${label}`).join("\n")
   const listHtml = params.segmentLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")
 
-  await transporter.sendMail({
+  await deliver("newsletter_confirmation", about, {
     from: env.SMTP_FROM,
     to,
     subject: "Confirmez votre inscription à la newsletter SCS Firearms",
@@ -342,32 +412,36 @@ export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmatio
     "Vous disposez de 14 jours à compter de la réception de vos articles pour exercer votre droit de rétractation, dans les conditions de l'article 8 des conditions générales ci-dessous. Un formulaire de rétractation figure à la fin de cet e-mail."
   const termsIntro = `Vous avez accepté nos conditions générales de vente (version du ${termsDate}) en passant commande. Leur texte intégral figure ci-dessous : conservez cet e-mail.`
 
-  await transporter.sendMail({
-    from: env.SMTP_FROM,
-    to,
-    subject: `Confirmation de votre commande ${o.orderRef} — SCS Firearms`,
-    text:
-      `${hello}\n\nNous avons bien reçu votre commande ${o.orderRef} du ${placed}.\n\n` +
-      `Articles :\n${o.lines.map((l) => `- ${l.name}${l.qty > 1 ? ` × ${l.qty}` : ""}`).join("\n")}\n\n` +
-      `${totals.map(([k, v]) => `${k} : ${v}`).join("\n")}\n\n` +
-      (steps.length ? `Prochaines étapes :\n${steps.map((s) => `- ${s}`).join("\n")}\n\n` : "") +
-      `Livraison à :\n${o.shippingAddress.join("\n")}\n\n` +
-      `Suivre votre commande : ${orderUrl}\n\n` +
-      `${withdrawal}\n\n${renderInlinesText(SELLER, site)}\n\n` +
-      `----------------------------------------\nCONDITIONS GÉNÉRALES DE VENTE\n\n${termsIntro}\n\n${renderTermsText(site)}\n`,
-    html:
-      `<p>${escapeHtml(hello)}</p>` +
-      `<p>Nous avons bien reçu votre commande <strong>${escapeHtml(o.orderRef)}</strong> du ${escapeHtml(placed)}.</p>` +
-      `<p>Articles :</p><ul>${o.lines.map((l) => `<li>${escapeHtml(l.name)}${l.qty > 1 ? ` × ${l.qty}` : ""}</li>`).join("")}</ul>` +
-      `<table role="presentation">${totals.map(([k, v]) => `<tr><td>${k}</td><td style="text-align:right;padding-left:1.5em">${v}</td></tr>`).join("")}</table>` +
-      (steps.length
-        ? `<p>Prochaines étapes :</p><ul>${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>`
-        : "") +
-      `<p>Livraison à :<br>${o.shippingAddress.map(escapeHtml).join("<br>")}</p>` +
-      `<p><a href="${orderUrl}">Suivre ma commande</a></p>` +
-      `<p>${escapeHtml(withdrawal)}</p><p>${renderInlinesHtml(SELLER, site)}</p>` +
-      `<hr><h2>Conditions générales de vente</h2><p>${escapeHtml(termsIntro)}</p>${renderTermsHtml(site)}`,
-  })
+  await deliver(
+    "order_confirmation",
+    { orderId: o.orderId },
+    {
+      from: env.SMTP_FROM,
+      to,
+      subject: `Confirmation de votre commande ${o.orderRef} — SCS Firearms`,
+      text:
+        `${hello}\n\nNous avons bien reçu votre commande ${o.orderRef} du ${placed}.\n\n` +
+        `Articles :\n${o.lines.map((l) => `- ${l.name}${l.qty > 1 ? ` × ${l.qty}` : ""}`).join("\n")}\n\n` +
+        `${totals.map(([k, v]) => `${k} : ${v}`).join("\n")}\n\n` +
+        (steps.length ? `Prochaines étapes :\n${steps.map((s) => `- ${s}`).join("\n")}\n\n` : "") +
+        `Livraison à :\n${o.shippingAddress.join("\n")}\n\n` +
+        `Suivre votre commande : ${orderUrl}\n\n` +
+        `${withdrawal}\n\n${renderInlinesText(SELLER, site)}\n\n` +
+        `----------------------------------------\nCONDITIONS GÉNÉRALES DE VENTE\n\n${termsIntro}\n\n${renderTermsText(site)}\n`,
+      html:
+        `<p>${escapeHtml(hello)}</p>` +
+        `<p>Nous avons bien reçu votre commande <strong>${escapeHtml(o.orderRef)}</strong> du ${escapeHtml(placed)}.</p>` +
+        `<p>Articles :</p><ul>${o.lines.map((l) => `<li>${escapeHtml(l.name)}${l.qty > 1 ? ` × ${l.qty}` : ""}</li>`).join("")}</ul>` +
+        `<table role="presentation">${totals.map(([k, v]) => `<tr><td>${k}</td><td style="text-align:right;padding-left:1.5em">${v}</td></tr>`).join("")}</table>` +
+        (steps.length
+          ? `<p>Prochaines étapes :</p><ul>${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>`
+          : "") +
+        `<p>Livraison à :<br>${o.shippingAddress.map(escapeHtml).join("<br>")}</p>` +
+        `<p><a href="${orderUrl}">Suivre ma commande</a></p>` +
+        `<p>${escapeHtml(withdrawal)}</p><p>${renderInlinesHtml(SELLER, site)}</p>` +
+        `<hr><h2>Conditions générales de vente</h2><p>${escapeHtml(termsIntro)}</p>${renderTermsHtml(site)}`,
+    },
+  )
 }
 
 export interface InvoiceAvailableEmail {
@@ -393,17 +467,21 @@ export async function sendInvoiceAvailableEmail(to: string, d: InvoiceAvailableE
       : `suite au remboursement de la commande ${d.orderRef} est disponible.`
   const amount = EUROS.format(d.amountTtc)
 
-  await transporter.sendMail({
-    from: env.SMTP_FROM,
-    to,
-    subject: `${document} est disponible — commande ${d.orderRef}`,
-    text:
-      `${document} ${context}\n\n` +
-      `Montant : ${amount}\n\n` +
-      `Téléchargez-la depuis votre espace client : ${orderUrl}`,
-    html:
-      `<p>${escapeHtml(document)} ${escapeHtml(context)}</p>` +
-      `<p>Montant : <strong>${escapeHtml(amount)}</strong></p>` +
-      `<p><a href="${orderUrl}">Télécharger depuis mon espace client</a></p>`,
-  })
+  await deliver(
+    "invoice_available",
+    { orderId: d.orderId },
+    {
+      from: env.SMTP_FROM,
+      to,
+      subject: `${document} est disponible — commande ${d.orderRef}`,
+      text:
+        `${document} ${context}\n\n` +
+        `Montant : ${amount}\n\n` +
+        `Téléchargez-la depuis votre espace client : ${orderUrl}`,
+      html:
+        `<p>${escapeHtml(document)} ${escapeHtml(context)}</p>` +
+        `<p>Montant : <strong>${escapeHtml(amount)}</strong></p>` +
+        `<p><a href="${orderUrl}">Télécharger depuis mon espace client</a></p>`,
+    },
+  )
 }

@@ -23,6 +23,8 @@ export default defineConfig({
       // Stripe is mocked in tests; these just satisfy env validation
       STRIPE_SECRET_KEY: "sk_test_dummy",
       STRIPE_WEBHOOK_SECRET: "whsec_test_dummy",
+      // Brevo delivery reports (story 12.7c): the shared token the webhook expects
+      BREVO_WEBHOOK_SECRET: "brevo_test_webhook_secret_0123456789",
       // Bank-transfer RIB is snapshotted onto orders; these satisfy validation
       VIREMENT_IBAN: "FR7630006000011234567890189",
       VIREMENT_BIC: "AGRIFRPP",
