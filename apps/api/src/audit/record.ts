@@ -38,8 +38,18 @@ function errorCode(error: string | null | undefined): string | null {
  * belongs to a change made in one, so both commit or neither does.
  */
 export async function recordAuditEvent(event: AuditEvent, executor: DbExecutor = db): Promise<void> {
+  await recordAuditEvents([event], executor)
+}
+
+/** Several events in one insert (a catalogue import archives hundreds of rows). */
+export async function recordAuditEvents(events: AuditEvent[], executor: DbExecutor = db): Promise<void> {
+  if (events.length === 0) return
+  await executor.insert(auditLogs).values(events.map(toRow))
+}
+
+function toRow(event: AuditEvent): typeof auditLogs.$inferInsert {
   const orderId = event.orderId ?? null
-  await executor.insert(auditLogs).values({
+  return {
     userId: event.userId ?? null,
     userRole: event.userRole ?? null,
     entityType: event.entityType,
@@ -54,7 +64,7 @@ export async function recordAuditEvent(event: AuditEvent, executor: DbExecutor =
     error: errorCode(event.error),
     ipAddress: orderId ? null : (event.ipAddress ?? null),
     userAgent: orderId ? null : (event.userAgent ?? null),
-  })
+  }
 }
 
 /** The order columns whose changes appear in its history, by the word used in the action. */

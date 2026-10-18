@@ -2,8 +2,9 @@ import { resetPasswordSchema } from "@armurier/shared"
 import { hash, verify } from "@node-rs/argon2"
 import { and, eq, gt, isNull } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, passwordResetTokens, refreshTokens, users } from "../db/schema.js"
+import { passwordResetTokens, refreshTokens, users } from "../db/schema.js"
 import { hashRefreshToken } from "./tokens.js"
 
 const ARGON2ID_OPTIONS = {
@@ -80,7 +81,7 @@ export const resetPasswordRoute: FastifyPluginAsync = async (fastify) => {
 
       const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, resetToken.userId)).limit(1)
 
-      await db.insert(auditLogs).values({
+      await recordAuditEvent({
         userId: resetToken.userId,
         userRole: user?.role ?? null,
         entityType: "user",

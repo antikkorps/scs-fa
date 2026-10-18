@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { db } from "../db/client.js"
 import { auditLogs, orders, users } from "../db/schema.js"
 import { currentReqId, runWithRequestContext } from "./context.js"
-import { recordAuditEvent } from "./record.js"
+import { recordAuditEvent, recordAuditEvents } from "./record.js"
 
 const EMAIL_PREFIX = "audit-helper-"
 
@@ -146,6 +146,18 @@ describe("audit event helper (story 12.7b)", () => {
       WHERE first.order_id = ${orderId} AND first.action = 'test.first'
         AND second.order_id = ${orderId} AND second.action = 'test.second'`)
     expect(rows).toEqual([{ inOrder: true }])
+  })
+
+  it("writes several events in one call, and nothing for none", async () => {
+    await recordAuditEvents([])
+    await recordAuditEvents([
+      { entityType: "order", orderId, action: "test.batch-a" },
+      { entityType: "order", orderId, action: "test.batch-b", result: "failure", error: "test.code" },
+    ])
+
+    const batch = (await eventsOf(orderId)).filter((row) => row.action.startsWith("test.batch-"))
+    expect(batch).toHaveLength(2)
+    expect(batch.find((row) => row.action === "test.batch-b")).toMatchObject({ result: "failure", error: "test.code" })
   })
 
   it("keeps the event when its order is deleted, only the link is dropped", async () => {

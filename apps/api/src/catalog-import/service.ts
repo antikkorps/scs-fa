@@ -19,11 +19,11 @@ import {
   parseCatalogImportTable,
 } from "@armurier/shared"
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm"
+import { recordAuditEvents } from "../audit/record.js"
 import { db } from "../db/client.js"
 import {
   ancientWeapons,
   artworks,
-  auditLogs,
   catalogImportImages,
   catalogImports,
   legalCategories,
@@ -491,7 +491,7 @@ export async function commitCatalogImport(
         .returning({ id: products.id, sku: products.sku })
       archived = rowsArchived.length
       if (rowsArchived.length > 0) {
-        await tx.insert(auditLogs).values(
+        await recordAuditEvents(
           rowsArchived.map((r) => ({
             userId: meta.userId,
             userRole: "admin",
@@ -500,6 +500,7 @@ export async function commitCatalogImport(
             action: "product.archived",
             newValue: { sku: r.sku, source: "catalog_import", importId: imp.id },
           })),
+          tx,
         )
       }
     }

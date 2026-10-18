@@ -1,8 +1,9 @@
 import { refreshSchema } from "@armurier/shared"
 import { eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, users } from "../db/schema.js"
+import { users } from "../db/schema.js"
 import { findRefreshTokenByHash, issueTokens, markRefreshTokenRevoked, revokeRefreshFamily } from "./tokens.js"
 
 export const refreshRoute: FastifyPluginAsync = async (fastify) => {
@@ -36,7 +37,7 @@ export const refreshRoute: FastifyPluginAsync = async (fastify) => {
     // the attacker AND the legitimate holder are logged out everywhere.
     if (stored.revokedAt) {
       const revoked = await revokeRefreshFamily(stored.familyId)
-      await db.insert(auditLogs).values({
+      await recordAuditEvent({
         userId: user.id,
         userRole: user.role,
         entityType: "user",
@@ -58,7 +59,7 @@ export const refreshRoute: FastifyPluginAsync = async (fastify) => {
 
     const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, stored.deviceLabel, stored.familyId)
 
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       userId: user.id,
       userRole: user.role,
       entityType: "user",
