@@ -528,6 +528,7 @@
 - **Agent-ready** : maintenir `llms.txt` à jour avec les 2 univers ; envisager l'exposition MCP en lecture (étudiée en 9.5, non implémentée).
 
 **Livré (2026-09-24)** — décisions de Franck du jour : images = **variantes sharp côté API** (pas de `@nuxt/image`), analytics = **Umami auto-hébergé + bandeau de consentement quoi qu'il arrive**, **pages de catégorie indexables**, **pas de point de vente physique**, **pages réglementation rédigées par Claude puis relues**, **politique de confidentialité dans la 9.6**, et correction du rate-limit par **appel interne + IP de confiance**.
+_Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **25 mois**, purgées chaque jour par le conteneur `backup` (`infra/backup/umami-purge.sh`, SQL testé sur le schéma réel d'Umami 3.2.0) ; cookie `__cf_bm` de Cloudflare déclaré dans `/confidentialite` et au registre.
 
 - [x] **Sitemap complet** via `GET /api/seo/sitemap` (une requête, `updatedAt` + image, mêmes règles de visibilité que les pages) : boutique, **catégories**, **chaque produit**, armes de collection, Gun Art, journal ; `lastmod` partout, **image sitemap**, URL percent-encodées. 🐞 L'espace de noms était `sitemap.org` au lieu de `sitemaps.org`
 - [x] **Pages de catégorie** `/boutique/categorie/[slug]` (title, description, H1, canonical propres) ; `?category=` → **301** ; slug produit `categorie` réservé (schémas partagés) ; composant `ShopCatalogue` partagé ; 🐞 les sélecteurs de catégorie affichaient « toutes » après hydratation

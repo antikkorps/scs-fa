@@ -105,6 +105,7 @@ journalctl -t scs-firearm-api-1 -p warning --since today   # avertissements et e
 | Journaux techniques du serveur | 14 jours | journald (`infra/journald/scs-firearm.conf`) |
 | Historique d'une commande, e-mails compris | 10 ans à compter de la date de la commande | purge quotidienne de l'API (`audit/retention.ts`) |
 | Connexions, sécurité, e-mails hors commande, actions admin hors commande | 1 an | purge quotidienne de l'API |
+| Statistiques de fréquentation (Umami) | 25 mois | tâche quotidienne du conteneur `backup` (`infra/backup/umami-purge.sh`) |
 
 Ces durées sont publiées dans `/confidentialite` (ligne « Journal des opérations
 sensibles ») et au registre des traitements (`docs/REGISTRE_TRAITEMENTS_RGPD.md`, traitements 7 et 8).

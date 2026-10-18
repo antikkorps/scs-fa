@@ -4,6 +4,7 @@
 set -eu
 
 BACKUP_CRON="${BACKUP_CRON:-0 3 * * *}"   # daily at 03:00 UTC
+UMAMI_PURGE_CRON="${UMAMI_PURGE_CRON:-30 3 * * *}"   # daily at 03:30 UTC
 RETENTION_COUNT="${RETENTION_COUNT:-14}"
 
 # If invoked with a command (e.g. `run --rm backup backup.sh`), run it directly.
@@ -15,9 +16,13 @@ fi
 export -p > /etc/backup.env
 
 # crond is PID 1 → redirect job output to the container's stdout/stderr.
-echo "${BACKUP_CRON} /usr/local/bin/backup.sh >/proc/1/fd/1 2>/proc/1/fd/2" > /etc/crontabs/root
+{
+  echo "${BACKUP_CRON} /usr/local/bin/backup.sh >/proc/1/fd/1 2>/proc/1/fd/2"
+  echo "${UMAMI_PURGE_CRON} /usr/local/bin/umami-purge.sh >/proc/1/fd/1 2>/proc/1/fd/2"
+} > /etc/crontabs/root
 
 echo "[backup] scheduler up — cron='${BACKUP_CRON}', retention=${RETENTION_COUNT} dumps"
+echo "[backup] Umami purge (data > 25 months) — cron='${UMAMI_PURGE_CRON}'"
 echo "[backup] on-demand: docker compose run --rm backup backup.sh | restore.sh [file]"
 
 # -f foreground, -l 8 log cron activity to stderr.

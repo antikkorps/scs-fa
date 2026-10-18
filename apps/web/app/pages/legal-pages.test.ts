@@ -49,6 +49,20 @@ describe("legal pages (story 12.1)", () => {
     expect(processors.some((item) => item.includes("prestataire d'envoi des e-mails"))).toBe(false)
   })
 
+  it("keeps audience statistics 25 months, and says so", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const row = wrapper.findAll("tr").find((line) => line.text().startsWith("Statistiques de fréquentation"))
+    expect(row?.find("mark.todo").exists()).toBe(false)
+    expect(row?.text()).toContain("25 mois")
+  })
+
+  it("declares Cloudflare's anti-bot cookie among the cookies that need no consent", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const row = wrapper.findAll("tr").find((line) => line.text().includes("__cf_bm"))
+    expect(row?.text()).toContain("Cloudflare")
+    expect(row?.text()).toContain("30 minutes")
+  })
+
   it("states how long the journal of sensitive operations is kept (story 12.7e)", async () => {
     const wrapper = await mountSuspended(Confidentialite)
     const row = wrapper.findAll("tr").find((line) => line.text().startsWith("Journal des opérations sensibles"))

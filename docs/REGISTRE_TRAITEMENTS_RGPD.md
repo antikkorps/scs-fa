@@ -25,7 +25,7 @@
 | Prestataire | Rôle | Données concernées | Localisation |
 |---|---|---|---|
 | Hetzner | Hébergement du site et de la base de données | Toutes les données du site | Allemagne (UE) |
-| Cloudflare | Acheminement et protection du site (DNS, anti-attaques) | Adresse IP, requêtes | Mondial — transferts encadrés [À vérifier : clauses contractuelles types] |
+| Cloudflare | Acheminement et protection du site (DNS, anti-attaques) | Adresse IP, requêtes ; cookie technique `__cf_bm` (30 minutes) quand la protection anti-robots est active | Mondial — transferts encadrés [À vérifier : clauses contractuelles types] |
 | Scaleway | Stockage des fichiers (pièces justificatives chiffrées, images) et des sauvegardes | Pièces justificatives, sauvegardes de la base | France (UE) |
 | Stripe | Paiement par carte bancaire | Données de carte (saisies chez Stripe), montant, e-mail | UE et États-Unis — transferts encadrés [À vérifier] |
 | Henrri (groupe Rivalis) | Établissement et conservation des factures et avoirs | Nom, adresse de facturation, détail et règlement de la commande (pas l'e-mail) | France (UE) [À vérifier] |
@@ -136,7 +136,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Personnes concernées | Visiteurs ayant accepté |
 | Données | Pages vues, site de provenance, type d'appareil et de navigateur, pays et ville déduits de l'adresse IP ; aucun cookie |
 | Destinataires | Aucun : Umami est hébergé sur le serveur du site |
-| Durée | [À compléter : par exemple 25 mois] |
+| Durée | 25 mois, puis suppression automatique (tâche quotidienne du conteneur `backup`, `infra/backup/umami-purge.sh`) |
 
 ### 10. Partenaires : artistes, bénéficiaires, fournisseurs
 
@@ -173,3 +173,4 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Date | Modification |
 |---|---|
 | 2026-10-19 | Création, à partir du site et de la politique de confidentialité (story 12.7e) |
+| 2026-10-19 | Mesure d'audience : conservation fixée à 25 mois, purge automatique ; cookie `__cf_bm` de Cloudflare déclaré |

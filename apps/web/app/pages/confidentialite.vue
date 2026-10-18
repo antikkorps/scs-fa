@@ -157,6 +157,14 @@ usePageSeo({
             <td>6 mois</td>
           </tr>
           <tr>
+            <td><code>__cf_bm</code></td>
+            <td>
+              Distinguer les visiteurs des robots malveillants ; posé par Cloudflare, qui protège le site, seulement quand
+              sa protection anti-robots est active
+            </td>
+            <td>30 minutes</td>
+          </tr>
+          <tr>
             <td>Cookies de notre prestataire de paiement</td>
             <td>Sécuriser le paiement par carte et prévenir la fraude, sur la page de paiement uniquement</td>
             <td>Fixée par le prestataire</td>
@@ -248,7 +256,7 @@ usePageSeo({
           </tr>
           <tr>
             <td>Statistiques de fréquentation</td>
-            <td><mark class="todo">[À compléter : par exemple 25 mois]</mark></td>
+            <td>25 mois, puis suppression automatique</td>
           </tr>
           <tr>
             <td>Sauvegardes</td>
