@@ -878,7 +878,7 @@
 - les réponses aux décisions ci-dessus, Gun Art et e-reporting avec son **comptable** ;
 - plus tard, les identifiants de **production** et le choix du pack.
 
-**Story 12.7** — Journalisation pour diagnostiquer les remontées de Fred et Stéphane — 📐 **CADRÉE** (2026-10-15), à coder _(créée le 2026-10-15, demande de Franck)_
+**Story 12.7** — Journalisation pour diagnostiquer les remontées de Fred et Stéphane — ✅ **LIVRÉE** (2026-10-19 ; cadrée le 2026-10-15) _(créée le 2026-10-15, demande de Franck)_
 
 > Besoin : quand Fred ou Stéphane remontent un problème (« Mme X n'a pas reçu son e-mail », « le paiement de la commande 0B7D1F3E est resté bloqué », « la facture n'est pas partie »), pouvoir **retrouver vite et sûrement ce qui s'est passé**, pour cette commande ou ce client, sans fouiller des logs bruts sur le serveur.
 
@@ -909,7 +909,9 @@
 - [x] **12.7d — Erreurs navigateur** : point d'entrée limité en débit + capture sur panier, tunnel et paiement.
   _Décisions (Franck, 2026-10-18)_ : **10 rapports par minute et par IP** ; capture des **erreurs JavaScript (non rattrapées, promesses, Vue) et réseau** (API injoignable, Stripe.js qui ne charge pas, erreur Stripe hors carte refusée / champ invalide) ; les réponses 4xx / 5xx de l'API ne sont pas renvoyées (le serveur journalise déjà ses 5xx).
   _Livré 2026-10-18 : `POST /api/client-errors` (public, limiteur à fenêtre en mémoire, 8 Ko, schéma strict, adresses e-mail et suites de chiffres masquées, chaîne de requête retirée) → `warn` « Browser error » dans journald avec le `reqId` ; front : `utils/clientErrors.ts` (une seule fois par erreur et par page, `/panier` et `/commande…` seulement), plugin `client-errors.client.ts`, `useApi` (pannes réseau), `StripeCardPayment`. Recherche : `just journal "Browser error"`._
-- [ ] **12.7e — Conservation et documentation** : purge quotidienne, durées dans `/confidentialite`, guide « que regarder quand on me remonte… » dans `docs/`.
+- [x] **12.7e — Conservation et documentation** : purge quotidienne, durées dans `/confidentialite`, guide « que regarder quand on me remonte… » dans `docs/`.
+  _Décisions (Franck, 2026-10-19)_ : les **10 ans** de l'historique d'une commande comptent **à partir de la date de la commande** ; **tout ce qui n'est pas rattaché à une commande** (connexions, sécurité, e-mails hors commande, actions admin sur le catalogue, les tarifs, les imports) est gardé **1 an**. Les logs techniques (14 jours) sont déjà purgés par journald (12.7a). L'anonymisation de la commande elle-même au bout de 10 ans reste hors de la 12.7.
+  _Livré 2026-10-19 : `audit/retention.ts` (purge au démarrage puis toutes les 24 h ; un historique de commande part en entier, événements tardifs compris), ligne « Journal des opérations sensibles » de `/confidentialite`, guide `docs/GUIDE_REMONTEES.md` (back-office pour Fred et Stéphane, journaux pour Franck, tableau des durées). Reste hors code : reporter ces durées au registre des traitements._
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 

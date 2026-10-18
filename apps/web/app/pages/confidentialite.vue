@@ -229,7 +229,11 @@ usePageSeo({
           </tr>
           <tr>
             <td>Journal des opérations sensibles</td>
-            <td><mark class="todo">[À compléter]</mark></td>
+            <td>
+              Historique d'une commande (paiements, expéditions, factures, e-mails envoyés) : 10 ans à compter de la
+              date de la commande, sans adresse IP ni navigateur. Connexions, opérations de sécurité et e-mails sans
+              lien avec une commande : 1 an. Journaux techniques du serveur : 14 jours
+            </td>
           </tr>
           <tr>
             <td>Abonnement à la lettre d'information</td>

@@ -15,6 +15,7 @@ import { adminArtworkImageRoutes, artworkImageRoutes } from "./artworks/images.j
 import { artworkRoutes } from "./artworks/index.js"
 import { adminArtworkPricingRoutes } from "./artworks/pricing.js"
 import { runWithRequestContext } from "./audit/context.js"
+import { startAuditPurgeScheduler } from "./audit/retention.js"
 import { authRoutes } from "./auth/index.js"
 import { adminBlogRoutes } from "./blog/admin.js"
 import { adminBlogImageRoutes, blogImageRoutes } from "./blog/images.js"
@@ -169,6 +170,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)
+  startAuditPurgeScheduler(fastify)
   startOrderConfirmationScheduler(fastify)
   startHenrriScheduler(fastify)
   startShipmentTrackingScheduler(fastify)

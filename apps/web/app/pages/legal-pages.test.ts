@@ -41,4 +41,13 @@ describe("legal pages (story 12.1)", () => {
     // Decision 2026-10-14: the e-mail is not sent to Henrri.
     expect(processors.find((item) => item.startsWith("Henrri"))).not.toMatch(/e-mail/)
   })
+
+  it("states how long the journal of sensitive operations is kept (story 12.7e)", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const row = wrapper.findAll("tr").find((line) => line.text().startsWith("Journal des opérations sensibles"))
+    expect(row?.find("mark.todo").exists()).toBe(false)
+    expect(row?.text()).toContain("10 ans à compter de la date de la commande")
+    expect(row?.text()).toContain("1 an")
+    expect(row?.text()).toContain("14 jours")
+  })
 })
