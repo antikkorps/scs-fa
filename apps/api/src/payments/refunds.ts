@@ -449,7 +449,7 @@ export async function settleStripeRefund(
       action: `payment.refund.${status}`,
       result: status === "succeeded" ? "success" : "failure",
       error: status === "succeeded" ? null : `stripe.refund_${status}`,
-      newValue: { stripeRefundId },
+      newValue: { stripeRefundId, amountTtc: row.amountTtc },
     })
 
   if (stripeStatus === "succeeded") {

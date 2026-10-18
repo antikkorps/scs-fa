@@ -1472,7 +1472,12 @@ describe("payments — Stripe card (Story 6.1)", () => {
         const history = await db.select().from(auditLogs).where(eq(auditLogs.orderId, orderId))
         expect(history.filter((event) => event.action === "payment.refund.pending")).toHaveLength(1)
         expect(history.filter((event) => event.action === "payment.refund.succeeded")).toEqual([
-          expect.objectContaining({ userId: null, userRole: "system", result: "success" }),
+          expect.objectContaining({
+            userId: null,
+            userRole: "system",
+            result: "success",
+            newValue: { stripeRefundId: "re_async", amountTtc: "100.00" },
+          }),
         ])
         expect(history.filter((event) => event.action === "order.payment.refunded")).toHaveLength(1)
       })
