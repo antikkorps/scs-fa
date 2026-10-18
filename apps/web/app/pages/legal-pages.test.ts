@@ -42,6 +42,13 @@ describe("legal pages (story 12.1)", () => {
     expect(processors.find((item) => item.startsWith("Henrri"))).not.toMatch(/e-mail/)
   })
 
+  it("names Brevo as the sender of the service e-mails and the newsletter", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const processors = wrapper.findAll("li").map((item) => item.text())
+    expect(processors).toContainEqual(expect.stringMatching(/^Brevo .*e-mails de service.*lettre d'information/))
+    expect(processors.some((item) => item.includes("prestataire d'envoi des e-mails"))).toBe(false)
+  })
+
   it("states how long the journal of sensitive operations is kept (story 12.7e)", async () => {
     const wrapper = await mountSuspended(Confidentialite)
     const row = wrapper.findAll("tr").find((line) => line.text().startsWith("Journal des opérations sensibles"))

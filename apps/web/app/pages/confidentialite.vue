@@ -12,7 +12,7 @@ import { EDITORIAL_PAGES } from "#shared/utils/editorialPages"
  * flipped there, the page shows a draft notice, is noindex and is not in the sitemap.
  */
 const REVIEWED = EDITORIAL_PAGES.confidentialite.reviewed
-const UPDATED_ON = "14 octobre 2026"
+const UPDATED_ON = "19 octobre 2026"
 
 usePageSeo({
   title: "Politique de confidentialité",
@@ -187,10 +187,10 @@ usePageSeo({
         <strong>Henrri</strong> (groupe Rivalis) — établissement et conservation de nos factures et avoirs : vos nom
         et adresse de facturation, le détail de la commande et son règlement ;
       </li>
-      <li><strong>Brevo</strong> — envoi de la lettre d'information, si vous y êtes abonné ;</li>
       <li>
-        <mark class="todo">[À compléter : prestataire d'envoi des e-mails de service (confirmation, réinitialisation
-          du mot de passe, suivi de commande)]</mark> ;
+        <strong>Brevo</strong> — envoi des e-mails de service (confirmation de commande, réinitialisation du mot de
+        passe, suivi de commande, facture disponible) et de la lettre d'information si vous y êtes abonné ; nous
+        indique si un e-mail a bien été remis ou refusé par votre messagerie ;
       </li>
       <li><strong>La Poste (Colissimo) et Mondial Relay</strong> — livraison de vos colis : nom et adresse de livraison.</li>
     </ul>
