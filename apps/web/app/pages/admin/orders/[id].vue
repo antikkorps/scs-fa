@@ -28,6 +28,13 @@ const order = computed(() => data.value?.data)
 
 useHead({ title: () => `Commande ${id.slice(0, 8)} — Administration SCS` })
 
+// Story 12.7b — the order's history sits in its own tab, next to the detail.
+const TABS = [
+  { id: "detail", label: "Détail" },
+  { id: "history", label: "Historique" },
+]
+const activeTab = ref("detail")
+
 const PAID = ["received", "reconciled", "partially_refunded"]
 
 // What is still refundable on each channel: amount paid minus refunds already
@@ -191,6 +198,13 @@ function num(v: unknown): number | null {
         </div>
       </header>
 
+      <AdminTabs v-model="activeTab" :tabs="TABS" label="Fiche commande" />
+
+      <div v-if="activeTab === 'history'" id="panel-history" role="tabpanel" aria-labelledby="tab-history">
+        <AdminOrderHistory :order-id="order.id" />
+      </div>
+
+      <div v-else id="panel-detail" role="tabpanel" aria-labelledby="tab-detail">
       <div class="grid">
         <section class="panel">
           <h2 class="panel__title">Articles</h2>
@@ -295,6 +309,7 @@ function num(v: unknown): number | null {
       </div>
 
       <AdminShipmentsPanel :order="order" class="shipping" @changed="refresh" />
+      </div>
     </template>
 
     <!-- Refund modal -->

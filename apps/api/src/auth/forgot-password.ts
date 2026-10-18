@@ -1,8 +1,9 @@
 import { forgotPasswordSchema } from "@armurier/shared"
 import { eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, passwordResetTokens, users } from "../db/schema.js"
+import { passwordResetTokens, users } from "../db/schema.js"
 import { sendPasswordResetEmail } from "../email.js"
 import { generateRefreshToken, hashRefreshToken } from "./tokens.js"
 
@@ -50,7 +51,7 @@ export const forgotPasswordRoute: FastifyPluginAsync = async (fastify) => {
           request.log.error({ err }, "forgot-password: failed to send email")
         })
 
-        await db.insert(auditLogs).values({
+        await recordAuditEvent({
           userId: user.id,
           userRole: user.role,
           entityType: "user",

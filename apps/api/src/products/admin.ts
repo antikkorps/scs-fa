@@ -8,13 +8,13 @@ import {
 } from "@armurier/shared"
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import {
   ancientWeapons,
   artworks,
-  auditLogs,
   cartItems,
   legalCategories,
   orders,
@@ -440,14 +440,17 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
             .update(products)
             .set(archive ? { archivedAt: now, published: false, updatedAt: now } : { archivedAt: null, updatedAt: now })
             .where(eq(products.id, params.data.id))
-          await tx.insert(auditLogs).values({
-            userId: request.user.sub,
-            userRole: "admin",
-            entityType: "product",
-            entityId: params.data.id,
-            action: archive ? "product.archived" : "product.restored",
-            newValue: { sku: existing.sku, source: "admin" },
-          })
+          await recordAuditEvent(
+            {
+              userId: request.user.sub,
+              userRole: "admin",
+              entityType: "product",
+              entityId: params.data.id,
+              action: archive ? "product.archived" : "product.restored",
+              newValue: { sku: existing.sku, source: "admin" },
+            },
+            tx,
+          )
         })
       }
       return reply.send({ data: await loadAdminProduct(params.data.id) })

@@ -4,6 +4,8 @@ import { and, eq, inArray, like, sql } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
+import { runWithRequestContext } from "../audit/context.js"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { auditLogs, henrriDocuments, orders, paymentCarte, refunds, users } from "../db/schema.js"
 import { createFakeHenrri } from "../test/henrri-fake.js"
@@ -37,6 +39,7 @@ describe("admin orders dashboard API (Story 7.1)", () => {
     await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, orderIds))
     await db.delete(refunds).where(inArray(refunds.orderId, orderIds))
     await db.delete(paymentCarte).where(inArray(paymentCarte.orderId, orderIds))
+    await db.delete(auditLogs).where(inArray(auditLogs.orderId, orderIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
     await db.delete(orders).where(inArray(orders.userId, userIds))
     await db.delete(users).where(like(users.email, "admord-%"))
@@ -253,7 +256,22 @@ describe("admin orders dashboard API (Story 7.1)", () => {
         .select()
         .from(auditLogs)
         .where(and(eq(auditLogs.entityId, orderId), eq(auditLogs.action, "henrri.retry")))
-      expect(audit).toBeDefined()
+      expect(audit).toMatchObject({ orderId, result: "success" })
+    })
+
+    it("ties the retry to the order's history and to the request that made it", async () => {
+      const orderId = await orderWithDocuments()
+      await app.inject({
+        method: "POST",
+        url: `/api/admin/orders/${orderId}/henrri/retry`,
+        headers: { authorization: `Bearer ${adminToken}`, "x-request-id": "req-retry-12-7b" },
+      })
+
+      const [audit] = await db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.orderId, orderId), eq(auditLogs.action, "henrri.retry")))
+      expect(audit).toMatchObject({ reqId: "req-retry-12-7b", userRole: "admin" })
     })
 
     it("refuses the retry to a customer, and for an unknown order", async () => {
@@ -324,6 +342,80 @@ describe("admin orders dashboard API (Story 7.1)", () => {
       await orderWithDocuments()
       const after = (await adminGet("/api/admin/orders/summary")).json().data.invoicesNeedingAttention
       expect(after).toBe(before + 1)
+    })
+  })
+
+  describe("GET /api/admin/orders/:id/history (story 12.7b)", () => {
+    async function orderWithHistory() {
+      const orderId = await insertOrder(customerId)
+      const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.email, ADMIN_EMAIL))
+      await recordAuditEvent({
+        userId: customerId,
+        userRole: "customer",
+        entityType: "order",
+        entityId: orderId,
+        orderId,
+        action: "order.created",
+      })
+      await runWithRequestContext({ reqId: "req-history-1" }, () =>
+        recordAuditEvent({
+          userRole: "system",
+          entityType: "henrri_document",
+          orderId,
+          action: "henrri.invoice.blocked",
+          result: "failure",
+          error: "henrri.NUMBERING_ERROR",
+        }),
+      )
+      await recordAuditEvent({
+        userId: admin.id,
+        userRole: "admin",
+        entityType: "order",
+        entityId: orderId,
+        orderId,
+        action: "henrri.retry",
+        newValue: { reset: 1 },
+      })
+      return orderId
+    }
+
+    it("tells the order's story oldest first: what, when, who, how it went", async () => {
+      const orderId = await orderWithHistory()
+      const other = await orderWithHistory()
+
+      const res = await adminGet(`/api/admin/orders/${orderId}/history`)
+      expect(res.statusCode).toBe(200)
+      const { data } = res.json()
+      expect(data).toHaveLength(3)
+      expect(data.map((event: { action: string }) => event.action)).toEqual([
+        "order.created",
+        "henrri.invoice.blocked",
+        "henrri.retry",
+      ])
+      expect(data[0]).toMatchObject({ actor: { kind: "customer", name: "Test Client" }, result: "success" })
+      expect(data[1]).toMatchObject({
+        actor: { kind: "system", name: null },
+        result: "failure",
+        error: "henrri.NUMBERING_ERROR",
+        reqId: "req-history-1",
+      })
+      expect(data[2]).toMatchObject({ actor: { kind: "admin", name: "Test Admin" }, newValue: { reset: 1 } })
+      expect(typeof data[0].createdAt).toBe("string")
+      expect(data.some((event: { orderId?: string }) => event.orderId === other)).toBe(false)
+    })
+
+    it("never sends an IP or a user-agent", async () => {
+      const orderId = await orderWithHistory()
+      const [event] = (await adminGet(`/api/admin/orders/${orderId}/history`)).json().data
+      expect(event).not.toHaveProperty("ipAddress")
+      expect(event).not.toHaveProperty("userAgent")
+    })
+
+    it("is for admins only, and 404s on an unknown order", async () => {
+      const orderId = await orderWithHistory()
+      expect((await adminGet(`/api/admin/orders/${orderId}/history`, customerToken)).statusCode).toBe(403)
+      expect((await adminGet("/api/admin/orders/00000000-0000-0000-0000-000000000000/history")).statusCode).toBe(404)
+      expect((await adminGet("/api/admin/orders/not-a-uuid/history")).statusCode).toBe(400)
     })
   })
 

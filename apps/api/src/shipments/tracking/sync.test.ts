@@ -181,6 +181,7 @@ describe("carrier tracking sync (story 11.9b)", () => {
     expect(entry?.userId).toBeNull()
     expect(entry?.action).toBe("shipment.delivered")
     expect(entry?.newValue).toMatchObject({ source: "carrier_api" })
+    expect(entry?.orderId).toBe(orderId)
   })
 
   it("keeps a travelling parcel travelling, while remembering what it was told", async () => {

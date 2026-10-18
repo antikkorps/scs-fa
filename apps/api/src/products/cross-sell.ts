@@ -13,8 +13,9 @@ import {
 } from "@armurier/shared"
 import { and, asc, eq, inArray } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, legalCategories, productCategories, productCrossSells, products } from "../db/schema.js"
+import { legalCategories, productCategories, productCrossSells, products } from "../db/schema.js"
 import { env } from "../env.js"
 import { validationError } from "../http.js"
 
@@ -317,15 +318,18 @@ export const adminProductCrossSellRoutes: FastifyPluginAsync = async (fastify) =
       }
       // Une suggestion est une décision commerciale sur une arme : la trace dit
       // qui l'a prise, et ce qu'elle a remplacé.
-      await tx.insert(auditLogs).values({
-        userId: request.user.sub,
-        userRole: "admin",
-        entityType: "product",
-        entityId: params.data.id,
-        action: "cross_sell.updated",
-        oldValue: { accessoryIds: before },
-        newValue: { accessoryIds },
-      })
+      await recordAuditEvent(
+        {
+          userId: request.user.sub,
+          userRole: "admin",
+          entityType: "product",
+          entityId: params.data.id,
+          action: "cross_sell.updated",
+          oldValue: { accessoryIds: before },
+          newValue: { accessoryIds },
+        },
+        tx,
+      )
     })
 
     return reply.send({ data: await adminCrossSellsFor(params.data.id) })

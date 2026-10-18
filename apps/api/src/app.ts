@@ -14,6 +14,7 @@ import { adminArtworkEditorialRoutes } from "./artworks/admin-editorial.js"
 import { adminArtworkImageRoutes, artworkImageRoutes } from "./artworks/images.js"
 import { artworkRoutes } from "./artworks/index.js"
 import { adminArtworkPricingRoutes } from "./artworks/pricing.js"
+import { runWithRequestContext } from "./audit/context.js"
 import { authRoutes } from "./auth/index.js"
 import { adminBlogRoutes } from "./blog/admin.js"
 import { adminBlogImageRoutes, blogImageRoutes } from "./blog/images.js"
@@ -74,6 +75,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   })
 
   fastify.decorate("henrri", options.henrri === undefined ? henrriClientFromEnv() : options.henrri)
+
+  // Audit events learn the request id from here, wherever they are written (story 12.7b).
+  fastify.addHook("onRequest", (request, _reply, done) => runWithRequestContext({ reqId: request.id }, done))
 
   // Centralised error handling + throttled admin alerting on 5xx (Story 7.2).
   setupErrorAlerting(fastify, env)
