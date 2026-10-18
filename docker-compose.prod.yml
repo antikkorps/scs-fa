@@ -196,6 +196,8 @@ services:
       BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-backups/postgres}
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
       RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
+      # Audience data older than 25 months is deleted daily (privacy policy).
+      UMAMI_PURGE_CRON: ${UMAMI_PURGE_CRON:-30 3 * * *}
     depends_on:
       postgres:
         condition: service_healthy

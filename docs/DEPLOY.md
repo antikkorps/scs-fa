@@ -302,6 +302,14 @@ tracker counts `www.<DOMAIN>` only. The `backup` service dumps the app database
 only — analytics are not backed up (acceptable loss; add a second dump if the
 client wants history preserved).
 
+Retention: audience data is kept **25 months** (privacy policy). Umami deletes
+nothing by itself, so the `backup` service runs `umami-purge.sh` daily
+(`UMAMI_PURGE_CRON`, default 03:30 UTC); it skips quietly until the `umami`
+database exists. On demand:
+`docker compose -f docker-compose.prod.yml run --rm backup umami-purge.sh`.
+The SQL (`infra/backup/umami-purge.sql`) targets Umami 3.2.0's tables: check it
+when upgrading Umami.
+
 ## Search Console (story 9.6)
 
 1. Add the property `https://www.<DOMAIN>` in Search Console **with the client's
