@@ -1,9 +1,10 @@
 import { shippingRatesSchema } from "@armurier/shared"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { auditLogs, shippingRates } from "../db/schema.js"
+import { shippingRates } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { loadShippingRates } from "./service.js"
 
@@ -35,16 +36,19 @@ export const adminShippingRateRoutes: FastifyPluginAsync = async (fastify) => {
         .values({ id: 1, ...values })
         .onConflictDoUpdate({ target: shippingRates.id, set: values })
       // A tariff change moves every future order's total: who changed it, and from what, must be traceable.
-      await tx.insert(auditLogs).values({
-        userId: request.user.sub,
-        userRole: "admin",
-        entityType: "shipping_rates",
-        action: "shipping_rates.updated",
-        oldValue: before,
-        newValue: rates,
-        ipAddress: request.ip,
-        userAgent: request.headers["user-agent"] ?? null,
-      })
+      await recordAuditEvent(
+        {
+          userId: request.user.sub,
+          userRole: "admin",
+          entityType: "shipping_rates",
+          action: "shipping_rates.updated",
+          oldValue: before,
+          newValue: rates,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        },
+        tx,
+      )
     })
 
     return reply.send({ data: await loadShippingRates() })

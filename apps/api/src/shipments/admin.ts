@@ -9,10 +9,11 @@ import {
 } from "@armurier/shared"
 import { eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { auditLogs, orders, shipmentItems, shipments } from "../db/schema.js"
+import { orders, shipmentItems, shipments } from "../db/schema.js"
 import { validationError } from "../http.js"
 import {
   allocatedItems,
@@ -117,14 +118,18 @@ export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
         })),
       )
 
-      await tx.insert(auditLogs).values({
-        userId: request.user.sub,
-        userRole: "admin",
-        entityType: "shipment",
-        entityId: row.id,
-        action: "shipment.created",
-        newValue: { orderId: order.id, position: row.position, carrier: body.carrier, items: body.items },
-      })
+      await recordAuditEvent(
+        {
+          userId: request.user.sub,
+          userRole: "admin",
+          entityType: "shipment",
+          entityId: row.id,
+          orderId: order.id,
+          action: "shipment.created",
+          newValue: { position: row.position, carrier: body.carrier, items: body.items },
+        },
+        tx,
+      )
       await recomputeOrderShippingStatus(order.id, tx)
       return row.id
     })
@@ -197,15 +202,19 @@ export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       await tx.update(shipments).set(patch).where(eq(shipments.id, current.id))
-      await tx.insert(auditLogs).values({
-        userId: request.user.sub,
-        userRole: "admin",
-        entityType: "shipment",
-        entityId: current.id,
-        action: next !== current.status ? `shipment.${next}` : "shipment.updated",
-        oldValue: { status: current.status, carrier: current.carrier, trackingNumber: current.trackingNumber },
-        newValue: { status: next, carrier, trackingNumber },
-      })
+      await recordAuditEvent(
+        {
+          userId: request.user.sub,
+          userRole: "admin",
+          entityType: "shipment",
+          entityId: current.id,
+          orderId: current.orderId,
+          action: next !== current.status ? `shipment.${next}` : "shipment.updated",
+          oldValue: { status: current.status, carrier: current.carrier, trackingNumber: current.trackingNumber },
+          newValue: { status: next, carrier, trackingNumber },
+        },
+        tx,
+      )
       await recomputeOrderShippingStatus(current.orderId, tx)
       return { orderId: current.orderId, leftNow: next === "shipped" && current.status !== "shipped" }
     })
@@ -259,14 +268,18 @@ export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       await tx.delete(shipments).where(eq(shipments.id, current.id))
-      await tx.insert(auditLogs).values({
-        userId: request.user.sub,
-        userRole: "admin",
-        entityType: "shipment",
-        entityId: current.id,
-        action: "shipment.deleted",
-        oldValue: { orderId: current.orderId, position: current.position, carrier: current.carrier },
-      })
+      await recordAuditEvent(
+        {
+          userId: request.user.sub,
+          userRole: "admin",
+          entityType: "shipment",
+          entityId: current.id,
+          orderId: current.orderId,
+          action: "shipment.deleted",
+          oldValue: { position: current.position, carrier: current.carrier },
+        },
+        tx,
+      )
       await recomputeOrderShippingStatus(current.orderId, tx)
     })
     return reply.code(204).send()

@@ -1,8 +1,9 @@
 import { updateProfileSchema } from "@armurier/shared"
 import { eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, users } from "../db/schema.js"
+import { users } from "../db/schema.js"
 import { authenticate } from "./authenticate.js"
 
 const PUBLIC_FIELDS = {
@@ -64,7 +65,7 @@ export const profileRoute: FastifyPluginAsync = async (fastify) => {
 
     await db.update(users).set(updates).where(eq(users.id, sub))
 
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       userId: sub,
       userRole: role,
       entityType: "user",

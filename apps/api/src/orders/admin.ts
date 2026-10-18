@@ -1,10 +1,12 @@
 import { adminOrderQuerySchema, uuidParamSchema } from "@armurier/shared"
 import { and, count, desc, eq, ilike, inArray, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { orderHistory } from "../audit/history.js"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { auditLogs, orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
+import { orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
 import {
   countDocumentsNeedingAttention,
   henrriDocumentsOfOrder,
@@ -174,6 +176,19 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
     })
   })
 
+  // GET /api/admin/orders/:id/history — the order's story, oldest first (story 12.7b).
+  fastify.get("/:id/history", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) {
+      return reply.code(400).send(validationError(params.error.issues))
+    }
+    const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, params.data.id)).limit(1)
+    if (!order) {
+      return reply.code(404).send({ error: "NotFound", message: "Order not found" })
+    }
+    return reply.code(200).send({ data: await orderHistory(order.id) })
+  })
+
   // POST /api/admin/orders/:id/henrri/retry — put the order's blocked invoice or
   // credit notes back in the Henrri queue (story 12.6), and run them now when
   // Henrri is configured, so the admin sees the outcome straight away.
@@ -188,10 +203,12 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const reset = await retryOrderDocuments(order.id)
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       userId: request.user.sub,
+      userRole: request.user.role,
       entityType: "order",
       entityId: order.id,
+      orderId: order.id,
       action: "henrri.retry",
       newValue: { reset },
     })

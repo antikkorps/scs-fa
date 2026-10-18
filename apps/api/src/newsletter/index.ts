@@ -12,9 +12,10 @@ import { and, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
 // Opaque single-use link tokens: same construction as the password-reset ones
 // (32 random bytes, stored as a SHA-256 hash), reused rather than re-invented.
+import { recordAuditEvent } from "../audit/record.js"
 import { generateRefreshToken as generateLinkToken, hashRefreshToken as hashLinkToken } from "../auth/tokens.js"
 import { db } from "../db/client.js"
-import { auditLogs, newsletterContacts, newsletterSubscriptions, newsletterTokens } from "../db/schema.js"
+import { newsletterContacts, newsletterSubscriptions, newsletterTokens } from "../db/schema.js"
 import { sendNewsletterConfirmationEmail } from "../email.js"
 import { newsletterProvider } from "./service.js"
 
@@ -179,7 +180,7 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      await db.insert(auditLogs).values({
+      await recordAuditEvent({
         entityType: "newsletter_contact",
         entityId: contact.id,
         action: "newsletter.subscribe_requested",
@@ -239,7 +240,7 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
     const segments = await confirmedSegments(contact.id)
     await syncProvider(request, contact.id, contact.email, segments)
 
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       entityType: "newsletter_contact",
       entityId: contact.id,
       action: "newsletter.confirmed",
@@ -342,7 +343,7 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
         await db.delete(newsletterTokens).where(eq(newsletterTokens.contactId, contact.id))
       }
 
-      await db.insert(auditLogs).values({
+      await recordAuditEvent({
         entityType: "newsletter_contact",
         entityId: contact.id,
         action: "newsletter.unsubscribed",

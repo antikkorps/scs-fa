@@ -17,6 +17,7 @@ import { randomUUID } from "node:crypto"
 import { orderReference } from "@armurier/shared"
 import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { henrriDocuments, orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
 import { sendInvoiceAvailableEmail } from "../email.js"
@@ -177,13 +178,43 @@ async function release(claimed: Claim, values: Partial<HenrriDocumentRow>) {
 
 async function block(claimed: Claim, reason: string): Promise<ProcessOutcome> {
   await release(claimed, { status: "blocked", lastError: reason })
+  await recordDocumentStep(claimed.id, "blocked", { reason })
   return "blocked"
 }
 
 /** An issued document that needs a human: it stays issued, the queue leaves it alone. */
 async function hold(claimed: Claim, reason: string): Promise<ProcessOutcome> {
   await release(claimed, { heldAt: new Date(), lastError: reason })
+  await recordDocumentStep(claimed.id, "held", { reason })
   return "held"
+}
+
+/**
+ * A step worth an admin's attention, in the order's history (story 12.7b): issued,
+ * or stopped for a human. A deferral is not one — the next pass tries again. The
+ * reason keeps only its code: Henrri's message is free text.
+ */
+async function recordDocumentStep(
+  documentId: string,
+  step: "issued" | "blocked" | "held",
+  detail: { number?: string; reason?: string },
+) {
+  const [document] = await db
+    .select({ orderId: henrriDocuments.orderId, kind: henrriDocuments.kind })
+    .from(henrriDocuments)
+    .where(eq(henrriDocuments.id, documentId))
+  if (!document) return
+  const code = detail.reason?.split(":")[0].trim()
+  await recordAuditEvent({
+    userRole: "system",
+    entityType: "henrri_document",
+    entityId: documentId,
+    orderId: document.orderId,
+    action: `henrri.${document.kind}.${step}`,
+    result: step === "issued" ? "success" : "failure",
+    error: code ? `henrri.${code}` : null,
+    newValue: detail.number ? { number: detail.number } : undefined,
+  })
 }
 
 interface Payment {
@@ -445,6 +476,7 @@ async function issueDocument(
     number = issued.number
   }
   await write(claimed, { status: "finalized", henrriNumber: number, finalizedAt: new Date(), lastError: null })
+  await recordDocumentStep(document.id, "issued", { number })
   log.info(
     { documentId: document.id, orderId: document.orderId, kind: document.kind, number },
     "Henrri document issued",

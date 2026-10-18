@@ -1,9 +1,10 @@
 import { CURRENT_RGPD_CONSENT_VERSION, registerSchema } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { isUniqueViolation } from "../db/errors.js"
-import { auditLogs, users } from "../db/schema.js"
+import { users } from "../db/schema.js"
 
 const ARGON2ID_OPTIONS = {
   memoryCost: 19_456, // 19 MiB — OWASP 2024 minimum for argon2id
@@ -57,7 +58,7 @@ export const registerRoute: FastifyPluginAsync = async (fastify) => {
             createdAt: users.createdAt,
           })
 
-        await db.insert(auditLogs).values({
+        await recordAuditEvent({
           userId: created.id,
           userRole: created.role,
           entityType: "user",

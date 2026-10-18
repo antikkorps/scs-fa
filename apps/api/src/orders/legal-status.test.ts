@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
-import { eq, inArray, like } from "drizzle-orm"
+import { and, eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import FormData from "form-data"
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
@@ -128,6 +128,16 @@ describe("order legal status (/api/orders/:id/legal)", () => {
       url: `/api/orders/${orderId}/legal`,
       headers: { authorization: `Bearer ${token}` },
     })
+  }
+
+  /** The legal steps in an order's history, oldest first (story 12.7b). */
+  async function legalHistory(orderId: string) {
+    const events = await db
+      .select({ action: auditLogs.action })
+      .from(auditLogs)
+      .where(and(eq(auditLogs.orderId, orderId), like(auditLogs.action, "order.legal.%")))
+      .orderBy(auditLogs.createdAt)
+    return events.map((event) => event.action)
   }
 
   async function orderStatusInDb(orderId: string) {
@@ -257,6 +267,8 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     const row = await orderStatusInDb(orderId)
     expect(row.status).toBe("docs_verified")
     expect(row.verifiedAt).not.toBeNull()
+    // Each step once in the order's history (story 12.7b), not once per document.
+    expect(await legalHistory(orderId)).toEqual(["order.legal.docs_verifying", "order.legal.docs_verified"])
 
     const res = await getLegal(orderId)
     const statuses = res.json().data.requiredDocs.map((d: { status: string }) => d.status)
@@ -371,6 +383,7 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     await markPaid(orderId)
     await recomputeOrderLegalStatus(customerId)
     expect((await orderStatusInDb(orderId)).status).toBe("completed")
+    expect(await legalHistory(orderId)).toEqual(["order.legal.completed"])
   })
 
   it("keeps a no-docs order payment_pending while payment is outstanding", async () => {
