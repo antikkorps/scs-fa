@@ -1,3 +1,5 @@
+import { isNetworkFailure, reportClientError } from "~/utils/clientErrors"
+
 // A `$fetch`-like helper for authenticated API calls. It routes through the
 // same-origin BFF proxy (/bff/api/*), which attaches the bearer from the
 // httpOnly access cookie and transparently refreshes the session server-side.
@@ -23,6 +25,8 @@ export function useApi() {
       if (status === 401 && import.meta.client) {
         await navigateTo(loginRedirect())
       }
+      // The API never heard of this call: only the browser can tell (story 12.7d).
+      if (isNetworkFailure(err)) reportClientError("network", err)
       throw err
     }
   }

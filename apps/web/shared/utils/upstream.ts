@@ -14,10 +14,17 @@
  * `X-Forwarded-For`, which Caddy overwrites with the real client IP — trusting
  * it is sound only because this server is reachable through Caddy alone. The
  * secret marks the call as internal, which earns a larger rate-limit budget.
+ * The visitor's `User-Agent` goes along too (story 12.7d), or the security
+ * trail and the browser error reports would only ever name the Nuxt server.
  */
-export function upstreamHeaders(clientIp: string | undefined, secret: string): Record<string, string> {
+export function upstreamHeaders(
+  clientIp: string | undefined,
+  secret: string,
+  userAgent?: string,
+): Record<string, string> {
   return {
     ...(clientIp ? { "x-forwarded-for": clientIp } : {}),
     ...(secret ? { "x-internal-auth": secret } : {}),
+    ...(userAgent ? { "user-agent": userAgent } : {}),
   }
 }
