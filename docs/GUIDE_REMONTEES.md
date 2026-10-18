@@ -107,4 +107,4 @@ journalctl -t scs-firearm-api-1 -p warning --since today   # avertissements et e
 | Connexions, sécurité, e-mails hors commande, actions admin hors commande | 1 an | purge quotidienne de l'API |
 
 Ces durées sont publiées dans `/confidentialite` (ligne « Journal des opérations
-sensibles ») et doivent figurer au registre des traitements.
+sensibles ») et au registre des traitements (`docs/REGISTRE_TRAITEMENTS_RGPD.md`, traitements 7 et 8).
