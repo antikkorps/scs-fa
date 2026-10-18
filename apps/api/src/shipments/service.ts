@@ -9,6 +9,7 @@ import {
   trackingUrlFor,
 } from "@armurier/shared"
 import { and, asc, eq, inArray, isNull } from "drizzle-orm"
+import { recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { orders, products, productVariants, shipmentItems, shipments, users } from "../db/schema.js"
 import { sendShipmentShippedEmail } from "../email.js"
@@ -58,7 +59,11 @@ export async function recomputeOrderShippingStatus(
   orderId: string,
   tx: DbExecutor = db,
 ): Promise<OrderShippingStatus | null> {
-  const [order] = await tx.select({ itemsJson: orders.itemsJson }).from(orders).where(eq(orders.id, orderId)).limit(1)
+  const [order] = await tx
+    .select({ itemsJson: orders.itemsJson, shippingStatus: orders.shippingStatus })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1)
   if (!order) return null
   const list = await loadShipments(orderId, tx)
   const status = aggregateShippingStatus(
@@ -66,6 +71,9 @@ export async function recomputeOrderShippingStatus(
     list.map((s) => ({ status: s.status, items: s.items.map(asRef) })),
   )
   await tx.update(orders).set({ shippingStatus: status, updatedAt: new Date() }).where(eq(orders.id, orderId))
+  if (status !== order.shippingStatus) {
+    await recordOrderStatusChange(orderId, "shipping", { from: order.shippingStatus, to: status }, tx)
+  }
   return status
 }
 

@@ -402,6 +402,25 @@ describe("multi-parcel shipping (story 11.9)", () => {
     const audit = await db.select().from(auditLogs).where(eq(auditLogs.entityId, first.id))
     expect(audit.map((a) => a.action)).toEqual(expect.arrayContaining(["shipment.shipped", "shipment.delivered"]))
     expect(audit.every((a) => a.orderId === orderId)).toBe(true)
+
+    // The order's own moves, the correction included: a parcel that changes
+    // nothing for the order (the first one delivered) adds nothing.
+    const history = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.orderId, orderId), like(auditLogs.action, "order.shipping.%")))
+      .orderBy(auditLogs.createdAt)
+    expect(history.map((event) => event.action)).toEqual([
+      "order.shipping.partially_shipped",
+      "order.shipping.unshipped",
+      "order.shipping.partially_shipped",
+      "order.shipping.shipped",
+      "order.shipping.delivered",
+    ])
+    expect(history[0]).toMatchObject({
+      oldValue: { shippingStatus: "unshipped" },
+      newValue: { shippingStatus: "partially_shipped" },
+    })
   })
 
   it("keeps the parcel shipped when the e-mail provider fails", async () => {

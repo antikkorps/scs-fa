@@ -3,6 +3,7 @@ import { eq, inArray, like, sql } from "drizzle-orm"
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "../db/client.js"
 import {
+  auditLogs,
   henrriDocuments,
   type OrderAddressSnapshot,
   orders,
@@ -779,6 +780,61 @@ describe("Henrri queue (story 12.6)", () => {
         expect.objectContaining({ orderId, reason: "Http503: Unavailable" }),
         "Henrri document deferred to the next pass",
       )
+    })
+  })
+
+  describe("order history (story 12.7b)", () => {
+    const historyOf = (orderId: string) => db.select().from(auditLogs).where(eq(auditLogs.orderId, orderId))
+
+    it("records an issued invoice with its Henrri number, as the system", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      await sync()
+
+      expect(await historyOf(orderId)).toEqual([
+        expect.objectContaining({
+          action: "henrri.invoice.issued",
+          entityType: "henrri_document",
+          userRole: "system",
+          result: "success",
+          newValue: { number: "26-10-1" },
+        }),
+      ])
+    })
+
+    it("records a blocked document as a failure, with Henrri's code but not its message", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      henrri.failNext("finalizeDocument", new HenrriError("NUMBERING_ERROR", 400, "Numbering failed"))
+      await sync()
+
+      expect(await historyOf(orderId)).toEqual([
+        expect.objectContaining({
+          action: "henrri.invoice.blocked",
+          result: "failure",
+          error: "henrri.NUMBERING_ERROR",
+        }),
+      ])
+    })
+
+    it("records an issued invoice held for an admin as a failure", async () => {
+      const { orderId } = await createPaidOrder({ mixed: true, transferReceived: "1195.00" })
+      await enqueueInvoice(orderId)
+      await sync()
+
+      expect((await historyOf(orderId)).map(({ action, result, error }) => ({ action, result, error }))).toEqual([
+        { action: "henrri.invoice.issued", result: "success", error: null },
+        { action: "henrri.invoice.held", result: "failure", error: "henrri.PaymentMismatch" },
+      ])
+    })
+
+    it("records nothing for a document merely deferred to the next pass", async () => {
+      const { orderId } = await createPaidOrder()
+      await enqueueInvoice(orderId)
+      henrri.failNext("finalizeDocument", new HenrriError("Http503", 503, "Unavailable"))
+      await sync()
+
+      expect(await historyOf(orderId)).toEqual([])
     })
   })
 })

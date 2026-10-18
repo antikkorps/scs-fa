@@ -56,3 +56,38 @@ export async function recordAuditEvent(event: AuditEvent, executor: DbExecutor =
     userAgent: orderId ? null : (event.userAgent ?? null),
   })
 }
+
+/** The order columns whose changes appear in its history, by the word used in the action. */
+const ORDER_STATUS_COLUMNS = {
+  payment: "paymentStatus",
+  shipping: "shippingStatus",
+  legal: "legalVerificationStatus",
+} as const
+
+export type OrderStatusKind = keyof typeof ORDER_STATUS_COLUMNS
+
+/**
+ * An order moved from one status to another (`order.payment.received`). Recorded
+ * as the system: these statuses are derived, and the event that caused the move
+ * (a payment, a parcel, a document) sits just before it, with its own actor.
+ */
+export async function recordOrderStatusChange(
+  orderId: string,
+  kind: OrderStatusKind,
+  change: { from: string | null; to: string },
+  executor: DbExecutor = db,
+): Promise<void> {
+  const column = ORDER_STATUS_COLUMNS[kind]
+  await recordAuditEvent(
+    {
+      userRole: "system",
+      entityType: "order",
+      entityId: orderId,
+      orderId,
+      action: `order.${kind}.${change.to}`,
+      oldValue: { [column]: change.from },
+      newValue: { [column]: change.to },
+    },
+    executor,
+  )
+}

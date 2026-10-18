@@ -1962,7 +1962,9 @@ export const auditLogs = pgTable(
     result: auditResultEnum("result").notNull().default("success"),
     error: varchar("error", { length: 100 }),
 
-    createdAt: timestamp("created_at").defaultNow(),
+    // clock_timestamp(), pas now() : les événements d'une même transaction
+    // gardent leur ordre dans l'historique (now() = début de la transaction).
+    createdAt: timestamp("created_at").default(sql`clock_timestamp()`),
   },
   (t) => [
     index("idx_audit_entity").on(t.entityType, t.entityId),

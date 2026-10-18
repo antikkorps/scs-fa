@@ -9,7 +9,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm"
 import type { FastifyBaseLogger } from "fastify"
 import type Stripe from "stripe"
-import { recordAuditEvent } from "../audit/record.js"
+import { recordAuditEvent, recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { orders, paymentCarte, paymentVirement } from "../db/schema.js"
 import { enqueueInvoice } from "../henrri/queue.js"
@@ -655,7 +655,14 @@ export async function recomputeOrderPaymentStatus(orderId: string): Promise<void
 
   if (!carteSatisfied || !virementSatisfied) return
 
-  await db.update(orders).set({ paymentStatus: "received", updatedAt: new Date() }).where(eq(orders.id, orderId))
+  // Compare-and-set: of two webhooks settling the last bucket at once, one moves the order.
+  const [flipped] = await db
+    .update(orders)
+    .set({ paymentStatus: "received", updatedAt: new Date() })
+    .where(and(eq(orders.id, orderId), eq(orders.paymentStatus, order.paymentStatus)))
+    .returning({ id: orders.id })
+  if (!flipped) return
+  await recordOrderStatusChange(orderId, "payment", { from: order.paymentStatus, to: "received" })
 
   // The money landed: what was owed becomes due (story 11.10).
   await settlePayoutsForOrder(orderId)

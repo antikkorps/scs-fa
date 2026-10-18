@@ -480,6 +480,11 @@ describe("payments — Stripe card (Story 6.1)", () => {
       const queued = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
       expect(queued).toEqual([expect.objectContaining({ kind: "invoice", status: "pending" })])
       expect(await historyEvent(orderId, "payment.stripe.received")).toMatchObject({ userId: null, result: "success" })
+      expect(await historyEvent(orderId, "order.payment.received")).toMatchObject({
+        userRole: "system",
+        oldValue: { paymentStatus: "pending" },
+        newValue: { paymentStatus: "received" },
+      })
     })
 
     it("still settles the payment when the charge lookup fails (card details left empty)", async () => {
@@ -514,6 +519,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
       expect(carte.paymentStatus).toBe("received")
       const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
       expect(order.paymentStatus).toBe("pending") // virement bucket not settled yet (Story 6.2)
+      expect(await historyEvent(orderId, "order.payment.received")).toBeUndefined()
     })
 
     it("does NOT settle when Stripe reports a paid amount below the order total", async () => {
@@ -1301,6 +1307,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
           expect.objectContaining({ refundId: res.json().data.id, expectedTotalTtc: "40.00" }),
         ])
         expect(await historyEvent(orderId, "payment.refund.succeeded")).toMatchObject({ entityId: res.json().data.id })
+        expect(await historyEvent(orderId, "order.payment.partially_refunded")).toMatchObject({ userRole: "system" })
       })
 
       it("full refund flips the order to refunded", async () => {
@@ -1312,6 +1319,10 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(res.json().data.orderPaymentStatus).toBe("refunded")
         const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(order.paymentStatus).toBe("refunded")
+        expect(await historyEvent(orderId, "order.payment.refunded")).toMatchObject({
+          oldValue: { paymentStatus: "received" },
+          newValue: { paymentStatus: "refunded" },
+        })
       })
 
       it("restores variant stock on a full refund of a real order", async () => {
@@ -1463,6 +1474,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(history.filter((event) => event.action === "payment.refund.succeeded")).toEqual([
           expect.objectContaining({ userId: null, userRole: "system", result: "success" }),
         ])
+        expect(history.filter((event) => event.action === "order.payment.refunded")).toHaveLength(1)
       })
     })
 

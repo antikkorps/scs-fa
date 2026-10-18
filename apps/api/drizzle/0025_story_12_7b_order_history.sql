@@ -1,4 +1,5 @@
 CREATE TYPE "public"."audit_result" AS ENUM('success', 'failure');--> statement-breakpoint
+ALTER TABLE "audit_logs" ALTER COLUMN "created_at" SET DEFAULT clock_timestamp();--> statement-breakpoint
 ALTER TABLE "audit_logs" ADD COLUMN "order_id" uuid;--> statement-breakpoint
 ALTER TABLE "audit_logs" ADD COLUMN "req_id" varchar(200);--> statement-breakpoint
 ALTER TABLE "audit_logs" ADD COLUMN "result" "audit_result" DEFAULT 'success' NOT NULL;--> statement-breakpoint

@@ -1,5 +1,5 @@
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
-import { eq, inArray, like } from "drizzle-orm"
+import { eq, inArray, like, sql } from "drizzle-orm"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { db } from "../db/client.js"
 import { auditLogs, orders, users } from "../db/schema.js"
@@ -131,6 +131,21 @@ describe("audit event helper (story 12.7b)", () => {
       .catch(() => undefined)
 
     expect((await eventsOf(orderId)).some((row) => row.action === "test.rolled-back")).toBe(false)
+  })
+
+  it("dates each event when it happens, so a transaction's events keep their order", async () => {
+    await db.transaction(async (tx) => {
+      await recordAuditEvent({ entityType: "order", orderId, action: "test.first" }, tx)
+      await recordAuditEvent({ entityType: "order", orderId, action: "test.second" }, tx)
+    })
+
+    // Compared in the database: its timestamps are finer than a JavaScript Date.
+    const { rows } = await db.execute<{ inOrder: boolean }>(sql`
+      SELECT second.created_at > first.created_at AS "inOrder"
+      FROM audit_logs first, audit_logs second
+      WHERE first.order_id = ${orderId} AND first.action = 'test.first'
+        AND second.order_id = ${orderId} AND second.action = 'test.second'`)
+    expect(rows).toEqual([{ inOrder: true }])
   })
 
   it("keeps the event when its order is deleted, only the link is dropped", async () => {

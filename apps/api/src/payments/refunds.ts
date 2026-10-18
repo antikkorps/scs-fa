@@ -6,7 +6,7 @@ import {
 } from "@armurier/shared"
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm"
 import type { FastifyBaseLogger } from "fastify"
-import { recordAuditEvent } from "../audit/record.js"
+import { recordAuditEvent, recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { artworkPrints, orders, paymentCarte, paymentVirement, productVariants, refunds } from "../db/schema.js"
 import {
@@ -335,7 +335,12 @@ export async function createOrderRefund(
  */
 export async function applyRefundEffects(orderId: string): Promise<string> {
   const [order] = await db
-    .select({ userId: orders.userId, totalTtc: orders.totalTtc, itemsJson: orders.itemsJson })
+    .select({
+      userId: orders.userId,
+      totalTtc: orders.totalTtc,
+      itemsJson: orders.itemsJson,
+      paymentStatus: orders.paymentStatus,
+    })
     .from(orders)
     .where(eq(orders.id, orderId))
     .limit(1)
@@ -352,10 +357,14 @@ export async function applyRefundEffects(orderId: string): Promise<string> {
 
   if (!isFull) {
     // Partial: keep the order paid, just flag it. Never downgrade a full refund.
-    await db
+    const [flagged] = await db
       .update(orders)
       .set({ paymentStatus: "partially_refunded", updatedAt: new Date() })
       .where(and(eq(orders.id, orderId), inArray(orders.paymentStatus, ["received", "reconciled"])))
+      .returning({ id: orders.id })
+    if (flagged) {
+      await recordOrderStatusChange(orderId, "payment", { from: order.paymentStatus, to: "partially_refunded" })
+    }
     await recomputeVipStatus(order.userId)
     // A refund reduces what is owed to the beneficiaries in proportion — they
     // are not paid on money that went back to the customer (story 11.10).
@@ -371,6 +380,7 @@ export async function applyRefundEffects(orderId: string): Promise<string> {
       .where(and(eq(orders.id, orderId), ne(orders.paymentStatus, "refunded")))
       .returning({ id: orders.id })
     if (!row) return false // already refunded — idempotent no-op
+    await recordOrderStatusChange(orderId, "payment", { from: order.paymentStatus, to: "refunded" }, tx)
 
     for (const item of order.itemsJson) {
       if (item.variantId) {
