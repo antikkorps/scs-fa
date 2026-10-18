@@ -20,6 +20,12 @@ export default defineVitestConfig({
     // not a licence for slow tests.
     hookTimeout: 60_000,
     testTimeout: 20_000,
+    environmentOptions: {
+      nuxt: {
+        // A dummy publishable key, so the card payment component mounts as in production.
+        overrides: { runtimeConfig: { public: { stripePublishableKey: "pk_test_vitest" } } },
+      },
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

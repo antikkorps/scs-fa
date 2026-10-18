@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js"
+import { isNetworkFailure, isReportableStripeError, reportClientError } from "~/utils/clientErrors"
 import { formatEuros } from "~/utils/format"
 
 const props = defineProps<{ orderId: string; amount: number }>()
@@ -27,6 +28,7 @@ onMounted(async () => {
     const { clientSecret } = await createStripeIntent(props.orderId)
     stripe = await loadStripe(pk)
     if (!stripe) {
+      reportClientError("stripe", new Error("Stripe.js did not load"))
       loadError.value = "Stripe est indisponible pour le moment."
       return
     }
@@ -43,6 +45,9 @@ onMounted(async () => {
       emit("paid")
       return
     }
+    // An unreachable API was reported by useApi; an API refusal is the server's to log.
+    const fromApi = isNetworkFailure(err) || authErrorStatus(err) !== undefined
+    if (!fromApi) reportClientError("stripe", err)
     loadError.value = "Impossible d'initialiser le paiement par carte."
   }
 })
@@ -53,6 +58,7 @@ async function pay() {
   payError.value = ""
   const { error, paymentIntent } = await stripe.confirmPayment({ elements, redirect: "if_required" })
   if (error) {
+    if (isReportableStripeError(error)) reportClientError("stripe", new Error(error.message), { code: error.code })
     payError.value = error.message ?? "Le paiement a échoué. Vérifiez votre carte."
     paying.value = false
     return

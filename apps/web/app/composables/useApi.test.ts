@@ -1,6 +1,7 @@
 // @vitest-environment nuxt
 import { mockNuxtImport } from "@nuxt/test-utils/runtime"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { setClientErrorReporter } from "~/utils/clientErrors"
 import { useApi } from "./useApi"
 
 const { requestMock, navigateToMock, routeRef } = vi.hoisted(() => ({
@@ -44,6 +45,22 @@ describe("useApi — BFF proxy", () => {
     requestMock.mockRejectedValue({ response: { status: 401 } })
     await expect(useApi()("/x")).rejects.toBeTruthy()
     expect(navigateToMock).toHaveBeenCalledWith(expect.stringContaining("/admin/login"))
+  })
+
+  it("reports a call that never reached the API, then rethrows it (story 12.7d)", async () => {
+    const report = vi.fn()
+    setClientErrorReporter(report)
+    const failure = Object.assign(new Error("fetch failed"), { name: "FetchError" })
+    requestMock.mockRejectedValue(failure)
+
+    await expect(useApi()("/orders")).rejects.toBe(failure)
+    expect(report).toHaveBeenCalledWith("network", failure)
+
+    report.mockReset()
+    requestMock.mockRejectedValue(Object.assign(new Error("409"), { name: "FetchError", response: { status: 409 } }))
+    await expect(useApi()("/orders")).rejects.toBeTruthy()
+    expect(report).not.toHaveBeenCalled()
+    setClientErrorReporter(null)
   })
 
   it("rethrows non-401 errors without redirecting", async () => {
