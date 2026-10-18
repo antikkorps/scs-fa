@@ -9,6 +9,13 @@ describe("upstreamHeaders (story 9.6)", () => {
     })
   })
 
+  it("forwards the visitor's browser, not the Nuxt server's (story 12.7d)", () => {
+    expect(upstreamHeaders("203.0.113.9", "", "Mozilla/5.0 (iPhone)")).toEqual({
+      "x-forwarded-for": "203.0.113.9",
+      "user-agent": "Mozilla/5.0 (iPhone)",
+    })
+  })
+
   it("sends nothing it does not have — never an empty secret or IP", () => {
     expect(upstreamHeaders(undefined, "")).toEqual({})
   })

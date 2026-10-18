@@ -1,4 +1,4 @@
-import { getRequestIP } from "h3"
+import { getRequestHeader, getRequestIP } from "h3"
 import { upstreamHeaders } from "#shared/utils/upstream"
 
 /**
@@ -16,11 +16,12 @@ export default defineNuxtPlugin(() => {
   if (import.meta.server) {
     const event = useRequestEvent()
     const clientIp = event ? getRequestIP(event, { xForwardedFor: true }) : undefined
+    const userAgent = event ? getRequestHeader(event, "user-agent") : undefined
     return {
       provide: {
         apiFetch: $fetch.create({
           baseURL: (config.apiInternalBase as string) || (config.public.apiBase as string),
-          headers: upstreamHeaders(clientIp, config.internalApiSecret as string),
+          headers: upstreamHeaders(clientIp, config.internalApiSecret as string, userAgent),
         }),
       },
     }

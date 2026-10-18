@@ -6,5 +6,6 @@ export function apiUpstream(event: H3Event): { base: string; headers: Record<str
   const config = useRuntimeConfig(event)
   const base = (config.apiInternalBase as string) || (config.public.apiBase as string)
   const clientIp = getRequestIP(event, { xForwardedFor: true })
-  return { base, headers: upstreamHeaders(clientIp, config.internalApiSecret as string) }
+  const userAgent = getRequestHeader(event, "user-agent")
+  return { base, headers: upstreamHeaders(clientIp, config.internalApiSecret as string, userAgent) }
 }
