@@ -1,7 +1,8 @@
 import { and, eq, inArray, isNotNull } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
+import { recordAuditEvent } from "../../audit/record.js"
 import { db } from "../../db/client.js"
-import { auditLogs, shipments } from "../../db/schema.js"
+import { shipments } from "../../db/schema.js"
 import { env } from "../../env.js"
 import { recomputeOrderShippingStatus } from "../service.js"
 import { trackedCarriers, trackingProviderFor } from "./index.js"
@@ -76,15 +77,19 @@ async function checkParcel(parcel: ParcelToCheck, logger?: Logger): Promise<Chec
 
     // `system`, not an admin: nobody clicked. The audit trail must say who — or
     // what — closed a parcel.
-    await tx.insert(auditLogs).values({
-      userId: null,
-      userRole: "system",
-      entityType: "shipment",
-      entityId: parcel.id,
-      action: "shipment.delivered",
-      oldValue: { status: "shipped" },
-      newValue: { status: "delivered", carrier: parcel.carrier, trackingLabel: result.label, source: "carrier_api" },
-    })
+    await recordAuditEvent(
+      {
+        userId: null,
+        userRole: "system",
+        entityType: "shipment",
+        entityId: parcel.id,
+        orderId: parcel.orderId,
+        action: "shipment.delivered",
+        oldValue: { status: "shipped" },
+        newValue: { status: "delivered", carrier: parcel.carrier, trackingLabel: result.label, source: "carrier_api" },
+      },
+      tx,
+    )
     await recomputeOrderShippingStatus(parcel.orderId, tx)
     return true
   })

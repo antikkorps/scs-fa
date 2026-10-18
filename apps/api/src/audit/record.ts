@@ -1,0 +1,58 @@
+import type { DbExecutor } from "../artworks/reservation.js"
+import { db } from "../db/client.js"
+import { auditLogs } from "../db/schema.js"
+import { currentReqId } from "./context.js"
+
+export interface AuditEvent {
+  action: string
+  entityType: string
+  entityId?: string | null
+  /** The order the event belongs to: it then appears in that order's history. */
+  orderId?: string | null
+  /** Null when nobody clicked: a webhook, a scheduled job. */
+  userId?: string | null
+  userRole?: string | null
+  oldValue?: unknown
+  newValue?: unknown
+  reason?: string | null
+  result?: "success" | "failure"
+  /** A short code (`henrri.Timeout`), never a message: messages can carry personal data. */
+  error?: string | null
+  /** Kept only outside an order — an order's history is kept 10 years without them. */
+  ipAddress?: string | null
+  userAgent?: string | null
+}
+
+export const INVALID_ERROR_CODE = "invalid_error_code"
+
+// Letters, digits and `._:-` — no spaces, no `@`: nothing an e-mail or a sentence fits in.
+const ERROR_CODE = /^[A-Za-z0-9_.:-]{1,100}$/
+
+function errorCode(error: string | null | undefined): string | null {
+  if (!error) return null
+  return ERROR_CODE.test(error) ? error : INVALID_ERROR_CODE
+}
+
+/**
+ * The one way to write an audit event. Pass the transaction when the event
+ * belongs to a change made in one, so both commit or neither does.
+ */
+export async function recordAuditEvent(event: AuditEvent, executor: DbExecutor = db): Promise<void> {
+  const orderId = event.orderId ?? null
+  await executor.insert(auditLogs).values({
+    userId: event.userId ?? null,
+    userRole: event.userRole ?? null,
+    entityType: event.entityType,
+    entityId: event.entityId ?? null,
+    action: event.action,
+    oldValue: event.oldValue,
+    newValue: event.newValue,
+    reason: event.reason ?? null,
+    orderId,
+    reqId: currentReqId(),
+    result: event.result ?? "success",
+    error: errorCode(event.error),
+    ipAddress: orderId ? null : (event.ipAddress ?? null),
+    userAgent: orderId ? null : (event.userAgent ?? null),
+  })
+}

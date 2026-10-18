@@ -14,13 +14,13 @@ import {
 import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { reservePrintForOrder } from "../artworks/reservation.js"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { loadCart } from "../cart/service.js"
 import { db } from "../db/client.js"
 import {
   addresses,
   artworkCartItems,
-  auditLogs,
   cartItems,
   type OrderAddressSnapshot,
   orders,
@@ -323,11 +323,12 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
       throw err
     }
 
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       userId,
       userRole: role,
       entityType: "order",
       entityId: orderId,
+      orderId,
       action: "order.created",
       newValue: {
         totalTtc: cart.summary.totalTtc,
@@ -335,8 +336,6 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         splitType: split.splitType,
         termsVersion: acceptedTermsVersion,
       },
-      ipAddress: request.ip,
-      userAgent: request.headers["user-agent"] ?? null,
     })
 
     // Confirmation on a durable medium (story 12.1). Not awaited: the customer

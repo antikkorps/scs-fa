@@ -253,7 +253,22 @@ describe("admin orders dashboard API (Story 7.1)", () => {
         .select()
         .from(auditLogs)
         .where(and(eq(auditLogs.entityId, orderId), eq(auditLogs.action, "henrri.retry")))
-      expect(audit).toBeDefined()
+      expect(audit).toMatchObject({ orderId, result: "success" })
+    })
+
+    it("ties the retry to the order's history and to the request that made it", async () => {
+      const orderId = await orderWithDocuments()
+      await app.inject({
+        method: "POST",
+        url: `/api/admin/orders/${orderId}/henrri/retry`,
+        headers: { authorization: `Bearer ${adminToken}`, "x-request-id": "req-retry-12-7b" },
+      })
+
+      const [audit] = await db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.orderId, orderId), eq(auditLogs.action, "henrri.retry")))
+      expect(audit).toMatchObject({ reqId: "req-retry-12-7b", userRole: "admin" })
     })
 
     it("refuses the retry to a customer, and for an unknown order", async () => {

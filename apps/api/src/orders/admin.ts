@@ -1,10 +1,11 @@
 import { adminOrderQuerySchema, uuidParamSchema } from "@armurier/shared"
 import { and, count, desc, eq, ilike, inArray, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { auditLogs, orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
+import { orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
 import {
   countDocumentsNeedingAttention,
   henrriDocumentsOfOrder,
@@ -188,10 +189,12 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const reset = await retryOrderDocuments(order.id)
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       userId: request.user.sub,
+      userRole: request.user.role,
       entityType: "order",
       entityId: order.id,
+      orderId: order.id,
       action: "henrri.retry",
       newValue: { reset },
     })

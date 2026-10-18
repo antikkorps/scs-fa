@@ -235,6 +235,7 @@ describe("multi-parcel shipping (story 11.9)", () => {
       .from(auditLogs)
       .where(and(eq(auditLogs.entityType, "shipment"), eq(auditLogs.entityId, parcel.id)))
     expect(audit.map((a) => a.action)).toContain("shipment.created")
+    expect(audit.every((a) => a.orderId === orderId)).toBe(true)
   })
 
   it("refuses to pack what the order does not hold", async () => {
@@ -400,6 +401,7 @@ describe("multi-parcel shipping (story 11.9)", () => {
 
     const audit = await db.select().from(auditLogs).where(eq(auditLogs.entityId, first.id))
     expect(audit.map((a) => a.action)).toEqual(expect.arrayContaining(["shipment.shipped", "shipment.delivered"]))
+    expect(audit.every((a) => a.orderId === orderId)).toBe(true)
   })
 
   it("keeps the parcel shipped when the e-mail provider fails", async () => {
@@ -433,6 +435,12 @@ describe("multi-parcel shipping (story 11.9)", () => {
     const data = await orderDetail()
     expect(data.shipments).toHaveLength(1)
     expect(data.shippingStatus).toBe("partially_shipped")
+
+    const [deleted] = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.entityId, second.id), eq(auditLogs.action, "shipment.deleted")))
+    expect(deleted.orderId).toBe(orderId)
   })
 
   it("shows the customer where each parcel is, without the internal notes", async () => {

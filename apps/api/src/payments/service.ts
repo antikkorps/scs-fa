@@ -9,8 +9,9 @@ import {
 import { and, eq, inArray } from "drizzle-orm"
 import type { FastifyBaseLogger } from "fastify"
 import type Stripe from "stripe"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, orders, paymentCarte, paymentVirement } from "../db/schema.js"
+import { orders, paymentCarte, paymentVirement } from "../db/schema.js"
 import { enqueueInvoice } from "../henrri/queue.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
@@ -122,12 +123,13 @@ export async function initStripePayment(orderId: string, userId: string): Promis
     .set({ stripePaymentIntentId: intent.id, updatedAt: new Date() })
     .where(eq(paymentCarte.id, carte.id))
 
-  await db.insert(auditLogs).values({
+  await recordAuditEvent({
     userId,
     entityType: "payment_carte",
     entityId: carte.id,
+    orderId,
     action: "payment.stripe.init",
-    newValue: { orderId, paymentIntentId: intent.id, amountTtc: carte.amountTtc },
+    newValue: { paymentIntentId: intent.id, amountTtc: carte.amountTtc },
   })
 
   return {
@@ -230,10 +232,11 @@ export async function claimVirementTransfer(orderId: string, userId: string, inp
     .where(eq(paymentVirement.id, virement.id))
     .returning()
 
-  await db.insert(auditLogs).values({
+  await recordAuditEvent({
     userId,
     entityType: "payment_virement",
     entityId: virement.id,
+    orderId: virement.orderId,
     action: "payment.virement.claimed",
     oldValue: { paymentStatus: virement.paymentStatus },
     newValue: { paymentStatus: "transfer_claimed", reportedAmount: input.reportedAmount ?? null },
@@ -301,10 +304,12 @@ export async function reconcileVirementBucket(
 
   const amountMatched = amountsMatchToCent(Number(input.amountReceivedTtc), Number(virement.amountExpectedTtc))
 
-  await db.insert(auditLogs).values({
+  await recordAuditEvent({
     userId: adminId,
+    userRole: "admin",
     entityType: "payment_virement",
     entityId: virement.id,
+    orderId: virement.orderId,
     action: "payment.virement.reconciled",
     oldValue: { paymentStatus: virement.paymentStatus },
     newValue: {
@@ -502,21 +507,23 @@ export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promi
         // Defence-in-depth: assert Stripe actually collected at least the amount
         // due before marking the order paid (the intent is created server-side,
         // but never trust the webhook's effect without checking the figure).
-        intent.amount_received,
+        { paidAmountCents: intent.amount_received },
       )
       return
     }
     case "payment_intent.payment_failed": {
       const intent = event.data.object as Stripe.PaymentIntent
-      await settleCartePayment(log, intent.id, {
-        paymentStatus: "failed",
-        failureReason: intent.last_payment_error?.message ?? "Card payment failed",
-      })
+      await settleCartePayment(
+        log,
+        intent.id,
+        { paymentStatus: "failed", failureReason: intent.last_payment_error?.message ?? "Card payment failed" },
+        { errorCode: declineCode(intent.last_payment_error) },
+      )
       return
     }
     case "payment_intent.canceled": {
       const intent = event.data.object as Stripe.PaymentIntent
-      await settleCartePayment(log, intent.id, { paymentStatus: "cancelled" })
+      await settleCartePayment(log, intent.id, { paymentStatus: "cancelled" }, { errorCode: "stripe.canceled" })
       return
     }
     // `charge.refunded` is deliberately not handled: its charge no longer
@@ -534,12 +541,28 @@ export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promi
 
 type CarteUpdate = Partial<typeof paymentCarte.$inferInsert>
 
+interface CarteSettlement {
+  /** What Stripe reports as collected, checked against what is due. */
+  paidAmountCents?: number
+  /** Set when the payment did not go through: the event is then a failure. */
+  errorCode?: string
+}
+
+/**
+ * Stripe's most precise code for a refused card (`insufficient_funds` before
+ * `card_declined`). Its message is never kept in the history: it is free text.
+ */
+function declineCode(error: Stripe.PaymentIntent.LastPaymentError | null | undefined): string {
+  return `stripe.${error?.decline_code ?? error?.code ?? "payment_failed"}`
+}
+
 async function settleCartePayment(
   log: Logger,
   paymentIntentId: string,
   update: CarteUpdate,
-  paidAmountCents?: number,
+  settlement: CarteSettlement = {},
 ): Promise<void> {
+  const { paidAmountCents } = settlement
   const [carte] = await db
     .select({ id: paymentCarte.id, orderId: paymentCarte.orderId, amountTtc: paymentCarte.amountTtc })
     .from(paymentCarte)
@@ -561,11 +584,15 @@ async function settleCartePayment(
         { orderId: carte.orderId, paymentIntentId, expectedCents, paidAmountCents },
         "Stripe collected less than the order total — not marked paid",
       )
-      await db.insert(auditLogs).values({
+      await recordAuditEvent({
+        userRole: "system",
         entityType: "payment_carte",
         entityId: carte.id,
+        orderId: carte.orderId,
         action: "payment.stripe.amount_mismatch",
-        newValue: { orderId: carte.orderId, paymentIntentId, expectedCents, paidAmountCents },
+        result: "failure",
+        error: "stripe.amount_short",
+        newValue: { paymentIntentId, expectedCents, paidAmountCents },
       })
       return
     }
@@ -576,11 +603,15 @@ async function settleCartePayment(
     .set({ ...update, updatedAt: new Date() })
     .where(eq(paymentCarte.id, carte.id))
 
-  await db.insert(auditLogs).values({
+  await recordAuditEvent({
+    userRole: "system",
     entityType: "payment_carte",
     entityId: carte.id,
+    orderId: carte.orderId,
     action: `payment.stripe.${update.paymentStatus}`,
-    newValue: { orderId: carte.orderId, paymentIntentId },
+    result: settlement.errorCode ? "failure" : "success",
+    error: settlement.errorCode ?? null,
+    newValue: { paymentIntentId },
   })
   log.info({ orderId: carte.orderId, paymentIntentId, status: update.paymentStatus }, "Stripe card payment updated")
 

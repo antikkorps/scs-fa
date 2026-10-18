@@ -6,16 +6,9 @@ import {
 } from "@armurier/shared"
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm"
 import type { FastifyBaseLogger } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import {
-  artworkPrints,
-  auditLogs,
-  orders,
-  paymentCarte,
-  paymentVirement,
-  productVariants,
-  refunds,
-} from "../db/schema.js"
+import { artworkPrints, orders, paymentCarte, paymentVirement, productVariants, refunds } from "../db/schema.js"
 import {
   nearestExpressibleRefunds,
   type RefundRecord,
@@ -277,6 +270,7 @@ export async function createOrderRefund(
     status = refund.status === "succeeded" ? "succeeded" : refund.status === "pending" ? "pending" : "failed"
     if (status === "failed") failureReason = refund.failure_reason ?? "Stripe refund did not succeed"
   }
+  const failed = status === "failed"
 
   const settledNow = status === "succeeded"
   const [row] = await db
@@ -299,12 +293,16 @@ export async function createOrderRefund(
     })
     .returning()
 
-  await db.insert(auditLogs).values({
+  await recordAuditEvent({
     userId: adminId,
+    userRole: "admin",
     entityType: "refund",
     entityId: row.id,
+    orderId,
     action: `payment.refund.${status}`,
-    newValue: { orderId, channel: input.channel, amountTtc, stripeRefundId },
+    result: failed ? "failure" : "success",
+    error: failed ? stripeRefundError(failureReason) : null,
+    newValue: { channel: input.channel, amountTtc, stripeRefundId },
   })
 
   // A refund that is already settled moves the order and gets its credit note; a
@@ -408,6 +406,11 @@ async function currentStatus(orderId: string): Promise<string> {
   return o?.paymentStatus ?? "unknown"
 }
 
+/** Stripe's failure reason is a code (`lost_or_stolen_card`); anything else is not kept. */
+function stripeRefundError(failureReason: string | null): string {
+  return failureReason && /^[a-z_]+$/.test(failureReason) ? `stripe.${failureReason}` : "stripe.refund_failed"
+}
+
 /**
  * Finalise a Stripe refund from a webhook: flip a stored refund to its terminal
  * status and, when it succeeds, apply the order-level effects. Matched by Stripe
@@ -426,12 +429,26 @@ export async function settleStripeRefund(
   const logUpdate = () =>
     log.info({ orderId: row.orderId, stripeRefundId, status: stripeStatus }, "Stripe refund updated")
 
+  // Stripe confirms what an admin asked for: nobody clicked this time.
+  const recordSettlement = (status: "succeeded" | "failed" | "cancelled") =>
+    recordAuditEvent({
+      userRole: "system",
+      entityType: "refund",
+      entityId: row.id,
+      orderId: row.orderId,
+      action: `payment.refund.${status}`,
+      result: status === "succeeded" ? "success" : "failure",
+      error: status === "succeeded" ? null : `stripe.refund_${status}`,
+      newValue: { stripeRefundId },
+    })
+
   if (stripeStatus === "succeeded") {
     if (row.status === "succeeded") return // already applied
     await db
       .update(refunds)
       .set({ status: "succeeded", processedAt: new Date(), failureReason: null, updatedAt: new Date() })
       .where(eq(refunds.id, row.id))
+    await recordSettlement("succeeded")
     await applyRefundEffects(row.orderId)
     await enqueueCreditNote(row.id)
     logUpdate()
@@ -439,14 +456,17 @@ export async function settleStripeRefund(
   }
 
   if (stripeStatus === "failed" || stripeStatus === "canceled") {
+    const status = stripeStatus === "failed" ? "failed" : "cancelled"
+    if (row.status === status) return // already recorded
     await db
       .update(refunds)
       .set({
-        status: stripeStatus === "failed" ? "failed" : "cancelled",
+        status,
         failureReason: stripeStatus === "failed" ? "Stripe reported the refund failed" : null,
         updatedAt: new Date(),
       })
       .where(eq(refunds.id, row.id))
+    await recordSettlement(status)
     logUpdate()
   }
 }
