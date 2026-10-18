@@ -58,6 +58,8 @@ export interface OrderShippingPortion {
 export const userRoleEnum = pgEnum("user_role", ["customer", "vendor", "admin"])
 export const addressTypeEnum = pgEnum("address_type", ["shipping", "billing", "both"])
 export const legalCategoryEnum = pgEnum("legal_category", ["A", "B", "C", "D", "none"])
+// Issue d'un événement d'audit (story 12.7b)
+export const auditResultEnum = pgEnum("audit_result", ["success", "failure"])
 // Expédition (story 11.9) — reflets exacts de SHIPMENT_STATUSES / ORDER_SHIPPING_STATUSES (@armurier/shared)
 export const shipmentStatusEnum = pgEnum("shipment_status", ["preparing", "shipped", "delivered"])
 export const orderShippingStatusEnum = pgEnum("order_shipping_status", [
@@ -1952,17 +1954,31 @@ export const auditLogs = pgTable(
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: text("user_agent"),
 
-    createdAt: timestamp("created_at").defaultNow(),
+    // Historique de commande (story 12.7b) : la commande concernée, la requête
+    // qui a produit l'événement (pour remonter aux logs techniques) et son issue.
+    // `error` = code court, jamais de texte libre (données personnelles).
+    orderId: uuid("order_id"),
+    reqId: varchar("req_id", { length: 200 }),
+    result: auditResultEnum("result").notNull().default("success"),
+    error: varchar("error", { length: 100 }),
+
+    // clock_timestamp(), pas now() : les événements d'une même transaction
+    // gardent leur ordre dans l'historique (now() = début de la transaction).
+    createdAt: timestamp("created_at").default(sql`clock_timestamp()`),
   },
   (t) => [
-     index("idx_audit_entity").on(t.entityType, t.entityId),
-     index("idx_audit_user").on(t.userId),
-     index("idx_audit_action").on(t.action),
-     index("idx_audit_created").on(t.createdAt),
-     foreignKey({
+    index("idx_audit_entity").on(t.entityType, t.entityId),
+    index("idx_audit_user").on(t.userId),
+    index("idx_audit_action").on(t.action),
+    index("idx_audit_created").on(t.createdAt),
+    index("idx_audit_order").on(t.orderId, t.createdAt),
+    index("idx_audit_req").on(t.reqId),
+    foreignKey({
       columns: [t.userId],
       foreignColumns: [users.id],
     }),
+    // L'historique survit à la commande : seul le lien disparaît.
+    foreignKey({ columns: [t.orderId], foreignColumns: [orders.id] }).onDelete("set null"),
   ],
 )
 

@@ -1,8 +1,9 @@
 import type { LegalDocType } from "@armurier/shared"
 import { and, eq, inArray, isNull, lt } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
+import { recordAuditEvents } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, legalDocuments, users } from "../db/schema.js"
+import { legalDocuments, users } from "../db/schema.js"
 import { type SlaBreachItem, sendLegalDocSlaBreachEmail } from "../email.js"
 import { env } from "../env.js"
 
@@ -65,7 +66,7 @@ export async function runLegalDocSlaBreachCheck(now: Date = new Date()): Promise
       .set({ slaBreachNotifiedAt: now })
       // Re-check the guard so a concurrent run can't double-mark / double-audit
       .where(and(inArray(legalDocuments.id, ids), isNull(legalDocuments.slaBreachNotifiedAt)))
-    await tx.insert(auditLogs).values(
+    await recordAuditEvents(
       breached.map((d, i) => ({
         userId: null,
         userRole: "system",
@@ -74,6 +75,7 @@ export async function runLegalDocSlaBreachCheck(now: Date = new Date()): Promise
         action: "legal_doc_sla_breached",
         newValue: { deadline: (d.deadline as Date).toISOString(), hoursOverdue: items[i].hoursOverdue },
       })),
+      tx,
     )
   })
 

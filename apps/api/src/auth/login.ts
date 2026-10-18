@@ -2,8 +2,9 @@ import { loginSchema } from "@armurier/shared"
 import { hash, verify } from "@node-rs/argon2"
 import { eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, users } from "../db/schema.js"
+import { users } from "../db/schema.js"
 import { issueTokens } from "./tokens.js"
 
 export const MAX_FAILED_ATTEMPTS = 5
@@ -77,7 +78,7 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
         // Journaled so a lockout can be explained afterwards. Never the
         // password tried; an unknown e-mail is not journaled at all (it would
         // store whatever an attacker typed, against no account).
-        await db.insert(auditLogs).values({
+        await recordAuditEvent({
           userId: user.id,
           userRole: user.role,
           entityType: "user",
@@ -106,7 +107,7 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
 
     const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, deviceLabel ?? null)
 
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       userId: user.id,
       userRole: user.role,
       entityType: "user",

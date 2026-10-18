@@ -3,10 +3,11 @@ import { MAX_ARTWORK_IMAGE_SIZE_BYTES } from "@armurier/shared"
 import { eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import sharp from "sharp"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { artworks, auditLogs } from "../db/schema.js"
+import { artworks } from "../db/schema.js"
 import { env } from "../env.js"
 import { replyForStorageReadFailure } from "../storage/http.js"
 import { storage } from "../storage/index.js"
@@ -164,7 +165,7 @@ export const adminArtworkImageRoutes: FastifyPluginAsync = async (fastify) => {
       await storage.delete(`${ORIGINAL_PREFIX}/${previousId}`)
     }
 
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       userId: request.user.sub,
       userRole: request.user.role,
       entityType: "artwork",
@@ -232,7 +233,7 @@ export const adminArtworkImageRoutes: FastifyPluginAsync = async (fastify) => {
     // already in the file, and a second stored field could only drift from it.
     const format = (await sharp(bytes).metadata()).format
 
-    await db.insert(auditLogs).values({
+    await recordAuditEvent({
       userId: request.user.sub,
       userRole: request.user.role,
       entityType: "artwork",

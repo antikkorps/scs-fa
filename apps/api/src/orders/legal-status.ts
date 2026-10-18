@@ -5,6 +5,7 @@ import {
   PAID_PAYMENT_STATUSES,
 } from "@armurier/shared"
 import { and, desc, eq, inArray } from "drizzle-orm"
+import { recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { legalCategories, legalDocuments, orders } from "../db/schema.js"
 
@@ -153,10 +154,14 @@ export async function recomputeOrderLegalStatus(userId: string): Promise<void> {
     // payment advances them. Nothing to do until the order is paid.
     if ((READY_LEGAL_STATES as readonly string[]).includes(order.legalVerificationStatus)) {
       if (!paid) continue
-      await db
+      const [completed] = await db
         .update(orders)
         .set({ legalVerificationStatus: "completed", updatedAt: new Date() })
         .where(and(eq(orders.id, order.id), inArray(orders.legalVerificationStatus, [...READY_LEGAL_STATES])))
+        .returning({ id: orders.id })
+      if (completed) {
+        await recordOrderStatusChange(order.id, "legal", { from: order.legalVerificationStatus, to: "completed" })
+      }
       continue
     }
 
@@ -181,7 +186,7 @@ export async function recomputeOrderLegalStatus(userId: string): Promise<void> {
           .sort((a, b) => (b.verifiedAt as Date).getTime() - (a.verifiedAt as Date).getTime())[0]?.verifiedBy
       : null
 
-    await db
+    const [moved] = await db
       .update(orders)
       .set({
         legalVerificationStatus: next,
@@ -193,5 +198,10 @@ export async function recomputeOrderLegalStatus(userId: string): Promise<void> {
       // The guard keeps a concurrent payment transition from being overwritten:
       // we only move orders that are still in an active state.
       .where(and(eq(orders.id, order.id), inArray(orders.legalVerificationStatus, [...ACTIVE_LEGAL_STATES])))
+      .returning({ id: orders.id })
+    // A new rejection reason alone is no new step.
+    if (moved && next !== order.legalVerificationStatus) {
+      await recordOrderStatusChange(order.id, "legal", { from: order.legalVerificationStatus, to: next })
+    }
   }
 }

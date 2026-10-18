@@ -235,6 +235,7 @@ describe("multi-parcel shipping (story 11.9)", () => {
       .from(auditLogs)
       .where(and(eq(auditLogs.entityType, "shipment"), eq(auditLogs.entityId, parcel.id)))
     expect(audit.map((a) => a.action)).toContain("shipment.created")
+    expect(audit.every((a) => a.orderId === orderId)).toBe(true)
   })
 
   it("refuses to pack what the order does not hold", async () => {
@@ -400,6 +401,26 @@ describe("multi-parcel shipping (story 11.9)", () => {
 
     const audit = await db.select().from(auditLogs).where(eq(auditLogs.entityId, first.id))
     expect(audit.map((a) => a.action)).toEqual(expect.arrayContaining(["shipment.shipped", "shipment.delivered"]))
+    expect(audit.every((a) => a.orderId === orderId)).toBe(true)
+
+    // The order's own moves, the correction included: a parcel that changes
+    // nothing for the order (the first one delivered) adds nothing.
+    const history = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.orderId, orderId), like(auditLogs.action, "order.shipping.%")))
+      .orderBy(auditLogs.createdAt)
+    expect(history.map((event) => event.action)).toEqual([
+      "order.shipping.partially_shipped",
+      "order.shipping.unshipped",
+      "order.shipping.partially_shipped",
+      "order.shipping.shipped",
+      "order.shipping.delivered",
+    ])
+    expect(history[0]).toMatchObject({
+      oldValue: { shippingStatus: "unshipped" },
+      newValue: { shippingStatus: "partially_shipped" },
+    })
   })
 
   it("keeps the parcel shipped when the e-mail provider fails", async () => {
@@ -433,6 +454,12 @@ describe("multi-parcel shipping (story 11.9)", () => {
     const data = await orderDetail()
     expect(data.shipments).toHaveLength(1)
     expect(data.shippingStatus).toBe("partially_shipped")
+
+    const [deleted] = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.entityId, second.id), eq(auditLogs.action, "shipment.deleted")))
+    expect(deleted.orderId).toBe(orderId)
   })
 
   it("shows the customer where each parcel is, without the internal notes", async () => {

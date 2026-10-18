@@ -7,10 +7,11 @@ import {
 } from "@armurier/shared"
 import { and, asc, count, eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync, FastifyRequest } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
-import { auditLogs, legalDocuments, users } from "../db/schema.js"
+import { legalDocuments, users } from "../db/schema.js"
 import { sendLegalDocApprovedEmail, sendLegalDocRejectedEmail } from "../email.js"
 import { validationError } from "../http.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
@@ -73,7 +74,7 @@ async function auditDecision(
   newValue: Record<string, unknown>,
   reason?: string,
 ) {
-  await db.insert(auditLogs).values({
+  await recordAuditEvent({
     userId: request.user.sub,
     userRole: request.user.role,
     entityType: "legal_document",
