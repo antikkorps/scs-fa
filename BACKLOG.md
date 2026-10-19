@@ -914,7 +914,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
   _Décisions (Franck, 2026-10-19)_ : les **10 ans** de l'historique d'une commande comptent **à partir de la date de la commande** ; **tout ce qui n'est pas rattaché à une commande** (connexions, sécurité, e-mails hors commande, actions admin sur le catalogue, les tarifs, les imports) est gardé **1 an**. Les logs techniques (14 jours) sont déjà purgés par journald (12.7a). L'anonymisation de la commande elle-même au bout de 10 ans reste hors de la 12.7.
   _Livré 2026-10-19 : `audit/retention.ts` (purge au démarrage puis toutes les 24 h ; un historique de commande part en entier, événements tardifs compris), ligne « Journal des opérations sensibles » de `/confidentialite`, guide `docs/GUIDE_REMONTEES.md` (back-office pour Fred et Stéphane, journaux pour Franck, tableau des durées). Registre des traitements rédigé dans `docs/REGISTRE_TRAITEMENTS_RGPD.md` (11 traitements, sous-traitants, durées) ; les mentions « À compléter » (identité, contrats, durées compte / pièces / audience / partenaires) attendent le client._
 
-**Story 12.8** — Espace pro et administrations : catalogue sans prix, demande de devis, connexion par code e-mail — 📝 **EN CADRAGE** (2026-10-19) _(créée le 2026-10-19, demande de Fred et Stéphane)_
+**Story 12.8** — Espace pro et administrations : catalogue sans prix, demande de devis, connexion par code e-mail — 📝 **CADRÉE** (2026-10-19, reste Chorus Pro) _(créée le 2026-10-19, demande de Fred et Stéphane)_
 
 > Besoin : un accès réservé aux **professionnels** (armuriers, clubs de tir, sociétés de sécurité privée) et, parmi eux, aux **administrations**. Ils ne voient **aucun prix** : ils remplissent un panier qui devient une **demande de devis** ; SCS les recontacte avec un devis où les remises sont gérées finement. Ces comptes se connectent par **mot de passe + code envoyé par e-mail**, pour qu'une personne ne puisse pas confier ses accès à quelqu'un d'extérieur. Double authentification facultative pour les particuliers.
 
@@ -929,12 +929,12 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - **Un compte = une personne** (pas plusieurs acheteurs par organisation dans un premier temps). Le code par e-mail sert à empêcher qu'un agent confie ses accès à quelqu'un d'extérieur.
 - **Facturation des administrations (Chorus Pro)** : Franck pose la question au comptable (Henrri dépose-t-il sur Chorus Pro, ou dépôt manuel ?).
 
-**Propositions (à valider avec Franck avant de coder) :**
+**Propositions (validées par Franck le 2026-10-19) :**
 
 - **Organisation à part** : une table `organisations` (raison sociale, SIRET, type `armurier` | `club` | `securite_privee` | `administration`, statut `pending` | `approved` | `rejected` | `suspended`, validée par / le, remise par défaut, paiement à 30 jours autorisé), reliée au compte, **une seule personne par organisation pour l'instant**. Ajouter plus tard plusieurs acheteurs ne demandera alors pas de reprise de données.
 - **Inscription pro** : page dédiée, SIRET contrôlé (clé de Luhn), puis interrogé sur l'**API Recherche d'entreprises** de l'État (`recherche-entreprises.api.gouv.fr`, gratuite, sans clé) : établissement actif, raison sociale pré-remplie, et une **nature juridique de droit public (codes 7xxx) propose « administration »**. **Validation manuelle par SCS** dans le back-office ; tant que le compte n'est pas validé, il voit « demande en cours » et ne peut rien demander.
 - **Prix masqués côté API** (pas seulement à l'affichage) pour un compte pro connecté ; les prix publics restent visibles hors connexion, comme pour n'importe quel visiteur. Le panier pro se termine par « Demander un devis » au lieu du paiement.
-- **Prix particuliers** : une **remise par défaut par organisation**, pré-remplie dans chaque devis, puis ajustable **ligne par ligne** (remise % ou prix net HT). Des prix négociés affichés directement dans la boutique pourront venir plus tard sur la même base.
+- **Prix particuliers** : voir « Tranché » ci-dessous.
 - **Devis** : table `quote_requests` (lignes figées à la demande, statut `requested` → `in_review` → `sent` → `accepted` | `declined` | `expired` → `converted`, date de validité). SCS ajuste dans le back-office, le devis est créé et validé dans **Henrri**, son PDF est envoyé par **notre** e-mail (Brevo, comme pour les factures : Henrri n'envoie rien). Le client **accepte depuis son espace**, ce qui crée la commande aux prix du devis ; il paie ensuite par carte, virement, ou à 30 jours si l'organisation y est autorisée (par défaut pour les administrations, sur décision de SCS pour les autres). Historique dans l'onglet « Historique » (12.7b).
 - **Contrôle légal, proposé par nous** : **aucune règle automatique**. Un devis contenant des articles de **catégorie A, B ou C** ne peut être converti en commande qu'après dépôt **et validation par SCS** du justificatif correspondant, rangé sur l'organisation (réutilise `legal-documents` : scan, stockage, validation / refus). Catégorie D et articles sans catégorie : SIRET seul. Liste indicative affichée à SCS au moment de valider, **à corriger à l'usage** :
   - armurier : agrément d'armurier et, pour A et B, autorisation de commerce (AFCI) ;
@@ -944,22 +944,22 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - **Connexion par code e-mail** : après le mot de passe, un **code à 6 chiffres** est envoyé par e-mail (valable 10 minutes, 5 essais, envoi limité en débit, code stocké sous forme d'empreinte, jamais en clair). **Un code plutôt qu'un lien magique** : les messageries d'administration (Outlook et ses filtres anti-hameçonnage) ouvrent les liens elles-mêmes et consommeraient le lien avant l'agent, et le code fonctionne quand on lit ses mails sur un autre appareil. Obligatoire pour les comptes pro, **à chaque connexion**.
 - **Double authentification des particuliers** : **facultative**, par application (TOTP, type Google Authenticator), avec des codes de secours.
 
-**À trancher par Franck :**
+**Tranché par Franck (2026-10-19) :**
 
-- [ ] Double authentification **obligatoire pour les comptes admin SCS** (recommandé : ils ont accès à tout) — par application ou par code e-mail ?
-- [ ] Durée de session d'un compte pro (recommandé : **7 jours au plus**, puis nouveau code ; contre 30 jours aujourd'hui pour tous).
-- [ ] Table `organisations` séparée (recommandé) ou champs ajoutés à `users` ?
-- [ ] « Prix particuliers » = remise par défaut par organisation + ajustement ligne par ligne : c'est bien l'attente ?
+- **Double authentification obligatoire pour les comptes admin SCS**, par application (TOTP) : c'est le plus robuste pour des comptes qui ont accès à tout (livrée avec la 12.8e ; d'ici là, code e-mail de la 12.8a).
+- **Session d'un compte pro : 7 jours au plus**, puis nouveau code (30 jours inchangés pour les particuliers).
+- **Table `organisations` séparée** des utilisateurs.
+- **Prix particuliers** : **une remise propre à chaque pro** (taux sur le prix public HT, réglé dans le back-office), **appliquée à tout prix qu'on lui affiche** (devis, et boutique si on lui ouvre l'affichage), puis **ajustable ligne par ligne** dans le devis. D'où une option par organisation **« afficher les prix »**, **désactivée par défaut** : activée, le pro voit en boutique ses prix nets de sa remise, mais commande toujours par devis.
 
 **En attente** : réponse du comptable sur Chorus Pro (Franck).
 
 **Découpage proposé :**
 
-- [ ] **12.8a — Connexion par code e-mail** : table des codes, étape de vérification après le mot de passe, e-mail, limites ; s'applique aux comptes qui l'exigent (pros, admins selon décision). Indépendante du reste, peut démarrer dès les décisions prises.
+- [ ] **12.8a — Connexion par code e-mail** : table des codes, étape de vérification après le mot de passe, e-mail, limites ; s'applique aux comptes pro et, en attendant la 12.8e, aux admins ; session pro limitée à 7 jours. Indépendante du reste, peut démarrer tout de suite.
 - [ ] **12.8b — Comptes pro** : `organisations`, inscription avec SIRET + API Recherche d'entreprises, validation / refus / suspension dans le back-office, e-mails de suivi.
-- [ ] **12.8c — Catalogue sans prix et demande de devis** : prix retirés des réponses API pour les pros, panier → demande de devis, suivi des demandes dans l'espace pro.
+- [ ] **12.8c — Catalogue sans prix et demande de devis** : prix retirés des réponses API pour les pros (ou remplacés par leurs prix nets si l'option « afficher les prix » est activée), panier → demande de devis, suivi des demandes dans l'espace pro.
 - [ ] **12.8d — Devis et commande** : traitement back-office (lignes, remises, validité), devis Henrri + PDF, acceptation par le client → commande, paiement carte / virement / 30 jours, blocage tant que le justificatif A / B / C n'est pas validé.
-- [ ] **12.8e — Double authentification par application** : TOTP facultatif pour les particuliers, codes de secours, obligatoire pour les admins si retenu.
+- [ ] **12.8e — Double authentification par application** : TOTP facultatif pour les particuliers, codes de secours, **obligatoire pour les admins**.
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
