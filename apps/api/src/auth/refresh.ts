@@ -20,7 +20,8 @@ export const refreshRoute: FastifyPluginAsync = async (fastify) => {
     }
 
     const stored = await findRefreshTokenByHash(parsed.data.refreshToken)
-    if (!stored || stored.expiresAt <= new Date()) {
+    const now = new Date()
+    if (!stored || stored.expiresAt <= now || (stored.sessionExpiresAt && stored.sessionExpiresAt <= now)) {
       return reply.code(401).send({
         error: "InvalidRefreshToken",
         message: "Refresh token is invalid or expired",
@@ -57,7 +58,10 @@ export const refreshRoute: FastifyPluginAsync = async (fastify) => {
     // is detectable) and issue a new pair within the same family.
     await markRefreshTokenRevoked(stored.id)
 
-    const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, stored.deviceLabel, stored.familyId)
+    const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, stored.deviceLabel, {
+      familyId: stored.familyId,
+      sessionExpiresAt: stored.sessionExpiresAt,
+    })
 
     await recordAuditEvent({
       userId: user.id,

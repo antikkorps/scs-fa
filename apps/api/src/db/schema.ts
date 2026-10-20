@@ -319,6 +319,10 @@ export const refreshTokens = pgTable(
     // that replaying it is detectable as theft → the whole family is revoked.
     familyId: uuid("family_id").notNull().defaultRandom(),
     revokedAt: timestamp("revoked_at"),
+    // Story 12.8a — an absolute end to the session, set at login and copied
+    // onto every rotation, for the accounts whose session is capped (admins,
+    // and the pro accounts of 12.8b). NULL: the sliding expiry alone applies.
+    sessionExpiresAt: timestamp("session_expires_at"),
   },
   (t) => [
     index("idx_refresh_tokens_user").on(t.userId),

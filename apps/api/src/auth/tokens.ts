@@ -29,6 +29,19 @@ export function computeRefreshExpiry(now = new Date()): Date {
   return new Date(now.getTime() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000)
 }
 
+/** Story 12.8a — how long a capped session may last after its login, refreshes or not. */
+export const CAPPED_SESSION_DAYS = 7
+
+/**
+ * The absolute end of a session opened now, or null when only the sliding
+ * expiry applies. Admins are capped (decision 2026-10-19); the pro accounts of
+ * 12.8b will be too.
+ */
+export function sessionExpiryFor(role: string, now = new Date()): Date | null {
+  if (role !== "admin") return null
+  return new Date(now.getTime() + CAPPED_SESSION_DAYS * 24 * 60 * 60 * 1000)
+}
+
 export async function signAccessToken(
   fastify: FastifyInstance,
   payload: { sub: string; role: string },
@@ -40,19 +53,22 @@ export async function issueTokens(
   fastify: FastifyInstance,
   user: { id: string; role: string },
   deviceLabel: string | null,
-  // Rotations of one session reuse the parent's family; a fresh login omits it
-  // and starts a new family.
-  familyId?: string,
+  // Rotations of one session reuse the parent's family and its absolute end;
+  // a fresh login omits both: a new family, and the cap its role calls for.
+  session?: { familyId: string; sessionExpiresAt: Date | null },
 ): Promise<AuthTokens> {
   const accessToken = await signAccessToken(fastify, { sub: user.id, role: user.role })
   const refreshToken = generateRefreshToken()
+  const sessionExpiresAt = session ? session.sessionExpiresAt : sessionExpiryFor(user.role)
+  const slidingExpiry = computeRefreshExpiry()
 
   await db.insert(refreshTokens).values({
     userId: user.id,
     tokenHash: hashRefreshToken(refreshToken),
-    expiresAt: computeRefreshExpiry(),
+    expiresAt: sessionExpiresAt && sessionExpiresAt < slidingExpiry ? sessionExpiresAt : slidingExpiry,
     deviceLabel,
-    familyId: familyId ?? randomUUID(),
+    familyId: session?.familyId ?? randomUUID(),
+    sessionExpiresAt,
   })
 
   return {
