@@ -5,6 +5,8 @@ import type { FastifyPluginAsync } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
+import { startLoginChallenge } from "./login-code.js"
+import { requiresLoginCode } from "./login-code-policy.js"
 import { issueTokens } from "./tokens.js"
 
 export const MAX_FAILED_ATTEMPTS = 5
@@ -95,15 +97,20 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
       })
     }
 
+    // The password is right: the failure trail goes, whatever comes next.
+    const needsCode = await requiresLoginCode(user)
     await db
       .update(users)
       .set({
         failedLoginAttempts: 0,
         lockedUntil: null,
         lastFailedLoginAt: null,
-        lastLoginAt: new Date(),
+        ...(needsCode ? {} : { lastLoginAt: new Date() }),
       })
       .where(eq(users.id, user.id))
+
+    // Story 12.8a: no session yet for these accounts — the mailed code opens it.
+    if (needsCode) return reply.code(200).send(await startLoginChallenge(user, deviceLabel ?? null))
 
     const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, deviceLabel ?? null)
 

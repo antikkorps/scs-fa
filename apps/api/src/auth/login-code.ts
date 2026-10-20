@@ -1,0 +1,220 @@
+// Story 12.8a — the second step of a login, for the accounts whose policy asks
+// for it (login-code-policy.ts): after the right password, a 6-digit code is
+// mailed; the session opens only on that code.
+//
+// A code rather than a magic link: the mail filters of administrations open
+// links on their own, which would spend a link before its recipient does, and
+// a code can be read on one device and typed on another.
+
+import { createHmac, hkdfSync, randomInt, timingSafeEqual } from "node:crypto"
+import { loginCodeResendSchema, loginCodeVerifySchema } from "@armurier/shared"
+import { and, eq, gt, isNull, lt, sql } from "drizzle-orm"
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
+import { startDailyPurge } from "../daily-purge.js"
+import { db } from "../db/client.js"
+import { loginChallenges, users } from "../db/schema.js"
+import { sendLoginCodeEmail } from "../email.js"
+import { env } from "../env.js"
+import {
+  generateRefreshToken as generateChallengeToken,
+  hashRefreshToken as hashChallengeToken,
+  issueTokens,
+} from "./tokens.js"
+
+export const LOGIN_CODE_TTL_MINUTES = 10
+export const LOGIN_CODE_MAX_ATTEMPTS = 5
+/** The first code and two more on request. */
+export const LOGIN_CODE_MAX_SENDS = 3
+const RESEND_AFTER_MS = 60 * 1000
+const TTL_MS = LOGIN_CODE_TTL_MINUTES * 60 * 1000
+/** A spent or expired challenge is kept a day, for the journal to be explained by. */
+const KEEP_AFTER_EXPIRY_MS = 24 * 60 * 60 * 1000
+
+// A key of its own, derived from the JWT secret: no new secret to manage, and
+// the JWT key itself never touches a code.
+const CODE_KEY = Buffer.from(hkdfSync("sha256", env.JWT_SECRET, "", "scs-firearms login code", 32))
+
+function digestCode(code: string): string {
+  return createHmac("sha256", CODE_KEY).update(code).digest("hex")
+}
+
+function newCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0")
+}
+
+function sameDigest(a: string, b: string): boolean {
+  return a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
+}
+
+function validationError(reply: FastifyReply, issues: { path: PropertyKey[]; message: string }[]) {
+  return reply.code(400).send({
+    error: "ValidationError",
+    issues: issues.map((i) => ({ path: i.path.map(String).join("."), message: i.message })),
+  })
+}
+
+function invalidChallenge(reply: FastifyReply) {
+  return reply.code(401).send({
+    error: "InvalidLoginChallenge",
+    message: "This login has expired. Sign in again with your password.",
+  })
+}
+
+/** A challenge still open: not spent, not expired. */
+async function openChallenge(challengeToken: string) {
+  const [row] = await db
+    .select()
+    .from(loginChallenges)
+    .where(
+      and(
+        eq(loginChallenges.tokenHash, hashChallengeToken(challengeToken)),
+        isNull(loginChallenges.consumedAt),
+        gt(loginChallenges.expiresAt, new Date()),
+      ),
+    )
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * Called by the login route once the password is right: open a challenge, mail
+ * its code, and return what the client needs to ask for it.
+ */
+export async function startLoginChallenge(
+  user: { id: string; email: string },
+  deviceLabel: string | null,
+): Promise<{ codeRequired: true; challengeToken: string; expiresIn: number }> {
+  const challengeToken = generateChallengeToken()
+  const code = newCode()
+  await db.insert(loginChallenges).values({
+    userId: user.id,
+    tokenHash: hashChallengeToken(challengeToken),
+    codeHash: digestCode(code),
+    expiresAt: new Date(Date.now() + TTL_MS),
+    deviceLabel,
+  })
+  await sendLoginCodeEmail(user.email, code, LOGIN_CODE_TTL_MINUTES, { userId: user.id })
+  return { codeRequired: true, challengeToken, expiresIn: TTL_MS / 1000 }
+}
+
+function journal(request: FastifyRequest, user: { id: string; role: string }, action: string, newValue?: unknown) {
+  return recordAuditEvent({
+    userId: user.id,
+    userRole: user.role,
+    entityType: "user",
+    entityId: user.id,
+    action,
+    newValue,
+    ipAddress: request.ip,
+    userAgent: request.headers["user-agent"] ?? null,
+  })
+}
+
+export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
+  /** POST /api/auth/login/verify — the code: opens the session, as a password-only login would. */
+  fastify.post(
+    "/login/verify",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = loginCodeVerifySchema.safeParse(request.body)
+      if (!parsed.success) return validationError(reply, parsed.error.issues)
+
+      const challenge = await openChallenge(parsed.data.challengeToken)
+      if (!challenge) return invalidChallenge(reply)
+      const [user] = await db.select().from(users).where(eq(users.id, challenge.userId)).limit(1)
+      if (!user) return invalidChallenge(reply)
+
+      if (!sameDigest(digestCode(parsed.data.code), challenge.codeHash)) {
+        const attempts = challenge.attempts + 1
+        const spent = attempts >= LOGIN_CODE_MAX_ATTEMPTS
+        await db
+          .update(loginChallenges)
+          .set({ attempts, ...(spent ? { consumedAt: new Date() } : {}) })
+          .where(eq(loginChallenges.id, challenge.id))
+        await journal(request, user, spent ? "user.login_code_exhausted" : "user.login_code_failed", { attempts })
+        return reply.code(401).send({
+          error: "InvalidLoginCode",
+          message: "Invalid code",
+          remainingAttempts: LOGIN_CODE_MAX_ATTEMPTS - attempts,
+        })
+      }
+
+      // Spend it first, and only if nobody did in between: two requests racing
+      // with the same code open one session, not two.
+      const [spent] = await db
+        .update(loginChallenges)
+        .set({ consumedAt: new Date() })
+        .where(and(eq(loginChallenges.id, challenge.id), isNull(loginChallenges.consumedAt)))
+        .returning({ id: loginChallenges.id })
+      if (!spent) return invalidChallenge(reply)
+
+      await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id))
+      const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, challenge.deviceLabel)
+      await journal(request, user, "user.login", { method: "password+email_code" })
+
+      return reply.code(200).send({
+        ...tokens,
+        user: { id: user.id, email: user.email, firstName: user.firstname, lastName: user.lastname, role: user.role },
+      })
+    },
+  )
+
+  /** POST /api/auth/login/resend — a new code for the same challenge; the previous one stops working. */
+  fastify.post(
+    "/login/resend",
+    { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = loginCodeResendSchema.safeParse(request.body)
+      if (!parsed.success) return validationError(reply, parsed.error.issues)
+
+      const challenge = await openChallenge(parsed.data.challengeToken)
+      if (!challenge) return invalidChallenge(reply)
+      const [user] = await db.select().from(users).where(eq(users.id, challenge.userId)).limit(1)
+      if (!user) return invalidChallenge(reply)
+
+      const now = new Date()
+      const waitMs = challenge.lastSentAt.getTime() + RESEND_AFTER_MS - now.getTime()
+      if (challenge.sendCount >= LOGIN_CODE_MAX_SENDS || waitMs > 0) {
+        return reply.code(429).send({
+          error: "LoginCodeResendRefused",
+          message:
+            challenge.sendCount >= LOGIN_CODE_MAX_SENDS
+              ? "No more codes for this login. Sign in again with your password."
+              : "Wait a moment before asking for a new code.",
+          retryAfterSeconds: challenge.sendCount >= LOGIN_CODE_MAX_SENDS ? null : Math.ceil(waitMs / 1000),
+        })
+      }
+
+      const code = newCode()
+      await db
+        .update(loginChallenges)
+        .set({
+          codeHash: digestCode(code),
+          attempts: 0,
+          sendCount: sql`${loginChallenges.sendCount} + 1`,
+          lastSentAt: now,
+          expiresAt: new Date(now.getTime() + TTL_MS),
+        })
+        .where(eq(loginChallenges.id, challenge.id))
+      await sendLoginCodeEmail(user.email, code, LOGIN_CODE_TTL_MINUTES, { userId: user.id })
+      await journal(request, user, "user.login_code_resent", { sendCount: challenge.sendCount + 1 })
+
+      return reply.code(202).send({ expiresIn: TTL_MS / 1000 })
+    },
+  )
+}
+
+/** Delete challenges a day past their expiry, spent or not (a spent one expires within minutes). Idempotent. */
+export async function purgeLoginChallenges(now: Date = new Date()): Promise<{ challenges: number }> {
+  const removed = await db
+    .delete(loginChallenges)
+    .where(lt(loginChallenges.expiresAt, new Date(now.getTime() - KEEP_AFTER_EXPIRY_MS)))
+    .returning({ id: loginChallenges.id })
+  return { challenges: removed.length }
+}
+
+/** Purge at startup, then once a day. */
+export function startLoginChallengePurgeScheduler(app: FastifyInstance): void {
+  startDailyPurge(app, "login challenge", purgeLoginChallenges)
+}

@@ -7,13 +7,31 @@ import type { AuthUser } from "~/types/admin"
 // state (display name, role); the server enforces all authorization.
 const USER_COOKIE_OPTS = { sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7, secure: !import.meta.dev } as const
 
+export type LoginOutcome = { status: "signed_in"; user: AuthUser } | { status: "code_required"; expiresIn: number }
+
 export function useAuth() {
   const user = useCookie<AuthUser | null>("scs_user", USER_COOKIE_OPTS)
 
-  async function login(email: string, password: string): Promise<AuthUser> {
-    const res = await $fetch<{ user: AuthUser }>("/bff/auth/login", { method: "POST", body: { email, password } })
+  // Story 12.8a: for some accounts the right password is not enough — the BFF
+  // keeps the challenge in an httpOnly cookie and the mailed code finishes it.
+  async function login(email: string, password: string): Promise<LoginOutcome> {
+    const res = await $fetch<{ user: AuthUser } | { codeRequired: true; expiresIn: number }>("/bff/auth/login", {
+      method: "POST",
+      body: { email, password },
+    })
+    if ("codeRequired" in res) return { status: "code_required", expiresIn: res.expiresIn }
+    user.value = res.user
+    return { status: "signed_in", user: res.user }
+  }
+
+  async function verifyLoginCode(code: string): Promise<AuthUser> {
+    const res = await $fetch<{ user: AuthUser }>("/bff/auth/login/verify", { method: "POST", body: { code } })
     user.value = res.user
     return res.user
+  }
+
+  async function resendLoginCode(): Promise<void> {
+    await $fetch("/bff/auth/login/resend", { method: "POST" })
   }
 
   async function register(input: RegisterInput): Promise<AuthUser> {
@@ -56,6 +74,8 @@ export function useAuth() {
   return {
     user,
     login,
+    verifyLoginCode,
+    resendLoginCode,
     register,
     logout,
     refresh,

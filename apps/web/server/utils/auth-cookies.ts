@@ -1,4 +1,5 @@
 import type { H3Event } from "h3"
+import type { AuthUser } from "~/types/admin"
 
 // Neither session token reaches client-side JS: both live in httpOnly cookies
 // managed exclusively by the BFF. The refresh token is read/written by the
@@ -7,6 +8,11 @@ import type { H3Event } from "h3"
 // a non-secret `scs_user` cookie (set client-side) for UI state.
 export const REFRESH_COOKIE = "scs_refresh"
 export const ACCESS_COOKIE = "scs_token"
+// Story 12.8a: the pending login of an account that confirms by mailed code.
+// Half a credential (the password was right): httpOnly, and only sent to the
+// two routes that finish the login.
+export const LOGIN_CHALLENGE_COOKIE = "scs_login_challenge"
+const LOGIN_CHALLENGE_PATH = "/bff/auth/login"
 
 // Matches the API refresh-token TTL (JWT_REFRESH_EXPIRES_IN, default 7d).
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 7
@@ -44,6 +50,53 @@ export function readAccessCookie(event: H3Event): string | undefined {
 
 export function clearAccessCookie(event: H3Event): void {
   deleteCookie(event, ACCESS_COOKIE, { path: "/" })
+}
+
+export function setLoginChallengeCookie(event: H3Event, token: string, maxAgeSeconds: number): void {
+  setCookie(event, LOGIN_CHALLENGE_COOKIE, token, {
+    ...httpOnlyOpts,
+    path: LOGIN_CHALLENGE_PATH,
+    maxAge: maxAgeSeconds,
+  })
+}
+
+export function readLoginChallengeCookie(event: H3Event): string | undefined {
+  return getCookie(event, LOGIN_CHALLENGE_COOKIE)
+}
+
+export function clearLoginChallengeCookie(event: H3Event): void {
+  deleteCookie(event, LOGIN_CHALLENGE_COOKIE, { path: LOGIN_CHALLENGE_PATH })
+}
+
+interface ApiSession {
+  accessToken: string
+  refreshToken: string
+  user: AuthUser
+}
+
+interface ApiLoginChallenge {
+  codeRequired: true
+  challengeToken: string
+  expiresIn: number
+}
+
+/**
+ * Turn what the API answered to a login into the BFF's answer: a session goes
+ * into the httpOnly cookies and only the user comes back; a challenge (story
+ * 12.8a) goes into its own cookie and the page is told to ask for the code.
+ */
+export function finishLogin(
+  event: H3Event,
+  res: ApiSession | ApiLoginChallenge,
+): { user: AuthUser } | { codeRequired: true; expiresIn: number } {
+  if ("codeRequired" in res) {
+    setLoginChallengeCookie(event, res.challengeToken, res.expiresIn)
+    return { codeRequired: true, expiresIn: res.expiresIn }
+  }
+  clearLoginChallengeCookie(event)
+  setRefreshCookie(event, res.refreshToken)
+  setAccessCookie(event, res.accessToken)
+  return { user: res.user }
 }
 
 /**

@@ -197,6 +197,20 @@
       "when": 1792527173283,
       "tag": "0027_drop_dead_images_count",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792530132486,
+      "tag": "0028_story_12_8a_session_cap",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792530310757,
+      "tag": "0029_story_12_8a_login_challenges",
+      "breakpoints": true
     }
   ]
 }
