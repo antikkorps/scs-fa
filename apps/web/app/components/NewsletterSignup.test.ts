@@ -3,6 +3,7 @@ import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { flushPromises } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import NewsletterSignup from "./NewsletterSignup.vue"
+import newsletterSignupSource from "./NewsletterSignup.vue?raw"
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }))
 mockNuxtImport("useApi", () => () => apiMock)
@@ -96,5 +97,30 @@ describe("NewsletterSignup", () => {
 
     expect(wrapper.text()).toContain("Inscription impossible")
     expect(wrapper.find("form").exists()).toBe(true)
+  })
+
+  it("shows the API's refusal of an address on the address field", async () => {
+    // The browser check is deliberately loose; the API has the last word.
+    apiMock.mockRejectedValue(Object.assign(new Error("Bad Request"), { statusCode: 400 }))
+    const wrapper = await mountSuspended(NewsletterSignup)
+    await fill(wrapper, "client@example.c")
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Adresse email invalide.")
+    expect(wrapper.text()).not.toContain("Inscription impossible")
+  })
+
+  it("sends the address trimmed", async () => {
+    const wrapper = await mountSuspended(NewsletterSignup, { props: { defaultSegments: ["armurerie"] } })
+    await fill(wrapper, "  visiteur@example.fr  ")
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+    expect(body().email).toBe("visiteur@example.fr")
+  })
+
+  it("validates without zod: it sits in the footer of every page, and the API re-validates", () => {
+    // A zod schema here put the whole of zod (~70 KB) in the entry bundle.
+    expect(newsletterSignupSource).not.toMatch(/Schema\b/)
   })
 })

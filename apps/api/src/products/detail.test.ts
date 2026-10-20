@@ -134,6 +134,8 @@ describe("GET /api/products/:id", () => {
     })
     expect(body.category).toMatchObject({ slug: "arme-poing", name: "Armes de poing" })
     expect(body.seo).toBeDefined()
+    // A dead column nothing ever wrote to: not part of the contract.
+    expect(body).not.toHaveProperty("imagesCount")
   })
 
   it("returns buyable variants with per-variant TTC pricing", async () => {

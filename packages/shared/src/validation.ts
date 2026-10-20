@@ -1,4 +1,3 @@
-import { z } from "zod"
 import { ARTWORK_ORIENTATIONS } from "./artwork.js"
 import {
   ADDRESS_TYPES,
@@ -18,6 +17,7 @@ import {
   SHIPMENT_STATUSES,
   SHIPPING_CARRIER_CODES,
 } from "./shipping.js"
+import { z } from "./zod.js"
 
 /**
  * Rend chaque champ facultatif POUR UN PATCH, en retirant d'abord sa valeur par

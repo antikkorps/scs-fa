@@ -11,9 +11,13 @@ const STRIPE_NETWORK = "https://m.stripe.network"
 export function contentSecurityPolicy(nonce: string): string {
   return [
     "default-src 'self'",
-    // Inline scripts are allowed only via the per-request nonce (no
-    // 'unsafe-inline'); Stripe.js loads from its own origin.
-    `script-src 'self' 'nonce-${nonce}' ${STRIPE_JS}`,
+    // Google's "strict CSP": a script runs if it carries the per-request nonce
+    // or was loaded by one that does ('strict-dynamic' — Nuxt's lazy chunks,
+    // Stripe.js and Umami are all inserted by our own code). A host allowlist
+    // alone can be bypassed through any script an allowed origin serves, so
+    // browsers that know 'strict-dynamic' ignore 'self', the Stripe origin and
+    // 'unsafe-inline'; those are only the fallback for browsers that do not.
+    `script-src 'nonce-${nonce}' 'strict-dynamic' 'self' ${STRIPE_JS} 'unsafe-inline'`,
     // Styles keep 'unsafe-inline': Nuxt inlines component CSS into <style>
     // blocks of the SSR document, and Vue `:style` bindings render `style`
     // attributes — which a nonce cannot cover at all.
@@ -33,12 +37,16 @@ export function contentSecurityPolicy(nonce: string): string {
   ].join("; ")
 }
 
+// A `<link>` that fetches a script: Nuxt's module preloads and script prefetches.
+const SCRIPT_LINK = /<link(?![^>]*\snonce=)(?=[^>]*\s(?:rel="modulepreload"|as="script"))/gi
+
 /**
- * Add `nonce="…"` to every inline `<script>` in the given HTML fragments so it
- * satisfies the nonce-based script-src. External scripts (with `src`) already
- * match the origin allowlist and JSON-LD data blocks are inert, but tagging
- * them too is harmless and keeps the rule simple. Idempotent: a tag that
- * already carries a nonce is left untouched.
+ * Add `nonce="…"` to every `<script>` in the given HTML fragments, and to every
+ * `<link>` that fetches a script, so they satisfy the nonce-based script-src:
+ * under 'strict-dynamic' a parser-inserted tag without the nonce is refused,
+ * even from our own origin. JSON-LD data blocks are inert, but tagging them too
+ * is harmless and keeps the rule simple. Idempotent: a tag that already carries
+ * a nonce is left untouched.
  */
 export function withScriptNonce(fragments: unknown[], nonce: string): string[] {
   // Modules do not all push strings: the PrimeVue module (since removed) pushed
@@ -48,5 +56,9 @@ export function withScriptNonce(fragments: unknown[], nonce: string): string[] {
   return fragments
     .flat(Number.POSITIVE_INFINITY)
     .filter((f): f is string => typeof f === "string")
-    .map((f) => f.replace(/<script(?![^>]*\snonce=)/gi, `<script nonce="${nonce}"`))
+    .map((f) =>
+      f
+        .replace(/<script(?![^>]*\snonce=)/gi, `<script nonce="${nonce}"`)
+        .replace(SCRIPT_LINK, `<link nonce="${nonce}"`),
+    )
 }

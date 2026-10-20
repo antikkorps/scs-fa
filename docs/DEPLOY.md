@@ -321,6 +321,12 @@ when upgrading Umami.
 3. Do the same in Bing Webmaster Tools (it can import the Search Console property).
 4. After go-live, run the Rich Results Test on a product, an artwork and a
    category page; the markup is produced by `app/utils/structuredData.ts`.
+5. About 28 days after go-live, read **Core Web Vitals** (Search Console, or
+   PageSpeed Insights' "real users" block — CrUX data). Mobile LCP is judged
+   there, against 2.5 s at the 75th percentile, not on the Lighthouse lab score
+   (decision 2026-10-20: the lab simulation gives ~3.0 s for a hero text real
+   browsers paint in ~0.2 s). If real users miss 2.5 s, the next lever is to
+   preload a single font family (BACKLOG § 9.6).
 
 ## Responsive images (story 9.6)
 

@@ -15,6 +15,7 @@ import {
   LEGAL_CATEGORY_CHOICES,
 } from "./catalog-import.js"
 import { fixC1, parseCsv } from "./csv.js"
+import { assertZipWithinLimits, ZipLimitError } from "./zip-guard.js"
 
 export class SpreadsheetError extends Error {}
 
@@ -23,9 +24,14 @@ export interface ReadSpreadsheetOptions {
   sheet?: string
   /** Refuse anything longer — an import is a bounded, reviewed batch. */
   maxRows?: number
+  /** Refuse a workbook bigger than this once unzipped — the zip bomb guard. */
+  maxUnzippedBytes?: number
 }
 
 const DEFAULT_MAX_ROWS = 20_000
+// A 6 000-row supplier workbook unzips to ~12 MB: 20 000 rows fit with room.
+const DEFAULT_MAX_UNZIPPED_BYTES = 100 * 1024 * 1024
+const MAX_ZIP_ENTRIES = 1000
 const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04]
 
 const isZip = (bytes: Uint8Array) => ZIP_MAGIC.every((b, i) => bytes[i] === b)
@@ -50,6 +56,15 @@ function cellText(value: ExcelJS.CellValue): string {
 }
 
 async function readXlsx(bytes: Uint8Array, options: ReadSpreadsheetOptions): Promise<string[][]> {
+  try {
+    assertZipWithinLimits(bytes, {
+      maxUnzippedBytes: options.maxUnzippedBytes ?? DEFAULT_MAX_UNZIPPED_BYTES,
+      maxEntries: MAX_ZIP_ENTRIES,
+    })
+  } catch (err) {
+    if (err instanceof ZipLimitError) throw new SpreadsheetError(err.message)
+    throw err
+  }
   const wb = new ExcelJS.Workbook()
   try {
     await wb.xlsx.load(bytes as unknown as ArrayBuffer)

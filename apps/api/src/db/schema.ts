@@ -633,7 +633,6 @@ export const products = pgTable(
 
     // Média
     featuredImageUrl: varchar("featured_image_url", { length: 512 }),
-    imagesCount: integer("images_count").default(0),
 
     // SEO
     metaTitle: varchar("meta_title", { length: 255 }),
@@ -1114,7 +1113,6 @@ export const artworks = pgTable(
 
     // Médias
     featuredImageUrl: varchar("featured_image_url", { length: 512 }),
-    imagesCount: integer("images_count").default(0),
     // Orientation de l'image ("portrait" | "landscape" | "square") — pilote le
     // ratio des cartes et du détail côté front. Propriété de l'image, pas du
     // format papier, donc stockée explicitement (cf. shared/artwork.ts).

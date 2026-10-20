@@ -1,3 +1,4 @@
+import { crc32, deflateRawSync } from "node:zlib"
 import ExcelJS from "exceljs"
 import { describe, expect, it } from "vitest"
 import { CATALOG_IMPORT_COLUMNS } from "./catalog-import.js"
@@ -67,6 +68,66 @@ describe("readSpreadsheet — xlsx", () => {
   it("refuses a zip that is not a workbook", async () => {
     const notXlsx = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5, 6])
     await expect(readSpreadsheet(notXlsx)).rejects.toBeInstanceOf(SpreadsheetError)
+  })
+})
+
+/** A zip built by hand, so an entry can lie about its size the way a bomb does. */
+function zipOf(entries: { name: string; data: Uint8Array; declaredSize?: number }[]): Uint8Array {
+  const locals: Buffer[] = []
+  const centrals: Buffer[] = []
+  let offset = 0
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name)
+    const packed = deflateRawSync(entry.data)
+    const sizes = (header: Buffer, at: number) => {
+      header.writeUInt16LE(8, at) // deflate
+      header.writeUInt32LE(crc32(entry.data), at + 6)
+      header.writeUInt32LE(packed.length, at + 10)
+      header.writeUInt32LE(entry.declaredSize ?? entry.data.length, at + 14)
+      header.writeUInt16LE(name.length, at + 18)
+    }
+    const local = Buffer.alloc(30)
+    local.writeUInt32LE(0x04034b50, 0)
+    sizes(local, 8)
+    const central = Buffer.alloc(46)
+    central.writeUInt32LE(0x02014b50, 0)
+    sizes(central, 10)
+    central.writeUInt32LE(offset, 42)
+    locals.push(local, name, packed)
+    centrals.push(central, name)
+    offset += local.length + name.length + packed.length
+  }
+  const directory = Buffer.concat(centrals)
+  const end = Buffer.alloc(22)
+  end.writeUInt32LE(0x06054b50, 0)
+  end.writeUInt16LE(entries.length, 8)
+  end.writeUInt16LE(entries.length, 10)
+  end.writeUInt32LE(directory.length, 12)
+  end.writeUInt32LE(offset, 16)
+  return new Uint8Array(Buffer.concat([...locals, directory, end]))
+}
+
+describe("readSpreadsheet — zip bombs", () => {
+  it("refuses a workbook that inflates past the size budget", async () => {
+    const file = await xlsx((ws) => {
+      for (let i = 0; i < 200; i++) ws.addRow([`ligne ${i}`, "x".repeat(50)])
+    })
+    await expect(readSpreadsheet(file, { maxUnzippedBytes: 10_000 })).rejects.toThrow(/too large/i)
+  })
+
+  it("refuses an entry that inflates past the size it declares", async () => {
+    const bomb = zipOf([{ name: "xl/worksheets/sheet1.xml", data: new Uint8Array(1_000_000), declaredSize: 100 }])
+    await expect(readSpreadsheet(bomb)).rejects.toThrow(/declares/i)
+  })
+
+  it("refuses an archive with more entries than any workbook has", async () => {
+    const entries = Array.from({ length: 1001 }, (_, i) => ({ name: `f${i}`, data: new Uint8Array(1) }))
+    await expect(readSpreadsheet(zipOf(entries))).rejects.toThrow(/entries/i)
+  })
+
+  it("refuses an archive whose directory cannot be found", async () => {
+    const truncated = zipOf([{ name: "a", data: new Uint8Array(10) }]).slice(0, -22)
+    await expect(readSpreadsheet(truncated)).rejects.toBeInstanceOf(SpreadsheetError)
   })
 })
 

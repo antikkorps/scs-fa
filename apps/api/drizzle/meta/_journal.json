@@ -190,6 +190,13 @@
       "when": 1792340342120,
       "tag": "0026_story_12_7c_email_message_id",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792527173283,
+      "tag": "0027_drop_dead_images_count",
+      "breakpoints": true
     }
   ]
 }
