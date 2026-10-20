@@ -4,13 +4,12 @@
 
 import { and, inArray, isNull, lt } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
+import { startDailyPurge } from "../daily-purge.js"
 import { db } from "../db/client.js"
 import { auditLogs, orders } from "../db/schema.js"
-import { env } from "../env.js"
 
 const ORDER_HISTORY_YEARS = 10
 const OTHER_EVENTS_YEARS = 1
-const PURGE_EVERY_MS = 24 * 60 * 60 * 1000
 
 function yearsBefore(now: Date, years: number): Date {
   const cutoff = new Date(now)
@@ -40,20 +39,7 @@ export async function purgeAuditLogs(now: Date = new Date()): Promise<{ orderEve
   return { orderEvents: orderEvents.length, otherEvents: otherEvents.length }
 }
 
-/** Purge at startup, then once a day. No-op under tests. Cleared on server close. */
+/** Purge at startup, then once a day. */
 export function startAuditPurgeScheduler(app: FastifyInstance): void {
-  if (env.NODE_ENV === "test") return
-
-  const run = () =>
-    purgeAuditLogs()
-      .then((purged) => {
-        if (purged.orderEvents + purged.otherEvents > 0) app.log.info(purged, "audit log purge")
-      })
-      .catch((err) => app.log.error({ err }, "audit log purge failed"))
-
-  void run()
-  const timer = setInterval(run, PURGE_EVERY_MS)
-  timer.unref?.()
-  app.addHook("onClose", async () => clearInterval(timer))
-  app.log.info("audit log purge scheduler started")
+  startDailyPurge(app, "audit log", purgeAuditLogs)
 }

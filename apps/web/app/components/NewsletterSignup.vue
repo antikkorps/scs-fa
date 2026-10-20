@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import {
-  NEWSLETTER_SEGMENT_LABELS,
-  NEWSLETTER_SEGMENTS,
-  type NewsletterSegment,
-  newsletterSubscribeSchema,
-} from "@armurier/shared"
+import { NEWSLETTER_SEGMENT_LABELS, NEWSLETTER_SEGMENTS, type NewsletterSegment } from "@armurier/shared"
 
 // Newsletter opt-in (story 11.4). One contact, several universes: the visitor
 // ticks what they want to receive. `defaultSegments` pre-ticks the universe the
@@ -51,31 +46,48 @@ function toggle(segment: NewsletterSegment) {
     : [...selected.value, segment]
 }
 
+// Only what a visitor can get wrong, said in their words. No zod schema here:
+// this form sits in the footer of every page, and a schema would ship all of
+// zod in the entry bundle. The API validates the request in full anyway.
+const PLAUSIBLE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const MAX_EMAIL_LENGTH = 255
+
+function formErrors(address: string): Record<string, string> {
+  const errors: Record<string, string> = {}
+  if (!PLAUSIBLE_EMAIL.test(address) || address.length > MAX_EMAIL_LENGTH) errors.email = "Adresse email invalide."
+  if (selected.value.length === 0) errors.segments = "Choisissez au moins une newsletter."
+  if (!consent.value) errors.consent = "Votre accord explicite est nécessaire."
+  return errors
+}
+
 async function submit() {
   error.value = ""
-  fieldErrors.value = {}
-
-  const parsed = newsletterSubscribeSchema.safeParse({
-    email: email.value.trim(),
-    segments: selected.value,
-    consent: consent.value,
-    ...(props.source ? { source: props.source } : {}),
-  })
-  if (!parsed.success) {
-    fieldErrors.value = zodFieldErrors(parsed.error)
-    if (selected.value.length === 0) fieldErrors.value.segments = "Choisissez au moins une newsletter."
-    if (!consent.value) fieldErrors.value.consent = "Votre accord explicite est nécessaire."
-    return
-  }
+  const address = email.value.trim()
+  fieldErrors.value = formErrors(address)
+  if (Object.keys(fieldErrors.value).length > 0) return
 
   status.value = "loading"
   try {
-    await api("/newsletter/subscribe", { method: "POST", body: parsed.data })
+    await api("/newsletter/subscribe", {
+      method: "POST",
+      body: {
+        email: address,
+        segments: selected.value,
+        consent: true,
+        ...(props.source ? { source: props.source } : {}),
+      },
+    })
     // Deliberately the same message whatever the address' history: the form must
     // not reveal whether an address is already subscribed.
     status.value = "sent"
-  } catch {
+  } catch (err) {
     status.value = "idle"
+    // Segments and consent are checked above exactly as the API does: a 400
+    // is the address the loose browser check let through.
+    if ((err as { statusCode?: number }).statusCode === 400) {
+      fieldErrors.value = { email: "Adresse email invalide." }
+      return
+    }
     error.value = "Inscription impossible pour le moment. Réessayez dans quelques instants."
   }
 }

@@ -166,7 +166,6 @@ export interface ProductDetail {
   hasAccessoryRestrictions: boolean | null
   accessoryRestrictionNotes: string | null
   featuredImageUrl: string | null
-  imagesCount: number | null
   seo: { metaTitle: string | null; metaDescription: string | null; keywords: string | null }
   category: { slug: string | null; name: string | null }
   crossSells: ProductCrossSellItem[]

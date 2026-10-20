@@ -91,7 +91,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Personnes concernées | Abonnés |
 | Données | E-mail, thèmes choisis, preuve du consentement (date, adresse IP et navigateur à l'inscription et à la confirmation) |
 | Destinataires | Brevo (uniquement les contacts dont l'inscription est confirmée) |
-| Durée | Jusqu'à la désinscription ; l'adresse est alors effacée, seules une empreinte non réversible et les dates du consentement sont gardées comme preuve. Inscription non confirmée : lien valable 72 heures |
+| Durée | Jusqu'à la désinscription ; l'adresse est alors effacée, seules une empreinte non réversible et les dates du consentement sont gardées comme preuve. Inscription non confirmée : lien valable 72 heures, puis la demande et l'adresse sont effacées (purge quotidienne) |
 
 ### 6. E-mails de service et suivi de leur remise
 

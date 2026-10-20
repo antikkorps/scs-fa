@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest"
 import { contentSecurityPolicy, withScriptNonce } from "./csp"
 
 describe("contentSecurityPolicy", () => {
-  it("allows inline scripts via the nonce and drops 'unsafe-inline' from script-src", () => {
-    const csp = contentSecurityPolicy("abc123")
-    expect(csp).toContain("script-src 'self' 'nonce-abc123' https://js.stripe.com")
-    expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/)
+  it("trusts scripts by nonce, and what they load, rather than by host", () => {
+    // A host allowlist can be bypassed through any script served by an allowed
+    // origin; 'strict-dynamic' makes browsers ignore it in favour of the nonce.
+    const scriptSrc = contentSecurityPolicy("abc123").match(/script-src [^;]*/)?.[0]
+    expect(scriptSrc).toBe("script-src 'nonce-abc123' 'strict-dynamic' 'self' https://js.stripe.com 'unsafe-inline'")
   })
 
   it("keeps 'unsafe-inline' for styles (SSR-inlined component CSS and style bindings)", () => {
@@ -51,6 +52,24 @@ describe("withScriptNonce", () => {
 
   it("is idempotent — never double-adds a nonce", () => {
     expect(withScriptNonce(['<script nonce="X">a</script>'], "Y")).toEqual(['<script nonce="X">a</script>'])
+  })
+
+  it("tags the links that fetch scripts: 'strict-dynamic' ignores 'self' for them", () => {
+    const [preload, prefetch] = withScriptNonce(
+      [
+        '<link rel="modulepreload" as="script" crossorigin href="/_nuxt/a.js">',
+        '<link rel="prefetch" as="script" crossorigin href="/_nuxt/b.js">',
+      ],
+      "N3",
+    )
+    expect(preload).toBe('<link nonce="N3" rel="modulepreload" as="script" crossorigin href="/_nuxt/a.js">')
+    expect(prefetch).toBe('<link nonce="N3" rel="prefetch" as="script" crossorigin href="/_nuxt/b.js">')
+  })
+
+  it("leaves the links that fetch no script untouched", () => {
+    const font = '<link rel="preload" as="font" crossorigin href="/_fonts/a.woff2">'
+    const image = '<link rel="prefetch" as="image" type="image/svg+xml" href="/_nuxt/logo.svg">'
+    expect(withScriptNonce([font, image], "N4")).toEqual([font, image])
   })
 
   it("leaves fragments without scripts unchanged", () => {
