@@ -34,6 +34,7 @@ type EmailType =
   | "newsletter_confirmation"
   | "order_confirmation"
   | "invoice_available"
+  | "login_code"
 
 /** The order first (its history), else the account, else the newsletter contact. */
 function journalEntity(about: EmailAbout): { entityType: string; entityId: string | null } {
@@ -91,6 +92,29 @@ export async function sendPasswordResetEmail(to: string, token: string, about: E
       <p><a href="${resetUrl}">Reset my password</a> (valid 1 hour)</p>
       <p>If you did not request this, ignore this email.</p>
     `,
+  })
+}
+
+/** Story 12.8a — the code that completes a login. Short-lived, so no link: a code survives mail scanners that open links. */
+export async function sendLoginCodeEmail(
+  to: string,
+  code: string,
+  validMinutes: number,
+  about: EmailAbout = {},
+): Promise<void> {
+  await deliver("login_code", about, {
+    from: env.SMTP_FROM,
+    to,
+    subject: `${code} — votre code de connexion SCS Firearms`,
+    text:
+      `Votre code de connexion : ${code}\n\n` +
+      `Il est valable ${validMinutes} minutes et ne sert qu'une fois.\n\n` +
+      `Si vous n'êtes pas à l'origine de cette connexion, quelqu'un connaît votre mot de passe : changez-le sans attendre.`,
+    html:
+      `<p>Votre code de connexion :</p>` +
+      `<p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p>` +
+      `<p>Il est valable ${validMinutes} minutes et ne sert qu'une fois.</p>` +
+      `<p>Si vous n'êtes pas à l'origine de cette connexion, quelqu'un connaît votre mot de passe : changez-le sans attendre.</p>`,
   })
 }
 

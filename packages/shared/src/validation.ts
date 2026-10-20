@@ -73,6 +73,16 @@ export const loginSchema = z.object({
   deviceLabel: z.string().max(255).optional(),
 })
 
+// Story 12.8a — the second step of a login: the code mailed after the password.
+export const loginCodeVerifySchema = z.object({
+  challengeToken: z.string().min(20).max(100),
+  code: z.string().regex(/^\d{6}$/, "The code has 6 digits"),
+})
+
+export const loginCodeResendSchema = z.object({
+  challengeToken: z.string().min(20).max(100),
+})
+
 export const refreshSchema = z.object({
   refreshToken: z.string().min(20).max(256),
 })
@@ -531,6 +541,7 @@ export type ProductIdParam = z.infer<typeof productIdParamSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type RefreshInput = z.infer<typeof refreshSchema>
+export type LoginCodeVerifyInput = z.infer<typeof loginCodeVerifySchema>
 export type CreateOrderInput = z.infer<typeof createOrderSchema>
 export type ProductFilters = z.infer<typeof productFiltersSchema>
 

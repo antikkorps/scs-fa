@@ -6,7 +6,7 @@ vi.mock("nodemailer", () => ({ createTransport: () => ({ sendMail }) }))
 // Rendering only: the journal (story 12.7c) is covered by email-journal.test.ts.
 vi.mock("./audit/record.js", () => ({ recordAuditEvent: vi.fn().mockResolvedValue(undefined) }))
 
-const { sendInvoiceAvailableEmail, sendOrderConfirmationEmail } = await import("./email.js")
+const { sendInvoiceAvailableEmail, sendLoginCodeEmail, sendOrderConfirmationEmail } = await import("./email.js")
 
 const base = {
   orderId: "0b7d1f3e-8a51-4c1e-9d0a-2f6b1c3e4d5f",
@@ -102,5 +102,20 @@ describe("sendInvoiceAvailableEmail (story 12.6)", () => {
     const mail = await sendInvoice({ kind: "credit_note", number: "26-10-2", amountTtc: 50 })
     expect(mail.subject).toBe("Votre avoir 26-10-2 est disponible — commande 0B7D1F3E")
     expect(mail.text).toContain("remboursement")
+  })
+})
+
+describe("sendLoginCodeEmail (story 12.8a)", () => {
+  it("gives the code, how long it lasts, and what to do if the login is not yours — and no link", async () => {
+    await sendLoginCodeEmail("agent@mairie.fr", "042917", 10)
+    const mail = sendMail.mock.calls[0]?.[0] as { to: string; subject: string; text: string; html: string }
+
+    expect(mail.to).toBe("agent@mairie.fr")
+    expect(mail.subject).toContain("042917")
+    expect(mail.text).toContain("042917")
+    expect(mail.text).toContain("10 minutes")
+    expect(mail.text).toContain("changez-le")
+    // Mail filters open links on their own: a link would be spent before the agent reads it.
+    expect(mail.html).not.toMatch(/<a\s/i)
   })
 })

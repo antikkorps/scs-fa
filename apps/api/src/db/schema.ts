@@ -293,6 +293,34 @@ export const passwordResetTokens = pgTable(
   ],
 )
 
+// Story 12.8a — the second step of a login for the accounts that need it:
+// a 6-digit code mailed after the right password. The challenge token tells
+// the two requests apart without exposing the account; both it and the code
+// are kept as digests only (the code keyed with a server secret, since a
+// million values would not resist an offline search of a leaked table).
+export const loginChallenges = pgTable(
+  "login_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    sendCount: integer("send_count").notNull().default(1),
+    lastSentAt: timestamp("last_sent_at").notNull().defaultNow(),
+    // Set by the right code, and by the last wrong one: either way, spent.
+    consumedAt: timestamp("consumed_at"),
+    deviceLabel: varchar("device_label", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_login_challenges_user").on(t.userId),
+    index("idx_login_challenges_expires").on(t.expiresAt),
+    foreignKey({ columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade"),
+  ],
+)
+
 export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
   user: one(users, {
     fields: [passwordResetTokens.userId],

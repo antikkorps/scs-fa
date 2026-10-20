@@ -17,6 +17,7 @@ import { adminArtworkPricingRoutes } from "./artworks/pricing.js"
 import { runWithRequestContext } from "./audit/context.js"
 import { startAuditPurgeScheduler } from "./audit/retention.js"
 import { authRoutes } from "./auth/index.js"
+import { startLoginChallengePurgeScheduler } from "./auth/login-code.js"
 import { adminBlogRoutes } from "./blog/admin.js"
 import { adminBlogImageRoutes, blogImageRoutes } from "./blog/images.js"
 import { blogRoutes } from "./blog/index.js"
@@ -173,6 +174,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   startLegalDocSlaScheduler(fastify)
   startAuditPurgeScheduler(fastify)
   startNewsletterPurgeScheduler(fastify)
+  startLoginChallengePurgeScheduler(fastify)
   startOrderConfirmationScheduler(fastify)
   startHenrriScheduler(fastify)
   startShipmentTrackingScheduler(fastify)

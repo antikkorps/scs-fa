@@ -204,6 +204,13 @@
       "when": 1792530132486,
       "tag": "0028_story_12_8a_session_cap",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792530310757,
+      "tag": "0029_story_12_8a_login_challenges",
+      "breakpoints": true
     }
   ]
 }
