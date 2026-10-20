@@ -252,7 +252,7 @@ usePageSeo({
           </tr>
           <tr>
             <td>Inscription à la lettre non confirmée</td>
-            <td>Le lien de confirmation expire au bout de 72 heures ; rien ne vous est envoyé sans confirmation</td>
+            <td>Le lien de confirmation expire au bout de 72 heures ; sans confirmation, rien ne vous est envoyé et votre adresse est effacée</td>
           </tr>
           <tr>
             <td>Statistiques de fréquentation</td>
