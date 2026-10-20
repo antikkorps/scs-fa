@@ -26,7 +26,6 @@ async function fetchPublishedProduct(match: SQL) {
       hasAccessoryRestrictions: products.hasAccessoryRestrictions,
       accessoryRestrictionNotes: products.accessoryRestrictionNotes,
       featuredImageUrl: products.featuredImageUrl,
-      imagesCount: products.imagesCount,
       metaTitle: products.metaTitle,
       metaDescription: products.metaDescription,
       keywords: products.keywords,
@@ -132,7 +131,6 @@ async function fetchPublishedProduct(match: SQL) {
     hasAccessoryRestrictions: row.hasAccessoryRestrictions,
     accessoryRestrictionNotes: row.accessoryRestrictionNotes,
     featuredImageUrl: row.featuredImageUrl,
-    imagesCount: row.imagesCount,
     seo: {
       metaTitle: row.metaTitle,
       metaDescription: row.metaDescription,
