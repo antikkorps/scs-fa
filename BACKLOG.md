@@ -355,7 +355,7 @@
 - [x] ⚠️ **Défaut attrapé par un test** : après un réordonnancement refusé, le rechargement **effaçait le message d'erreur** — l'admin ne voyait rien. On recharge d'abord, on reporte ensuite
 - [x] ⚠️ **Défaut vu au rendu** : le titre « Visuels » s'affichait deux fois (le panneau et le composant). Un seul désormais
 - [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 439 / shared 91 / web 196 = 726** au vert (+25) ; **smoke réel** (upload produit et œuvre, filigrane visuellement confirmé sur le rendu de galerie, original privé en 404 anonyme et 200 en admin, alt obligatoire, non-image rejetée, traversal en 404) et **parcours navigateur complet** (upload par la galerie, réordonnancement déplaçant l'image principale, badge filigrane sur les œuvres). Captures : `/tmp/scs-pw/media-*.png`
-- Reste ouvert : **images OG par produit** (à décider) ; les colonnes `images_count` de `products` et `artworks`, jamais alimentées, sont encore en base (plus exposées par l'API depuis le bloc 1, 2026-10-20) — à supprimer par migration ; les visuels **publiés avant cette story** restent des URL saisies à la main tant qu'ils ne sont pas re-téléversés _(AVIF et image sitemap : livrés)_
+- Reste ouvert : **images OG par produit** (à décider) ; _(colonnes `images_count` de `products` et `artworks`, jamais alimentées : supprimées, migration 0027, bloc 1, 2026-10-20)_ ; les visuels **publiés avant cette story** restent des URL saisies à la main tant qu'ils ne sont pas re-téléversés _(AVIF et image sitemap : livrés)_
 
 ## PHASE 8 — Mise en prod
 
