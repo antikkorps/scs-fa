@@ -9,12 +9,12 @@
 // Nothing here touches the database: whether a category exists or a reference
 // is already in the catalogue is the API's call.
 
-import { z } from "zod"
 import { LEGAL_CATEGORIES, type LegalCategory } from "./constants.js"
 import { normaliseHeader } from "./csv.js"
 import { parseBankAmount } from "./orders.js"
 import { round2 } from "./pricing.js"
 import { RESERVED_PRODUCT_SLUGS } from "./validation.js"
+import { z } from "./zod.js"
 
 // --- Collector output ------------------------------------------------------
 
