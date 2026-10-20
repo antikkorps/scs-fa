@@ -45,7 +45,7 @@
 - [x] Init git repo + commit initial
 - [x] `docs/schema.ts` supprimé (canonical = `apps/api/src/db/schema.ts`)
 - [x] `docs/seeds_and_workflows.ts` marqué `@ts-nocheck` (référence pour portage workflows)
-- [ ] CI GitHub Actions (`pnpm verify`) — différé J+1
+- [x] CI — sur Forgejo Actions et non GitHub (`.forgejo/workflows/ci.yml`)
 
 ## PHASE 1 — Auth (security-first)
 
@@ -338,7 +338,7 @@
 - [x] ⚠️ **Défaut vu au rendu, pas au code** : `[...DEFAULT_FORMATS]` copie le tableau mais **partage les objets** — éditer les formats d'une nouvelle œuvre réécrivait le gabarit pour toute la session. Copie profonde
 - [x] ⚠️ **Défaut de langue** : « + Nouveau artiste », « Aucun série ». Le français élide et genre : les libellés sont **donnés**, plus assemblés
 - [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 423 / shared 91 / web 187 = 701** au vert (+51) ; **smoke réel au navigateur** (les 6 écrans chargent sans erreur, création d'un artiste à la souris de bout en bout, garde-fou de prix réagissant à la saisie, tirages et variantes affichés). Captures : `/tmp/scs-pw/crud-*.png`
-- Reste ouvert : **saisie du visuel par URL** en attendant la 7.5b (l'upload Gun Art de la 11.5 renseigne déjà le champ) ; pas encore de **prévisualisation** ni de **journalisation d'audit** sur ces écrans
+- Reste ouvert : pas encore de **prévisualisation** ni de **journalisation d'audit** sur ces écrans (seuls l'archivage et la restauration d'un produit sont journalisés) _(saisie du visuel par URL : réglée par la 7.5b)_
 
 **Story 7.5b** — Médias catalogue : upload, galerie & variantes responsives ✅
 
@@ -355,7 +355,7 @@
 - [x] ⚠️ **Défaut attrapé par un test** : après un réordonnancement refusé, le rechargement **effaçait le message d'erreur** — l'admin ne voyait rien. On recharge d'abord, on reporte ensuite
 - [x] ⚠️ **Défaut vu au rendu** : le titre « Visuels » s'affichait deux fois (le panneau et le composant). Un seul désormais
 - [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 439 / shared 91 / web 196 = 726** au vert (+25) ; **smoke réel** (upload produit et œuvre, filigrane visuellement confirmé sur le rendu de galerie, original privé en 404 anonyme et 200 en admin, alt obligatoire, non-image rejetée, traversal en 404) et **parcours navigateur complet** (upload par la galerie, réordonnancement déplaçant l'image principale, badge filigrane sur les œuvres). Captures : `/tmp/scs-pw/media-*.png`
-- Reste ouvert : **AVIF** (gain LCP à mesurer contre le coût CPU, à traiter avec la 9.6) ; **image sitemap** et OG images par produit (9.6) ; l'`imagesCount` historique sur `artworks` n'est plus alimenté — à retirer ou à recâbler ; les visuels **publiés avant cette story** restent des URL saisies à la main tant qu'ils ne sont pas re-téléversés
+- Reste ouvert : **images OG par produit** (à décider) ; les colonnes `images_count` de `products` et `artworks`, jamais alimentées, sont encore en base (plus exposées par l'API depuis le bloc 1, 2026-10-20) — à supprimer par migration ; les visuels **publiés avant cette story** restent des URL saisies à la main tant qu'ils ne sont pas re-téléversés _(AVIF et image sitemap : livrés)_
 
 ## PHASE 8 — Mise en prod
 
@@ -850,7 +850,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
   - **E-reporting B2C** : Henrri annonce l'émission en septembre 2027 — calendrier réellement couvert ?
   - **Libellé de la remise VIP** (« Remise VIP — article », ligne négative au taux de l'article) et **montants de remboursement ajustés d'un centime** quand Henrri ne peut pas exprimer le montant exact.
 - [ ] **Faible, non traité volontairement** : `round2` arrondit en flottant (1,005 → 1,00) ; appliqué une seule fois puis figé sur la commande, il reste cohérent partout — à passer en centimes entiers lors d'un futur chantier « prix ».
-- [ ] **Registre des traitements** (tenu par le client, hors dépôt) : ajouter Henrri comme sous-traitant — « Facturation : établissement et conservation des factures et avoirs ; données : nom, adresse de facturation, e-mail, détail de la commande et règlement ; sous-traitant : Henrri (groupe Rivalis) ; durée : 10 ans (L123-22 C. com.) ».
+- [x] **Registre des traitements** (`docs/REGISTRE_TRAITEMENTS_RGPD.md`, 12.7e) : Henrri y figure comme sous-traitant. Formulation d'origine — « Facturation : établissement et conservation des factures et avoirs ; données : nom, adresse de facturation, e-mail, détail de la commande et règlement ; sous-traitant : Henrri (groupe Rivalis) ; durée : 10 ans (L123-22 C. com.) ».
 - [ ] **Production** : clé API Henrri de production + choix du pack (client).
 - ✅ **Accès API obtenus** (2026-10-14) : `clientSecret` généré avec le webhook (le secret de 88 caractères affiché d'abord était celui du webhook seul). `pnpm henrri:check` vert. Bac à sable : facture = type 1, avoir = type 2, ligne « Article » = 3, CB = mode 3, virement = mode 4, crédits illimités.
 
@@ -1081,7 +1081,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **Front** : composable `useTags` (SSR-cachée) + composant `ProductTagFilters` (pastilles à cocher groupées par facette, compteurs, « tout effacer », cases réellement présentes dans l'arbre d'accessibilité) ; branché sur `/boutique` avec l'URL comme source de vérité (`?tags=` partageable, retour arrière fonctionnel)
 - [x] ⚠️ **Effet de bord rattrapé — règle VIP.** `isNewFirearmQualifying` s'appuyait sur la **catégorie** `occasion`/`arme-ancienne` : la bascule en tags aurait silencieusement rendu une arme d'occasion **éligible au VIP**. La règle lit désormais les tags, et les commandes conservent leurs tags dans l'instantané `items_json`. L'ancienne clé catégorie est **conservée** pour les commandes antérieures à 11.1, dont l'instantané ne porte aucun tag
 - [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 316 / shared 68 / web 117 = 501** au vert ; smoke réel sur serveur live (`/api/tags` avec compteurs, `?tags=occasion` → 2 articles, slug inconnu ignoré, slug malformé 400) et **SSR `/boutique`** (panneau rendu, pastille active, décompte correct)
-- Reste ouvert, hors périmètre de cette story : **pages de tag indexables** + canonicals sur les vues filtrées (à traiter avec la 9.6), badges de tag sur les cartes produit (la 11.3 touche déjà les cartes), et l'**écran d'administration des tags** (pose/dépose sur un produit) — à cadrer avec la 7.5
+- Reste ouvert, hors périmètre de cette story : **pages de tag indexables** + canonicals sur les vues filtrées (à traiter avec la 9.6), badges de tag sur les cartes produit (la 11.3 touche déjà les cartes), _(écran d'administration des tags et pose/dépose sur un produit : livrés par la 7.5a)_
 
 **Story 11.2** — Univers « Armes de collection & historiques » ✅
 
@@ -1097,7 +1097,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **Seed** : 3 armes (Lefaucheux 1854, Luger P08 1917, Gras 1874) + 1 **accessoire historique** (étui de P08 daté 1941), avec récits, provenance et tags
 - [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 337 / shared 68 / web 117 = 522** au vert ; smoke réel (listing, dossier historique, tags, variante unique, **assainissement d'une charge XSS réelle** — `<script>`, `onerror` et `javascript:` supprimés) et SSR des deux pages
 - ⚠️ **Bug trouvé par le smoke, pas par les tests** : la pose des tags utilisait `= any()`, que le driver sérialise en tuple et non en tableau → toute création admin avec tags renvoyait 500. Corrigé (`inArray`) **et couvert par un test** de création admin, qui manquait
-- Reste ouvert : écran d'administration Nuxt des armes de collection (l'API est là, l'UI viendra avec la refonte produit de la 7.5) ; les slugs de tags `arme-ancienne`/`arme-historique` sont formulés pour des armes et lisent mal sur un accessoire — à renommer si le vocabulaire gêne le client
+- Reste ouvert : les slugs de tags `arme-ancienne`/`arme-historique` sont formulés pour des armes et lisent mal sur un accessoire — à renommer si le vocabulaire gêne le client
 
 **Story 11.3** — Marquage « vendu » persistant ✅
 
@@ -1125,7 +1125,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **Front** : composant `NewsletterSignup` réutilisable (cases à cocher par univers, **pré-cochage du seul univers d'où vient le visiteur, jamais l'ensemble**, mention de consentement explicite), branché sur le **footer**, sur le **listing collection** et sur la **fiche d'un article indisponible** — le CTA « se tenir informé des arrivées » reporté par la 11.3. Pages `/newsletter/confirmation` et `/newsletter/desabonnement` (gestion par segment ou retrait total), toutes deux en `noindex`
 - [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 352 / shared 75 / web 140 = 567** au vert (+32) ; **smoke réel sur serveur live** du cycle complet (capture → confirmation → rejeu du lien refusé → désabonnement d'un seul segment → désabonnement total avec purge de l'adresse → lien mort ensuite), passage par le **BFF** vérifié (POST anonyme accepté, requête cross-origin rejetée en 403), SSR des trois pages et **captures Playwright** du formulaire (footer et fiche produit)
 - ⚠️ **Défaut vu à la capture, pas au code** : deux instances du formulaire coexistent sur une fiche produit (CTA + footer) — l'`id` du titre était dupliqué (`aria-labelledby` cassé) et le champ email s'étirait sur toute la largeur du footer. Corrigé (`useId()`, largeur plafonnée)
-- Reste ouvert, hors périmètre : **page « politique de confidentialité »** (elle n'existe pas encore — la mention de consentement la cite en texte mais ne peut pas encore y lier) ; **écran d'administration** des abonnés et des envois ; purge planifiée des `pending` jamais confirmés (aujourd'hui ils restent inertes, jamais envoyés)
+- Reste ouvert, hors périmètre : **écran d'administration** des abonnés et des envois _(page de confidentialité : livrée ; purge quotidienne des inscriptions non confirmées au-delà de 72 h : bloc 1, 2026-10-20)_
 
 **Story 11.5** — Protection des visuels Gun Art ✅
 
@@ -1142,7 +1142,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] ⚠️ **Effet de bord du plafond d'upload** : un original « qualité tirage » dépasse la limite multipart globale (10 Mo, dimensionnée pour les documents légaux). Le plafond applicatif passe à 30 Mo **et chaque route porte désormais sa propre limite explicite** (documents légaux 10 Mo, images de blog 10 Mo) — la limite par requête de `@fastify/multipart` s'est révélée inopérante (elle faisait échouer tous les uploads en 500), donc le contrôle est fait dans le handler. Les tests existants sur la taille des documents légaux verrouillent la non-régression
 - [x] **Vérifié** : `pnpm -r typecheck` clean, Biome clean, **API 370 / shared 75 / web 144 = 589** au vert (+22) ; **smoke réel** (upload admin → dérivé public 1400 px filigrané, original 401 sans jeton et 200 en admin, `featuredImageUrl` mis à jour, fiche Gun Art servie avec `draggable=false` et menu contextuel bloqué) et **rendus visuels comparés** pour les trois positions
 - ⚠️ **Défaut vu au rendu, pas au code** : la largeur du texte était sous-estimée (la lettre finale sortait du cadre en position coin) — l'estimation ignorait l'interlettrage. Corrigé et re-rendu
-- Reste ouvert : **écran d'administration** pour poser un visuel (l'API est là, l'UI viendra avec la 7.5) ; variantes responsives / AVIF (tracées en 9.6) ; le filigrane ne protège pas les visuels **déjà publiés** avant cette story — il faudra les re-téléverser
+- Reste ouvert : le filigrane ne protège pas les visuels **déjà publiés** avant cette story — il faudra les re-téléverser
 
 **Story 11.6** — Gun Art éditorial : séries, thèmes & page artiste ✅
 
@@ -1160,7 +1160,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **SEO** : JSON-LD `Person` (artiste), `CreativeWorkSeries` (série), `isPartOf` sur l'œuvre, `CollectionPage` sur le thème ; séries, thèmes et artistes ajoutés au `sitemap.xml`, au `llms.txt` et au `llms-full.txt`
 - [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 393 / shared 91 / web 166 = 650** au vert (+32) ; **smoke réel** (les 6 routes API, les 4 pages front en 200 et les 404 sur slug inconnu, JSON-LD `Person` / `CreativeWorkSeries` / `isPartOf` présents, lien Amazon correctement attribué, sitemap et llms-full enrichis, recherche « Camille » retrouvant ses œuvres). Captures : `/tmp/scs-pw/edito-*.png`
 - ⚠️ **Défaut vu au rendu, pas au code** : la colonne de 320 px du portrait restait réservée même sans portrait, comprimant la bio sur la moitié gauche. Corrigé par une classe conditionnelle et re-rendu
-- Reste ouvert : **écrans d'administration** pour créer séries, thèmes et artistes (l'API publique est là, le CRUD admin arrive avec la 7.5) ; les **photos noir et blanc** et les visuels de série se posent par upload (le `cover_image_url` de série n'a pas encore de route d'upload dédiée — la 7.5 encore) ; pages de thème à coordonner avec la 9.6 pour les canonicals
+- ~~Reste ouvert~~ Réglé : écrans séries, thèmes et artistes (7.5a), upload des couvertures de série et des portraits (7.5b), SEO des pages de thème (`usePageSeo`)
 
 **Story 11.7** — Cohérence des prix Gun Art entre formats ✅
 
@@ -1174,7 +1174,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **25 exemplaires tous formats confondus** — verrouillé par un test explicite : l'index unique `uniq_print_per_artwork` sur `(artwork_id, print_number)` fait qu'un numéro déjà pris dans un format ne peut pas être réutilisé dans un autre
 - [x] **Vérifié** : Biome clean, `pnpm -r typecheck` clean, **API 376 / shared 91 / web 151 = 618** au vert (+29) ; **smoke réel** en admin (grille client → verdict incohérent + les deux remèdes chiffrés, 24 cellules surlignées sur 75 ; facteurs portés à 1 / 2 / 3 → verdict cohérent, 0 cellule). Captures : `/tmp/scs-pw/price-{broken,fixed,grid}.png`
 - ⚠️ **Défaut vu au rendu, pas au code** : la page était écrite en palette claire alors que le back-office est sombre — titres de panneaux invisibles. Repris sur les tokens du thème (`--ink-soft`, `--paper-faint`, `--brass`, `--danger`) et re-rendu
-- Reste ouvert : **brancher le garde-fou sur le formulaire d'œuvre** (il n'existe pas encore — 7.5) ; la valeur du garde-fou est là, son point d'application arrivera avec le CRUD
+- ~~Reste ouvert~~ Réglé (7.5a) : le garde-fou tourne dans le formulaire d'œuvre et l'API le rejoue à l'enregistrement
 
 **Story 11.8** — Cross-sell « Fréquemment achetés ensemble » ✅ _(livrée le 2026-09-18, branche `feat/story-11.8-cross-sell`)_
 
