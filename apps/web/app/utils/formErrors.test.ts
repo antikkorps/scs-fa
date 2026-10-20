@@ -1,6 +1,6 @@
 import { loginSchema, registerSchema } from "@armurier/shared"
 import { describe, expect, it } from "vitest"
-import { apiErrorCode, authErrorStatus, zodFieldErrors } from "./formErrors"
+import { apiErrorCode, apiErrorField, authErrorStatus, zodFieldErrors } from "./formErrors"
 
 describe("zodFieldErrors", () => {
   it("maps failing fields to French messages", () => {
@@ -52,5 +52,26 @@ describe("apiErrorCode", () => {
   it("returns undefined for anything else", () => {
     expect(apiErrorCode(new Error("boom"))).toBeUndefined()
     expect(apiErrorCode(null)).toBeUndefined()
+  })
+})
+
+describe("apiErrorField", () => {
+  it("reads a detail the API sends next to its error code", () => {
+    const err = { response: { status: 401 }, data: { error: "InvalidLoginCode", remainingAttempts: 2 } }
+    expect(apiErrorField<number>(err, "remainingAttempts")).toBe(2)
+  })
+
+  it("reads it through the BFF auth routes too, which wrap the API's body", () => {
+    const err = {
+      response: { status: 401 },
+      data: { error: true, statusCode: 401, data: { error: "InvalidLoginCode", remainingAttempts: 4 } },
+    }
+    expect(apiErrorCode(err)).toBe("InvalidLoginCode")
+    expect(apiErrorField<number>(err, "remainingAttempts")).toBe(4)
+  })
+
+  it("is undefined when the detail, or the body, is missing", () => {
+    expect(apiErrorField({ data: { error: "X" } }, "remainingAttempts")).toBeUndefined()
+    expect(apiErrorField(new Error("network"), "remainingAttempts")).toBeUndefined()
   })
 })

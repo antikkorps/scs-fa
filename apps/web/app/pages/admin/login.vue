@@ -19,8 +19,9 @@ async function submit() {
   error.value = ""
   loading.value = true
   try {
-    const user = await login(email.value, password.value)
-    if (user.role !== "admin") {
+    const outcome = await login(email.value, password.value)
+    // An account that confirms by mailed code is a pro one (12.8b), never an admin.
+    if (outcome.status !== "signed_in" || outcome.user.role !== "admin") {
       error.value = "Ce compte n'a pas accès à l'administration."
       return
     }

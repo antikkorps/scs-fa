@@ -33,8 +33,25 @@ export function authErrorStatus(err: unknown): number | undefined {
   return (err as { response?: { status?: number } })?.response?.status
 }
 
+/**
+ * The API's own error body inside a fetch error. The /bff/api proxy passes it
+ * as is; the BFF auth routes rethrow it wrapped in an H3 error, under `data`.
+ */
+function apiErrorBody(err: unknown): Record<string, unknown> | undefined {
+  const data = (err as { data?: Record<string, unknown> } | null)?.data
+  if (typeof data?.error === "string") return data
+  const wrapped = data?.data
+  return wrapped && typeof wrapped === "object" ? (wrapped as Record<string, unknown>) : undefined
+}
+
 // Extracts the API's machine-readable error code (`{ error: "TermsOutdated" }`)
 // from an upstream/BFF fetch error (FetchError shape).
 export function apiErrorCode(err: unknown): string | undefined {
-  return (err as { data?: { error?: string } } | null)?.data?.error
+  const code = apiErrorBody(err)?.error
+  return typeof code === "string" ? code : undefined
+}
+
+// A detail the API sends next to its error code (`{ error, remainingAttempts }`).
+export function apiErrorField<T>(err: unknown, key: string): T | undefined {
+  return apiErrorBody(err)?.[key] as T | undefined
 }

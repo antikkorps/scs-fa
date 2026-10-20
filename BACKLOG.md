@@ -947,8 +947,8 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 
 **Tranché par Franck (2026-10-19) :**
 
-- **Double authentification obligatoire pour les comptes admin SCS**, par application (TOTP) : c'est le plus robuste pour des comptes qui ont accès à tout (livrée avec la 12.8e ; d'ici là, code e-mail de la 12.8a).
-- **Session d'un compte pro : 7 jours au plus**, puis nouveau code (30 jours inchangés pour les particuliers).
+- **Double authentification obligatoire pour les comptes admin SCS**, par application (TOTP) : c'est le plus robuste pour des comptes qui ont accès à tout (livrée avec la 12.8e). _Révisé le 2026-10-20 : **pas de code e-mail pour les admins** d'ici là, seulement le plafond de session de 7 jours._
+- **Session d'un compte pro : 7 jours au plus**, puis nouveau code. _(Correction 2026-10-20 : les particuliers ont une session de **7 jours glissants** — `JWT_REFRESH_EXPIRES_IN=7d` —, pas 30 ; inchangée. Le plafond, lui, est absolu : compté depuis la connexion, renouvellements compris.)_
 - **Table `organisations` séparée** des utilisateurs.
 - **Prix particuliers** : **une remise propre à chaque pro** (taux sur le prix public HT, réglé dans le back-office), **appliquée à tout prix qu'on lui affiche** (devis, et boutique si on lui ouvre l'affichage), puis **ajustable ligne par ligne** dans le devis. D'où une option par organisation **« afficher les prix »**, **désactivée par défaut** : activée, le pro voit en boutique ses prix nets de sa remise, mais commande toujours par devis.
 
@@ -956,7 +956,12 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 
 **Découpage proposé :**
 
-- [ ] **12.8a — Connexion par code e-mail** : table des codes, étape de vérification après le mot de passe, e-mail, limites ; s'applique aux comptes pro et, en attendant la 12.8e, aux admins ; session pro limitée à 7 jours. Indépendante du reste, peut démarrer tout de suite.
+- [x] **12.8a — Connexion par code e-mail** ✅ _(codée le 2026-10-20)_
+  - **Plafond de session** : colonne `refresh_tokens.session_expires_at` (migration 0028), fixée à la connexion, recopiée à chaque renouvellement, aucun renouvellement ne la dépasse. **Admins : 7 jours** ; particuliers : NULL, inchangés. Les pros de la 12.8b s'y ajouteront (`sessionExpiryFor`, `auth/tokens.ts`).
+  - **Code e-mail** : table `login_challenges` (migration 0029). Mot de passe juste → pas de session, un défi + un code à 6 chiffres par e-mail (10 min, 5 essais, 3 envois au plus, une minute entre deux) ; `POST /auth/login/verify` ouvre la session, `POST /auth/login/resend` remplace le code. Code gardé en **HMAC** (clé dérivée du secret JWT par HKDF : aucune variable de plus), jeton de défi haché, consommation atomique. Purge quotidienne un jour après expiration. Journal : `user.login` (`method: password+email_code`), `user.login_code_failed` / `_exhausted` / `_resent`, envoi `email.login_code.sent`.
+  - **Front** : étape « code » sur `/connexion` (saisie `one-time-code`, espaces tolérés, essais restants, renvoi, retour au mot de passe quand le code ne peut plus servir). Le jeton de défi reste dans un **cookie httpOnly** limité à `/bff/auth/login` : le JavaScript ne le voit jamais. Vérifié en navigateur de bout en bout (Mailpit), 375 px compris.
+  - **Aucun compte ne l'exige encore** : `auth/login-code-policy.ts` répond non pour tous ; la **12.8b** la basculera pour les membres d'une organisation.
+  - Trouvé en route : les routes d'authentification du BFF emballent le corps d'erreur de l'API sous `data` → `apiErrorCode` / `apiErrorField` lisent les deux formes.
 - [ ] **12.8b — Comptes pro** : `organisations`, inscription avec SIRET + API Recherche d'entreprises, validation / refus / suspension dans le back-office, e-mails de suivi.
 - [ ] **12.8c — Catalogue sans prix et demande de devis** : prix retirés des réponses API pour les pros (ou remplacés par leurs prix nets si l'option « afficher les prix » est activée), panier → demande de devis, suivi des demandes dans l'espace pro.
 - [ ] **12.8d — Devis et commande** : traitement back-office (lignes, remises, validité), devis Henrri + PDF, acceptation par le client → commande, paiement carte / virement / 30 jours, blocage tant que le justificatif A / B / C n'est pas validé.
