@@ -182,14 +182,6 @@ useSeoMeta({
   grid-template-columns: 1fr;
   align-items: start;
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 
 @media (min-width: 560px) {
   .grid {

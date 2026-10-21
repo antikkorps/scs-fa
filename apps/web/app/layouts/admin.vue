@@ -13,6 +13,7 @@ const groups = [
       { to: "/admin/payments/virements", label: "Virements", icon: "▤" },
       { to: "/admin/legal-docs", label: "Documents", icon: "▣" },
       { to: "/admin/organisations", label: "Comptes pro", icon: "◫" },
+      { to: "/admin/devis", label: "Devis", icon: "✉" },
       { to: "/admin/livraison", label: "Frais de port", icon: "⇶" },
     ],
   },

@@ -53,7 +53,9 @@ async function openFirst() {
 
 const callsTo = (suffix: string) => apiMock.mock.calls.filter(([url]) => String(url).endsWith(suffix))
 
-beforeEach(() => apiMock.mockReset())
+beforeEach(() => {
+  apiMock.mockReset()
+})
 
 describe("admin/organisations.vue (story 12.8b)", () => {
   it("lists pending requests first, with what the registry said", async () => {

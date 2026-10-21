@@ -103,3 +103,43 @@ export const adminOrganisationListQuerySchema = paginationSchema.extend({
 export type OrganisationTermsInput = z.infer<typeof organisationTermsSchema>
 export type ApproveOrganisationInput = z.infer<typeof approveOrganisationSchema>
 export type UpdateOrganisationTermsInput = z.infer<typeof updateOrganisationTermsSchema>
+
+// ---------------------------------------------------------------------------
+// Quote requests (story 12.8c): a pro's basket becomes a request SCS answers
+// with a quote (12.8d).
+
+export const QUOTE_REQUEST_STATUSES = [
+  "requested",
+  "in_review",
+  "sent",
+  "accepted",
+  "declined",
+  "expired",
+  "converted",
+  "cancelled",
+] as const
+export type QuoteRequestStatus = (typeof QUOTE_REQUEST_STATUSES)[number]
+
+/** What a pro may still cancel: SCS has not started on it. */
+export const CANCELLABLE_QUOTE_STATUSES = ["requested"] as const satisfies readonly QuoteRequestStatus[]
+
+export const MAX_QUOTE_LINE_QTY = 9999
+export const MAX_QUOTE_LINES = 200
+export const MAX_QUOTE_MESSAGE_LENGTH = 2000
+
+const quoteQtySchema = z.number().int().min(1).max(MAX_QUOTE_LINE_QTY)
+
+export const quoteBasketItemSchema = z.object({ variantId: z.string().uuid(), qty: quoteQtySchema.default(1) }).strict()
+
+export const quoteBasketQtySchema = z.object({ qty: quoteQtySchema }).strict()
+
+export const quoteRequestSubmitSchema = z
+  .object({ message: z.string().trim().max(MAX_QUOTE_MESSAGE_LENGTH).optional() })
+  .strict()
+
+export const adminQuoteRequestListQuerySchema = paginationSchema.extend({
+  status: z.enum(QUOTE_REQUEST_STATUSES).optional(),
+})
+
+export type QuoteBasketItemInput = z.infer<typeof quoteBasketItemSchema>
+export type QuoteRequestSubmitInput = z.infer<typeof quoteRequestSubmitSchema>

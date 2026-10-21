@@ -251,6 +251,8 @@ export const CATALOG_IMPORT_COLUMNS = [
   { key: "import", header: "Importer", required: true },
   // Story 12.4: online or not. Blank leaves an existing product as it is.
   { key: "active", header: "Actif", required: false },
+  // Story 12.8c: shown to approved pros only. Blank leaves an existing product as it is.
+  { key: "proOnly", header: "Réservé pro", required: false },
   { key: "supplier", header: "Fournisseur", required: true },
   { key: "supplierSku", header: "Réf. fournisseur", required: true },
   { key: "ean", header: "EAN", required: false },
@@ -305,6 +307,8 @@ const NO = new Set(["non", "n", "no", "0", "false", "faux"])
 export interface CatalogImportRow {
   /** "Actif": true / false, or null when the cell is blank (an existing product keeps its state). */
   active: boolean | null
+  /** "Réservé pro": true / false, or null when the cell is blank (an existing product keeps its audience). */
+  proOnly: boolean | null
   /** "Version": the product's last modification when the sheet was exported, or null. */
   version: Date | null
   supplier: string
@@ -440,9 +444,17 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
   const vatPct = number("vatPct", "TVA %", null, 0, 99.99)
   const stockQty = number("stockQty", "Stock", null, 0, 1_000_000)
 
-  const activeCell = normaliseHeader(get("active"))
-  const active = !activeCell ? null : YES.has(activeCell) ? true : NO.has(activeCell) ? false : undefined
-  if (active === undefined) errors.push(`« Actif » doit valoir oui, non ou rester vide (lu : « ${get("active")} »)`)
+  // A yes / no column where blank means "leave as it is".
+  const yesNoOrBlank = (key: "active" | "proOnly", column: string): boolean | null => {
+    const cell = normaliseHeader(get(key))
+    if (!cell) return null
+    if (YES.has(cell)) return true
+    if (NO.has(cell)) return false
+    errors.push(`« ${column} » doit valoir oui, non ou rester vide (lu : « ${get(key)} »)`)
+    return null
+  }
+  const active = yesNoOrBlank("active", "Actif")
+  const proOnly = yesNoOrBlank("proOnly", "Réservé pro")
 
   const rawVersion = get("version")
   const version = rawVersion ? new Date(rawVersion) : null
@@ -472,7 +484,8 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
     status: "valid",
     errors: [],
     data: {
-      active: active ?? null,
+      active,
+      proOnly,
       version,
       supplier,
       supplierSku,

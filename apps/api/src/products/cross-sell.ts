@@ -18,6 +18,7 @@ import { db } from "../db/client.js"
 import { legalCategories, productCategories, productCrossSells, products } from "../db/schema.js"
 import { env } from "../env.js"
 import { validationError } from "../http.js"
+import { publiclyVisible } from "./visibility.js"
 
 // Story 11.8 — cross-sell « fréquemment achetés ensemble ».
 //
@@ -113,7 +114,7 @@ export async function publicCrossSellsFor(productId: string, vatPct: number) {
     .innerJoin(products, eq(products.id, productCrossSells.accessoryId))
     .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
-    .where(eq(productCrossSells.productId, productId))
+    .where(and(eq(productCrossSells.productId, productId), eq(products.audience, "public")))
     .orderBy(...crossSellOrder)
 
   return displayableCrossSells(
@@ -239,9 +240,7 @@ export const adminProductCrossSellRoutes: FastifyPluginAsync = async (fastify) =
       .from(products)
       .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
       .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
-      .where(
-        and(inArray(productCategories.slug, [...CROSS_SELL_ACCESSORY_CATEGORY_SLUGS]), eq(products.published, true)),
-      )
+      .where(and(inArray(productCategories.slug, [...CROSS_SELL_ACCESSORY_CATEGORY_SLUGS]), publiclyVisible()))
       .orderBy(asc(productCategories.displayOrder), asc(products.name))
 
     const data = rows

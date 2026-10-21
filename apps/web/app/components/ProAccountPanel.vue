@@ -67,6 +67,11 @@ async function submit() {
     <template v-else-if="organisation?.status === 'approved'">
       <h2 id="pro-panel-title" class="pro-panel__h">Compte professionnel validé</h2>
       <p class="pro-panel__text">{{ organisation.legalName }} ({{ organisationTypeLabel(organisation.type) }}).</p>
+      <nav class="pro-panel__links" aria-label="Espace professionnel">
+        <NuxtLink to="/pro/catalogue" class="btn btn-primary">Catalogue professionnel</NuxtLink>
+        <NuxtLink to="/pro/demande" class="btn btn-ghost">Ma demande en cours</NuxtLink>
+        <NuxtLink to="/pro/demandes" class="btn btn-ghost">Mes demandes de devis</NuxtLink>
+      </nav>
     </template>
 
     <template v-else-if="organisation?.status === 'suspended'">
@@ -139,6 +144,11 @@ async function submit() {
 }
 .pro-panel__open {
   align-self: flex-start;
+}
+.pro-panel__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
 }
 .pro-panel__actions {
   display: flex;

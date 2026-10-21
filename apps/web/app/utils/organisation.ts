@@ -1,4 +1,4 @@
-import type { OrganisationStatus, OrganisationType } from "@armurier/shared"
+import type { OrganisationStatus, OrganisationType, QuoteRequestStatus } from "@armurier/shared"
 import type { Severity } from "~/utils/status"
 
 // Story 12.8b — French labels for pro accounts, shared by the signup form, the
@@ -47,4 +47,21 @@ export function organisationStatus(status: OrganisationStatus): StatusMeta {
 
 export function registryCheckLabel(check: RegistryCheck): StatusMeta {
   return REGISTRY_CHECKS[check]
+}
+
+// Story 12.8c — quote requests.
+
+const QUOTE_REQUEST_STATUS: Record<QuoteRequestStatus, StatusMeta> = {
+  requested: { label: "Envoyée", severity: "warn" },
+  in_review: { label: "En cours d'étude", severity: "warn" },
+  sent: { label: "Devis envoyé", severity: "ok" },
+  accepted: { label: "Acceptée", severity: "ok" },
+  declined: { label: "Déclinée", severity: "muted" },
+  expired: { label: "Expirée", severity: "muted" },
+  converted: { label: "Commandée", severity: "ok" },
+  cancelled: { label: "Annulée", severity: "muted" },
+}
+
+export function quoteRequestStatus(status: QuoteRequestStatus): StatusMeta {
+  return QUOTE_REQUEST_STATUS[status]
 }

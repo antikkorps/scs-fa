@@ -1,9 +1,10 @@
-import { ORGANISATION_STATUSES, ORGANISATION_TYPES } from "@armurier/shared"
+import { ORGANISATION_STATUSES, ORGANISATION_TYPES, QUOTE_REQUEST_STATUSES } from "@armurier/shared"
 import { describe, expect, it } from "vitest"
 import {
   ORGANISATION_TYPE_OPTIONS,
   organisationStatus,
   organisationTypeLabel,
+  quoteRequestStatus,
   registryCheckLabel,
 } from "./organisation"
 
@@ -25,5 +26,12 @@ describe("organisation labels (story 12.8b)", () => {
     expect(registryCheckLabel("verified")).toEqual({ label: "Établissement actif", severity: "ok" })
     expect(registryCheckLabel("unavailable").severity).toBe("warn")
     expect(registryCheckLabel("inactive").severity).toBe("bad")
+  })
+})
+
+describe("quote request labels (story 12.8c)", () => {
+  it("gives every request status a label and a colour", () => {
+    for (const status of QUOTE_REQUEST_STATUSES) expect(quoteRequestStatus(status).label).not.toBe(status)
+    expect(quoteRequestStatus("requested")).toEqual({ label: "Envoyée", severity: "warn" })
   })
 })

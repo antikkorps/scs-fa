@@ -149,6 +149,7 @@ export async function exportCatalogWorkbook(
       sourceUrl: products.sourceUrl,
       sku: products.sku,
       published: sql<boolean>`coalesce(${products.published}, false)`,
+      audience: products.audience,
       updatedAt: products.updatedAt,
     })
     .from(products)
@@ -176,6 +177,7 @@ export async function exportCatalogWorkbook(
   const sheetRows: CatalogSheetRow[] = rows.map((r) => ({
     import: "oui",
     active: r.published ? "oui" : "non",
+    proOnly: r.audience === "pro" ? "oui" : "non",
     supplier: r.supplier,
     supplierSku: r.supplierSku,
     ean: r.ean,

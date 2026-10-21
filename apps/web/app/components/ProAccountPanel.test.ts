@@ -79,5 +79,8 @@ describe("ProAccountPanel (story 12.8b)", () => {
     mine.mockResolvedValue({ ...ORGANISATION, status: "approved" })
     const wrapper = await mounted()
     expect(wrapper.text()).toContain("Compte professionnel validé")
+    for (const href of ["/pro/catalogue", "/pro/demande", "/pro/demandes"]) {
+      expect(wrapper.find(`a[href="${href}"]`).exists(), href).toBe(true)
+    }
   })
 })

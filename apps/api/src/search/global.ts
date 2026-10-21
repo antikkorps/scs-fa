@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { artists, artworkPrints, artworks, legalCategories, productCategories, products } from "../db/schema.js"
+import { publiclyVisible } from "../products/visibility.js"
 
 // Aggregated availability/price-from for artwork cards (mirrors artworks/public.ts).
 const AVAILABLE_COUNT = sql<number>`count(${artworkPrints.id}) filter (where ${artworkPrints.status} = 'available')::int`
@@ -54,7 +55,7 @@ export const globalSearchRoute: FastifyPluginAsync = async (fastify) => {
       .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
       .where(
         and(
-          eq(products.published, true),
+          publiclyVisible(),
           // Products that back a Gun Art piece surface as artworks, not as
           // standalone catalogue results — avoid showing the same item twice.
           sql`not exists (select 1 from ${artworks} where ${artworks.productId} = ${products.id})`,

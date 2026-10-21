@@ -120,6 +120,7 @@ export type CatalogSheetRow = Partial<Record<CatalogImportColumnKey, string | nu
 const COLUMN_WIDTHS: Partial<Record<CatalogImportColumnKey, number>> = {
   import: 10,
   active: 8,
+  proOnly: 11,
   supplier: 18,
   supplierSku: 16,
   ean: 15,
@@ -196,6 +197,7 @@ export function addCatalogSheet(
   }
   list("import", `"${IMPORT_CHOICES.join(",")}"`, "Répondez oui ou non.")
   list("active", `"${IMPORT_CHOICES.join(",")}"`, "Répondez oui, non, ou laissez vide.")
+  list("proOnly", `"${IMPORT_CHOICES.join(",")}"`, "Oui : visible des seuls comptes pro validés. Vide : inchangé.")
   list("legalCategory", `"${LEGAL_CATEGORY_CHOICES.join(",")}"`, "Choisissez A, B, C, D ou Aucune.")
   if (supplierNames.length > 0)
     list(

@@ -21,12 +21,17 @@ const columns: CatalogueColumn[] = [
   { key: "stockQty", label: "Stock", numeric: true },
   { key: "variantCount", label: "Variantes", numeric: true },
   { key: "published", label: "Publié", boolean: true },
+  { key: "proOnly", label: "Réservé pro", boolean: true },
 ]
 
 // Archived products (story 12.4) stay out of the way unless asked for.
 const showArchived = ref(false)
 const archivedCount = computed(() => (data.value?.data ?? []).filter((p) => p.archivedAt).length)
-const rows = computed(() => (data.value?.data ?? []).filter((p) => showArchived.value || !p.archivedAt))
+const rows = computed(() =>
+  (data.value?.data ?? [])
+    .filter((p) => showArchived.value || !p.archivedAt)
+    .map((p) => ({ ...p, proOnly: p.audience === "pro" })),
+)
 </script>
 
 <template>

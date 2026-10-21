@@ -35,6 +35,7 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
           priceDeltaHt: productVariants.priceDeltaHt,
           productPriceHt: products.priceHt,
           published: products.published,
+          audience: products.audience,
           // A collection weapon exists in a single copy, so it is held for the
           // shopper as soon as it enters their cart (story 11.2).
           isUniquePiece: ancientWeapons.isUnique,
@@ -45,7 +46,8 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
         .where(eq(productVariants.id, variantId))
         .limit(1)
 
-      if (!variant?.published) {
+      // Story 12.8c: a pro product never enters the ordinary cart (a pro asks for a quote).
+      if (!variant?.published || variant.audience !== "public") {
         return reply.code(404).send({ error: "NotFound", message: "Variant not found" })
       }
 
