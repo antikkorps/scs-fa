@@ -963,6 +963,11 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
   - **Aucun compte ne l'exige encore** : `auth/login-code-policy.ts` répond non pour tous ; la **12.8b** la basculera pour les membres d'une organisation.
   - Trouvé en route : les routes d'authentification du BFF emballent le corps d'erreur de l'API sous `data` → `apiErrorCode` / `apiErrorField` lisent les deux formes.
 - [ ] **12.8b — Comptes pro** : `organisations`, inscription avec SIRET + API Recherche d'entreprises, validation / refus / suspension dans le back-office, e-mails de suivi.
+  _Décisions (Franck, 2026-10-21)_ :
+  - **Lien compte → organisation** : `users.organisation_id` (clé étrangère, nullable), **unique pour l'instant** (une personne par organisation ; retirer l'index suffira pour plusieurs acheteurs). **Pas de nouveau rôle** : un pro reste `customer` ; « pro » = rattaché à une organisation. Le code e-mail (12.8a) et le plafond de session de 7 jours s'appliquent dès le rattachement, quel que soit le statut.
+  - **Inscription** : page dédiée qui crée compte + organisation, **et** demande depuis l'espace d'un particulier déjà inscrit (son compte bascule, ses commandes restent).
+  - **API Recherche d'entreprises** : le SIRET doit passer la clé de Luhn ; si l'API est en panne ou ne trouve pas l'établissement, la demande est **acceptée mais marquée « non vérifiée »** pour SCS, qui valide toujours à la main. Ce que l'API a renvoyé (nature juridique, NAF, adresse, état actif) est gardé avec l'organisation.
+  - **En attente / suspendu / refusé** : connexion possible (avec code), historique visible, mais **aucune demande de devis** ; un bandeau dit pourquoi. Refus et suspension : motif envoyé par e-mail.
 - [ ] **12.8c — Catalogue sans prix et demande de devis** : prix retirés des réponses API pour les pros (ou remplacés par leurs prix nets si l'option « afficher les prix » est activée), panier → demande de devis, suivi des demandes dans l'espace pro.
 - [ ] **12.8d — Devis et commande** : traitement back-office (lignes, remises, validité), devis Henrri + PDF, acceptation par le client → commande, paiement carte / virement / 30 jours, blocage tant que le justificatif A / B / C n'est pas validé.
 - [ ] **12.8e — Double authentification par application** : TOTP facultatif pour les particuliers, codes de secours, **obligatoire pour les admins**.
