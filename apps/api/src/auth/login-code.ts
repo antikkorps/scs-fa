@@ -150,7 +150,7 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
       if (!spent) return invalidChallenge(reply)
 
       await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id))
-      const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, challenge.deviceLabel)
+      const tokens = await issueTokens(fastify, user, challenge.deviceLabel)
       await journal(request, user, "user.login", { method: "password+email_code" })
 
       return reply.code(200).send({

@@ -62,4 +62,9 @@ describe("inscription.vue", () => {
     expect(wrapper.text()).toContain("Un compte existe déjà")
     expect(navigateToMock).not.toHaveBeenCalled()
   })
+
+  it("points professionals to their own signup", async () => {
+    const wrapper = await mountSuspended(Inscription)
+    expect(wrapper.find('a[href="/pro/inscription"]').exists()).toBe(true)
+  })
 })

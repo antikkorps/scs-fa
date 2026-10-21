@@ -15,6 +15,9 @@ const FR_FIELD_MESSAGES: Record<string, string> = {
   phone: "Numéro de téléphone invalide.",
   rgpdConsent: "Vous devez accepter la politique de confidentialité.",
   token: "Lien invalide ou expiré.",
+  siret: "Numéro SIRET invalide (14 chiffres).",
+  legalName: "La raison sociale est requise.",
+  organisationType: "Choisissez le type d'organisation.",
 }
 
 // Flattens Zod issues into a { field: frMessage } map for inline form errors.

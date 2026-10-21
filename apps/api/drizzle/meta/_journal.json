@@ -211,6 +211,13 @@
       "when": 1792530310757,
       "tag": "0029_story_12_8a_login_challenges",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792609220237,
+      "tag": "0030_story_12_8b_organisations",
+      "breakpoints": true
     }
   ]
 }

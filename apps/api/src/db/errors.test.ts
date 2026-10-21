@@ -13,4 +13,10 @@ describe("isUniqueViolation", () => {
     expect(isUniqueViolation(null)).toBe(false)
     expect(isUniqueViolation("23505")).toBe(false)
   })
+
+  it("tells one unique constraint from another when asked", () => {
+    const wrapped = new Error("Failed query", { cause: { code: "23505", constraint: "users_email_unique" } })
+    expect(isUniqueViolation(wrapped, "users_email_unique")).toBe(true)
+    expect(isUniqueViolation(wrapped, "uq_organisations_siret_open")).toBe(false)
+  })
 })
