@@ -4,6 +4,7 @@ import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { ancientWeapons, legalCategories, productCategories, products } from "../db/schema.js"
 import { buildTagFilterConditions, productTagsJson } from "./tag-filter.js"
+import { publiclyVisible } from "./visibility.js"
 
 export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (request, reply) => {
@@ -23,7 +24,7 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
     // Only published products are publicly listable. Gun Art is its own universe
     // served by /api/artworks, so its backing products are excluded here — this
     // endpoint is the armurerie catalogue (firearms, ammo, accessories…).
-    const conditions: SQL[] = [eq(products.published, true), ne(productCategories.category, "gun_art")]
+    const conditions: SQL[] = [publiclyVisible(), ne(productCategories.category, "gun_art")]
     if (category) conditions.push(eq(productCategories.slug, category))
     if (legalCategory) conditions.push(eq(legalCategories.category, legalCategory))
     if (minPrice !== undefined) conditions.push(gte(products.priceHt, minPrice.toString()))

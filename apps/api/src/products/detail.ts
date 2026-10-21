@@ -5,6 +5,7 @@ import { db } from "../db/client.js"
 import { ancientWeapons, legalCategories, productCategories, products, productVariants } from "../db/schema.js"
 import { publicCrossSellsFor } from "./cross-sell.js"
 import { productTagsJson } from "./tag-filter.js"
+import { publiclyVisible } from "./visibility.js"
 
 // Shared lookup for a single published product (by id or by slug). Returns the
 // public detail shape, or null when not found / unpublished.
@@ -61,7 +62,7 @@ async function fetchPublishedProduct(match: SQL) {
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
     .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
     // Only published products are publicly accessible
-    .where(and(match, eq(products.published, true)))
+    .where(and(match, publiclyVisible()))
     .limit(1)
 
   if (!row) return null

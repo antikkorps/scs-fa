@@ -11,6 +11,7 @@ import {
   productCategories,
   products,
 } from "../db/schema.js"
+import { publiclyVisible } from "../products/visibility.js"
 
 /**
  * GET /api/seo/sitemap — every publicly indexable entity, in one payload (story 9.6).
@@ -36,7 +37,7 @@ export const seoRoutes: FastifyPluginAsync = async (fastify) => {
         .from(products)
         .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
         .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
-        .where(and(eq(products.published, true), ne(productCategories.category, "gun_art")))
+        .where(and(publiclyVisible(), ne(productCategories.category, "gun_art")))
         .orderBy(asc(products.slug)),
       // A category page with nothing in it would be thin content: only
       // categories holding at least one published product are listed, dated by
@@ -48,7 +49,7 @@ export const seoRoutes: FastifyPluginAsync = async (fastify) => {
           updatedAt: max(products.updatedAt),
         })
         .from(productCategories)
-        .innerJoin(products, and(eq(products.categoryId, productCategories.id), eq(products.published, true)))
+        .innerJoin(products, and(eq(products.categoryId, productCategories.id), publiclyVisible()))
         .where(ne(productCategories.category, "gun_art"))
         .groupBy(productCategories.id)
         .orderBy(asc(productCategories.displayOrder), asc(productCategories.name)),

@@ -62,6 +62,7 @@ export const legalCategoryEnum = pgEnum("legal_category", ["A", "B", "C", "D", "
 // Issue d'un événement d'audit (story 12.7b)
 export const auditResultEnum = pgEnum("audit_result", ["success", "failure"])
 // Story 12.8b — pro accounts (values mirror ORGANISATION_TYPES / _STATUSES in shared).
+export const productAudienceEnum = pgEnum("product_audience", ["public", "pro"])
 export const organisationTypeEnum = pgEnum("organisation_type", ["armurier", "club", "securite_privee", "administration"])
 export const organisationStatusEnum = pgEnum("organisation_status", ["pending", "approved", "rejected", "suspended"])
 // What the company registry said of the SIRET at signup; only `verified` is an open establishment.
@@ -733,6 +734,8 @@ export const products = pgTable(
 
     // Statuts
     published: boolean("published").default(true),
+    // Story 12.8c — `pro`: shown only to approved pro accounts, never on the public side.
+    audience: productAudienceEnum("audience").notNull().default("public"),
     featured: boolean("featured").default(false),
     // Archivé (story 12.4) : retiré du catalogue sans être effacé — les
     // commandes passées gardent leur référence, et « Réactiver » le ramène.
