@@ -91,6 +91,12 @@ export default defineNuxtConfig({
         "/commande/**",
         "/newsletter/**",
         "/recherche",
+        // Story 12.8c — the pro space (its signup page, /pro/inscription, stays indexable).
+        "/pro/catalogue",
+        "/pro/catalogue/**",
+        "/pro/demande",
+        "/pro/demandes",
+        "/pro/demandes/**",
       ].map((path) => [path, { headers: NOINDEX }]),
     ),
   },

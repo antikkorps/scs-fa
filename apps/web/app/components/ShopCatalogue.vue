@@ -370,14 +370,6 @@ select.input {
   font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 
 @media (min-width: 560px) {
   .grid {

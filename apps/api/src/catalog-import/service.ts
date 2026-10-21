@@ -16,6 +16,7 @@ import {
   type LegalCategory,
   normaliseHeader,
   normaliseSupplierRef,
+  type ProductAudience,
   parseCatalogImportTable,
 } from "@armurier/shared"
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm"
@@ -50,6 +51,7 @@ interface ExistingProduct {
   costPrice: string | null
   legalCategory: LegalCategory | null
   published: boolean
+  audience: ProductAudience
   archivedAt: Date | null
   updatedAt: Date | null
   mediaCount: number
@@ -195,6 +197,7 @@ export async function planCatalogImport(
         costPrice: products.costPrice,
         legalCategory: legalCategories.category,
         published: sql<boolean>`coalesce(${products.published}, false)`,
+        audience: products.audience,
         archivedAt: products.archivedAt,
         updatedAt: products.updatedAt,
         mediaCount: sql<number>`(select count(*)::int from ${media} where ${media.ownerType} = 'product' and ${media.ownerId} = ${products.id})`,
@@ -238,6 +241,9 @@ export async function planCatalogImport(
     row.sku = null
     if (data.active !== null && data.active !== existing.published) {
       row.warnings.push(data.active ? "Mis en ligne" : "Retiré de la vente")
+    }
+    if (data.proOnly !== null && data.proOnly !== (existing.audience === "pro")) {
+      row.warnings.push(data.proOnly ? "Réservé aux pros" : "Ouvert au public")
     }
     if (existing.legalCategory !== data.legalCategory) {
       row.warnings.push(
@@ -428,6 +434,7 @@ export async function commitCatalogImport(
             parcelCount: defaultParcelCount(data.legalCategory, row.categorySlug),
             // Going live stays a human gesture: a "oui" typed in "Actif", or later.
             published: data.active ?? false,
+            audience: data.proOnly ? "pro" : "public",
           })
           .returning({ id: products.id })
         if (!product) throw new Error("Product insert returned no row")
@@ -465,6 +472,8 @@ export async function commitCatalogImport(
               : {}),
             // "Actif" is an explicit instruction, overwrite or not; blank = unchanged.
             ...(data.active === null ? {} : { published: data.active }),
+            // Same for "Réservé pro".
+            ...(data.proOnly === null ? {} : { audience: data.proOnly ? "pro" : "public" }),
             updatedAt: new Date(),
           })
           .where(eq(products.id, ex.id))

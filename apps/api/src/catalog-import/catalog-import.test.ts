@@ -615,6 +615,24 @@ describe("admin catalogue import (story 12.2)", () => {
       expect((await productByRef("RT-2"))?.product).toMatchObject({ published: true, priceHt: "77.00", stockQty: 9 })
     })
 
+    it("round-trips « Réservé pro »: exported, then applied, blank leaving it as it is (story 12.8c)", async () => {
+      const { table, col } = await exportTable()
+      const line = table.find((r) => r[col("supplierSku")] === "RT-2") as string[]
+      expect(line[col("proOnly")]).toBe("non")
+
+      line[col("proOnly")] = "oui"
+      const { preview, res } = await importFile(csvOf([table[0] as string[], line]), true)
+      expect(preview.rows[0].warnings).toContain("Réservé aux pros")
+      expect(res.statusCode).toBe(201)
+      expect((await productByRef("RT-2"))?.product.audience).toBe("pro")
+
+      const again = (await exportTable()).table.find((r) => r[col("supplierSku")] === "RT-2") as string[]
+      expect(again[col("proOnly")]).toBe("oui")
+      again[col("proOnly")] = ""
+      await importFile(csvOf([table[0] as string[], again]), true)
+      expect((await productByRef("RT-2"))?.product.audience).toBe("pro")
+    })
+
     it("refuses to overwrite a product edited in the back-office after the export", async () => {
       const { table, col } = await exportTable()
       const rt3 = await productByRef("RT-3")

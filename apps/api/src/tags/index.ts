@@ -3,6 +3,7 @@ import { and, asc, eq, ne, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { productCategories, products, productTags, tags } from "../db/schema.js"
+import { publiclyVisible } from "../products/visibility.js"
 
 type TagRow = {
   slug: string
@@ -40,13 +41,7 @@ export const tagRoutes: FastifyPluginAsync = async (fastify) => {
           .from(productTags)
           .innerJoin(products, eq(products.id, productTags.productId))
           .innerJoin(productCategories, eq(productCategories.id, products.categoryId))
-          .where(
-            and(
-              eq(productTags.tagId, tags.id),
-              eq(products.published, true),
-              ne(productCategories.category, "gun_art"),
-            ),
-          )})`,
+          .where(and(eq(productTags.tagId, tags.id), publiclyVisible(), ne(productCategories.category, "gun_art")))})`,
       })
       .from(tags)
       .orderBy(asc(tags.displayOrder), asc(tags.name))

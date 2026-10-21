@@ -4,6 +4,7 @@ import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { ancientWeapons, legalCategories, productCategories, products } from "../db/schema.js"
 import { buildTagFilterConditions, productTagsJson } from "../products/tag-filter.js"
+import { publiclyVisible } from "../products/visibility.js"
 
 /**
  * GET /api/ancient-weapons — the collection universe listing.
@@ -31,7 +32,7 @@ export const ancientWeaponRoutes: FastifyPluginAsync = async (fastify) => {
     const { tags: tagSlugs, legalCategory, available, page, limit } = parsed.data
 
     // The inner join on ancient_weapons is what restricts this to collection pieces.
-    const conditions: SQL[] = [eq(products.published, true)]
+    const conditions: SQL[] = [publiclyVisible()]
     if (legalCategory) conditions.push(eq(legalCategories.category, legalCategory))
     if (tagSlugs) conditions.push(...(await buildTagFilterConditions(tagSlugs)))
     if (available === true) conditions.push(gt(products.stockQty, 0))

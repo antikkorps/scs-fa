@@ -6,6 +6,7 @@ import {
   LEGAL_DOC_TYPES,
   LEGAL_DOC_VERIFICATION_STATUS,
   MAX_TAG_FILTERS,
+  PRODUCT_AUDIENCES,
   TAG_FACETS,
 } from "./constants.js"
 import { MAX_CROSS_SELLS_PER_PRODUCT } from "./cross-sell.js"
@@ -954,6 +955,7 @@ const productBaseSchema = z
     trackStock: z.boolean().default(true),
     featuredImageUrl: optionalUrl,
     published: z.boolean().default(false),
+    audience: z.enum(PRODUCT_AUDIENCES).default("public"),
     featured: z.boolean().default(false),
     tagSlugs: z.array(tagSlugSchema).max(MAX_TAG_FILTERS).default([]),
     variants: z.array(productVariantSchema).max(50).default([]),

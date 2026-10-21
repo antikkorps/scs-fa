@@ -487,14 +487,6 @@ async function saveEdit(s: AdminShipment) {
 .draft__qty {
   width: 5rem;
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 @media (min-width: 700px) {
   .fields,
   .edit {

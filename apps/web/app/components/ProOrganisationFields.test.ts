@@ -20,7 +20,9 @@ function mountWithForm(initial: Partial<Form> = {}) {
   return { form, mounted: mountSuspended(Host) }
 }
 
-beforeEach(() => lookup.mockReset())
+beforeEach(() => {
+  lookup.mockReset()
+})
 
 describe("ProOrganisationFields (story 12.8b)", () => {
   it("asks the registry once the SIRET is complete, and pre-fills the name and type", async () => {

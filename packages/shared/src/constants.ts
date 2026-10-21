@@ -1,5 +1,11 @@
 // Catégories légales françaises (Classification préfectorale)
 export const LEGAL_CATEGORIES = ["A", "B", "C", "D", "none"] as const
+
+// Story 12.8c — who may see a product: everyone, or only approved pro accounts
+// (a bulletproof vest for a police force). A `pro` product never surfaces on
+// the public side.
+export const PRODUCT_AUDIENCES = ["public", "pro"] as const
+export type ProductAudience = (typeof PRODUCT_AUDIENCES)[number]
 export type LegalCategory = (typeof LEGAL_CATEGORIES)[number]
 
 export const USER_ROLES = ["customer", "vendor", "admin"] as const

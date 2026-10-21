@@ -66,6 +66,11 @@ const available = computed(() => isPurchasable(state.value) && !heldByOther.valu
 
 const { isAuthenticated } = useAuth()
 const cart = useCart()
+// Story 12.8c: an approved pro asks for a quote on the armurerie instead of
+// buying; a collection piece stays an ordinary purchase, for them too.
+const proAccess = useProAccess()
+onMounted(() => proAccess.load())
+const asksForQuote = computed(() => proAccess.isApprovedPro.value && !ancient.value)
 const adding = ref(false)
 const added = ref(false)
 const addError = ref("")
@@ -298,7 +303,10 @@ useHead({
             </p>
           </section>
 
-          <div class="detail__cta">
+          <div v-if="asksForQuote && selectedVariant" class="detail__cta">
+            <ProQuoteButton :variant-id="selectedVariant.id" />
+          </div>
+          <div v-else class="detail__cta">
             <button type="button" class="btn btn-primary buy" :disabled="!available || adding" @click="addToCart">
               {{
                 available

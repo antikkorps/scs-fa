@@ -41,6 +41,7 @@ type EmailType =
   | "organisation_rejected"
   | "organisation_suspended"
   | "organisation_reinstated"
+  | "quote_request_received"
 
 /** The order first (its history), else the account, else the newsletter contact. */
 function journalEntity(about: EmailAbout): { entityType: string; entityId: string | null } {
@@ -207,6 +208,42 @@ export async function sendOrganisationReinstatedEmail(
     `Le compte professionnel de ${organisation.legalName} est rétabli.`,
     `Vous pouvez à nouveau demander vos devis depuis votre espace : ${PRO_SPACE_URL()}`,
   ])
+}
+
+/** Story 12.8c — the pro's receipt for a quote request. */
+export async function sendQuoteRequestReceivedEmail(
+  to: string,
+  request: { number: string; lineCount: number },
+  about: EmailAbout = {},
+): Promise<void> {
+  const lines = request.lineCount > 1 ? `${request.lineCount} articles` : "1 article"
+  await deliverParagraphs("quote_request_received", about, to, `Demande de devis ${request.number} reçue`, [
+    `Nous avons bien reçu votre demande de devis ${request.number} (${lines}).`,
+    "Notre équipe l'étudie et vous envoie un devis par e-mail. Vous pouvez suivre son avancement depuis votre espace.",
+    `Votre espace : ${PRO_SPACE_URL()}`,
+  ])
+}
+
+export interface QuoteRequestAlert {
+  number: string
+  legalName: string
+  lineCount: number
+}
+
+/** Internal alert to SCS admins: not a customer e-mail, so not journaled (12.7c). */
+export async function sendQuoteRequestAlertEmail(to: string[], request: QuoteRequestAlert): Promise<void> {
+  if (to.length === 0) return
+  const lines = [
+    `Nouvelle demande de devis ${request.number} de ${request.legalName} : ${request.lineCount} ligne(s).`,
+    `À traiter ici : ${env.WEB_BASE_URL}/admin/devis`,
+  ]
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: `[Devis] ${request.number} — ${request.legalName}`,
+    text: lines.join("\n\n"),
+    html: lines.map((line) => `<p>${escapeHtml(line)}</p>`).join(""),
+  })
 }
 
 export interface OrganisationRequestAlert {

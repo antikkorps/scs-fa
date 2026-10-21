@@ -27,6 +27,8 @@ const form = reactive({
   trackStock: true,
   featuredImageUrl: "",
   published: false,
+  // Story 12.8c: shown to approved pros only.
+  proOnly: false,
   featured: false,
   tagSlugs: [] as string[],
   variants: [] as AdminProductVariant[],
@@ -95,6 +97,7 @@ async function load() {
       trackStock: d.trackStock ?? true,
       featuredImageUrl: d.featuredImageUrl ?? "",
       published: d.published,
+      proOnly: d.audience === "pro",
       featured: d.featured,
       tagSlugs: d.tagSlugs,
       variants: d.variants,
@@ -160,6 +163,7 @@ function payload() {
     stockQty: Number(form.stockQty),
     trackStock: form.trackStock,
     published: form.published,
+    audience: form.proOnly ? "pro" : "public",
     featured: form.featured,
     tagSlugs: form.tagSlugs,
     parcelCount: Number(form.parcelCount) || 1,
@@ -449,6 +453,10 @@ async function save() {
         <label class="field field--check">
           <input v-model="form.published" type="checkbox" class="check" :disabled="Boolean(archivedAt)" >
           <span>Publié sur le site</span>
+        </label>
+        <label class="field field--check">
+          <input v-model="form.proOnly" name="proOnly" type="checkbox" class="check" >
+          <span>Réservé aux comptes pro (invisible du public)</span>
         </label>
         <label class="field field--check">
           <input v-model="form.featured" type="checkbox" class="check" >
