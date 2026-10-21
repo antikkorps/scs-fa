@@ -123,21 +123,31 @@ export const organisationRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = request.user.sub
 
       const [account] = await db
-        .select({ id: users.id, email: users.email, organisationId: users.organisationId })
+        .select({
+          id: users.id,
+          email: users.email,
+          organisationId: users.organisationId,
+          status: organisations.status,
+        })
         .from(users)
+        .leftJoin(organisations, eq(organisations.id, users.organisationId))
         .where(eq(users.id, userId))
       if (!account) return reply.code(401).send({ error: "Unauthorized", message: "Unknown account" })
-      if (account.organisationId) return reply.code(409).send(ALREADY_MEMBER)
+      // A refused request may be replaced by a new one, as its e-mail offers.
+      if (account.organisationId && account.status !== "rejected") return reply.code(409).send(ALREADY_MEMBER)
 
       const lookup = await lookUpEstablishment(parsed.data.siret)
       try {
         const { organisation, registryVerified } = await db.transaction(async (tx) => {
           const opened = await openOrganisation(tx, parsed.data, lookup, requestContext(request, userId))
-          // The IS NULL guard settles two requests racing for the same account.
+          // Guarded on the organisation read above: two requests racing for the same account cannot both attach.
+          const stillUnchanged = account.organisationId
+            ? eq(users.organisationId, account.organisationId)
+            : isNull(users.organisationId)
           const attached = await tx
             .update(users)
             .set({ organisationId: opened.organisation.id, updatedAt: new Date() })
-            .where(and(eq(users.id, userId), isNull(users.organisationId)))
+            .where(and(eq(users.id, userId), stillUnchanged))
             .returning({ id: users.id })
           if (attached.length === 0) throw new AlreadyMemberError()
 

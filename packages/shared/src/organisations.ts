@@ -1,7 +1,7 @@
 // Pro accounts (story 12.8b): gunsmiths, shooting clubs, private security
 // firms and administrations, each behind one organisation identified by its
 // SIRET and approved by hand in the back-office.
-import { registerSchema } from "./validation.js"
+import { paginationSchema, registerSchema, toPatchSchema } from "./validation.js"
 import { z } from "./zod.js"
 
 export const ORGANISATION_TYPES = ["armurier", "club", "securite_privee", "administration"] as const
@@ -72,3 +72,34 @@ export const organisationRequestSchema = z.object(organisationRequestFields)
 
 export type ProSignupInput = z.infer<typeof proSignupSchema>
 export type OrganisationRequestInput = z.infer<typeof organisationRequestSchema>
+
+// ---------------------------------------------------------------------------
+// Back-office (story 12.8b)
+
+/** The commercial terms SCS sets on an organisation (decision 2026-10-19). */
+export const organisationTermsSchema = z
+  .object({
+    // A rate on the public price excluding VAT, applied to every price shown to the pro.
+    discountPct: z.number().min(0).max(100).multipleOf(0.01),
+    net30Allowed: z.boolean(),
+    showPrices: z.boolean(),
+  })
+  .strict()
+
+/** Approval may set the terms at once; left out, administrations get the 30-day payment. */
+export const approveOrganisationSchema = toPatchSchema(organisationTermsSchema).strict()
+
+export const updateOrganisationTermsSchema = toPatchSchema(organisationTermsSchema)
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "At least one field must be provided" })
+
+/** A refusal or a suspension: the reason is mailed to the member as written. */
+export const organisationReviewReasonSchema = z.object({ reason: z.string().trim().min(3).max(1000) }).strict()
+
+export const adminOrganisationListQuerySchema = paginationSchema.extend({
+  status: z.enum(ORGANISATION_STATUSES).optional(),
+})
+
+export type OrganisationTermsInput = z.infer<typeof organisationTermsSchema>
+export type ApproveOrganisationInput = z.infer<typeof approveOrganisationSchema>
+export type UpdateOrganisationTermsInput = z.infer<typeof updateOrganisationTermsSchema>

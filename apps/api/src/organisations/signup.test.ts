@@ -287,6 +287,19 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
       expect(session?.expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 7 * DAY_MS)
     })
 
+    it("lets a member whose request was refused file a new one", async () => {
+      const paul = await customer()
+      const refused = (await request(paul.token)).json().data
+      await db.update(organisations).set({ status: "rejected" }).where(eq(organisations.id, refused.id))
+
+      const res = await request(paul.token)
+
+      expect(res.statusCode).toBe(201)
+      expect((await organisationOf(paul.id))?.id).toBe(res.json().data.id)
+      await db.delete(auditLogs).where(eq(auditLogs.entityId, refused.id))
+      await db.delete(organisations).where(eq(organisations.id, refused.id))
+    })
+
     it("refuses a second organisation, an admin and an anonymous caller", async () => {
       const paul = await customer()
       await request(paul.token)
