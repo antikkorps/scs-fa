@@ -143,7 +143,7 @@ describe("admin product form (story 7.5a)", () => {
     await flushPromises()
 
     const call = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
-    expect((call?.[1] as { body: { audience: string } }).body.audience).toBe("pro")
+    expect((call?.[1] as { body: { audience: string } } | undefined)?.body.audience).toBe("pro")
   })
 
   it("adds a variant without an id, so the server inserts it", async () => {
