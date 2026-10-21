@@ -25,6 +25,7 @@ const DETAIL = {
   featured: false,
   featuredImageUrl: null,
   published: true,
+  audience: "public",
   metaTitle: null,
   metaDescription: null,
   variants: [
@@ -129,6 +130,20 @@ describe("admin product form (story 7.5a)", () => {
     expect(body?.variants[0]).toMatchObject({ id: "v1", skuVariant: "ARM-1-A", finition: "Bronzé" })
     // Empty attributes are omitted, not sent as empty strings.
     expect(body?.variants[0]).not.toHaveProperty("munition")
+  })
+
+  it("reserves a product for pros from its page (story 12.8c)", async () => {
+    const wrapper = await mountEdit()
+    const box = wrapper.find('input[name="proOnly"]')
+    expect((box.element as HTMLInputElement).checked).toBe(false)
+
+    await box.setValue(true)
+    apiMock.mockResolvedValueOnce({ data: DETAIL })
+    await wrapper.find(".btn-primary").trigger("click")
+    await flushPromises()
+
+    const call = apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")
+    expect((call?.[1] as { body: { audience: string } }).body.audience).toBe("pro")
   })
 
   it("adds a variant without an id, so the server inserts it", async () => {
