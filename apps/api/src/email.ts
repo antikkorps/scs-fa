@@ -3,6 +3,7 @@ import {
   type LegalDocRejectionReason,
   type LegalDocType,
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
+  type OrganisationType,
   renderInlinesHtml,
   renderInlinesText,
   renderTermsHtml,
@@ -35,6 +36,11 @@ type EmailType =
   | "order_confirmation"
   | "invoice_available"
   | "login_code"
+  | "organisation_request_received"
+  | "organisation_approved"
+  | "organisation_rejected"
+  | "organisation_suspended"
+  | "organisation_reinstated"
 
 /** The order first (its history), else the account, else the newsletter contact. */
 function journalEntity(about: EmailAbout): { entityType: string; entityId: string | null } {
@@ -115,6 +121,122 @@ export async function sendLoginCodeEmail(
       `<p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p>` +
       `<p>Il est valable ${validMinutes} minutes et ne sert qu'une fois.</p>` +
       `<p>Si vous n'êtes pas à l'origine de cette connexion, quelqu'un connaît votre mot de passe : changez-le sans attendre.</p>`,
+  })
+}
+
+// Story 12.8b — the pro account's follow-up e-mails, in French like the site.
+const ORGANISATION_TYPE_LABELS: Record<OrganisationType, string> = {
+  armurier: "Armurier",
+  club: "Club de tir",
+  securite_privee: "Sécurité privée",
+  administration: "Administration",
+}
+
+const PRO_SPACE_URL = () => `${env.WEB_BASE_URL}/compte`
+
+/** One short French e-mail: paragraphs of plain text, escaped into the HTML part. */
+async function deliverParagraphs(
+  type: EmailType,
+  about: EmailAbout,
+  to: string,
+  subject: string,
+  paragraphs: string[],
+): Promise<void> {
+  await deliver(type, about, {
+    from: env.SMTP_FROM,
+    to,
+    subject,
+    text: paragraphs.join("\n\n"),
+    html: paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join(""),
+  })
+}
+
+export async function sendOrganisationRequestReceivedEmail(
+  to: string,
+  organisation: { legalName: string },
+  about: EmailAbout = {},
+): Promise<void> {
+  await deliverParagraphs("organisation_request_received", about, to, "Votre demande de compte professionnel", [
+    `Nous avons bien reçu la demande de compte professionnel pour ${organisation.legalName}.`,
+    "Notre équipe la vérifie et vous écrit dès qu'elle est validée. D'ici là, vous pouvez vous connecter, mais pas encore demander de devis.",
+    "À chaque connexion, un code vous sera envoyé par e-mail après votre mot de passe.",
+  ])
+}
+
+export async function sendOrganisationApprovedEmail(
+  to: string,
+  organisation: { legalName: string },
+  about: EmailAbout = {},
+): Promise<void> {
+  await deliverParagraphs("organisation_approved", about, to, "Votre compte professionnel est validé", [
+    `Le compte professionnel de ${organisation.legalName} est validé.`,
+    `Vous pouvez dès maintenant demander vos devis depuis votre espace : ${PRO_SPACE_URL()}`,
+  ])
+}
+
+export async function sendOrganisationRejectedEmail(
+  to: string,
+  organisation: { legalName: string; reason: string },
+  about: EmailAbout = {},
+): Promise<void> {
+  await deliverParagraphs("organisation_rejected", about, to, "Votre demande de compte professionnel", [
+    `Nous ne pouvons pas valider la demande de compte professionnel pour ${organisation.legalName}.`,
+    `Motif : ${organisation.reason}`,
+    "Vous pouvez répondre à cet e-mail pour nous apporter des précisions, ou déposer une nouvelle demande.",
+  ])
+}
+
+export async function sendOrganisationSuspendedEmail(
+  to: string,
+  organisation: { legalName: string; reason: string },
+  about: EmailAbout = {},
+): Promise<void> {
+  await deliverParagraphs("organisation_suspended", about, to, "Votre compte professionnel est suspendu", [
+    `Le compte professionnel de ${organisation.legalName} est suspendu : les demandes de devis ne sont plus possibles.`,
+    `Motif : ${organisation.reason}`,
+    "Votre historique reste consultable. Répondez à cet e-mail pour en parler avec nous.",
+  ])
+}
+
+export async function sendOrganisationReinstatedEmail(
+  to: string,
+  organisation: { legalName: string },
+  about: EmailAbout = {},
+): Promise<void> {
+  await deliverParagraphs("organisation_reinstated", about, to, "Votre compte professionnel est rétabli", [
+    `Le compte professionnel de ${organisation.legalName} est rétabli.`,
+    `Vous pouvez à nouveau demander vos devis depuis votre espace : ${PRO_SPACE_URL()}`,
+  ])
+}
+
+export interface OrganisationRequestAlert {
+  legalName: string
+  siret: string
+  type: OrganisationType
+  /** False when the registry could not confirm an open establishment. */
+  registryVerified: boolean
+}
+
+/** Internal alert to SCS admins: not a customer e-mail, so not journaled (12.7c). */
+export async function sendOrganisationRequestAlertEmail(
+  to: string[],
+  request: OrganisationRequestAlert,
+): Promise<void> {
+  if (to.length === 0) return
+  const reviewUrl = `${env.WEB_BASE_URL}/admin/organisations`
+  const lines = [
+    `Nouvelle demande de compte professionnel : ${request.legalName} (${ORGANISATION_TYPE_LABELS[request.type]}), SIRET ${request.siret}.`,
+    request.registryVerified
+      ? "Le registre des entreprises confirme un établissement actif."
+      : "Attention : le registre des entreprises n'a pas confirmé un établissement actif.",
+    `À valider ici : ${reviewUrl}`,
+  ]
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    subject: `[À valider] Compte pro — ${request.legalName}`,
+    text: lines.join("\n\n"),
+    html: lines.map((line) => `<p>${escapeHtml(line)}</p>`).join(""),
   })
 }
 

@@ -67,7 +67,7 @@ describe("proSignupSchema", () => {
   it("refuses a SIRET whose key is wrong, on the siret field", () => {
     const result = proSignupSchema.safeParse({ ...valid, siret: "73282932000075" })
     expect(result.success).toBe(false)
-    expect(result.error?.issues[0].path).toEqual(["siret"])
+    expect(result.error?.issues[0]?.path).toEqual(["siret"])
   })
 
   it("refuses an unknown organisation type", () => {

@@ -41,6 +41,7 @@ import { startNewsletterPurgeScheduler } from "./newsletter/retention.js"
 import { adminOrderRoutes } from "./orders/admin.js"
 import { startOrderConfirmationScheduler } from "./orders/confirmation.js"
 import { orderRoutes } from "./orders/index.js"
+import { organisationRoutes } from "./organisations/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
 import { adminPayoutRoutes } from "./payouts/index.js"
@@ -128,6 +129,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   }))
 
   await fastify.register(authRoutes, { prefix: "/api/auth" })
+  await fastify.register(organisationRoutes, { prefix: "/api/organisations" })
   await fastify.register(productRoutes, { prefix: "/api/products" })
   await fastify.register(productCategoryRoutes, { prefix: "/api/product-categories" })
   await fastify.register(tagRoutes, { prefix: "/api/tags" })
