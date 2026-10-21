@@ -509,14 +509,6 @@ function toggleUpload(docType: string) {
   font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 .items {
   list-style: none;
   margin: 0 0 1.25rem;
