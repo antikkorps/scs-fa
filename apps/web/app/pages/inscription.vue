@@ -109,6 +109,10 @@ async function submit() {
         Déjà un compte ?
         <NuxtLink to="/connexion">Se connecter</NuxtLink>
       </p>
+      <p class="auth-alt">
+        Armurier, club, sécurité privée ou administration ?
+        <NuxtLink to="/pro/inscription">Ouvrir un compte professionnel</NuxtLink>
+      </p>
     </form>
   </div>
 </template>
