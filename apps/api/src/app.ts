@@ -41,6 +41,8 @@ import { startNewsletterPurgeScheduler } from "./newsletter/retention.js"
 import { adminOrderRoutes } from "./orders/admin.js"
 import { startOrderConfirmationScheduler } from "./orders/confirmation.js"
 import { orderRoutes } from "./orders/index.js"
+import { adminOrganisationRoutes } from "./organisations/admin.js"
+import { organisationRoutes } from "./organisations/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
 import { adminPayoutRoutes } from "./payouts/index.js"
@@ -128,6 +130,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   }))
 
   await fastify.register(authRoutes, { prefix: "/api/auth" })
+  await fastify.register(organisationRoutes, { prefix: "/api/organisations" })
   await fastify.register(productRoutes, { prefix: "/api/products" })
   await fastify.register(productCategoryRoutes, { prefix: "/api/product-categories" })
   await fastify.register(tagRoutes, { prefix: "/api/tags" })
@@ -153,6 +156,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(adminLegalDocumentRoutes, { prefix: "/api/admin/legal-documents" })
   await fastify.register(adminPaymentRoutes, { prefix: "/api/admin/payments" })
   await fastify.register(adminOrderRoutes, { prefix: "/api/admin/orders" })
+  await fastify.register(adminOrganisationRoutes, { prefix: "/api/admin/organisations" })
   await fastify.register(adminShipmentRoutes, { prefix: "/api/admin/shipments" })
   await fastify.register(adminShippingRateRoutes, { prefix: "/api/admin/shipping-rates" })
   await fastify.register(adminBlogRoutes, { prefix: "/api/admin/blog" })

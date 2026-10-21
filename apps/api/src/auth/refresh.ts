@@ -58,7 +58,7 @@ export const refreshRoute: FastifyPluginAsync = async (fastify) => {
     // is detectable) and issue a new pair within the same family.
     await markRefreshTokenRevoked(stored.id)
 
-    const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, stored.deviceLabel, {
+    const tokens = await issueTokens(fastify, user, stored.deviceLabel, {
       familyId: stored.familyId,
       sessionExpiresAt: stored.sessionExpiresAt,
     })
