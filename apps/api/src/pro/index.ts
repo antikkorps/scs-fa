@@ -3,6 +3,7 @@ import { authenticate } from "../auth/authenticate.js"
 import { requireApprovedPro } from "./access.js"
 import { proCatalogueRoutes } from "./catalogue.js"
 import { quoteBasketRoutes } from "./quote-basket.js"
+import { quoteRequestRoutes } from "./quote-requests.js"
 
 /** Everything under /api/pro: members of an approved organisation only (story 12.8c). */
 export const proRoutes: FastifyPluginAsync = async (fastify) => {
@@ -14,4 +15,5 @@ export const proRoutes: FastifyPluginAsync = async (fastify) => {
   })
   await fastify.register(proCatalogueRoutes)
   await fastify.register(quoteBasketRoutes, { prefix: "/quote-basket" })
+  await fastify.register(quoteRequestRoutes, { prefix: "/quote-requests" })
 }

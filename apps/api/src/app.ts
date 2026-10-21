@@ -46,7 +46,9 @@ import { organisationRoutes } from "./organisations/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
 import { adminPayoutRoutes } from "./payouts/index.js"
+import { adminQuoteRequestRoutes } from "./pro/admin-quotes.js"
 import { proRoutes } from "./pro/index.js"
+import { startQuoteRequestPurgeScheduler } from "./pro/retention.js"
 import { productCategoryRoutes } from "./product-categories/index.js"
 import { adminProductRoutes } from "./products/admin.js"
 import { productRoutes } from "./products/index.js"
@@ -159,6 +161,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(adminPaymentRoutes, { prefix: "/api/admin/payments" })
   await fastify.register(adminOrderRoutes, { prefix: "/api/admin/orders" })
   await fastify.register(adminOrganisationRoutes, { prefix: "/api/admin/organisations" })
+  await fastify.register(adminQuoteRequestRoutes, { prefix: "/api/admin/quote-requests" })
   await fastify.register(adminShipmentRoutes, { prefix: "/api/admin/shipments" })
   await fastify.register(adminShippingRateRoutes, { prefix: "/api/admin/shipping-rates" })
   await fastify.register(adminBlogRoutes, { prefix: "/api/admin/blog" })
@@ -181,6 +184,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   startAuditPurgeScheduler(fastify)
   startNewsletterPurgeScheduler(fastify)
   startLoginChallengePurgeScheduler(fastify)
+  startQuoteRequestPurgeScheduler(fastify)
   startOrderConfirmationScheduler(fastify)
   startHenrriScheduler(fastify)
   startShipmentTrackingScheduler(fastify)
