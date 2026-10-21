@@ -159,6 +159,17 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Destinataires | Scaleway (stockage) |
 | Durée | Les 14 dernières sauvegardes quotidiennes, les plus anciennes supprimées au fur et à mesure |
 
+### 12. Comptes professionnels et demandes de devis
+
+| | |
+|---|---|
+| Finalité | Ouvrir des comptes aux professionnels (armuriers, clubs de tir, sécurité privée, administrations) après vérification par SCS ; recevoir et suivre leurs demandes de devis |
+| Base légale | Mesures précontractuelles prises à la demande de la personne ; intérêt légitime (vérifier qu'un compte pro correspond à un établissement réel) |
+| Personnes concernées | Représentants des organisations professionnelles |
+| Données | Nom, prénom, e-mail du représentant ; raison sociale, SIRET, type d'organisation, réponse du registre des entreprises au moment de la demande ; décision de SCS et son motif ; conditions commerciales ; articles et quantités demandés, message libre |
+| Destinataires | Personnel habilité de SCS Firearms ; Hetzner ; Brevo (e-mails de suivi). Le SIRET est vérifié auprès de l'API publique Recherche d'entreprises de l'État, qui ne reçoit que ce numéro |
+| Durée | Demande de devis jamais convertie en commande : 3 ans après sa dernière activité (purge quotidienne). Demande convertie : conservée avec la commande (10 ans). Organisation : tant que le compte existe |
+
 ## Mesures de sécurité communes
 
 - Site servi exclusivement en HTTPS ; serveur limité à SSH, HTTP et HTTPS.

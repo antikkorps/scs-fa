@@ -236,6 +236,10 @@ usePageSeo({
             <td>10 ans, au titre des obligations comptables (article L123-22 du Code de commerce)</td>
           </tr>
           <tr>
+            <td>Demandes de devis (comptes professionnels)</td>
+            <td>3 ans après leur dernière activité si elles n'aboutissent pas à une commande ; avec la commande sinon</td>
+          </tr>
+          <tr>
             <td>Journal des opérations sensibles</td>
             <td>
               Historique d'une commande (paiements, expéditions, factures, e-mails envoyés) : 10 ans à compter de la
