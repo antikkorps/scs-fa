@@ -230,7 +230,8 @@ async function retry(id: string) {
       <h2 id="step-export" class="panel__title">Modifier le catalogue dans Excel</h2>
       <p class="hint">
         Téléchargez le catalogue dans les colonnes de l'import : modifiez prix et textes, ajoutez des lignes, passez
-        <em>Actif</em> à « oui » ou « non » (même produit chez deux fournisseurs : une ligne active, l'autre non), puis
+        <em>Actif</em> à « oui » ou « non » (même produit chez deux fournisseurs : une ligne active, l'autre non),
+        <em>Réservé pro</em> à « oui » pour un article que seuls les comptes professionnels validés verront, puis
         déposez le fichier ci-dessous. Le stock n'y figure pas : un fichier ne le modifie jamais.
       </p>
       <p class="hint">

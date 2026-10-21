@@ -225,10 +225,18 @@ describe("parseCatalogImportTable", () => {
     costPriceHt: "300",
     priceHt: "429,99",
   }
+  const parse = (over: Record<string, string>) =>
+    parseCatalogImportTable([header, line({ ...valid, ...over })]).rows[0]
+
+  it("reads « Réservé pro » as pro / public / unchanged (story 12.8c)", () => {
+    expect(CATALOG_IMPORT_COLUMNS.map((column) => column.header)).toContain("Réservé pro")
+    expect(parse({ proOnly: "oui" })?.data?.proOnly).toBe(true)
+    expect(parse({ proOnly: "non" })?.data?.proOnly).toBe(false)
+    expect(parse({})?.data?.proOnly).toBeNull()
+    expect(parse({ proOnly: "pros" })?.errors.join()).toMatch(/« Réservé pro » doit valoir/)
+  })
 
   it("reads « Actif » as on / off / unchanged, and the export's « Version »", () => {
-    const parse = (over: Record<string, string>) =>
-      parseCatalogImportTable([header, line({ ...valid, ...over })]).rows[0]
     expect(parse({ active: "oui" })?.data?.active).toBe(true)
     expect(parse({ active: "Non" })?.data?.active).toBe(false)
     expect(parse({})?.data).toMatchObject({ active: null, version: null })
