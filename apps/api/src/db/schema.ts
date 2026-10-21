@@ -4,6 +4,7 @@
 
 import { relations, sql } from "drizzle-orm"
 import {
+  type AnyPgColumn,
   boolean,
   check,
   customType,
@@ -60,6 +61,16 @@ export const addressTypeEnum = pgEnum("address_type", ["shipping", "billing", "b
 export const legalCategoryEnum = pgEnum("legal_category", ["A", "B", "C", "D", "none"])
 // Issue d'un événement d'audit (story 12.7b)
 export const auditResultEnum = pgEnum("audit_result", ["success", "failure"])
+// Story 12.8b — pro accounts (values mirror ORGANISATION_TYPES / _STATUSES in shared).
+export const organisationTypeEnum = pgEnum("organisation_type", ["armurier", "club", "securite_privee", "administration"])
+export const organisationStatusEnum = pgEnum("organisation_status", ["pending", "approved", "rejected", "suspended"])
+// What the company registry said of the SIRET at signup; only `verified` is an open establishment.
+export const organisationRegistryCheckEnum = pgEnum("organisation_registry_check", [
+  "verified",
+  "inactive",
+  "not_found",
+  "unavailable",
+])
 // Expédition (story 11.9) — reflets exacts de SHIPMENT_STATUSES / ORDER_SHIPPING_STATUSES (@armurier/shared)
 export const shipmentStatusEnum = pgEnum("shipment_status", ["preparing", "shipped", "delivered"])
 export const orderShippingStatusEnum = pgEnum("order_shipping_status", [
@@ -159,6 +170,9 @@ export const users = pgTable(
 
     // Rôles
     role: userRoleEnum("role").notNull().default("customer"),
+    // Story 12.8b — a pro is a customer attached to an organisation (one person each, for now).
+    // The annotation breaks the users ↔ organisations type cycle.
+    organisationId: uuid("organisation_id").references((): AnyPgColumn => organisations.id),
 
     // Statut légal
     legalVerifiedAt: timestamp("legal_verified_at"),
@@ -208,6 +222,8 @@ export const users = pgTable(
       columns: [t.legalVerifiedBy],
       foreignColumns: [t.id],
     }),
+    // Unique while an organisation has a single buyer: dropping it is all several buyers will need.
+    uniqueIndex("uq_users_organisation").on(t.organisationId),
   ],
 )
 
@@ -224,7 +240,51 @@ export const usersRelations = relations(users, ({ many, one }) => ({
     fields: [users.legalVerifiedBy],
     references: [users.id],
   }),
+  organisation: one(organisations, {
+    fields: [users.organisationId],
+    references: [organisations.id],
+  }),
 }))
+
+// ============================================================================
+// Story 12.8b — organisations (pro accounts), approved by hand in the back-office
+// ============================================================================
+
+export const organisations = pgTable(
+  "organisations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    legalName: varchar("legal_name", { length: 255 }).notNull(),
+    siret: varchar("siret", { length: 14 }).notNull(),
+    type: organisationTypeEnum("type").notNull(),
+    status: organisationStatusEnum("status").notNull().default("pending"),
+
+    // The registry's answer at signup, kept so SCS judges on what it said then.
+    registryCheck: organisationRegistryCheckEnum("registry_check").notNull(),
+    registrySnapshot: jsonb("registry_snapshot"),
+    registryCheckedAt: timestamp("registry_checked_at").notNull().defaultNow(),
+
+    // Last approval, refusal or suspension; the reason is mailed on a refusal or a suspension.
+    reviewedBy: uuid("reviewed_by"),
+    reviewedAt: timestamp("reviewed_at"),
+    reviewReason: text("review_reason"),
+
+    // Commercial terms, set by SCS (decision 2026-10-19).
+    discountPct: decimal("discount_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+    net30Allowed: boolean("net30_allowed").notNull().default(false),
+    showPrices: boolean("show_prices").notNull().default(false),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // A refused request may be filed again under the same SIRET; anything else is a duplicate.
+    uniqueIndex("uq_organisations_siret_open").on(t.siret).where(sql`${t.status} <> 'rejected'`),
+    index("idx_organisations_status").on(t.status),
+    foreignKey({ columns: [t.reviewedBy], foreignColumns: [users.id] }).onDelete("set null"),
+    check("chk_organisations_discount_pct", sql`${t.discountPct} >= 0 AND ${t.discountPct} <= 100`),
+  ],
+)
 
 // ============================================================================
 // Address book (multiple saved shipping/billing addresses per user)

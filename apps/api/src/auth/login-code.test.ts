@@ -8,8 +8,8 @@ import { db } from "../db/client.js"
 import { auditLogs, loginChallenges, refreshTokens, users } from "../db/schema.js"
 import { LOGIN_CODE_MAX_ATTEMPTS, LOGIN_CODE_MAX_SENDS, purgeLoginChallenges } from "./login-code.js"
 
-// No account needs a code yet: the pro accounts of 12.8b will. The suite picks
-// its own accounts through the policy, and reads the codes off the mailer.
+// The policy (members of an organisation, story 12.8b) is tested on its own;
+// this suite picks its own accounts through it, and reads the codes off the mailer.
 const { codeAccounts, sentCodes } = vi.hoisted(() => ({
   codeAccounts: new Set<string>(),
   sentCodes: [] as { to: string; code: string }[],

@@ -112,7 +112,7 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
     // Story 12.8a: no session yet for these accounts — the mailed code opens it.
     if (needsCode) return reply.code(200).send(await startLoginChallenge(user, deviceLabel ?? null))
 
-    const tokens = await issueTokens(fastify, { id: user.id, role: user.role }, deviceLabel ?? null)
+    const tokens = await issueTokens(fastify, user, deviceLabel ?? null)
 
     await recordAuditEvent({
       userId: user.id,
