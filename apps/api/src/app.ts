@@ -46,6 +46,7 @@ import { organisationRoutes } from "./organisations/index.js"
 import { adminPaymentRoutes } from "./payments/admin.js"
 import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
 import { adminPayoutRoutes } from "./payouts/index.js"
+import { proRoutes } from "./pro/index.js"
 import { productCategoryRoutes } from "./product-categories/index.js"
 import { adminProductRoutes } from "./products/admin.js"
 import { productRoutes } from "./products/index.js"
@@ -131,6 +132,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   await fastify.register(authRoutes, { prefix: "/api/auth" })
   await fastify.register(organisationRoutes, { prefix: "/api/organisations" })
+  await fastify.register(proRoutes, { prefix: "/api/pro" })
   await fastify.register(productRoutes, { prefix: "/api/products" })
   await fastify.register(productCategoryRoutes, { prefix: "/api/product-categories" })
   await fastify.register(tagRoutes, { prefix: "/api/tags" })

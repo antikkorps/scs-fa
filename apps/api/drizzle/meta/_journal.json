@@ -225,6 +225,13 @@
       "when": 1792611634571,
       "tag": "0031_story_12_8c_product_audience",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792612471087,
+      "tag": "0032_story_12_8c_quote_requests",
+      "breakpoints": true
     }
   ]
 }

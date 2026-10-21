@@ -15,6 +15,7 @@ import {
   integer,
   jsonb,
   pgEnum,
+  pgSequence,
   pgTable,
   primaryKey,
   text,
@@ -62,6 +63,17 @@ export const legalCategoryEnum = pgEnum("legal_category", ["A", "B", "C", "D", "
 // Issue d'un événement d'audit (story 12.7b)
 export const auditResultEnum = pgEnum("audit_result", ["success", "failure"])
 // Story 12.8b — pro accounts (values mirror ORGANISATION_TYPES / _STATUSES in shared).
+// Story 12.8c — values mirror QUOTE_REQUEST_STATUSES in shared.
+export const quoteRequestStatusEnum = pgEnum("quote_request_status", [
+  "requested",
+  "in_review",
+  "sent",
+  "accepted",
+  "declined",
+  "expired",
+  "converted",
+  "cancelled",
+])
 export const productAudienceEnum = pgEnum("product_audience", ["public", "pro"])
 export const organisationTypeEnum = pgEnum("organisation_type", ["armurier", "club", "securite_privee", "administration"])
 export const organisationStatusEnum = pgEnum("organisation_status", ["pending", "approved", "rejected", "suspended"])
@@ -284,6 +296,87 @@ export const organisations = pgTable(
     index("idx_organisations_status").on(t.status),
     foreignKey({ columns: [t.reviewedBy], foreignColumns: [users.id] }).onDelete("set null"),
     check("chk_organisations_discount_pct", sql`${t.discountPct} >= 0 AND ${t.discountPct} <= 100`),
+  ],
+)
+
+// ============================================================================
+// Story 12.8c — quote requests: a pro's basket becomes a request SCS answers
+// with a quote (12.8d). No public price ever leaves for the pro.
+// ============================================================================
+
+/** The pro's basket being prepared: what and how many, never a price. */
+export const quoteBasketItems = pgTable(
+  "quote_basket_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    variantId: uuid("variant_id").notNull(),
+    qty: integer("qty").notNull(),
+    addedAt: timestamp("added_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_quote_basket_line").on(t.userId, t.variantId),
+    foreignKey({ columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.variantId], foreignColumns: [productVariants.id] }).onDelete("cascade"),
+    check("chk_quote_basket_qty", sql`${t.qty} BETWEEN 1 AND 9999`),
+  ],
+)
+
+/** Numbers DR-<year>-<n>: one sequence, never reset (a request is no accounting document). */
+export const quoteRequestNumberSeq = pgSequence("quote_request_number_seq")
+
+export const quoteRequests = pgTable(
+  "quote_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    number: varchar("number", { length: 20 }).notNull().unique(),
+    organisationId: uuid("organisation_id").notNull(),
+    requestedBy: uuid("requested_by").notNull(),
+    message: text("message"),
+    status: quoteRequestStatusEnum("status").notNull().default("requested"),
+    // Set with the quote (12.8d).
+    validUntil: timestamp("valid_until"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    // Last activity: a request never converted is purged 3 years after it.
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_quote_requests_organisation").on(t.organisationId, t.createdAt),
+    index("idx_quote_requests_status").on(t.status),
+    foreignKey({ columns: [t.organisationId], foreignColumns: [organisations.id] }),
+    foreignKey({ columns: [t.requestedBy], foreignColumns: [users.id] }),
+  ],
+)
+
+/** The lines as asked, frozen: a product edited or deleted later leaves them as they were. */
+export const quoteRequestItems = pgTable(
+  "quote_request_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    quoteRequestId: uuid("quote_request_id").notNull(),
+    position: integer("position").notNull(),
+    productId: uuid("product_id"),
+    variantId: uuid("variant_id"),
+    productName: varchar("product_name", { length: 255 }).notNull(),
+    productSku: varchar("product_sku", { length: 100 }).notNull(),
+    variantSku: varchar("variant_sku", { length: 150 }),
+    variantLabel: varchar("variant_label", { length: 255 }),
+    legalCategory: legalCategoryEnum("legal_category"),
+    qty: integer("qty").notNull(),
+    // For SCS only: the public price the quote starts from.
+    publicPriceHt: decimal("public_price_ht", { precision: 10, scale: 2 }).notNull(),
+    vatPct: decimal("vat_pct", { precision: 4, scale: 2 }).notNull(),
+    // The quote's own figures (12.8d).
+    quotedPriceHt: decimal("quoted_price_ht", { precision: 10, scale: 2 }),
+    lineDiscountPct: decimal("line_discount_pct", { precision: 5, scale: 2 }),
+  },
+  (t) => [
+    index("idx_quote_request_items_request").on(t.quoteRequestId, t.position),
+    foreignKey({ columns: [t.quoteRequestId], foreignColumns: [quoteRequests.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.productId], foreignColumns: [products.id] }).onDelete("set null"),
+    foreignKey({ columns: [t.variantId], foreignColumns: [productVariants.id] }).onDelete("set null"),
+    check("chk_quote_request_items_qty", sql`${t.qty} BETWEEN 1 AND 9999`),
   ],
 )
 

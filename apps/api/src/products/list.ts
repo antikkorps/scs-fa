@@ -1,4 +1,4 @@
-import { computePriceTtc, productFiltersSchema } from "@armurier/shared"
+import { computePriceTtc, type ProductFilters, productFiltersSchema } from "@armurier/shared"
 import { and, asc, desc, eq, gte, lte, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
@@ -18,104 +18,115 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
         })),
       })
     }
-
-    const { category, tags: tagSlugs, legalCategory, search, minPrice, maxPrice, page, limit } = parsed.data
-
-    // Only published products are publicly listable. Gun Art is its own universe
-    // served by /api/artworks, so its backing products are excluded here — this
+    // Only published products for everyone. Gun Art is its own universe served
+    // by /api/artworks, so its backing products are excluded here — this
     // endpoint is the armurerie catalogue (firearms, ammo, accessories…).
-    const conditions: SQL[] = [publiclyVisible(), ne(productCategories.category, "gun_art")]
-    if (category) conditions.push(eq(productCategories.slug, category))
-    if (legalCategory) conditions.push(eq(legalCategories.category, legalCategory))
-    if (minPrice !== undefined) conditions.push(gte(products.priceHt, minPrice.toString()))
-    if (maxPrice !== undefined) conditions.push(lte(products.priceHt, maxPrice.toString()))
-    if (search) {
-      conditions.push(sql`${products.searchVector} @@ websearch_to_tsquery('french', ${search})`)
-    }
-    if (tagSlugs) conditions.push(...(await buildTagFilterConditions(tagSlugs)))
-
-    const where = and(...conditions)
-
-    // Search results are ranked by relevance; otherwise featured first, then newest
-    const orderBy = search
-      ? [
-          desc(sql`ts_rank(${products.searchVector}, websearch_to_tsquery('french', ${search}))`),
-          desc(products.createdAt),
-        ]
-      : [desc(products.featured), desc(products.createdAt)]
-
-    const [{ total }] = await db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(products)
-      .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
-      .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
-      .where(where)
-
-    const rows = await db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        slug: products.slug,
-        name: products.name,
-        description: products.description,
-        priceHt: products.priceHt,
-        vatPct: products.vatPct,
-        stockQty: products.stockQty,
-        featured: products.featured,
-        requiresLegalVerification: products.requiresLegalVerification,
-        featuredImageUrl: products.featuredImageUrl,
-        categorySlug: productCategories.slug,
-        categoryName: productCategories.name,
-        legalCategory: legalCategories.category,
-        tags: productTagsJson,
-        // Distinguishes a piece that is gone for good from an ordinary product
-        // that is merely out of stock — they must not be worded, or marked up
-        // for search engines, the same way (story 11.3).
-        isUnique: ancientWeapons.isUnique,
-        createdAt: products.createdAt,
-      })
-      .from(products)
-      .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
-      .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
-      .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
-      .where(where)
-      .orderBy(...orderBy, asc(products.id))
-      .limit(limit)
-      .offset((page - 1) * limit)
-
-    const data = rows.map((r) => {
-      const priceHt = Number(r.priceHt)
-      const vatPct = Number(r.vatPct ?? 0)
-      return {
-        id: r.id,
-        sku: r.sku,
-        slug: r.slug,
-        name: r.name,
-        description: r.description,
-        priceHt,
-        vatPct,
-        priceTtc: computePriceTtc(priceHt, vatPct),
-        stockQty: r.stockQty,
-        featured: r.featured,
-        requiresLegalVerification: r.requiresLegalVerification,
-        featuredImageUrl: r.featuredImageUrl,
-        category: { slug: r.categorySlug, name: r.categoryName },
-        tags: r.tags,
-        isUnique: r.isUnique === true,
-        legalCategory: r.legalCategory,
-        createdAt: r.createdAt,
-      }
-    })
-
-    return reply.code(200).send({
-      data,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasMore: page * limit < total,
-      },
-    })
+    return reply
+      .code(200)
+      .send(await listCatalogue(parsed.data, and(publiclyVisible(), ne(productCategories.category, "gun_art")) as SQL))
   })
+}
+
+/**
+ * One page of the catalogue, filtered and ranked, under the visibility the
+ * caller sets: the public one, or the pro catalogue's (story 12.8c).
+ */
+export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
+  const { category, tags: tagSlugs, legalCategory, search, minPrice, maxPrice, page, limit } = filters
+
+  const conditions: SQL[] = [visibility]
+  if (category) conditions.push(eq(productCategories.slug, category))
+  if (legalCategory) conditions.push(eq(legalCategories.category, legalCategory))
+  if (minPrice !== undefined) conditions.push(gte(products.priceHt, minPrice.toString()))
+  if (maxPrice !== undefined) conditions.push(lte(products.priceHt, maxPrice.toString()))
+  if (search) {
+    conditions.push(sql`${products.searchVector} @@ websearch_to_tsquery('french', ${search})`)
+  }
+  if (tagSlugs) conditions.push(...(await buildTagFilterConditions(tagSlugs)))
+
+  const where = and(...conditions)
+
+  // Search results are ranked by relevance; otherwise featured first, then newest
+  const orderBy = search
+    ? [
+        desc(sql`ts_rank(${products.searchVector}, websearch_to_tsquery('french', ${search}))`),
+        desc(products.createdAt),
+      ]
+    : [desc(products.featured), desc(products.createdAt)]
+
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(products)
+    .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
+    .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
+    .where(where)
+
+  const rows = await db
+    .select({
+      id: products.id,
+      sku: products.sku,
+      slug: products.slug,
+      name: products.name,
+      description: products.description,
+      priceHt: products.priceHt,
+      vatPct: products.vatPct,
+      stockQty: products.stockQty,
+      featured: products.featured,
+      requiresLegalVerification: products.requiresLegalVerification,
+      featuredImageUrl: products.featuredImageUrl,
+      categorySlug: productCategories.slug,
+      categoryName: productCategories.name,
+      legalCategory: legalCategories.category,
+      tags: productTagsJson,
+      // Distinguishes a piece that is gone for good from an ordinary product
+      // that is merely out of stock — they must not be worded, or marked up
+      // for search engines, the same way (story 11.3).
+      isUnique: ancientWeapons.isUnique,
+      audience: products.audience,
+      createdAt: products.createdAt,
+    })
+    .from(products)
+    .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
+    .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
+    .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
+    .where(where)
+    .orderBy(...orderBy, asc(products.id))
+    .limit(limit)
+    .offset((page - 1) * limit)
+
+  const data = rows.map((r) => {
+    const priceHt = Number(r.priceHt)
+    const vatPct = Number(r.vatPct ?? 0)
+    return {
+      id: r.id,
+      sku: r.sku,
+      slug: r.slug,
+      name: r.name,
+      description: r.description,
+      priceHt,
+      vatPct,
+      priceTtc: computePriceTtc(priceHt, vatPct),
+      stockQty: r.stockQty,
+      featured: r.featured,
+      requiresLegalVerification: r.requiresLegalVerification,
+      featuredImageUrl: r.featuredImageUrl,
+      category: { slug: r.categorySlug, name: r.categoryName },
+      tags: r.tags,
+      isUnique: r.isUnique === true,
+      legalCategory: r.legalCategory,
+      audience: r.audience,
+      createdAt: r.createdAt,
+    }
+  })
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    },
+  }
 }

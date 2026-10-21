@@ -7,9 +7,10 @@ import { publicCrossSellsFor } from "./cross-sell.js"
 import { productTagsJson } from "./tag-filter.js"
 import { publiclyVisible } from "./visibility.js"
 
-// Shared lookup for a single published product (by id or by slug). Returns the
-// public detail shape, or null when not found / unpublished.
-async function fetchPublishedProduct(match: SQL) {
+// Shared lookup for a single published product (by id or by slug), under the
+// visibility the caller sets: the public one by default, or the pro
+// catalogue's (story 12.8c). Returns the detail shape, or null when not found.
+export async function fetchPublishedProduct(match: SQL, visibility: SQL = publiclyVisible()) {
   const [row] = await db
     .select({
       id: products.id,
@@ -54,6 +55,7 @@ async function fetchPublishedProduct(match: SQL) {
       ancientExpertDate: ancientWeapons.expertDate,
       ancientHistoricalInfo: ancientWeapons.historicalInfo,
       ancientIsUnique: ancientWeapons.isUnique,
+      audience: products.audience,
       createdAt: products.createdAt,
       updatedAt: products.updatedAt,
     })
@@ -61,8 +63,7 @@ async function fetchPublishedProduct(match: SQL) {
     .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
     .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
-    // Only published products are publicly accessible
-    .where(and(match, publiclyVisible()))
+    .where(and(match, visibility))
     .limit(1)
 
   if (!row) return null
@@ -132,6 +133,7 @@ async function fetchPublishedProduct(match: SQL) {
     hasAccessoryRestrictions: row.hasAccessoryRestrictions,
     accessoryRestrictionNotes: row.accessoryRestrictionNotes,
     featuredImageUrl: row.featuredImageUrl,
+    audience: row.audience,
     seo: {
       metaTitle: row.metaTitle,
       metaDescription: row.metaDescription,
