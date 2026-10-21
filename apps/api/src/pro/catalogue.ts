@@ -11,13 +11,9 @@ import { withNetPrices } from "./prices.js"
 
 /**
  * The pro catalogue (story 12.8c): the public armurerie and the products
- * reserved for pros, without public prices. Personal answers: never cached.
+ * reserved for pros, without public prices.
  */
 export const proCatalogueRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook("onSend", async (_request, reply) => {
-    reply.header("cache-control", "private, no-store")
-  })
-
   fastify.get("/products", async (request, reply) => {
     const parsed = productFiltersSchema.safeParse(request.query)
     if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))

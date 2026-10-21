@@ -44,8 +44,12 @@ describe("the pro catalogue (story 12.8c)", () => {
   })
 
   describe("who may open it", () => {
-    it("lets in a member of an approved organisation", async () => {
-      expect((await get("/api/pro/products", pro.token)).statusCode).toBe(200)
+    it("lets in a member of an approved organisation, with an answer no cache keeps", async () => {
+      const res = await get("/api/pro/products", pro.token)
+      expect(res.statusCode).toBe(200)
+      expect(res.headers["cache-control"]).toBe("private, no-store")
+      const basket = await get("/api/pro/quote-basket", pro.token)
+      expect(basket.headers["cache-control"]).toBe("private, no-store")
     })
 
     it("turns away an anonymous visitor, a private customer and an admin", async () => {
