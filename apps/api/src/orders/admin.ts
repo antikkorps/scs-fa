@@ -1,5 +1,5 @@
 import { adminOrderQuerySchema, uuidParamSchema } from "@armurier/shared"
-import { and, count, desc, eq, ilike, inArray, sql } from "drizzle-orm"
+import { and, count, desc, eq, ilike, inArray, ne, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { orderHistory } from "../audit/history.js"
 import { recordAuditEvent } from "../audit/record.js"
@@ -16,6 +16,7 @@ import {
 import { processHenrriDocument } from "../henrri/queue.js"
 import { validationError } from "../http.js"
 import { adminShippingView } from "../shipments/service.js"
+import { paymentOverdue } from "./expiry.js"
 
 // Row shape for the admin orders list: enough to triage without the full detail.
 const LIST_FIELDS = {
@@ -43,14 +44,17 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /api/admin/orders/summary — headline counts for the dashboard overview.
   // Declared before `/:id` so "summary" is never parsed as an order id.
   fastify.get("/summary", async (_request, reply) => {
-    const [[{ total }], byPayment, byLegal, invoicesNeedingAttention] = await Promise.all([
+    const [[{ total }], byPayment, byLegal, invoicesNeedingAttention, [{ overduePayments }]] = await Promise.all([
       db.select({ total: count() }).from(orders),
       db.select({ status: orders.paymentStatus, n: count() }).from(orders).groupBy(orders.paymentStatus),
+      // A cancelled order waits for nothing, documents included (story 12.9a).
       db
         .select({ status: orders.legalVerificationStatus, n: count() })
         .from(orders)
+        .where(ne(orders.paymentStatus, "cancelled"))
         .groupBy(orders.legalVerificationStatus),
       countDocumentsNeedingAttention(),
+      db.select({ overduePayments: count() }).from(orders).where(paymentOverdue()),
     ])
 
     const countWhere = (rows: Array<{ status: string; n: number }>, statuses: string[]) =>
@@ -65,6 +69,7 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
         docsToReview: countWhere(byLegal, ["pending", "docs_verifying"]),
         docsRejected: countWhere(byLegal, ["docs_rejected"]),
         invoicesNeedingAttention,
+        overduePayments,
         byPaymentStatus: Object.fromEntries(byPayment.map((r) => [r.status, r.n])),
         byLegalStatus: Object.fromEntries(byLegal.map((r) => [r.status, r.n])),
       },
@@ -77,13 +82,14 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) {
       return reply.code(400).send(validationError(parsed.error.issues))
     }
-    const { paymentStatus, legalStatus, shippingStatus, invoices, search, page, limit } = parsed.data
+    const { paymentStatus, legalStatus, shippingStatus, invoices, payments, search, page, limit } = parsed.data
 
     const conditions = [
       paymentStatus ? eq(orders.paymentStatus, paymentStatus) : undefined,
       legalStatus ? eq(orders.legalVerificationStatus, legalStatus) : undefined,
       shippingStatus ? eq(orders.shippingStatus, shippingStatus) : undefined,
       invoices === "attention" ? inArray(orders.id, ordersNeedingAttention()) : undefined,
+      payments === "overdue" ? paymentOverdue() : undefined,
       search ? ilike(users.email, `%${search}%`) : undefined,
     ].filter(Boolean)
     const where = conditions.length ? and(...conditions) : undefined

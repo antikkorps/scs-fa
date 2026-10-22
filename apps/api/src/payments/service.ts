@@ -71,12 +71,15 @@ export interface StripePaymentInit {
  */
 export async function initStripePayment(orderId: string, userId: string): Promise<StripePaymentInit> {
   const [order] = await db
-    .select({ id: orders.id, userId: orders.userId })
+    .select({ id: orders.id, userId: orders.userId, paymentStatus: orders.paymentStatus })
     .from(orders)
     .where(eq(orders.id, orderId))
     .limit(1)
   if (!order || order.userId !== userId) {
     throw new PaymentError(404, "NotFound", "Order not found")
+  }
+  if (order.paymentStatus === "cancelled") {
+    throw new PaymentError(409, "OrderCancelled", "This order was cancelled")
   }
 
   const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId)).limit(1)
@@ -648,6 +651,26 @@ export async function recomputeOrderPaymentStatus(orderId: string): Promise<void
     .from(paymentVirement)
     .where(eq(paymentVirement.orderId, orderId))
     .limit(1)
+
+  // Cancelled for lack of payment (story 12.9a), its stock back on sale: money
+  // landing now must not revive it. SCS sees it in the history and refunds.
+  if (order.paymentStatus === "cancelled") {
+    const paidBucket = [carte, virement].some(
+      (bucket) => bucket && PAID_PAYMENT_STATUSES.includes(bucket.paymentStatus),
+    )
+    if (paidBucket) {
+      await recordAuditEvent({
+        userRole: "system",
+        entityType: "order",
+        entityId: orderId,
+        orderId,
+        action: "payment.received_after_cancellation",
+        result: "failure",
+        error: "order.cancelled",
+      })
+    }
+    return
+  }
 
   const carteSatisfied = !carte || PAID_PAYMENT_STATUSES.includes(carte.paymentStatus)
   const virementDue = order.itemsJson.some((i) => i.requiresPaymentVirement)

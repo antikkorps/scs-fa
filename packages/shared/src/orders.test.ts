@@ -3,11 +3,13 @@ import {
   amountsMatchToCent,
   calculateOrderPaymentSplit,
   extractTransferReference,
+  orderPaymentDeadline,
   orderReference,
   PAYMENT_SPLIT,
   parseBankAmount,
   parseBankStatementCsv,
   requiresVirement,
+  transferReminderDate,
   VIREMENT_REF_ALPHABET,
   virementReferenceFromBytes,
 } from "./orders.js"
@@ -190,5 +192,23 @@ describe("calculateOrderPaymentSplit", () => {
 describe("orderReference", () => {
   it("is the first eight characters of the id, upper-cased", () => {
     expect(orderReference("0b7d1f3e-8a51-4c1e-9d0a-2f6b1c3e4d5f")).toBe("0B7D1F3E")
+  })
+})
+
+describe("orderPaymentDeadline (story 12.9a)", () => {
+  const placedAt = new Date("2026-10-22T10:00:00Z")
+
+  it("gives a card-only order one hour", () => {
+    expect(orderPaymentDeadline(placedAt, { hasTransfer: false })).toEqual(new Date("2026-10-22T11:00:00Z"))
+  })
+
+  it("gives an order with a bank transfer seven days, card part included", () => {
+    expect(orderPaymentDeadline(placedAt, { hasTransfer: true })).toEqual(new Date("2026-10-29T10:00:00Z"))
+  })
+})
+
+describe("transferReminderDate (story 12.9a)", () => {
+  it("falls four days after the order", () => {
+    expect(transferReminderDate(new Date("2026-10-22T10:00:00Z"))).toEqual(new Date("2026-10-26T10:00:00Z"))
   })
 })

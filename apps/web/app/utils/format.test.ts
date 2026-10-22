@@ -4,6 +4,7 @@ import {
   artworkImage,
   availabilityLabel,
   fallbackImage,
+  formatCountdown,
   formatDate,
   formatDateTime,
   formatEuros,
@@ -114,5 +115,18 @@ describe("availabilityLabel", () => {
     expect(availabilityLabel(16, 25)).toBe("16 / 25 disponibles")
     expect(availabilityLabel(1, 25)).toBe("Dernier exemplaire")
     expect(availabilityLabel(0, 25)).toBe("Édition épuisée")
+  })
+})
+
+describe("formatCountdown (story 12.9a)", () => {
+  it("shows minutes and two-digit seconds", () => {
+    expect(formatCountdown(29 * 60_000 + 5_000)).toBe("29:05")
+    expect(formatCountdown(61_000)).toBe("1:01")
+  })
+
+  it("rounds up to the second, and never goes below zero", () => {
+    expect(formatCountdown(500)).toBe("0:01")
+    expect(formatCountdown(0)).toBe("0:00")
+    expect(formatCountdown(-3_000)).toBe("0:00")
   })
 })

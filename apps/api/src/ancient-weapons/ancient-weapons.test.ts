@@ -251,6 +251,45 @@ describe("Collection weapons (story 11.2)", () => {
       expect((await addToCart(rivalToken, uniqueVariantId)).statusCode).toBe(201)
     })
 
+    it("tells the holder until when the piece is held, and nobody else (story 12.9a)", async () => {
+      await addToCart(buyerToken, uniqueVariantId)
+      const cartOf = async (token: string) =>
+        (await app.inject({ method: "GET", url: "/api/cart", headers: { authorization: `Bearer ${token}` } })).json()
+          .data
+      const [variant] = await db
+        .select({ reservedUntil: productVariants.reservedUntil })
+        .from(productVariants)
+        .where(eq(productVariants.id, uniqueVariantId))
+
+      const line = (await cartOf(buyerToken)).items[0]
+      expect(Date.parse(line.heldUntil)).toBe(variant.reservedUntil?.getTime())
+    })
+
+    it("stops counting down once the hold has lapsed", async () => {
+      await addToCart(buyerToken, uniqueVariantId)
+      await db
+        .update(productVariants)
+        .set({ reservedUntil: sql`now() - interval '1 minute'` })
+        .where(eq(productVariants.id, uniqueVariantId))
+
+      const cart = await app.inject({
+        method: "GET",
+        url: "/api/cart",
+        headers: { authorization: `Bearer ${buyerToken}` },
+      })
+      expect(cart.json().data.items[0].heldUntil).toBeNull()
+    })
+
+    it("never counts down an ordinary multi-stock product", async () => {
+      await addToCart(buyerToken, plainVariantId)
+      const cart = await app.inject({
+        method: "GET",
+        url: "/api/cart",
+        headers: { authorization: `Bearer ${buyerToken}` },
+      })
+      expect(cart.json().data.items[0].heldUntil).toBeNull()
+    })
+
     it("treats a lapsed hold as free, without any sweeper running", async () => {
       await addToCart(buyerToken, uniqueVariantId)
       // Push the hold into the past: nothing sweeps it, it is simply ignored.

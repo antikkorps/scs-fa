@@ -28,6 +28,7 @@ function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
     updatedAt: "2026-10-14T09:00:00.000Z",
     legalVerificationStatus: "completed",
     paymentStatus: "partially_refunded",
+    paymentDueAt: null,
     subtotalHt: 200,
     vatAmount: 25.5,
     totalTtc: 225.5,
@@ -80,5 +81,27 @@ describe("my order — invoices (story 12.6)", () => {
     getOrder.mockResolvedValue(order())
     const wrapper = await mounted()
     expect(wrapper.find("#invoices-h").exists()).toBe(false)
+  })
+})
+
+describe("my order — unpaid orders (story 12.9a)", () => {
+  it("says until when an unpaid order can be paid", async () => {
+    getOrder.mockResolvedValue(
+      order({
+        paymentStatus: "pending",
+        paymentDueAt: "2026-10-21T09:00:00.000Z",
+        payment: { carte: null, virement: null },
+      }),
+    )
+    const wrapper = await mounted()
+    expect(wrapper.find(".cta-pay").text()).toContain("Procéder au paiement")
+    expect(wrapper.find(".cta-pay__deadline").text()).toContain("À régler avant le")
+  })
+
+  it("tells a cancelled order apart, with nothing left to pay or upload", async () => {
+    getOrder.mockResolvedValue(order({ paymentStatus: "cancelled", payment: { carte: null, virement: null } }))
+    const wrapper = await mounted()
+    expect(wrapper.text()).toContain("Commande annulée faute de paiement")
+    expect(wrapper.text()).not.toContain("Procéder au paiement")
   })
 })

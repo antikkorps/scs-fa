@@ -1,3 +1,4 @@
+import { TRANSFER_REMINDER_DAYS, UNPAID_CARD_ORDER_MINUTES, UNPAID_TRANSFER_ORDER_DAYS } from "./constants.js"
 import { normaliseHeader, parseCsv } from "./csv.js"
 import { computeVatTotals, round2 } from "./pricing.js"
 
@@ -230,6 +231,20 @@ export function calculateOrderPaymentSplit(items: PaymentSplitItem[]): PaymentSp
  * The short reference shown to the customer (order pages, e-mails): the first
  * eight characters of the order id, upper-cased.
  */
+const MINUTE_MS = 60 * 1000
+const DAY_MS = 24 * 60 * MINUTE_MS
+
+/** When an unpaid order is cancelled (story 12.9a): one hour by card, a week with a bank transfer. */
+export function orderPaymentDeadline(placedAt: Date, order: { hasTransfer: boolean }): Date {
+  const delay = order.hasTransfer ? UNPAID_TRANSFER_ORDER_DAYS * DAY_MS : UNPAID_CARD_ORDER_MINUTES * MINUTE_MS
+  return new Date(placedAt.getTime() + delay)
+}
+
+/** When a customer who has not sent their bank transfer gets a reminder (story 12.9a). */
+export function transferReminderDate(placedAt: Date): Date {
+  return new Date(placedAt.getTime() + TRANSFER_REMINDER_DAYS * DAY_MS)
+}
+
 export function orderReference(orderId: string): string {
   return orderId.slice(0, 8).toUpperCase()
 }

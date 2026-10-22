@@ -8,7 +8,7 @@ import { and, asc, eq, inArray, ne, sql } from "drizzle-orm"
 import type { FastifyBaseLogger } from "fastify"
 import { recordAuditEvent, recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { artworkPrints, orders, paymentCarte, paymentVirement, productVariants, refunds } from "../db/schema.js"
+import { orders, paymentCarte, paymentVirement, refunds } from "../db/schema.js"
 import {
   nearestExpressibleRefunds,
   type RefundRecord,
@@ -17,6 +17,7 @@ import {
 } from "../henrri/credit-notes.js"
 import { buildInvoiceDraft, type DraftRefusal } from "../henrri/documents.js"
 import { enqueueCreditNote } from "../henrri/queue.js"
+import { releaseOrderInventory } from "../orders/inventory.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import { PaymentError } from "./service.js"
@@ -382,20 +383,7 @@ export async function applyRefundEffects(orderId: string): Promise<string> {
     if (!row) return false // already refunded — idempotent no-op
     await recordOrderStatusChange(orderId, "payment", { from: order.paymentStatus, to: "refunded" }, tx)
 
-    for (const item of order.itemsJson) {
-      if (item.variantId) {
-        await tx
-          .update(productVariants)
-          .set({ stockQty: sql`${productVariants.stockQty} + ${item.qty}`, updatedAt: new Date() })
-          .where(eq(productVariants.id, item.variantId))
-      }
-      if (item.printId) {
-        await tx
-          .update(artworkPrints)
-          .set({ status: "available", orderId: null, updatedAt: new Date() })
-          .where(and(eq(artworkPrints.id, item.printId), eq(artworkPrints.orderId, orderId)))
-      }
-    }
+    await releaseOrderInventory(tx, orderId, order.itemsJson)
     return true
   })
 

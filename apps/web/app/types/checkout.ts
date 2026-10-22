@@ -71,6 +71,8 @@ export interface OrderDetail {
   updatedAt: string
   legalVerificationStatus: string
   paymentStatus: string
+  /** Past this, an unpaid order is cancelled (story 12.9a); null once paid or cancelled. */
+  paymentDueAt: string | null
   subtotalHt: number
   vatAmount: number
   totalTtc: number

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { CART_HOLD_MINUTES, UNPAID_CARD_ORDER_MINUTES, UNPAID_TRANSFER_ORDER_DAYS } from "./constants.js"
 import { LEGAL_IDENTITY } from "./legal-identity.js"
 import { escapeHtml, renderTermsHtml, renderTermsText, TERMS_SECTIONS } from "./terms-content.js"
 
@@ -31,5 +32,15 @@ describe("terms content (story 12.1)", () => {
 
   it("escapes HTML-significant characters", () => {
     expect(escapeHtml(`<a href="x">&'`)).toBe("&lt;a href=&quot;x&quot;&gt;&amp;&#39;")
+  })
+
+  it("states the payment deadlines and cart holds the shop enforces (story 12.9a)", () => {
+    const text = renderTermsText({ siteUrl })
+    expect(text).toContain(`dans les ${UNPAID_CARD_ORDER_MINUTES} minutes qui suivent la commande`)
+    expect(text).toContain(`sous ${UNPAID_TRANSFER_ORDER_DAYS} jours`)
+    expect(text).toContain(
+      `ou un tirage Gun Art placé dans le panier est réservé au client pendant ${CART_HOLD_MINUTES} minutes`,
+    )
+    expect(text).not.toContain("tant qu'il est dans le panier")
   })
 })

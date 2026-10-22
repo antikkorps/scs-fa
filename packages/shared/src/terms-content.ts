@@ -1,4 +1,10 @@
-import { LEGAL_DOC_REVIEW_SLA_HOURS, UNIQUE_PIECE_HOLD_MINUTES } from "./constants.js"
+import {
+  CART_HOLD_MINUTES,
+  LEGAL_DOC_REVIEW_SLA_HOURS,
+  TRANSFER_REMINDER_DAYS,
+  UNPAID_CARD_ORDER_MINUTES,
+  UNPAID_TRANSFER_ORDER_DAYS,
+} from "./constants.js"
 import { LEGAL_IDENTITY, type LegalIdentity } from "./legal-identity.js"
 
 /**
@@ -100,7 +106,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
         " s'ajoutent au prix des articles ; leur montant et le prix total sont indiqués dans le récapitulatif, avant la validation de la commande. Ils sont forfaitaires : par colis pour une arme (envoi assuré, remis contre signature ; une arme de catégorie B est livrée en deux colis), un forfait unique par commande pour les munitions et accessoires — offert à partir du montant indiqué au panier —, et par tirage pour les œuvres Gun Art. La remise fidélité ne s'applique pas aux frais de livraison.",
       ),
       p(
-        `Le prix appliqué est celui affiché au moment de la commande. Une pièce unique de l'armurerie placée dans le panier est réservée au client pendant ${UNIQUE_PIECE_HOLD_MINUTES} minutes, puis remise en vente ; un tirage Gun Art reste réservé tant qu'il est dans le panier.`,
+        `Le prix appliqué est celui affiché au moment de la commande. Une pièce unique de l'armurerie ou un tirage Gun Art placé dans le panier est réservé au client pendant ${CART_HOLD_MINUTES} minutes, puis remis en vente.`,
       ),
     ],
   },
@@ -122,17 +128,18 @@ export const TERMS_SECTIONS: TermsSection[] = [
       list(
         [
           b("par carte bancaire"),
-          ", pour les armes de catégorie D, les articles en vente libre et les tirages Gun Art. Le paiement est traité par notre prestataire Stripe : SCS Firearms n'a jamais connaissance des numéros de carte ;",
+          `, pour les armes de catégorie D, les articles en vente libre et les tirages Gun Art, dans les ${UNPAID_CARD_ORDER_MINUTES} minutes qui suivent la commande. Le paiement est traité par notre prestataire Stripe : SCS Firearms n'a jamais connaissance des numéros de carte ;`,
         ],
         [
           b("par virement bancaire"),
-          ", pour les armes, éléments et munitions des catégories B et C. Les coordonnées bancaires et la référence à indiquer sont communiquées après la commande. Le virement doit nous parvenir sous ",
-          todo("À compléter : délai de paiement, par exemple 10 jours"),
-          ", faute de quoi la commande peut être annulée.",
+          `, pour les armes, éléments et munitions des catégories B et C. Les coordonnées bancaires et la référence à indiquer sont communiquées après la commande. Le virement doit nous parvenir sous ${UNPAID_TRANSFER_ORDER_DAYS} jours ; un rappel est envoyé au bout de ${TRANSFER_REMINDER_DAYS} jours.`,
         ],
       ),
       p(
-        "Une commande qui mêle les deux types d'articles est réglée en deux parties, dont le détail s'affiche après la commande. Les articles restent la propriété de SCS Firearms (ou, pour un tirage Gun Art, de l'artiste) jusqu'au paiement complet de leur prix.",
+        `Une commande qui mêle les deux types d'articles est réglée en deux parties, dont le détail s'affiche après la commande ; les deux parties disposent alors du délai de ${UNPAID_TRANSFER_ORDER_DAYS} jours. Les articles restent la propriété de SCS Firearms (ou, pour un tirage Gun Art, de l'artiste) jusqu'au paiement complet de leur prix.`,
+      ),
+      p(
+        "Une commande qui n'est pas réglée dans ces délais est annulée et ses articles sont remis en vente ; le client en est informé par e-mail. Une commande en partie réglée, ou dont le virement a été signalé comme effectué, n'est pas annulée automatiquement : nous prenons contact avec le client.",
       ),
     ],
   },

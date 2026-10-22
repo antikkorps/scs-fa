@@ -47,6 +47,23 @@ export function formatDate(iso: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? "—" : DATE.format(d)
 }
 
+const TIME = new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" })
+
+/** Format an ISO date string as a fr-FR time of day ("10:12"), or an em dash when absent/invalid. */
+export function formatTime(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "—" : TIME.format(d)
+}
+
+/** A remaining duration as "m:ss", rounded up to the second and never negative (story 12.9a). */
+export function formatCountdown(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, "0")}`
+}
+
 /** Small deterministic string hash (FNV-ish) used to vary the placeholder accent. */
 function seedHash(seed: string): number {
   let h = 0

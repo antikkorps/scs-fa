@@ -232,6 +232,13 @@
       "when": 1792612471087,
       "tag": "0032_story_12_8c_quote_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792691110467,
+      "tag": "0033_story_12_9a_payment_reminder",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,7 @@ import { buildApp } from "../app.js"
 import { runWithRequestContext } from "../audit/context.js"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { auditLogs, henrriDocuments, orders, paymentCarte, refunds, users } from "../db/schema.js"
+import { auditLogs, henrriDocuments, orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
 import { createFakeHenrri } from "../test/henrri-fake.js"
 
 const PREFIX = "ADMORD-"
@@ -39,6 +39,7 @@ describe("admin orders dashboard API (Story 7.1)", () => {
     await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, orderIds))
     await db.delete(refunds).where(inArray(refunds.orderId, orderIds))
     await db.delete(paymentCarte).where(inArray(paymentCarte.orderId, orderIds))
+    await db.delete(paymentVirement).where(inArray(paymentVirement.orderId, orderIds))
     await db.delete(auditLogs).where(inArray(auditLogs.orderId, orderIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
     await db.delete(orders).where(inArray(orders.userId, userIds))
@@ -65,7 +66,7 @@ describe("admin orders dashboard API (Story 7.1)", () => {
 
   async function insertOrder(
     owner: string,
-    opts: { paymentStatus?: string; legalStatus?: string; totalTtc?: string } = {},
+    opts: { paymentStatus?: string; legalStatus?: string; totalTtc?: string; placedAt?: Date } = {},
   ) {
     const [o] = await db
       .insert(orders)
@@ -79,6 +80,7 @@ describe("admin orders dashboard API (Story 7.1)", () => {
         paymentStatus: (opts.paymentStatus ?? "pending") as any,
         // biome-ignore lint/suspicious/noExplicitAny: enum string injected directly in tests
         legalVerificationStatus: (opts.legalStatus ?? "pending") as any,
+        createdAt: opts.placedAt,
       })
       .returning({ id: orders.id })
     return o.id
@@ -155,6 +157,50 @@ describe("admin orders dashboard API (Story 7.1)", () => {
 
     it("rejects an out-of-range status filter (400)", async () => {
       expect((await adminGet("/api/admin/orders?paymentStatus=bogus")).statusCode).toBe(400)
+    })
+  })
+
+  describe("overdue payments (story 12.9a)", () => {
+    const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+
+    async function transferOrder(placedAt: Date, status: "awaiting_transfer" | "transfer_claimed") {
+      const orderId = await insertOrder(customerId, { placedAt })
+      await db.insert(paymentVirement).values({
+        orderId,
+        amountExpectedTtc: "240.00",
+        ibanRecipient: "FR7630006000011234567890189",
+        paymentReference: `SCS-ADM-${orderId.slice(0, 8)}`,
+        paymentStatus: status,
+      })
+      return orderId
+    }
+
+    it("lists the unpaid orders past their deadline, and only those", async () => {
+      const overdue = await transferOrder(daysAgo(9), "transfer_claimed")
+      const inTime = await transferOrder(daysAgo(2), "transfer_claimed")
+      const paid = await insertOrder(customerId, { paymentStatus: "received", placedAt: daysAgo(30) })
+
+      const ids = (await adminGet("/api/admin/orders?payments=overdue&limit=100"))
+        .json()
+        .data.map((o: { id: string }) => o.id)
+
+      expect(ids).toContain(overdue)
+      expect(ids).not.toContain(inTime)
+      expect(ids).not.toContain(paid)
+    })
+
+    it("counts them on the dashboard", async () => {
+      const before = (await adminGet("/api/admin/orders/summary")).json().data.overduePayments
+      await transferOrder(daysAgo(8), "transfer_claimed")
+      const after = (await adminGet("/api/admin/orders/summary")).json().data.overduePayments
+      expect(after).toBe(before + 1)
+    })
+
+    it("does not count a cancelled order's documents as still to review", async () => {
+      const before = (await adminGet("/api/admin/orders/summary")).json().data.docsToReview
+      await insertOrder(customerId, { paymentStatus: "cancelled", legalStatus: "pending" })
+      const after = (await adminGet("/api/admin/orders/summary")).json().data.docsToReview
+      expect(after).toBe(before)
     })
   })
 

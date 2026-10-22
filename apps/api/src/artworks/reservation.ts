@@ -1,6 +1,7 @@
-import { and, eq } from "drizzle-orm"
+import { CART_HOLD_MINUTES } from "@armurier/shared"
+import { and, eq, gte, inArray, lt, sql } from "drizzle-orm"
 import { type Database, db } from "../db/client.js"
-import { artworkPrints } from "../db/schema.js"
+import { artworkCartItems, artworkPrints } from "../db/schema.js"
 
 // Either the root db handle or a transaction handle, so callers can compose a
 // reservation with other writes (cart insert, order creation) in one atomic unit.
@@ -53,4 +54,43 @@ export async function reservePrintForOrder(printId: string, orderId: string, exe
     .where(and(eq(artworkPrints.id, printId), eq(artworkPrints.status, "in_cart")))
     .returning({ id: artworkPrints.id })
   return reserved ?? null
+}
+
+// Story 12.9a — a print stays held CART_HOLD_MINUTES after it entered the cart.
+const holdStart = sql`now() - make_interval(mins => ${CART_HOLD_MINUTES})`
+
+/** Cart lines whose print is still held: the only ones the cart shows and the checkout takes. */
+export const printHoldActive = () => gte(artworkCartItems.addedAt, holdStart)
+
+/** When the print of a cart line stops being held. */
+export function printHeldUntil(addedAt: Date): Date {
+  return new Date(addedAt.getTime() + CART_HOLD_MINUTES * 60 * 1000)
+}
+
+/**
+ * Put back on sale the prints whose hold has lapsed (story 12.9a): their cart
+ * lines go, and the prints return to `available` — guarded on `in_cart`, so a
+ * print ordered meanwhile is never touched. Returns how many lines went.
+ */
+export async function releaseLapsedPrintHolds(): Promise<number> {
+  return db.transaction(async (tx) => {
+    const lapsed = await tx
+      .delete(artworkCartItems)
+      .where(lt(artworkCartItems.addedAt, holdStart))
+      .returning({ printId: artworkCartItems.printId })
+    if (lapsed.length === 0) return 0
+    await tx
+      .update(artworkPrints)
+      .set({ status: "available", updatedAt: new Date() })
+      .where(
+        and(
+          inArray(
+            artworkPrints.id,
+            lapsed.map((line) => line.printId),
+          ),
+          eq(artworkPrints.status, "in_cart"),
+        ),
+      )
+    return lapsed.length
+  })
 }

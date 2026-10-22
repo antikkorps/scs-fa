@@ -45,6 +45,7 @@ describe("e-mail journal (story 12.7c)", () => {
       transferTtc: 0,
       transferReference: null,
       requiresLegalVerification: false,
+      paymentDueAt: new Date(),
       shippingAddress: ["Jean Tireur"],
       termsVersion: CURRENT_TERMS_VERSION,
     })

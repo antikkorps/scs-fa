@@ -23,6 +23,8 @@ export interface OrderHistoryEvent {
 
 const LABELS: Record<string, string> = {
   "order.created": "Commande passée",
+  "order.expired": "Commande annulée faute de paiement",
+  "payment.received_after_cancellation": "Paiement reçu sur une commande annulée — à rembourser",
   "payment.stripe.init": "Paiement par carte lancé",
   "payment.stripe.received": "Paiement par carte reçu",
   "payment.stripe.failed": "Paiement par carte refusé",
@@ -77,6 +79,8 @@ const EMAIL_NAMES: Record<string, string> = {
   legal_doc_approved: "de document validé",
   legal_doc_rejected: "de document refusé",
   newsletter_confirmation: "de confirmation d'inscription à la newsletter",
+  transfer_reminder: "de rappel de virement",
+  unpaid_order_cancelled: "d'annulation pour non-paiement",
 }
 
 /** What became of the e-mail, and the word that introduces its recipient. */
@@ -141,6 +145,10 @@ const HENRRI_CODES_ONLY: Record<string, string> = {
   PaymentNotRecorded: "Facture émise, mais son règlement n'a pas pu être enregistré dans Henrri.",
 }
 
+const ORDER_ERRORS: Record<string, string> = {
+  cancelled: "La commande était déjà annulée, son stock remis en vente",
+}
+
 const SMTP_ERRORS: Record<string, string> = {
   EENVELOPE: "Le serveur d'envoi a refusé l'adresse",
   ECONNECTION: "Serveur d'envoi injoignable",
@@ -166,6 +174,7 @@ export function historyErrorLabel(error: string | null): string {
   if (source === "brevo" && code) return BREVO_ERRORS[code] ?? `Brevo : ${code}`
   if (source === "stripe" && code) return `Stripe : ${STRIPE_ERRORS[code] ?? code}`
   if (source === "henrri" && code) return HENRRI_CODES_ONLY[code] ?? henrriBlockReason(code)
+  if (source === "order" && ORDER_ERRORS[code]) return ORDER_ERRORS[code]
   return error
 }
 

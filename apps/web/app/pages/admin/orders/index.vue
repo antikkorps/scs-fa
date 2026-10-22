@@ -23,6 +23,8 @@ const legalFilter = ref((route.query.legalStatus as string) || "")
 const shippingFilter = ref((route.query.shippingStatus as string) || "")
 // Story 12.6: "attention" lists the orders whose Henrri documents need an admin.
 const invoicesFilter = ref((route.query.invoices as string) || "")
+// Story 12.9a: "overdue" lists the unpaid orders past their payment deadline.
+const paymentsFilter = ref((route.query.payments as string) || "")
 const search = ref((route.query.search as string) || "")
 const page = ref(Number(route.query.page) || 1)
 
@@ -32,6 +34,7 @@ const query = computed(() => {
   if (legalFilter.value) p.set("legalStatus", legalFilter.value)
   if (shippingFilter.value) p.set("shippingStatus", shippingFilter.value)
   if (invoicesFilter.value) p.set("invoices", invoicesFilter.value)
+  if (paymentsFilter.value) p.set("payments", paymentsFilter.value)
   if (search.value.trim()) p.set("search", search.value.trim())
   p.set("page", String(page.value))
   p.set("limit", "20")
@@ -56,6 +59,7 @@ function resetFilters() {
   legalFilter.value = ""
   shippingFilter.value = ""
   invoicesFilter.value = ""
+  paymentsFilter.value = ""
   search.value = ""
   page.value = 1
   syncUrl()
@@ -67,6 +71,7 @@ function syncUrl() {
       ...(legalFilter.value ? { legalStatus: legalFilter.value } : {}),
       ...(shippingFilter.value ? { shippingStatus: shippingFilter.value } : {}),
       ...(invoicesFilter.value ? { invoices: invoicesFilter.value } : {}),
+      ...(paymentsFilter.value ? { payments: paymentsFilter.value } : {}),
       ...(search.value.trim() ? { search: search.value.trim() } : {}),
       ...(page.value > 1 ? { page: String(page.value) } : {}),
     },
@@ -87,6 +92,7 @@ watch(
     legalFilter.value = (q.legalStatus as string) || ""
     shippingFilter.value = (q.shippingStatus as string) || ""
     invoicesFilter.value = (q.invoices as string) || ""
+    paymentsFilter.value = (q.payments as string) || ""
     search.value = (q.search as string) || ""
     page.value = Number(q.page) || 1
   },
@@ -117,6 +123,10 @@ watch(
       <select v-model="invoicesFilter" class="ctl" @change="applyFilters">
         <option value="">Toutes factures</option>
         <option value="attention">Factures à traiter</option>
+      </select>
+      <select v-model="paymentsFilter" class="ctl" @change="applyFilters">
+        <option value="">Toutes échéances</option>
+        <option value="overdue">Paiement en retard</option>
       </select>
       <button type="submit" class="btn btn-ghost">Filtrer</button>
       <button type="button" class="btn btn-ghost" @click="resetFilters">Réinitialiser</button>

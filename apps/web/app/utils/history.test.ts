@@ -38,6 +38,22 @@ describe("historyEventLabel (story 12.7b)", () => {
     expect(historyEventLabel(event("shipment.shipped"))).toBe("Colis expédié")
   })
 
+  it("tells an unpaid order's end, and money that came too late (story 12.9a)", () => {
+    expect(historyEventLabel(event("order.expired"))).toBe("Commande annulée faute de paiement")
+    expect(historyEventLabel(event("order.payment.cancelled"))).toBe("Paiement : Annulé")
+    expect(historyEventLabel(event("payment.received_after_cancellation"))).toBe(
+      "Paiement reçu sur une commande annulée — à rembourser",
+    )
+    expect(historyErrorLabel("order.cancelled")).toBe("La commande était déjà annulée, son stock remis en vente")
+    const recipient = { recipient: "jean@example.fr" }
+    expect(historyEventLabel(event("email.transfer_reminder.sent", { newValue: recipient }))).toBe(
+      "E-mail de rappel de virement envoyé à jean@example.fr",
+    )
+    expect(historyEventLabel(event("email.unpaid_order_cancelled.sent", { newValue: recipient }))).toBe(
+      "E-mail d'annulation pour non-paiement envoyé à jean@example.fr",
+    )
+  })
+
   it("names Henrri documents with their number once issued", () => {
     expect(historyEventLabel(event("henrri.invoice.issued", { newValue: { number: "26-10-1" } }))).toBe(
       "Facture 26-10-1 émise",

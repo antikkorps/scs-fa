@@ -671,6 +671,32 @@ describe("orders (POST /api/orders)", () => {
     expect(typeof data.payment.virement.iban).toBe("string")
   })
 
+  it("tells the customer until when an unpaid order can be paid (story 12.9a)", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const cardOrder = (await createOrder()).json().data
+    await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+    const transferOrder = (await createOrder()).json().data
+
+    const fetchOrder = async (id: string) =>
+      (await app.inject({ method: "GET", url: `/api/orders/${id}`, headers: authHeaders(token) })).json().data
+    const card = await fetchOrder(cardOrder.id)
+    const transfer = await fetchOrder(transferOrder.id)
+
+    const hoursFromPlacement = (order: { createdAt: string; paymentDueAt: string }) =>
+      (Date.parse(order.paymentDueAt) - Date.parse(order.createdAt)) / 3_600_000
+    expect(hoursFromPlacement(card)).toBe(1)
+    expect(hoursFromPlacement(transfer)).toBe(7 * 24)
+  })
+
+  it("gives no deadline once the order is paid", async () => {
+    await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+    const created = (await createOrder()).json().data
+    await db.update(orders).set({ paymentStatus: "received" }).where(eq(orders.id, created.id))
+
+    const res = await app.inject({ method: "GET", url: `/api/orders/${created.id}`, headers: authHeaders(token) })
+    expect(res.json().data.paymentDueAt).toBeNull()
+  })
+
   it("returns 404 for an unknown order id", async () => {
     const res = await app.inject({
       method: "GET",

@@ -998,7 +998,13 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 
 **Découpage :**
 
-- [ ] **12.9a — Commandes impayées** (high 1) : expiration carte 1 h / virement 7 j, rappel J+4, annulation en compare-and-set (jamais une commande qu'un webhook vient de payer), libération stock / tirages / pièces uniques, e-mails, historique ; tirages Gun Art restés dans un panier libérés aussi.
+- [x] **12.9a — Commandes impayées** (high 1) ✅ _(codée le 2026-10-22)_
+  - _Précisions de Franck (2026-10-22)_ : une commande **en partie réglée, ou dont le virement est déclaré, n'est jamais annulée automatiquement** (SCS décide) ; tirage Gun Art dans un panier réservé **30 min avec un compteur** pour le client.
+  - **Balayage toutes les 5 min** (`orders/expiry.ts`) : carte seule annulée après 1 h, commande avec virement après 7 j (carte comprise), rappel e-mail à J+4 (une fois : `orders.payment_reminder_sent_at`, migration 0033). PaymentIntent Stripe annulé d'abord ; paiement en cours ou annulation refusée par Stripe → commande gardée. Annulation en compare-and-set qui revérifie les paiements, stock et tirages rendus par le même code que le remboursement total, reversements annulés, historique + e-mail.
+  - Argent arrivé sur une commande annulée : elle n'est pas relancée, l'historique le signale (« à rembourser ») ; paiement carte refusé (409).
+  - Back-office : filtre et carte « Paiements en retard » (`?payments=overdue`) ; une commande annulée ne compte plus dans « Docs à vérifier ». Client : échéance sur la commande et dans l'e-mail de confirmation ; commande annulée sans paiement ni dépôt de pièces.
+  - **Panier** : tirage réservé `CART_HOLD_MINUTES` (30) depuis son ajout — masqué du panier dès l'échéance, remis en vente par un balayage chaque minute ; compteur sur les pièces uniques et les tirages (panier + validation de commande).
+  - CGV : délais (60 min carte, 7 j virement, rappel J+4, cas partiels) et réservation des tirages — version **2026-10-22**.
 - [ ] **12.9b — Secrets d'exemple refusés en prod** (high 2) : toute valeur contenant `change-me` ou égale à un exemple commité refusée au démarrage (JWT, refresh, secret interne, webhook Brevo, mot de passe admin du seed).
 - [ ] **12.9c — Dépendances** (high 3) : montées de version (fastify, @fastify/busboy, sharp, nodemailer, nuxt, fast-jwt…), `osvVulnerabilityAlerts` dans Renovate, `pnpm audit --prod --audit-level high` en CI.
 - [ ] **12.9d — Panier revérifié au paiement** : prix, publication, audience pro (409) ; catégorie A refusée aux particuliers.

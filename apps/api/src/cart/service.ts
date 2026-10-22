@@ -8,7 +8,8 @@ import {
   type ShippableLine,
   type ShippingQuote,
 } from "@armurier/shared"
-import { asc, eq, sql } from "drizzle-orm"
+import { and, asc, eq, sql } from "drizzle-orm"
+import { printHeldUntil, printHoldActive } from "../artworks/reservation.js"
 import { db } from "../db/client.js"
 import {
   artworkCartItems,
@@ -58,11 +59,15 @@ export interface CartProductLine {
   requiresLegalVerification: boolean
   /** Parcels one unit travels in — drives the firearm shipping rate (story 12.3). */
   parcelCount: number
+  /** A unique piece held for this shopper goes back on sale past this; null otherwise (story 12.9a). */
+  heldUntil: Date | null
 }
 
 export interface CartArtworkLine {
   id: string
   printId: string
+  /** The print goes back on sale past this (story 12.9a). */
+  heldUntil: Date
   artworkId: string
   title: string
   printDesignation: string
@@ -123,6 +128,7 @@ function shippableLinesOf(items: CartProductLine[], artworkItems: CartArtworkLin
 export async function loadCart(userId: string): Promise<CartView> {
   const [user] = await db.select({ vipActive: users.vipActive }).from(users).where(eq(users.id, userId)).limit(1)
   const isVip = user?.vipActive === true
+  const now = new Date()
 
   const productRows = await db
     .select({
@@ -135,6 +141,8 @@ export async function loadCart(userId: string): Promise<CartView> {
       munition: productVariants.munition,
       couleur: productVariants.couleur,
       stockQty: productVariants.stockQty,
+      reservedBy: productVariants.reservedBy,
+      reservedUntil: productVariants.reservedUntil,
       productId: products.id,
       name: products.name,
       sku: products.sku,
@@ -159,6 +167,7 @@ export async function loadCart(userId: string): Promise<CartView> {
   const artworkRows = await db
     .select({
       id: artworkCartItems.id,
+      addedAt: artworkCartItems.addedAt,
       priceHtAtTime: artworkCartItems.priceHtAtTime,
       printId: artworkPrints.id,
       printDesignation: artworkPrints.printDesignation,
@@ -174,7 +183,8 @@ export async function loadCart(userId: string): Promise<CartView> {
     .innerJoin(artworks, eq(artworkPrints.artworkId, artworks.id))
     .innerJoin(products, eq(artworks.productId, products.id))
     .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
-    .where(eq(artworkCartItems.userId, userId))
+    // A lapsed hold is gone from the cart at once, before the sweep frees the print.
+    .where(and(eq(artworkCartItems.userId, userId), printHoldActive()))
     .orderBy(asc(artworkCartItems.addedAt))
 
   const discountFor = (lineHt: number, marginPct: string | null, categorySlug: string) =>
@@ -208,6 +218,7 @@ export async function loadCart(userId: string): Promise<CartView> {
       legalCategory: r.legalCategory,
       requiresLegalVerification: r.requiresLegalVerification,
       parcelCount: r.parcelCount,
+      heldUntil: r.reservedBy === userId && r.reservedUntil && r.reservedUntil > now ? r.reservedUntil : null,
     }
   })
 
@@ -219,6 +230,7 @@ export async function loadCart(userId: string): Promise<CartView> {
     return {
       id: r.id,
       printId: r.printId,
+      heldUntil: printHeldUntil(r.addedAt ?? now),
       artworkId: r.artworkId,
       title: r.title,
       printDesignation: r.printDesignation,

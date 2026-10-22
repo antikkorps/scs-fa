@@ -1,4 +1,4 @@
-import { orderReference } from "@armurier/shared"
+import { orderPaymentDeadline, orderReference } from "@armurier/shared"
 import { and, eq, isNotNull, isNull, lt, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
 import { db } from "../db/client.js"
@@ -67,6 +67,7 @@ export async function sendOrderConfirmation(orderId: string, log: Logger): Promi
       transferTtc: Number(row.transferTtc ?? 0),
       transferReference: row.transferReference,
       requiresLegalVerification: order.legalVerificationStatus === "pending",
+      paymentDueAt: orderPaymentDeadline(order.createdAt ?? new Date(), { hasTransfer: row.transferTtc !== null }),
       shippingAddress: address
         ? [
             `${address.firstName} ${address.lastName}`,

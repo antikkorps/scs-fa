@@ -4,6 +4,7 @@ import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
+import { releaseLapsedPrintHolds } from "../artworks/reservation.js"
 import { db } from "../db/client.js"
 import {
   artworkCartItems,
@@ -510,5 +511,69 @@ describe("cart (/api/cart)", () => {
       .from(artworkPrints)
       .where(eq(artworkPrints.id, availablePrintId))
     expect(print.status).toBe("available")
+  })
+
+  describe("Gun Art print hold (story 12.9a)", () => {
+    const HOLD_MS = 30 * 60 * 1000
+
+    async function addPrint() {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/cart/items",
+        headers: await authHeaders(),
+        payload: { printId: availablePrintId, qty: 1 },
+      })
+      expect(res.statusCode).toBe(201)
+      return res.json().data
+    }
+    async function ageCartLine(minutes: number) {
+      await db
+        .update(artworkCartItems)
+        .set({ addedAt: new Date(Date.now() - minutes * 60 * 1000) })
+        .where(eq(artworkCartItems.userId, userId))
+    }
+    async function printStatus() {
+      const [print] = await db
+        .select({ status: artworkPrints.status })
+        .from(artworkPrints)
+        .where(eq(artworkPrints.id, availablePrintId))
+      return print.status
+    }
+
+    it("tells the shopper until when the print is held", async () => {
+      const before = Date.now()
+      const cart = await addPrint()
+      const heldUntil = Date.parse(cart.artworkItems[0].heldUntil)
+      expect(heldUntil).toBeGreaterThanOrEqual(before + HOLD_MS - 1000)
+      expect(heldUntil).toBeLessThanOrEqual(Date.now() + HOLD_MS + 1000)
+    })
+
+    it("drops a print whose hold has lapsed from the cart", async () => {
+      await addPrint()
+      await ageCartLine(31)
+      const cart = (await app.inject({ method: "GET", url: "/api/cart", headers: await authHeaders() })).json().data
+      expect(cart.artworkItems).toEqual([])
+      expect(cart.summary.itemCount).toBe(0)
+    })
+
+    it("puts a print back on sale once its hold has lapsed", async () => {
+      await addPrint()
+      await ageCartLine(31)
+
+      expect(await releaseLapsedPrintHolds()).toBeGreaterThanOrEqual(1)
+
+      expect(await printStatus()).toBe("available")
+      const lines = await db.select().from(artworkCartItems).where(eq(artworkCartItems.userId, userId))
+      expect(lines).toEqual([])
+    })
+
+    it("keeps a print still within its hold", async () => {
+      await addPrint()
+      await ageCartLine(29)
+
+      await releaseLapsedPrintHolds()
+
+      expect(await printStatus()).toBe("in_cart")
+    })
   })
 })

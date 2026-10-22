@@ -1555,6 +1555,9 @@ export const orders = pgTable(
 
     // Paiement
     paymentStatus: paymentStatusEnum("payment_status").notNull().default("pending"),
+    // Rappel « virement non reçu » envoyé (story 12.9a, J+4) : posé avant l'envoi,
+    // il garantit un seul rappel par commande, même si deux balayages se croisent.
+    paymentReminderSentAt: timestamp("payment_reminder_sent_at"),
 
     // CGV acceptées à la commande (story 12.1) : quelle version, et quand.
     // Nulles sur les commandes antérieures à la story, jamais réécrites ensuite.

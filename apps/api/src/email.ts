@@ -42,6 +42,8 @@ type EmailType =
   | "organisation_suspended"
   | "organisation_reinstated"
   | "quote_request_received"
+  | "transfer_reminder"
+  | "unpaid_order_cancelled"
 
 /** The order first (its history), else the account, else the newsletter contact. */
 function journalEntity(about: EmailAbout): { entityType: string; entityId: string | null } {
@@ -530,6 +532,8 @@ export type OrderConfirmationEmail = {
   transferTtc: number
   transferReference: string | null
   requiresLegalVerification: boolean
+  /** Past this, the order is cancelled if nothing was paid (story 12.9a). */
+  paymentDueAt: Date
   /** Delivery address, one line per entry. */
   shippingAddress: string[]
   /** CGV version accepted with the order (ISO date). */
@@ -552,6 +556,51 @@ const SELLER: TermsInline[] = [
   " — ",
   { fact: "email", label: "adresse e-mail de contact" },
 ]
+
+export interface TransferReminderEmail {
+  orderId: string
+  orderRef: string
+  firstname: string | null
+  amountTtc: number
+  reference: string | null
+  deadline: Date
+}
+
+/**
+ * "Your transfer has not arrived" (story 12.9a), day 4 of the week an order with
+ * a bank transfer is held. Sent once (`orders.payment_reminder_sent_at`).
+ */
+export async function sendTransferReminderEmail(to: string, r: TransferReminderEmail): Promise<void> {
+  const orderUrl = `${env.WEB_BASE_URL}/commande/${r.orderId}`
+  await deliverParagraphs(
+    "transfer_reminder",
+    { orderId: r.orderId },
+    to,
+    `Votre virement pour la commande ${r.orderRef}`,
+    [
+      r.firstname ? `Bonjour ${r.firstname},` : "Bonjour,",
+      `Nous n'avons pas encore reçu votre virement de ${EUROS.format(r.amountTtc)} pour la commande ${r.orderRef}${r.reference ? ` (référence à indiquer : ${r.reference})` : ""}.`,
+      `Vos articles restent réservés jusqu'au ${PARIS_DATETIME.format(r.deadline)}. Sans paiement à cette date, la commande sera annulée et les articles remis en vente.`,
+      `Les coordonnées bancaires figurent sur la page de votre commande : ${orderUrl}`,
+      "Si vous avez déjà fait le virement, signalez-le depuis cette page : nous le rapprocherons dès son arrivée.",
+    ],
+  )
+}
+
+export interface UnpaidOrderCancelledEmail {
+  orderId: string
+  orderRef: string
+  firstname: string | null
+}
+
+/** "Your order was cancelled for lack of payment" (story 12.9a). Nothing was charged. */
+export async function sendUnpaidOrderCancelledEmail(to: string, c: UnpaidOrderCancelledEmail): Promise<void> {
+  await deliverParagraphs("unpaid_order_cancelled", { orderId: c.orderId }, to, `Commande ${c.orderRef} annulée`, [
+    c.firstname ? `Bonjour ${c.firstname},` : "Bonjour,",
+    `Faute de paiement dans le délai prévu par nos conditions générales de vente, votre commande ${c.orderRef} est annulée et ses articles sont remis en vente. Aucune somme ne vous a été prélevée.`,
+    `Vous pouvez repasser commande à tout moment sur ${env.WEB_BASE_URL}.`,
+  ])
+}
 
 /**
  * Order confirmation (story 12.1) — the confirmation on a durable medium that
@@ -583,6 +632,11 @@ export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmatio
   if (o.transferTtc > 0) {
     steps.push(
       `Réglez ${EUROS.format(o.transferTtc)} par virement${o.transferReference ? `, en indiquant la référence ${o.transferReference}` : ""} : les coordonnées bancaires figurent sur la page de votre commande.`,
+    )
+  }
+  if (o.cardTtc > 0 || o.transferTtc > 0) {
+    steps.push(
+      `Réglez votre commande avant le ${PARIS_DATETIME.format(o.paymentDueAt)} : passé ce délai, elle est annulée et ses articles remis en vente.`,
     )
   }
   if (o.requiresLegalVerification) {

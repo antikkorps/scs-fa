@@ -1,3 +1,5 @@
+import { formatDateTime } from "./format"
+
 // French labels for order statuses shown to the customer (mirror the API enums
 // ORDER_PAYMENT_STATUSES / ORDER_LEGAL_STATUSES).
 
@@ -76,4 +78,10 @@ export function statusTone(status: string | null | undefined): "positive" | "neg
     return "negative"
   }
   return "neutral"
+}
+
+/** Until when an unpaid order can be paid (story 12.9a); empty once there is no deadline. */
+export function paymentDeadlineNote(paymentDueAt: string | null | undefined): string {
+  if (!paymentDueAt) return ""
+  return `À régler avant le ${formatDateTime(paymentDueAt)}. Passé ce délai, la commande est annulée et les articles remis en vente.`
 }

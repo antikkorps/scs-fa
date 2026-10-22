@@ -5,6 +5,7 @@ import {
   createOrderSchema,
   isDeliverableAddress,
   orderDocumentParamSchema,
+  orderPaymentDeadline,
   paginationSchema,
   requiresVirement,
   round2,
@@ -522,6 +523,11 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         shippingCost: Number(order.shippingCost),
         shippingHt: Number(order.shippingHt),
         shipments,
+        // Story 12.9a: past this, an order with no money in is cancelled.
+        paymentDueAt:
+          order.paymentStatus === "pending" && order.createdAt
+            ? orderPaymentDeadline(order.createdAt, { hasTransfer: Boolean(virement) })
+            : null,
         payment: {
           carte: carte ? { status: carte.paymentStatus, amountTtc: Number(carte.amountTtc) } : null,
           virement: virement

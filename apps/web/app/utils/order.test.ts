@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest"
+import { formatDateTime } from "./format.js"
 import {
   legalStatusLabel,
   parcelItemLabel,
+  paymentDeadlineNote,
   paymentStatusLabel,
   shipmentStatusLabel,
   shippingStatusLabel,
@@ -54,5 +56,17 @@ describe("statusTone", () => {
     expect(statusTone("failed")).toBe("negative")
     expect(statusTone("docs_rejected")).toBe("negative")
     expect(statusTone("pending")).toBe("neutral")
+  })
+})
+
+describe("paymentDeadlineNote (story 12.9a)", () => {
+  it("says until when the order can be paid, and what happens after", () => {
+    const note = paymentDeadlineNote("2026-10-29T10:00:00.000Z")
+    expect(note).toContain(formatDateTime("2026-10-29T10:00:00.000Z"))
+    expect(note).toContain("annulée")
+  })
+
+  it("says nothing once there is no deadline", () => {
+    expect(paymentDeadlineNote(null)).toBe("")
   })
 })
