@@ -99,6 +99,32 @@ describe("commande/index.vue — CGV acceptance (story 12.1)", () => {
   })
 })
 
+describe("commande/index.vue — cart changed (story 12.9d)", () => {
+  it("shows what changed, refreshes the summary, and lets the customer confirm again", async () => {
+    const refreshed = {
+      items: [{ id: "l-1", vatPct: 20, heldUntil: null }],
+      artworkItems: [],
+      summary: { ...summary, totalTtc: 999 },
+    }
+    createOrder.mockRejectedValue({
+      response: { status: 409 },
+      data: {
+        error: "CartChanged",
+        changes: [{ kind: "price_changed", lineId: "l-1", name: "Tapis de tir", previousPriceHt: 50, priceHt: 55 }],
+        cart: refreshed,
+      },
+    })
+    const wrapper = await mountCheckout()
+    await wrapper.find('input[name="terms"]').setValue(true)
+    await wrapper.find(".summary__cta").trigger("click")
+    await flushPromises()
+
+    expect(wrapper.find(".cart-changes").text()).toContain("Tapis de tir : le prix est passé de")
+    expect(wrapper.text()).toContain("Votre panier a changé")
+    expect(wrapper.find(".summary__cta").attributes("disabled")).toBeUndefined()
+  })
+})
+
 describe("commande/index.vue — shipping (story 12.3)", () => {
   it("shows the delivery cost in the summary before ordering", async () => {
     const wrapper = await mountCheckout()

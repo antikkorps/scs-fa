@@ -9,7 +9,7 @@ import {
   type ShippingQuote,
 } from "@armurier/shared"
 import { and, asc, eq, sql } from "drizzle-orm"
-import { printHeldUntil, printHoldActive } from "../artworks/reservation.js"
+import { printHeldUntil, printHoldActive, releasePrintFromCart } from "../artworks/reservation.js"
 import { db } from "../db/client.js"
 import {
   artworkCartItems,
@@ -24,6 +24,7 @@ import {
   tags,
   users,
 } from "../db/schema.js"
+import { releaseUniquePiece } from "../products/reservation.js"
 import { loadShippingRates } from "../shipping-rates/service.js"
 
 // A product's tag slugs, as a correlated aggregate. Built with the query builder
@@ -275,4 +276,105 @@ export async function loadCart(userId: string): Promise<CartView> {
       shipping,
     },
   }
+}
+
+/** What changed on a cart line since it was added (story 12.9d), as the checkout reports it. */
+export type CartChange =
+  | { kind: "price_changed"; lineId: string; name: string; previousPriceHt: number; priceHt: number }
+  /** Unpublished, or now reserved for pros: taken out of the cart. */
+  | { kind: "unavailable"; lineId: string; name: string }
+  /** Category A is sold to pros only, by quote (Franck, 2026-10-22): taken out of the cart. */
+  | { kind: "category_a"; lineId: string; name: string }
+
+/** Why a product can no longer be bought from the cart, if it cannot. */
+function blockedKind(line: { published: boolean | null; audience: string; legalCategory: string | null }) {
+  if (!line.published || line.audience !== "public") return "unavailable" as const
+  if (line.legalCategory === "A") return "category_a" as const
+  return null
+}
+
+/**
+ * Bring the cart in line with the catalogue as it is NOW (story 12.9d, security
+ * audit): a line whose product was unpublished, reserved for pros or is of
+ * category A leaves the cart — its unique-piece hold or print released — and a
+ * line whose price moved takes the new price. Returns what changed, so the
+ * checkout can refuse the order and show it: the customer confirms again.
+ */
+export async function reconcileCart(userId: string): Promise<CartChange[]> {
+  const productLines = await db
+    .select({
+      id: cartItems.id,
+      variantId: cartItems.variantId,
+      priceHtAtTime: cartItems.priceHtAtTime,
+      productPriceHt: products.priceHt,
+      priceDeltaHt: productVariants.priceDeltaHt,
+      name: products.name,
+      published: products.published,
+      audience: products.audience,
+      legalCategory: legalCategories.category,
+    })
+    .from(cartItems)
+    .innerJoin(productVariants, eq(cartItems.variantId, productVariants.id))
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
+    .where(eq(cartItems.userId, userId))
+    .orderBy(asc(cartItems.addedAt))
+
+  const printLines = await db
+    .select({
+      id: artworkCartItems.id,
+      printId: artworkCartItems.printId,
+      priceHtAtTime: artworkCartItems.priceHtAtTime,
+      printPriceHt: artworkPrints.priceHtUnit,
+      name: artworks.title,
+      published: products.published,
+      audience: products.audience,
+    })
+    .from(artworkCartItems)
+    .innerJoin(artworkPrints, eq(artworkCartItems.printId, artworkPrints.id))
+    .innerJoin(artworks, eq(artworkPrints.artworkId, artworks.id))
+    .innerJoin(products, eq(artworks.productId, products.id))
+    .where(and(eq(artworkCartItems.userId, userId), printHoldActive()))
+    .orderBy(asc(artworkCartItems.addedAt))
+
+  const changes: CartChange[] = []
+  await db.transaction(async (tx) => {
+    for (const line of productLines) {
+      const blocked = blockedKind(line)
+      if (blocked) {
+        await tx.delete(cartItems).where(eq(cartItems.id, line.id))
+        await releaseUniquePiece(line.variantId, userId, tx)
+        changes.push({ kind: blocked, lineId: line.id, name: line.name })
+        continue
+      }
+      const priceHt = round2(Number(line.productPriceHt) + Number(line.priceDeltaHt ?? 0))
+      const previousPriceHt = Number(line.priceHtAtTime)
+      if (priceHt !== previousPriceHt) {
+        await tx
+          .update(cartItems)
+          .set({ priceHtAtTime: priceHt.toFixed(2), updatedAt: new Date() })
+          .where(eq(cartItems.id, line.id))
+        changes.push({ kind: "price_changed", lineId: line.id, name: line.name, previousPriceHt, priceHt })
+      }
+    }
+    for (const line of printLines) {
+      const blocked = blockedKind({ ...line, legalCategory: null })
+      if (blocked) {
+        await tx.delete(artworkCartItems).where(eq(artworkCartItems.id, line.id))
+        await releasePrintFromCart(line.printId, tx)
+        changes.push({ kind: blocked, lineId: line.id, name: line.name })
+        continue
+      }
+      const priceHt = Number(line.printPriceHt)
+      const previousPriceHt = Number(line.priceHtAtTime)
+      if (priceHt !== previousPriceHt) {
+        await tx
+          .update(artworkCartItems)
+          .set({ priceHtAtTime: line.printPriceHt, updatedAt: new Date() })
+          .where(eq(artworkCartItems.id, line.id))
+        changes.push({ kind: "price_changed", lineId: line.id, name: line.name, previousPriceHt, priceHt })
+      }
+    }
+  })
+  return changes
 }

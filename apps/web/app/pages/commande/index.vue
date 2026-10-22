@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { CURRENT_TERMS_VERSION, isDeliverableAddress } from "@armurier/shared"
-import type { CartView } from "~/types/cart"
+import type { CartChange, CartView } from "~/types/cart"
 import type { Address, NewAddress } from "~/types/checkout"
-import { earliestHold } from "~/utils/cart"
+import { cartChangeLabel, earliestHold } from "~/utils/cart"
 import { formatDate, formatEuros } from "~/utils/format"
 
 definePageMeta({ middleware: "auth" })
@@ -42,6 +42,7 @@ const termsVersionLabel = formatDate(CURRENT_TERMS_VERSION)
 
 const placing = ref(false)
 const placeError = ref("")
+const cartChanges = ref<string[]>([])
 
 // Story 12.9a — held items go back on sale when their time runs out, checkout or not.
 const holdEndsAt = computed(() => (cart.value ? earliestHold(cart.value) : null))
@@ -101,6 +102,7 @@ const shippingUndeliverable = computed(
 
 async function placeOrder() {
   placeError.value = ""
+  cartChanges.value = []
   if (!shippingId.value) {
     placeError.value = "Choisissez une adresse de livraison."
     return
@@ -126,6 +128,19 @@ async function placeOrder() {
     await router.push(`/commande/${order.id}`)
   } catch (err) {
     const status = authErrorStatus(err)
+    // Story 12.9d: a price moved or an article left the catalogue since the cart
+    // was filled. The API sends the refreshed cart: show it, and what changed.
+    const refreshed = apiErrorField<CartView>(err, "cart")
+    if (status === 409 && apiErrorCode(err) === "CartChanged" && refreshed) {
+      cart.value = refreshed
+      cartCount.value = refreshed.summary.itemCount
+      cartChanges.value = (apiErrorField<CartChange[]>(err, "changes") ?? []).map((change) =>
+        cartChangeLabel(change, refreshed),
+      )
+      placeError.value = "Votre panier a changé depuis son remplissage : vérifiez-le, puis confirmez la commande."
+      placing.value = false
+      return
+    }
     placeError.value =
       status === 409 && apiErrorCode(err) === "TermsOutdated"
         ? "Nos conditions générales de vente ont changé depuis l'ouverture de cette page. Rechargez la page pour lire la nouvelle version."
@@ -239,6 +254,9 @@ const addressLine = (a: Address) =>
             {{ placing ? "Création…" : "Commander avec obligation de paiement" }}
           </button>
           <p v-if="placeError" class="err" role="alert">{{ placeError }}</p>
+          <ul v-if="cartChanges.length" class="cart-changes">
+            <li v-for="change in cartChanges" :key="change">{{ change }}</li>
+          </ul>
         </aside>
       </div>
     </section>
@@ -354,6 +372,12 @@ const addressLine = (a: Address) =>
   margin: -0.4rem 0 0.8rem;
   font-size: var(--fs-sm);
   color: var(--paper-dim);
+}
+.cart-changes {
+  margin: 0 0 1rem;
+  padding-left: 1.1rem;
+  font-size: var(--fs-sm);
+  color: var(--paper);
 }
 .hold-notice {
   margin: 0 0 1rem;

@@ -2,7 +2,7 @@ import { CURRENT_RGPD_CONSENT_VERSION, CURRENT_TERMS_VERSION } from "@armurier/s
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import {
@@ -45,7 +45,7 @@ async function categoryId(slug: string): Promise<string> {
   return row.id
 }
 
-async function legalCategoryId(code: "B" | "none"): Promise<string> {
+async function legalCategoryId(code: "A" | "B" | "none"): Promise<string> {
   const [row] = await db
     .select({ id: legalCategories.id })
     .from(legalCategories)
@@ -282,6 +282,147 @@ describe("orders (POST /api/orders)", () => {
   ) {
     return app.inject({ method: "POST", url: "/api/orders", headers: authHeaders(token), payload })
   }
+
+  describe("cart re-checked at checkout (story 12.9d)", () => {
+    // What a back-office edit may have changed since the line entered the cart.
+    async function editProduct(sku: string, changes: Partial<typeof products.$inferInsert>) {
+      await db.update(products).set(changes).where(eq(products.sku, sku))
+    }
+    afterEach(async () => {
+      const legalNone = await legalCategoryId("none")
+      await editProduct(`${PREFIX}acc`, {
+        priceHt: "50.00",
+        published: true,
+        audience: "public",
+        legalCategoryId: legalNone,
+      })
+      await editProduct(`${PREFIX}art`, { published: true })
+      await db.update(artworkPrints).set({ priceHtUnit: "100.00" }).where(eq(artworkPrints.id, printId))
+    })
+
+    it("refuses the order when a price changed, and reprices the cart for the customer to confirm", async () => {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 2 })
+      await editProduct(`${PREFIX}acc`, { priceHt: "55.00" })
+
+      const refused = await createOrder()
+
+      expect(refused.statusCode).toBe(409)
+      const body = refused.json()
+      expect(body.error).toBe("CartChanged")
+      expect(body.changes).toEqual([
+        expect.objectContaining({ kind: "price_changed", name: "Tapis de tir", previousPriceHt: 50, priceHt: 55 }),
+      ])
+      expect(body.cart.items[0]).toMatchObject({ variantId: accessoryVariantId, unitPriceHt: 55, qty: 2 })
+
+      const confirmed = await createOrder()
+      expect(confirmed.statusCode).toBe(201)
+      expect(confirmed.json().data.totals.subtotalHt).toBe(110)
+    })
+
+    it("refuses the order when a print's price changed", async () => {
+      await addToCart(token, { printId, qty: 1 })
+      await db.update(artworkPrints).set({ priceHtUnit: "120.00" }).where(eq(artworkPrints.id, printId))
+
+      const refused = await createOrder()
+
+      expect(refused.statusCode).toBe(409)
+      expect(refused.json().changes).toEqual([
+        expect.objectContaining({ kind: "price_changed", previousPriceHt: 100, priceHt: 120 }),
+      ])
+      expect(refused.json().cart.artworkItems[0].unitPriceHt).toBe(120)
+    })
+
+    it("takes out an article unpublished meanwhile", async () => {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      await editProduct(`${PREFIX}acc`, { published: false })
+
+      const refused = await createOrder()
+
+      expect(refused.statusCode).toBe(409)
+      expect(refused.json().changes).toEqual([expect.objectContaining({ kind: "unavailable", name: "Tapis de tir" })])
+      expect(refused.json().cart.items.map((l: { variantId: string }) => l.variantId)).toEqual([regulatedVariantId])
+    })
+
+    it("takes out an article now reserved for pros", async () => {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      await editProduct(`${PREFIX}acc`, { audience: "pro" })
+
+      const refused = await createOrder()
+
+      expect(refused.statusCode).toBe(409)
+      expect(refused.json().changes).toEqual([expect.objectContaining({ kind: "unavailable" })])
+      expect(refused.json().cart.items).toEqual([])
+    })
+
+    it("takes out a category A article: sold to pros only, by quote", async () => {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      await editProduct(`${PREFIX}acc`, { legalCategoryId: await legalCategoryId("A") })
+
+      const refused = await createOrder()
+
+      expect(refused.statusCode).toBe(409)
+      expect(refused.json().changes).toEqual([expect.objectContaining({ kind: "category_a" })])
+      expect(refused.json().cart.items).toEqual([])
+    })
+
+    it("takes out a print whose artwork was unpublished, and puts the print back on sale", async () => {
+      await addToCart(token, { printId, qty: 1 })
+      await editProduct(`${PREFIX}art`, { published: false })
+
+      const refused = await createOrder()
+
+      expect(refused.statusCode).toBe(409)
+      expect(refused.json().changes).toEqual([expect.objectContaining({ kind: "unavailable" })])
+      expect(refused.json().cart.artworkItems).toEqual([])
+      const [print] = await db
+        .select({ status: artworkPrints.status })
+        .from(artworkPrints)
+        .where(eq(artworkPrints.id, printId))
+      expect(print.status).toBe("available")
+    })
+
+    it("creates nothing when it refuses", async () => {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      await editProduct(`${PREFIX}acc`, { priceHt: "60.00" })
+
+      await createOrder()
+
+      expect(await db.select().from(orders).where(eq(orders.userId, userId))).toEqual([])
+    })
+  })
+
+  describe("what the cart refuses up front (story 12.9d)", () => {
+    afterEach(async () => {
+      await db
+        .update(products)
+        .set({ published: true, legalCategoryId: await legalCategoryId("none") })
+        .where(eq(products.sku, `${PREFIX}acc`))
+      await db
+        .update(products)
+        .set({ published: true })
+        .where(eq(products.sku, `${PREFIX}art`))
+    })
+
+    it("refuses a category A article to a private customer", async () => {
+      await db
+        .update(products)
+        .set({ legalCategoryId: await legalCategoryId("A") })
+        .where(eq(products.sku, `${PREFIX}acc`))
+      const res = await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      expect(res.statusCode).toBe(409)
+      expect(res.json().error).toBe("CategoryANotForSale")
+    })
+
+    it("refuses a print of an unpublished artwork", async () => {
+      await db
+        .update(products)
+        .set({ published: false })
+        .where(eq(products.sku, `${PREFIX}art`))
+      const res = await addToCart(token, { printId, qty: 1 })
+      expect(res.statusCode).toBe(404)
+    })
+  })
 
   it("requires authentication", async () => {
     const res = await app.inject({

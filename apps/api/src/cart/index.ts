@@ -4,9 +4,19 @@ import type { FastifyPluginAsync } from "fastify"
 import { releasePrintFromCart, reservePrintForCart } from "../artworks/reservation.js"
 import { authenticate } from "../auth/authenticate.js"
 import { db } from "../db/client.js"
-import { ancientWeapons, artworkCartItems, artworkPrints, cartItems, products, productVariants } from "../db/schema.js"
+import {
+  ancientWeapons,
+  artworkCartItems,
+  artworkPrints,
+  artworks,
+  cartItems,
+  legalCategories,
+  products,
+  productVariants,
+} from "../db/schema.js"
 import { validationError } from "../http.js"
 import { releaseAllUniquePieces, releaseUniquePiece, reserveUniquePiece } from "../products/reservation.js"
+import { publiclyVisible } from "../products/visibility.js"
 import { loadCart } from "./service.js"
 
 export const cartRoutes: FastifyPluginAsync = async (fastify) => {
@@ -36,6 +46,7 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
           productPriceHt: products.priceHt,
           published: products.published,
           audience: products.audience,
+          legalCategory: legalCategories.category,
           // A collection weapon exists in a single copy, so it is held for the
           // shopper as soon as it enters their cart (story 11.2).
           isUniquePiece: ancientWeapons.isUnique,
@@ -43,12 +54,21 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
         .from(productVariants)
         .innerJoin(products, eq(productVariants.productId, products.id))
         .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
+        .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
         .where(eq(productVariants.id, variantId))
         .limit(1)
 
       // Story 12.8c: a pro product never enters the ordinary cart (a pro asks for a quote).
       if (!variant?.published || variant.audience !== "public") {
         return reply.code(404).send({ error: "NotFound", message: "Variant not found" })
+      }
+
+      // Story 12.9d: category A is sold to pros only, by quote (Franck, 2026-10-22).
+      if (variant.legalCategory === "A") {
+        return reply.code(409).send({
+          error: "CategoryANotForSale",
+          message: "Category A articles are sold to professionals only, on quote",
+        })
       }
 
       const unitPriceHt = Number(variant.productPriceHt) + Number(variant.priceDeltaHt ?? 0)
@@ -95,10 +115,13 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
     // printId path (artwork): each print is a unique, single-quantity item.
     const id = printId as string
 
+    // Story 12.9d: a print of an unpublished artwork is not for sale.
     const [print] = await db
       .select({ id: artworkPrints.id })
       .from(artworkPrints)
-      .where(eq(artworkPrints.id, id))
+      .innerJoin(artworks, eq(artworkPrints.artworkId, artworks.id))
+      .innerJoin(products, eq(artworks.productId, products.id))
+      .where(and(eq(artworkPrints.id, id), publiclyVisible()))
       .limit(1)
     if (!print) {
       return reply.code(404).send({ error: "NotFound", message: "Print not found" })
