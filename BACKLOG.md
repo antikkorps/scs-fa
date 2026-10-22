@@ -915,7 +915,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
   _Décisions (Franck, 2026-10-19)_ : les **10 ans** de l'historique d'une commande comptent **à partir de la date de la commande** ; **tout ce qui n'est pas rattaché à une commande** (connexions, sécurité, e-mails hors commande, actions admin sur le catalogue, les tarifs, les imports) est gardé **1 an**. Les logs techniques (14 jours) sont déjà purgés par journald (12.7a). L'anonymisation de la commande elle-même au bout de 10 ans reste hors de la 12.7.
   _Livré 2026-10-19 : `audit/retention.ts` (purge au démarrage puis toutes les 24 h ; un historique de commande part en entier, événements tardifs compris), ligne « Journal des opérations sensibles » de `/confidentialite`, guide `docs/GUIDE_REMONTEES.md` (back-office pour Fred et Stéphane, journaux pour Franck, tableau des durées). Registre des traitements rédigé dans `docs/REGISTRE_TRAITEMENTS_RGPD.md` (11 traitements, sous-traitants, durées) ; les mentions « À compléter » (identité, contrats, durées compte / pièces / audience / partenaires) attendent le client._
 
-**Story 12.8** — Espace pro et administrations : catalogue sans prix, demande de devis, connexion par code e-mail — 📝 **CADRÉE** (2026-10-19, reste Chorus Pro) _(créée le 2026-10-19, demande de Fred et Stéphane)_
+**Story 12.8** — Espace pro et administrations : catalogue sans prix, demande de devis, connexion par code e-mail — 📝 **CADRÉE** (2026-10-19 ; Chorus Pro tranché le 2026-10-22) _(créée le 2026-10-19, demande de Fred et Stéphane)_
 
 > Besoin : un accès réservé aux **professionnels** (armuriers, clubs de tir, sociétés de sécurité privée) et, parmi eux, aux **administrations**. Ils ne voient **aucun prix** : ils remplissent un panier qui devient une **demande de devis** ; SCS les recontacte avec un devis où les remises sont gérées finement. Ces comptes se connectent par **mot de passe + code envoyé par e-mail**, pour qu'une personne ne puisse pas confier ses accès à quelqu'un d'extérieur. Double authentification facultative pour les particuliers.
 
@@ -929,6 +929,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - **Paiement après un devis accepté** : **carte, virement et paiement à 30 jours**.
 - **Un compte = une personne** (pas plusieurs acheteurs par organisation dans un premier temps). Le code par e-mail sert à empêcher qu'un agent confie ses accès à quelqu'un d'extérieur.
 - **Facturation des administrations (Chorus Pro)** : Franck pose la question au comptable (Henrri dépose-t-il sur Chorus Pro, ou dépôt manuel ?).
+  - _Réponse (2026-10-22)_ : les administrations seront bien facturées via **Chorus Pro**. **Dépôt manuel par SCS au début** (PDF Henrri déposé sur le portail Chorus Pro), pas d'intégration. En 12.8d : saisir sur le devis / la commande d'une administration le **code service** et le **numéro d'engagement** (bon de commande), et les reporter sur la facture Henrri.
 
 **Propositions (validées par Franck le 2026-10-19) :**
 
@@ -952,7 +953,6 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - **Table `organisations` séparée** des utilisateurs.
 - **Prix particuliers** : **une remise propre à chaque pro** (taux sur le prix public HT, réglé dans le back-office), **appliquée à tout prix qu'on lui affiche** (devis, et boutique si on lui ouvre l'affichage), puis **ajustable ligne par ligne** dans le devis. D'où une option par organisation **« afficher les prix »**, **désactivée par défaut** : activée, le pro voit en boutique ses prix nets de sa remise, mais commande toujours par devis.
 
-**En attente** : réponse du comptable sur Chorus Pro (Franck).
 
 **Découpage proposé :**
 
@@ -981,8 +981,30 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
   - Réglés par Claude : numéro lisible `DR-AAAA-NNNN` (distinct du numéro Henrri), message libre du client, annulation par le client tant que la demande n'est pas en cours de traitement, enum des statuts complet dès la migration.
   _Livré 2026-10-21_ : migrations **0031** (`products.audience`) et **0032** (`quote_basket_items`, `quote_requests`, `quote_request_items`, séquence des numéros). Côté public, une seule condition `publiclyVisible()` garde toutes les lectures de produits (liste, fiche, recherche, facettes, collection, sitemap, produits associés, panier classique), vérifiée par un test anti-fuite. Marquage « Réservé pro » : fiche produit, colonne de la liste, colonne Excel (oui / non / vide = inchangé). API `/api/pro/*` (membre d'une organisation **validée**, relu en base à chaque appel, réponses jamais mises en cache) : catalogue (liste et fiche publiques réutilisées, visibilité pro ; **aucun prix public** ; prix nets si « afficher les prix » ; **filtres de prix ignorés** — ils trahiraient le prix par dichotomie), panier de devis, envoi atomique `DR-AAAA-NNNN`, suivi, annulation tant que la demande est `requested`. Back-office `/api/admin/quote-requests` + écran **Devis** (lignes, prix publics de référence, conditions de l'organisation, « Prendre en charge » → `in_review`). E-mails : accusé au pro, alerte aux admins. Purge à 3 ans ; `/confidentialite` et registre (traitement 12) à jour. Front : `/pro/catalogue`, fiche pro, `/pro/demande`, `/pro/demandes`, bouton « Ajouter à ma demande de devis » dans la boutique (sauf pièces de collection ; le stock ne bloque pas un devis), liens dans l'encart pro de `/compte`. Vérifié en navigateur de bout en bout (375 px + back-office). En passant : `.sr-only` défini une fois dans `main.css` (12 copies locales retirées ; il manquait sur les nouvelles pages).
   _Reste ouvert (pour la 12.8d)_ : sur la fiche boutique, un pro voit encore la mention « vérification de vos documents après la commande » et la liste des pièces d'un particulier (CNI, SIA…) — à remplacer par le justificatif de l'organisation quand la 12.8d posera le contrôle A / B / C ; les styles de tableau / onglets / panneau des écrans admin restent copiés page par page.
-- [ ] **12.8d — Devis et commande** : traitement back-office (lignes, remises, validité), devis Henrri + PDF, acceptation par le client → commande, paiement carte / virement / 30 jours, blocage tant que le justificatif A / B / C n'est pas validé.
+- [ ] **12.8d — Devis et commande** : traitement back-office (lignes, remises, validité), devis Henrri + PDF, acceptation par le client → commande, paiement carte / virement / 30 jours, blocage tant que le justificatif A / B / C n'est pas validé. Administrations : code service + numéro d'engagement saisis et reportés sur la facture (dépôt Chorus Pro manuel par SCS).
 - [ ] **12.8e — Double authentification par application** : TOTP facultatif pour les particuliers, codes de secours, **obligatoire pour les admins**.
+
+**Story 12.9** — Audit de sécurité du 2026-10-21 (delta depuis le pentest 8.6) — 📝 **CADRÉE** (décisions de Franck le 2026-10-22) _(audit fait le 2026-10-21 après la 12.8c)_
+
+> Rapport : `docs/SECURITY_AUDIT_2026-10-21.md`. Rien n'est en production : les **3 high** sont à corriger avant le premier déploiement, puis les mediums ; les lows avant la mise en ligne sauf report motivé.
+
+**Tranché par Franck (2026-10-22) :**
+
+- **Commandes impayées** : carte annulée après **1 h** ; virement : rappel à **J+4**, annulation à **7 j**. L'annulation libère stock, tirages Gun Art et pièces uniques.
+- **Prix changé entre panier et paiement** : **refus 409** + panier rafraîchi, le client confirme à nouveau. Idem pour un article dépublié ou passé « réservé pro ».
+- **Catégorie A** : **interdite aux particuliers**, uniquement par devis pro (12.8d) après validation du justificatif de l'organisation.
+- **VIP** : accordé quand la commande qualifiante est **payée et ses documents validés** ; **retiré** si la ligne d'arme qualifiante est remboursée (remboursement partiel compris), sauf autre commande qualifiante.
+- **Taux de remise VIP réglable par SCS** dans le back-office (aujourd'hui en dur : 50 % de la marge). Les commandes gardent le taux figé (`vipDiscountAppliedPct`). Stockage proposé : table **`shop_settings`** à une ligne (colonne typée, page « Réglages », trace `audit_logs`) — à confirmer avant de coder.
+
+**Découpage :**
+
+- [ ] **12.9a — Commandes impayées** (high 1) : expiration carte 1 h / virement 7 j, rappel J+4, annulation en compare-and-set (jamais une commande qu'un webhook vient de payer), libération stock / tirages / pièces uniques, e-mails, historique ; tirages Gun Art restés dans un panier libérés aussi.
+- [ ] **12.9b — Secrets d'exemple refusés en prod** (high 2) : toute valeur contenant `change-me` ou égale à un exemple commité refusée au démarrage (JWT, refresh, secret interne, webhook Brevo, mot de passe admin du seed).
+- [ ] **12.9c — Dépendances** (high 3) : montées de version (fastify, @fastify/busboy, sharp, nodemailer, nuxt, fast-jwt…), `osvVulnerabilityAlerts` dans Renovate, `pnpm audit --prod --audit-level high` en CI.
+- [ ] **12.9d — Panier revérifié au paiement** : prix, publication, audience pro (409) ; catégorie A refusée aux particuliers.
+- [ ] **12.9e — VIP** : nouvelle règle d'octroi / de retrait + taux réglable (`shop_settings`).
+- [ ] **12.9f — Mediums restants** : code de connexion atomique + plafond par compte ; limites de débit sur le /64 IPv6 ; recherche globale (parenthèses, œuvres non publiées) ; `expiresAt` des pièces appliqué ; pièce validée non supprimable ; rôle Postgres dédié ; sauvegardes chiffrées et séparées + objets S3 ; taille du corps BFF bornée ; course à la rotation du jeton de rafraîchissement.
+- [ ] **12.9g — Lows** : voir le rapport (liens de réinitialisation, sessions admin d'avant 0028, SIRET squatté, événement Stripe tardif, PaymentIntent concurrents, remboursement sans verrou, débit des demandes de devis, jeton newsletter dans les logs, nonce CSP sur `v-html`, Umami, images non épinglées).
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
