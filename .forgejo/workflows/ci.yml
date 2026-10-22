@@ -92,6 +92,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Story 12.9c: a known high or critical advisory in a production dependency
+      # fails the build (exceptions, by advisory id: pnpm-workspace.yaml).
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
       - name: Lint (Biome)
         run: pnpm exec biome ci .
 
