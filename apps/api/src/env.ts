@@ -1,5 +1,6 @@
 import "dotenv/config"
 import { z } from "zod"
+import { sampleValueProblems } from "./env-guard.js"
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -175,5 +176,18 @@ const envSchema = z.object({
   INTERNAL_API_SECRET: z.string().min(32).optional(),
 })
 
-export const env = envSchema.parse(process.env)
+const parsed = envSchema.parse(process.env)
+
+// Story 12.9b — never run production on the sample values of the committed
+// examples (a "CHANGE-ME…" JWT secret passes the schema and forges admin tokens).
+if (parsed.NODE_ENV === "production") {
+  const problems = sampleValueProblems(process.env)
+  if (problems.length > 0) {
+    throw new Error(
+      `Production refuses the sample values of the committed .env examples. Set a real value for: ${problems.join(", ")}`,
+    )
+  }
+}
+
+export const env = parsed
 export type Env = z.infer<typeof envSchema>

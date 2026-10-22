@@ -192,7 +192,11 @@ below is the recommended path.
 
 - [ ] VM provisioned + hardened (§1), Docker firewall = SSH/80/443 only.
 - [ ] `.env` filled: every secret, `DOMAIN`, `ACME_EMAIL`, `S3_*`, Stripe **live**
-      keys, SMTP creds. No placeholder left.
+      keys, SMTP creds, the real `VIREMENT_*` account. No placeholder left — the
+      API refuses to start otherwise (story 12.9b): any secret still holding a
+      `CHANGE-ME` / `replace-me` / `your-…` sample (Postgres, Umami and the admin
+      seed included), the sample IBAN, or the same value for both JWT secrets.
+      `just logs api` then names the variables to fix, never their values.
 - [ ] Stack builds & boots on the VM; `migrate` ran; seed ran; `ps` all healthy.
 - [ ] **Stripe live webhook** registered at `https://www.<DOMAIN>/api/webhooks/stripe`,
       subscribed to exactly these five events: `payment_intent.succeeded`,
