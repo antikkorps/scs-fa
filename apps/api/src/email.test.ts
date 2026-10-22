@@ -6,7 +6,13 @@ vi.mock("nodemailer", () => ({ createTransport: () => ({ sendMail }) }))
 // Rendering only: the journal (story 12.7c) is covered by email-journal.test.ts.
 vi.mock("./audit/record.js", () => ({ recordAuditEvent: vi.fn().mockResolvedValue(undefined) }))
 
-const { sendInvoiceAvailableEmail, sendLoginCodeEmail, sendOrderConfirmationEmail } = await import("./email.js")
+const {
+  sendInvoiceAvailableEmail,
+  sendLoginCodeEmail,
+  sendOrderConfirmationEmail,
+  sendTransferReminderEmail,
+  sendUnpaidOrderCancelledEmail,
+} = await import("./email.js")
 
 const base = {
   orderId: "0b7d1f3e-8a51-4c1e-9d0a-2f6b1c3e4d5f",
@@ -26,6 +32,7 @@ const base = {
   transferTtc: 1200,
   transferReference: "SCS-AB12-CD34",
   requiresLegalVerification: true,
+  paymentDueAt: new Date("2026-10-06T14:05:00Z"),
   shippingAddress: ["Jean Dupont", "1 rue X", "75001 Paris"],
   termsVersion: CURRENT_TERMS_VERSION,
 }
@@ -55,6 +62,12 @@ describe("sendOrderConfirmationEmail (story 12.1)", () => {
     expect(mail.text).toContain("en indiquant la référence SCS-AB12-CD34")
     expect(mail.text).toContain("Déposez les pièces justificatives")
     expect(mail.text).not.toContain("par carte bancaire depuis la page")
+  })
+
+  it("says until when the order must be paid, and what happens after (story 12.9a)", async () => {
+    const mail = await send()
+    expect(mail.text).toContain("avant le 6 octobre 2026")
+    expect(mail.text).toContain("annulée")
   })
 
   it("carries the full CGV text and the withdrawal form — a durable medium, not a link", async () => {
@@ -117,5 +130,39 @@ describe("sendLoginCodeEmail (story 12.8a)", () => {
     expect(mail.text).toContain("changez-le")
     // Mail filters open links on their own: a link would be spent before the agent reads it.
     expect(mail.html).not.toMatch(/<a\s/i)
+  })
+})
+
+describe("unpaid order e-mails (story 12.9a)", () => {
+  const sent = () => sendMail.mock.calls[0]?.[0] as { subject: string; text: string; html: string }
+
+  it("reminds the transfer: amount, reference, deadline, where the bank details are", async () => {
+    await sendTransferReminderEmail("jean@example.fr", {
+      orderId: base.orderId,
+      orderRef: base.orderRef,
+      firstname: "Jean",
+      amountTtc: 1200,
+      reference: "SCS-AB12-CD34",
+      deadline: new Date("2026-10-06T14:05:00Z"),
+    })
+    const mail = sent()
+    expect(mail.subject).toContain("0B7D1F3E")
+    expect(mail.text).toContain("Bonjour Jean,")
+    expect(mail.text).toMatch(/1\s200,00\s€/)
+    expect(mail.text).toContain("SCS-AB12-CD34")
+    expect(mail.text).toContain("6 octobre 2026")
+    expect(mail.text).toContain(`/commande/${base.orderId}`)
+  })
+
+  it("tells the cancellation, and that nothing was charged", async () => {
+    await sendUnpaidOrderCancelledEmail("jean@example.fr", {
+      orderId: base.orderId,
+      orderRef: base.orderRef,
+      firstname: null,
+    })
+    const mail = sent()
+    expect(mail.subject).toBe("Commande 0B7D1F3E annulée")
+    expect(mail.text).toContain("Bonjour,")
+    expect(mail.text).toContain("Aucune somme ne vous a été prélevée")
   })
 })

@@ -40,6 +40,17 @@ export const LEGAL_DOC_REVIEW_SLA_HOURS = 48
  */
 export const UNIQUE_PIECE_HOLD_MINUTES = 30
 
+/**
+ * How long an unpaid order holds its stock, prints and unique pieces before it
+ * is cancelled (story 12.9a, Franck 2026-10-22). A card payment is done in
+ * minutes or abandoned; a bank transfer needs banking days, so an order with a
+ * transfer part gets a week — card part included — and a reminder on day 4.
+ * Shared because the CGV and the e-mails state them.
+ */
+export const UNPAID_CARD_ORDER_MINUTES = 60
+export const UNPAID_TRANSFER_ORDER_DAYS = 7
+export const TRANSFER_REMINDER_DAYS = 4
+
 // Standardized rejection reasons for legal documents (admin review).
 // "other" requires a free-text note explaining the decision.
 export const LEGAL_DOC_REJECTION_REASONS = [

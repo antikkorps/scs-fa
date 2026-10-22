@@ -22,6 +22,11 @@ export function retrievePaymentIntent(id: string): Promise<Stripe.PaymentIntent>
   return client().paymentIntents.retrieve(id)
 }
 
+/** Cancel a PaymentIntent nobody paid, so it can no longer be confirmed. Stripe refuses once it has succeeded. */
+export function cancelPaymentIntent(id: string): Promise<Stripe.PaymentIntent> {
+  return client().paymentIntents.cancel(id)
+}
+
 export function retrieveCharge(id: string): Promise<Stripe.Charge> {
   return client().charges.retrieve(id)
 }

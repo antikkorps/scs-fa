@@ -40,6 +40,7 @@ import { newsletterRoutes } from "./newsletter/index.js"
 import { startNewsletterPurgeScheduler } from "./newsletter/retention.js"
 import { adminOrderRoutes } from "./orders/admin.js"
 import { startOrderConfirmationScheduler } from "./orders/confirmation.js"
+import { startUnpaidOrderSweep } from "./orders/expiry.js"
 import { orderRoutes } from "./orders/index.js"
 import { adminOrganisationRoutes } from "./organisations/admin.js"
 import { organisationRoutes } from "./organisations/index.js"
@@ -186,6 +187,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   startLoginChallengePurgeScheduler(fastify)
   startQuoteRequestPurgeScheduler(fastify)
   startOrderConfirmationScheduler(fastify)
+  startUnpaidOrderSweep(fastify)
   startHenrriScheduler(fastify)
   startShipmentTrackingScheduler(fastify)
 

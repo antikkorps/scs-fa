@@ -504,6 +504,8 @@ export const adminOrderQuerySchema = z.object({
   shippingStatus: z.enum(ORDER_SHIPPING_STATUSES).optional(),
   // Story 12.6: orders whose Henrri invoice or credit notes need an admin.
   invoices: z.enum(["attention"]).optional(),
+  // Story 12.9a: unpaid orders past their payment deadline.
+  payments: z.enum(["overdue"]).optional(),
   search: z.string().trim().min(1).max(255).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
