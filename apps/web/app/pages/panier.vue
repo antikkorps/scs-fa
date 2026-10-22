@@ -42,6 +42,13 @@ async function run(op: () => Promise<CartView>) {
   }
 }
 
+// Story 12.9a — a held item's time ran out: it is back on sale (a print leaves the cart).
+const holdNotice = ref("")
+async function onHoldExpired() {
+  holdNotice.value = "Le délai de réservation d'un article est écoulé : il a été remis en vente."
+  await load()
+}
+
 const variantAttrs = (l: { finition: string | null; munition: string | null; couleur: string | null }) =>
   [l.finition, l.munition, l.couleur].filter(Boolean).join(" · ")
 </script>
@@ -51,6 +58,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
     <section class="container">
       <h1 class="cart__title">Mon panier</h1>
 
+      <p v-if="holdNotice" class="hold-notice" role="status">{{ holdNotice }}</p>
       <p v-if="pending" class="state">Chargement…</p>
       <p v-else-if="error" class="state">Impossible de charger le panier. Réessayez.</p>
       <p v-else-if="isEmpty" class="state">
@@ -64,6 +72,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
               <p class="line__name">{{ l.name }}</p>
               <p v-if="variantAttrs(l)" class="line__variant">{{ variantAttrs(l) }}</p>
               <p class="line__unit">{{ formatEuros(l.unitPriceHt * (1 + l.vatPct / 100)) }} TTC / unité</p>
+              <CartHoldCountdown v-if="l.heldUntil" :held-until="l.heldUntil" @expired="onHoldExpired" />
             </div>
             <div class="line__qty">
               <button
@@ -94,6 +103,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
             <div class="line__main">
               <p class="line__name">{{ a.title }}</p>
               <p class="line__variant">Tirage {{ a.printDesignation }} · {{ a.formatId }}</p>
+              <CartHoldCountdown :held-until="a.heldUntil" @expired="onHoldExpired" />
             </div>
             <p class="line__qty line__qty--fixed">1</p>
             <p class="line__total">{{ formatEuros(a.lineTtc) }}</p>
@@ -134,6 +144,10 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
 .state {
   color: var(--paper-dim);
   padding: 1.5rem 0 4rem;
+}
+.hold-notice {
+  margin: 0 0 1.5rem;
+  color: var(--brass);
 }
 .link {
   color: var(--brass);

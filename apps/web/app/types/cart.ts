@@ -22,11 +22,15 @@ export interface CartProductLine {
   categorySlug: string
   legalCategory: LegalCategoryCode | null
   requiresLegalVerification: boolean
+  /** A unique piece held for the shopper goes back on sale past this; null otherwise (story 12.9a). */
+  heldUntil: string | null
 }
 
 export interface CartArtworkLine {
   id: string
   printId: string
+  /** The print goes back on sale past this (story 12.9a). */
+  heldUntil: string
   artworkId: string
   title: string
   printDesignation: string

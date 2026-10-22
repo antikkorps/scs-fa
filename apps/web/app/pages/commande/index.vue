@@ -2,6 +2,7 @@
 import { CURRENT_TERMS_VERSION, isDeliverableAddress } from "@armurier/shared"
 import type { CartView } from "~/types/cart"
 import type { Address, NewAddress } from "~/types/checkout"
+import { earliestHold } from "~/utils/cart"
 import { formatDate, formatEuros } from "~/utils/format"
 
 definePageMeta({ middleware: "auth" })
@@ -41,6 +42,14 @@ const termsVersionLabel = formatDate(CURRENT_TERMS_VERSION)
 
 const placing = ref(false)
 const placeError = ref("")
+
+// Story 12.9a — held items go back on sale when their time runs out, checkout or not.
+const holdEndsAt = computed(() => (cart.value ? earliestHold(cart.value) : null))
+const holdNotice = ref("")
+async function onHoldExpired() {
+  holdNotice.value = "Le délai de réservation d'un article est écoulé : vérifiez votre panier avant de commander."
+  cart.value = await fetchCart()
+}
 
 const cartEmpty = computed(() => !pending.value && (cart.value?.summary.itemCount ?? 0) === 0)
 
@@ -213,6 +222,8 @@ const addressLine = (a: Address) =>
 
         <aside class="summary">
           <h2 class="section__h">Récapitulatif</h2>
+          <CartHoldCountdown v-if="holdEndsAt" :held-until="holdEndsAt" @expired="onHoldExpired" />
+          <p v-if="holdNotice" class="hold-notice" role="status">{{ holdNotice }}</p>
           <CartTotals :summary="cart.summary" />
           <label class="terms">
             <input v-model="termsAccepted" type="checkbox" name="terms" required />
@@ -343,6 +354,10 @@ const addressLine = (a: Address) =>
   margin: -0.4rem 0 0.8rem;
   font-size: var(--fs-sm);
   color: var(--paper-dim);
+}
+.hold-notice {
+  margin: 0 0 1rem;
+  color: var(--brass);
 }
 .terms {
   display: flex;
