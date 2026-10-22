@@ -4,6 +4,7 @@
 import { CURRENT_RGPD_CONSENT_VERSION, calculateArtworkPrice, defaultParcelCount } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, sql } from "drizzle-orm"
+import { isSampleValue } from "../env-guard.js"
 import { db } from "./client.js"
 import {
   ancientWeapons,
@@ -450,12 +451,12 @@ const SAMPLE_ADMIN_PASSWORD = "AdminSCS-ChangeMe-2026!"
 
 // Idempotent admin account so the backoffice is usable right after a seed.
 // Credentials come from env (ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD) with dev
-// defaults — which production refuses: a copied `.env.example` would otherwise
-// open the back office with a password published in the repository.
+// defaults — which production refuses, like any sample value (story 12.9b): a
+// copied example would otherwise open the back office with a published password.
 async function seedAdminUser() {
   const email = process.env.ADMIN_SEED_EMAIL ?? "admin@scs-firearm.local"
   const password = process.env.ADMIN_SEED_PASSWORD ?? SAMPLE_ADMIN_PASSWORD
-  if (process.env.NODE_ENV === "production" && password === SAMPLE_ADMIN_PASSWORD) {
+  if (process.env.NODE_ENV === "production" && isSampleValue(password)) {
     throw new Error("Set ADMIN_SEED_PASSWORD in .env: production refuses the sample admin password")
   }
 
