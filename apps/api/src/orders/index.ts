@@ -17,7 +17,7 @@ import type { FastifyPluginAsync } from "fastify"
 import { reservePrintForOrder } from "../artworks/reservation.js"
 import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
-import { loadCart } from "../cart/service.js"
+import { loadCart, reconcileCart } from "../cart/service.js"
 import { db } from "../db/client.js"
 import {
   addresses,
@@ -103,6 +103,19 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         error: "TermsOutdated",
         message: "The terms of sale have changed; review and accept the current version",
         currentVersion: CURRENT_TERMS_VERSION,
+      })
+    }
+
+    // Story 12.9d: the cart is re-checked against the catalogue as it is now. A
+    // moved price, or an article no longer for sale, refuses the order with the
+    // refreshed cart: the customer sees what changed and confirms again.
+    const changes = await reconcileCart(userId)
+    if (changes.length > 0) {
+      return reply.code(409).send({
+        error: "CartChanged",
+        message: "The cart changed since it was filled; review it and confirm again",
+        changes,
+        cart: await loadCart(userId),
       })
     }
 

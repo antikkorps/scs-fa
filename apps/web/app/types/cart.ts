@@ -62,3 +62,9 @@ export interface CartSummary {
   totalTtc: number
   shipping: ShippingQuote
 }
+
+/** What changed on a cart line since it was added; the checkout refuses the order with it (story 12.9d). */
+export type CartChange =
+  | { kind: "price_changed"; lineId: string; name: string; previousPriceHt: number; priceHt: number }
+  | { kind: "unavailable"; lineId: string; name: string }
+  | { kind: "category_a"; lineId: string; name: string }
