@@ -58,6 +58,7 @@ import { seoRoutes } from "./seo/index.js"
 import { adminShipmentRoutes } from "./shipments/admin.js"
 import { startShipmentTrackingScheduler } from "./shipments/tracking/sync.js"
 import { adminShippingRateRoutes } from "./shipping-rates/admin.js"
+import { adminShopSettingsRoutes } from "./shop-settings/admin.js"
 import { adminSupplierRoutes } from "./suppliers/admin.js"
 import { adminTagRoutes } from "./tags/admin.js"
 import { tagRoutes } from "./tags/index.js"
@@ -165,6 +166,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(adminQuoteRequestRoutes, { prefix: "/api/admin/quote-requests" })
   await fastify.register(adminShipmentRoutes, { prefix: "/api/admin/shipments" })
   await fastify.register(adminShippingRateRoutes, { prefix: "/api/admin/shipping-rates" })
+  await fastify.register(adminShopSettingsRoutes, { prefix: "/api/admin/shop-settings" })
   await fastify.register(adminBlogRoutes, { prefix: "/api/admin/blog" })
   await fastify.register(adminBlogImageRoutes, { prefix: "/api/admin/blog/images" })
   await fastify.register(adminMetricsRoutes, { prefix: "/api/admin/metrics" })

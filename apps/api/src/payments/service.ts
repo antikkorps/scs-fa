@@ -15,7 +15,6 @@ import { orders, paymentCarte, paymentVirement } from "../db/schema.js"
 import { enqueueInvoice } from "../henrri/queue.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
-import { recomputeVipStatus } from "../vip/service.js"
 import { settleStripeRefund } from "./refunds.js"
 import { createPaymentIntent, retrieveCharge, retrievePaymentIntent } from "./stripe.js"
 
@@ -693,7 +692,7 @@ export async function recomputeOrderPaymentStatus(orderId: string): Promise<void
   // Fully paid: one invoice, issued in Henrri by the queue (story 12.6).
   await enqueueInvoice(orderId)
 
-  // Paid order → may unlock VIP and advance the legal workflow.
-  await recomputeVipStatus(order.userId)
+  // Paid order → advances the legal workflow, which grants VIP once the order
+  // is complete (paid AND documents validated, story 12.9e).
   await recomputeOrderLegalStatus(order.userId)
 }

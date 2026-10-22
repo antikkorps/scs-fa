@@ -239,6 +239,13 @@
       "when": 1792691110467,
       "tag": "0033_story_12_9a_payment_reminder",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792697013573,
+      "tag": "0034_story_12_9e_shop_settings",
+      "breakpoints": true
     }
   ]
 }

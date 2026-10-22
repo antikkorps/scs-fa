@@ -1538,6 +1538,25 @@ export const shippingRates = pgTable(
   ],
 )
 
+/**
+ * Réglages de la boutique (story 12.9e) — UNE seule ligne (`id` = 1, contrainte),
+ * modifiée depuis le back-office ; qui l'a changée et depuis quoi est dans
+ * `audit_logs`. Aujourd'hui : la part de la marge rendue au client VIP (50 %
+ * par défaut, `DEFAULT_VIP_MARGIN_SHARE_PCT`). Une commande garde le taux figé.
+ */
+export const shopSettings = pgTable(
+  "shop_settings",
+  {
+    id: integer("id").primaryKey().default(1),
+    vipMarginSharePct: decimal("vip_margin_share_pct", { precision: 5, scale: 2 }).notNull().default("50"),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  () => [
+    check("chk_shop_settings_singleton", sql`id = 1`),
+    check("chk_shop_settings_vip_share", sql`vip_margin_share_pct >= 0 AND vip_margin_share_pct <= 100`),
+  ],
+)
+
 export const orders = pgTable(
   "orders",
   {

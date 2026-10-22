@@ -26,6 +26,7 @@ import {
 } from "../db/schema.js"
 import { releaseUniquePiece } from "../products/reservation.js"
 import { loadShippingRates } from "../shipping-rates/service.js"
+import { loadShopSettings } from "../shop-settings/service.js"
 
 // A product's tag slugs, as a correlated aggregate. Built with the query builder
 // rather than a raw string so the `products.id` reference stays qualified — a
@@ -188,8 +189,12 @@ export async function loadCart(userId: string): Promise<CartView> {
     .where(and(eq(artworkCartItems.userId, userId), printHoldActive()))
     .orderBy(asc(artworkCartItems.addedAt))
 
+  // The share of the margin a VIP gets back is SCS's to set (story 12.9e).
+  const { vipMarginSharePct } = await loadShopSettings()
   const discountFor = (lineHt: number, marginPct: string | null, categorySlug: string) =>
-    isVip ? calculateVipDiscount(lineHt, Number(marginPct ?? 0), categorySlug) : { discountPct: 0, discountAmount: 0 }
+    isVip
+      ? calculateVipDiscount(lineHt, Number(marginPct ?? 0), categorySlug, vipMarginSharePct)
+      : { discountPct: 0, discountAmount: 0 }
 
   const items: CartProductLine[] = productRows.map((r) => {
     const unitPriceHt = Number(r.priceHtAtTime)

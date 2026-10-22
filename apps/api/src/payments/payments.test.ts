@@ -1599,9 +1599,14 @@ describe("payments — Stripe card (Story 6.1)", () => {
     })
 
     describe("bank-transfer refunds (manual) + VIP cascade", () => {
+      // VIP comes from a paid order whose documents SCS validated (story 12.9e).
+      const completeLegalFlow = (orderId: string) =>
+        db.update(orders).set({ legalVerificationStatus: "completed" }).where(eq(orders.id, orderId))
+
       it("full refund revokes VIP earned from that order (no Stripe call)", async () => {
         const vipUser = await insertCustomer("rvip1")
         const orderId = await seedPaidVirementOrder(vipUser, "1200.00", [FIREARM_ITEM])
+        await completeLegalFlow(orderId)
         expect(await recomputeVipStatus(vipUser)).toBe(true)
 
         const res = await refund(orderId, { channel: "virement", amount: 1200 })
@@ -1617,9 +1622,10 @@ describe("payments — Stripe card (Story 6.1)", () => {
         expect(u.vipActive).toBe(false)
       })
 
-      it("partial refund keeps the order paid and VIP intact", async () => {
+      it("partial goodwill refund keeps the order paid and VIP intact", async () => {
         const vipUser = await insertCustomer("rvip2")
         const orderId = await seedPaidVirementOrder(vipUser, "1200.00", [FIREARM_ITEM])
+        await completeLegalFlow(orderId)
         expect(await recomputeVipStatus(vipUser)).toBe(true)
 
         const res = await refund(orderId, { channel: "virement", amount: 300 })

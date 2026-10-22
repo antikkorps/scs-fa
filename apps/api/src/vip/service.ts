@@ -1,21 +1,22 @@
-import { isNewFirearmQualifying, PAID_PAYMENT_STATUSES } from "@armurier/shared"
-import { asc, eq } from "drizzle-orm"
+import { keepsQualifyingFirearm, PAID_PAYMENT_STATUSES } from "@armurier/shared"
+import { and, asc, eq, inArray } from "drizzle-orm"
 import { db } from "../db/client.js"
-import { orders, users } from "../db/schema.js"
+import { orders, refunds, users } from "../db/schema.js"
 
 /**
  * Recompute a user's VIP status from scratch.
  *
- * A user is VIP (unlimited, no expiry) when they have a **paid** order
- * containing at least one **new firearm** (legal category B/C/D, not
- * second-hand/antique). Bidirectional and idempotent: it grants VIP when an
- * eligible paid order exists and **revokes** it when none does — a full refund
- * (Story 6.4) drops the order out of `PAID_PAYMENT_STATUSES`, so the user loses
- * VIP if it was their only qualifying purchase. A partial refund keeps the order
- * paid, so VIP stands. Already-correct state is left untouched (the original
- * `vipEligibleSince` is preserved rather than re-stamped).
+ * A user is VIP (unlimited, no expiry) when they have an order that is **paid
+ * and whose legal documents SCS has validated** — its lifecycle is `completed` —
+ * and that still holds at least one **new firearm** (legal category B/C/D, not
+ * second-hand/antique) once its returns are counted (story 12.9e, Franck
+ * 2026-10-22). Returning that firearm revokes VIP, in a partial refund too; a
+ * full refund drops the order out of `PAID_PAYMENT_STATUSES` anyway.
+ * Bidirectional and idempotent; already-correct state is left untouched (the
+ * original `vipEligibleSince` is preserved rather than re-stamped).
  *
- * Called on payment confirmation and on refund. Returns the resulting status.
+ * Called on payment, on document validation (via the legal status) and on
+ * refund. Returns the resulting status.
  */
 export async function recomputeVipStatus(userId: string): Promise<boolean> {
   const [user] = await db.select({ vipActive: users.vipActive }).from(users).where(eq(users.id, userId)).limit(1)
@@ -23,25 +24,43 @@ export async function recomputeVipStatus(userId: string): Promise<boolean> {
 
   const userOrders = await db
     .select({
+      id: orders.id,
       itemsJson: orders.itemsJson,
       paymentStatus: orders.paymentStatus,
+      legalVerificationStatus: orders.legalVerificationStatus,
       createdAt: orders.createdAt,
     })
     .from(orders)
     .where(eq(orders.userId, userId))
     .orderBy(asc(orders.createdAt))
 
-  let eligibleSince: Date | null = null
-  for (const order of userOrders) {
-    if (!PAID_PAYMENT_STATUSES.includes(order.paymentStatus)) continue
-    const qualifies = order.itemsJson.some((i) => isNewFirearmQualifying(i.legalCategory, i.category, i.tags ?? []))
-    if (qualifies) {
-      eligibleSince = order.createdAt
-      break
-    }
-  }
+  const candidates = userOrders.filter(
+    (order) => PAID_PAYMENT_STATUSES.includes(order.paymentStatus) && order.legalVerificationStatus === "completed",
+  )
+  const returns =
+    candidates.length === 0
+      ? []
+      : await db
+          .select({ orderId: refunds.orderId, lines: refunds.lines })
+          .from(refunds)
+          .where(
+            and(
+              inArray(
+                refunds.orderId,
+                candidates.map((order) => order.id),
+              ),
+              eq(refunds.status, "succeeded"),
+              eq(refunds.kind, "goods_return"),
+            ),
+          )
 
-  const shouldBeVip = eligibleSince !== null
+  const qualifying = candidates.find((order) => {
+    const returned = returns.filter((r) => r.orderId === order.id).flatMap((r) => r.lines ?? [])
+    return keepsQualifyingFirearm(order.itemsJson, returned)
+  })
+  const eligibleSince = qualifying?.createdAt ?? null
+
+  const shouldBeVip = qualifying !== undefined
   if (shouldBeVip === user.vipActive) return shouldBeVip // no transition — leave state as-is
 
   await db

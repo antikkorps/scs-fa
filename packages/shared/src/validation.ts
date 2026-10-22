@@ -1193,6 +1193,16 @@ export type CreateSupplierInput = z.infer<typeof createSupplierSchema>
 export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>
 export type UpdatePayoutInput = z.infer<typeof updatePayoutSchema>
 
+// Story 12.9e — the shop settings, replaced whole (PUT) like the shipping grid.
+export const shopSettingsSchema = z
+  .object({
+    // Share of the product margin a VIP gets back, in percent.
+    vipMarginSharePct: z.coerce.number().min(0).max(100).multipleOf(0.01),
+  })
+  .strict()
+
+export type ShopSettingsInput = z.infer<typeof shopSettingsSchema>
+
 // Story 12.3 — the shipping rate grid. Replaced whole (PUT), never patched: the
 // four amounts form one tariff and are reviewed together.
 const shippingRateSchema = z.coerce.number().min(0).max(1000).multipleOf(0.01)
