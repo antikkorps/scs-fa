@@ -1,4 +1,4 @@
-import { UNIQUE_PIECE_HOLD_MINUTES } from "@armurier/shared"
+import { CART_HOLD_MINUTES } from "@armurier/shared"
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm"
 import { db } from "../db/client.js"
 import { productVariants } from "../db/schema.js"
@@ -39,7 +39,7 @@ export async function reserveUniquePiece(
     .update(productVariants)
     .set({
       reservedBy: userId,
-      reservedUntil: sql`now() + interval '${sql.raw(String(UNIQUE_PIECE_HOLD_MINUTES))} minutes'`,
+      reservedUntil: sql`now() + interval '${sql.raw(String(CART_HOLD_MINUTES))} minutes'`,
       updatedAt: new Date(),
     })
     .where(and(eq(productVariants.id, variantId), claimable(userId)))

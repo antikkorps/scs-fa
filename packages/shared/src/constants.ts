@@ -33,12 +33,13 @@ export type PaymentStatus = (typeof PAYMENT_STATUS)[number]
 export const LEGAL_DOC_REVIEW_SLA_HOURS = 48
 
 /**
- * How long a unique piece stays held for the shopper who put it in their cart.
- * Long enough to gather identity documents and pick an address, short enough
- * that an abandoned cart doesn't take a one-off item off the market for a day.
- * Shared because the CGV state it (story 12.1).
+ * How long a unique piece (story 11.2) or a Gun Art print (story 12.9a) stays
+ * held for the shopper who put it in their cart. Long enough to gather identity
+ * documents and pick an address, short enough that an abandoned cart doesn't
+ * take a one-off item off the market for a day. Shared because the CGV state
+ * it and the cart shows the countdown.
  */
-export const UNIQUE_PIECE_HOLD_MINUTES = 30
+export const CART_HOLD_MINUTES = 30
 
 /**
  * How long an unpaid order holds its stock, prints and unique pieces before it

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { UNIQUE_PIECE_HOLD_MINUTES, UNPAID_CARD_ORDER_MINUTES, UNPAID_TRANSFER_ORDER_DAYS } from "./constants.js"
+import { CART_HOLD_MINUTES, UNPAID_CARD_ORDER_MINUTES, UNPAID_TRANSFER_ORDER_DAYS } from "./constants.js"
 import { LEGAL_IDENTITY } from "./legal-identity.js"
 import { escapeHtml, renderTermsHtml, renderTermsText, TERMS_SECTIONS } from "./terms-content.js"
 
@@ -39,7 +39,7 @@ describe("terms content (story 12.1)", () => {
     expect(text).toContain(`dans les ${UNPAID_CARD_ORDER_MINUTES} minutes qui suivent la commande`)
     expect(text).toContain(`sous ${UNPAID_TRANSFER_ORDER_DAYS} jours`)
     expect(text).toContain(
-      `ou un tirage Gun Art placé dans le panier est réservé au client pendant ${UNIQUE_PIECE_HOLD_MINUTES} minutes`,
+      `ou un tirage Gun Art placé dans le panier est réservé au client pendant ${CART_HOLD_MINUTES} minutes`,
     )
     expect(text).not.toContain("tant qu'il est dans le panier")
   })

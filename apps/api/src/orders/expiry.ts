@@ -9,13 +9,14 @@ import {
 } from "@armurier/shared"
 import { and, eq, exists, inArray, isNull, lt, not, notExists, or, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
+import { releaseLapsedPrintHolds } from "../artworks/reservation.js"
 import { recordAuditEvent, recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { orders, paymentCarte, paymentVirement, users } from "../db/schema.js"
 import { sendTransferReminderEmail, sendUnpaidOrderCancelledEmail } from "../email.js"
-import { env } from "../env.js"
 import { cancelPaymentIntent, retrievePaymentIntent } from "../payments/stripe.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
+import { startPeriodicJob } from "../periodic-job.js"
 import { releaseOrderInventory } from "./inventory.js"
 
 type Logger = Pick<FastifyBaseLogger, "warn" | "error">
@@ -229,17 +230,15 @@ async function cancelUnpaidOrder(order: Candidate, log: Logger): Promise<boolean
   return true
 }
 
-/** In-process sweep every five minutes, same pattern as the confirmation retry pass. */
+const PRINT_HOLD_SWEEP_EVERY_MS = 60 * 1000
+
+/**
+ * In-process sweeps (story 12.9a): unpaid orders every five minutes, lapsed
+ * Gun Art print holds every minute — the cart already hides them at once.
+ */
 export function startUnpaidOrderSweep(app: FastifyInstance): void {
-  if (env.NODE_ENV === "test") return
-  const run = () =>
-    sweepUnpaidOrders(new Date(), app.log)
-      .then((result) => {
-        if (result.cancelled > 0 || result.reminded > 0) app.log.info(result, "unpaid order sweep")
-      })
-      .catch((err) => app.log.error({ err }, "unpaid order sweep failed"))
-  void run()
-  const timer = setInterval(run, SWEEP_EVERY_MS)
-  timer.unref?.()
-  app.addHook("onClose", async () => clearInterval(timer))
+  startPeriodicJob(app, "unpaid order sweep", SWEEP_EVERY_MS, () => sweepUnpaidOrders(new Date(), app.log))
+  startPeriodicJob(app, "print hold sweep", PRINT_HOLD_SWEEP_EVERY_MS, async () => ({
+    printsReleased: await releaseLapsedPrintHolds(),
+  }))
 }

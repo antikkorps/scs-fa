@@ -1,7 +1,7 @@
 import {
+  CART_HOLD_MINUTES,
   LEGAL_DOC_REVIEW_SLA_HOURS,
   TRANSFER_REMINDER_DAYS,
-  UNIQUE_PIECE_HOLD_MINUTES,
   UNPAID_CARD_ORDER_MINUTES,
   UNPAID_TRANSFER_ORDER_DAYS,
 } from "./constants.js"
@@ -106,7 +106,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
         " s'ajoutent au prix des articles ; leur montant et le prix total sont indiqués dans le récapitulatif, avant la validation de la commande. Ils sont forfaitaires : par colis pour une arme (envoi assuré, remis contre signature ; une arme de catégorie B est livrée en deux colis), un forfait unique par commande pour les munitions et accessoires — offert à partir du montant indiqué au panier —, et par tirage pour les œuvres Gun Art. La remise fidélité ne s'applique pas aux frais de livraison.",
       ),
       p(
-        `Le prix appliqué est celui affiché au moment de la commande. Une pièce unique de l'armurerie ou un tirage Gun Art placé dans le panier est réservé au client pendant ${UNIQUE_PIECE_HOLD_MINUTES} minutes, puis remis en vente.`,
+        `Le prix appliqué est celui affiché au moment de la commande. Une pièce unique de l'armurerie ou un tirage Gun Art placé dans le panier est réservé au client pendant ${CART_HOLD_MINUTES} minutes, puis remis en vente.`,
       ),
     ],
   },
