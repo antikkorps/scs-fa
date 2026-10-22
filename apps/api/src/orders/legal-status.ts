@@ -8,6 +8,7 @@ import { and, desc, eq, inArray } from "drizzle-orm"
 import { recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { legalCategories, legalDocuments, orders } from "../db/schema.js"
+import { recomputeVipStatus } from "../vip/service.js"
 
 // Orders in these states still follow the document lifecycle: their legal status
 // is re-derived from the documents on every change.
@@ -146,6 +147,8 @@ export async function recomputeOrderLegalStatus(userId: string): Promise<void> {
   if (candidates.length === 0) return
 
   const docs = await loadUserDocs(userId)
+  // An order reaching `completed` may unlock VIP: paid AND documents validated (story 12.9e).
+  let completedOne = false
 
   for (const order of candidates) {
     const paid = PAID_PAYMENT_STATUSES.includes(order.paymentStatus)
@@ -161,6 +164,7 @@ export async function recomputeOrderLegalStatus(userId: string): Promise<void> {
         .returning({ id: orders.id })
       if (completed) {
         await recordOrderStatusChange(order.id, "legal", { from: order.legalVerificationStatus, to: "completed" })
+        completedOne = true
       }
       continue
     }
@@ -202,6 +206,9 @@ export async function recomputeOrderLegalStatus(userId: string): Promise<void> {
     // A new rejection reason alone is no new step.
     if (moved && next !== order.legalVerificationStatus) {
       await recordOrderStatusChange(order.id, "legal", { from: order.legalVerificationStatus, to: next })
+      if (next === "completed") completedOne = true
     }
   }
+
+  if (completedOne) await recomputeVipStatus(userId)
 }

@@ -418,6 +418,29 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     expect(row.verifiedAt).not.toBeNull()
   })
 
+  it("grants VIP at the moment SCS validates the documents of a paid new firearm (story 12.9e)", async () => {
+    await db
+      .update(users)
+      .set({ vipActive: false, vipStatus: null, vipEligibleSince: null })
+      .where(eq(users.id, customerId))
+    const vipOf = async () =>
+      (await db.select({ vip: users.vipActive }).from(users).where(eq(users.id, customerId)))[0]?.vip
+    const orderId = await seedOrder(customerId, ["D"])
+    await markPaid(orderId)
+    await recomputeOrderLegalStatus(customerId)
+    expect(await vipOf()).toBe(false)
+
+    const docId = await uploadDoc("cni")
+    await decide(docId, "approve")
+
+    expect((await orderStatusInDb(orderId)).status).toBe("completed")
+    expect(await vipOf()).toBe(true)
+    await db
+      .update(users)
+      .set({ vipActive: false, vipStatus: null, vipEligibleSince: null })
+      .where(eq(users.id, customerId))
+  })
+
   it("does not advance a completed order", async () => {
     const orderId = await seedOrder(customerId, [null, "none"])
     await markPaid(orderId)

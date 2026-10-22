@@ -15,6 +15,7 @@ const groups = [
       { to: "/admin/organisations", label: "Comptes pro", icon: "◫" },
       { to: "/admin/devis", label: "Devis", icon: "✉" },
       { to: "/admin/livraison", label: "Frais de port", icon: "⇶" },
+      { to: "/admin/reglages", label: "Réglages", icon: "⚙" },
     ],
   },
   {

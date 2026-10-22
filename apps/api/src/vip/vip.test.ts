@@ -15,6 +15,8 @@ import {
   products,
   productTags,
   productVariants,
+  refunds,
+  shopSettings,
   tags,
   users,
 } from "../db/schema.js"
@@ -77,6 +79,9 @@ describe("VIP (story 3.4)", () => {
     const userIds = db.select({ id: users.id }).from(users).where(like(users.email, "vip-test34%"))
     await db.delete(cartItems).where(inArray(cartItems.variantId, variantIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
+    await db
+      .delete(refunds)
+      .where(inArray(refunds.orderId, db.select({ id: orders.id }).from(orders).where(inArray(orders.userId, userIds))))
     await db.delete(orders).where(inArray(orders.userId, userIds))
     await db.delete(addresses).where(inArray(addresses.userId, userIds))
     await db.delete(productVariants).where(like(productVariants.skuVariant, `${PREFIX}%`))
@@ -171,7 +176,11 @@ describe("VIP (story 3.4)", () => {
 
   beforeEach(async () => {
     await db.delete(cartItems).where(eq(cartItems.userId, userId))
+    await db
+      .delete(refunds)
+      .where(inArray(refunds.orderId, db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))))
     await db.delete(orders).where(eq(orders.userId, userId))
+    await db.update(shopSettings).set({ vipMarginSharePct: "50" })
     await db
       .update(users)
       .set({ vipActive: false, vipStatus: null, vipEligibleSince: null })
@@ -205,6 +214,26 @@ describe("VIP (story 3.4)", () => {
   async function markOrderPaid(orderId: string) {
     await db.update(orders).set({ paymentStatus: "received" }).where(eq(orders.id, orderId))
   }
+  /** Paid, and the legal dossier cleared by SCS: the order's lifecycle is complete. */
+  async function markOrderCompleted(orderId: string) {
+    await db
+      .update(orders)
+      .set({ paymentStatus: "received", legalVerificationStatus: "completed" })
+      .where(eq(orders.id, orderId))
+  }
+  /** A goods-return refund that settled, for the given order lines. */
+  async function returnLines(orderId: string, lines: Array<{ item: number; qty: number }>) {
+    await db.insert(refunds).values({
+      orderId,
+      channel: "virement",
+      amountTtc: "100.00",
+      status: "succeeded",
+      currency: "EUR",
+      kind: "goods_return",
+      lines,
+    })
+    await db.update(orders).set({ paymentStatus: "partially_refunded" }).where(eq(orders.id, orderId))
+  }
 
   // --- Eligibility (recomputeVipStatus) ---
 
@@ -215,10 +244,19 @@ describe("VIP (story 3.4)", () => {
     expect(vip).toBe(false)
   })
 
-  it("grants VIP from a paid order containing a new firearm", async () => {
+  it("does not grant VIP while the order's documents are not validated (story 12.9e)", async () => {
     await addToCart(newFirearmVariantId, 1)
     const order = (await createOrder()).json().data
     await markOrderPaid(order.id)
+    await db.update(orders).set({ legalVerificationStatus: "docs_verifying" }).where(eq(orders.id, order.id))
+
+    expect(await recomputeVipStatus(userId)).toBe(false)
+  })
+
+  it("grants VIP from a paid order containing a new firearm, once its documents are validated", async () => {
+    await addToCart(newFirearmVariantId, 1)
+    const order = (await createOrder()).json().data
+    await markOrderCompleted(order.id)
 
     const vip = await recomputeVipStatus(userId)
     expect(vip).toBe(true)
@@ -234,18 +272,49 @@ describe("VIP (story 3.4)", () => {
   it("does not grant VIP from a paid order of a second-hand firearm", async () => {
     await addToCart(occasionVariantId, 1)
     const order = (await createOrder()).json().data
-    await markOrderPaid(order.id)
+    await markOrderCompleted(order.id)
     expect(await recomputeVipStatus(userId)).toBe(false)
   })
 
   it("does not grant VIP from a paid order of ammunition only", async () => {
     await addToCart(munitionVariantId, 2)
     const order = (await createOrder()).json().data
-    await markOrderPaid(order.id)
+    await markOrderCompleted(order.id)
     expect(await recomputeVipStatus(userId)).toBe(false)
   })
 
+  it("revokes VIP when the firearm that unlocked it is returned, even in a partial refund (story 12.9e)", async () => {
+    await addToCart(newFirearmVariantId, 1)
+    await addToCart(munitionVariantId, 1)
+    const order = (await createOrder()).json().data
+    await markOrderCompleted(order.id)
+    expect(await recomputeVipStatus(userId)).toBe(true)
+    // The firearm went into the cart first: it is line 0 of the order snapshot.
+    await returnLines(order.id, [{ item: 0, qty: 1 }])
+
+    expect(await recomputeVipStatus(userId)).toBe(false)
+  })
+
+  it("keeps VIP when only other articles of the order are returned (story 12.9e)", async () => {
+    await addToCart(newFirearmVariantId, 1)
+    await addToCart(munitionVariantId, 1)
+    const order = (await createOrder()).json().data
+    await markOrderCompleted(order.id)
+
+    await returnLines(order.id, [{ item: 1, qty: 1 }])
+
+    expect(await recomputeVipStatus(userId)).toBe(true)
+  })
+
   // --- Discount (cart + order) ---
+
+  it("gives back the share of the margin SCS set in the shop settings (story 12.9e)", async () => {
+    await setVip(true)
+    await db.update(shopSettings).set({ vipMarginSharePct: "40" })
+    const res = await addToCart(newFirearmVariantId, 1)
+    // margin 30% × 40% → 12% discount; 1000 HT → 120 off
+    expect(res.json().data.items[0]).toMatchObject({ discountPct: 12, discountAmount: 120 })
+  })
 
   it("applies a 50%-of-margin discount in the cart for a VIP", async () => {
     await setVip(true)

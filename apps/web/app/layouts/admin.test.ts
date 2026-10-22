@@ -28,12 +28,13 @@ describe("admin layout sidebar", () => {
     ])
     const links = wrapper.findAll(".nav__link").map((a) => a.attributes("href"))
     expect(links[0]).toBe("/admin")
-    expect(links).toHaveLength(21)
+    expect(links).toHaveLength(22)
     // No screen lost or listed twice in the regrouping.
     expect(new Set(links).size).toBe(links.length)
     expect(links).toEqual(
       expect.arrayContaining([
         "/admin/livraison",
+        "/admin/reglages",
         "/admin/metrics",
         "/admin/blog",
         "/admin/fournisseurs",

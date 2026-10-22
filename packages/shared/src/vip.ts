@@ -40,18 +40,48 @@ export function isNewFirearmQualifying(
   return !NON_NEW_PRODUCT_CATEGORIES.includes(categorySlug)
 }
 
+// Share of the product margin a VIP gets back, until SCS changes it in the back
+// office (story 12.9e, `shop_settings.vip_margin_share_pct`).
+export const DEFAULT_VIP_MARGIN_SHARE_PCT = 50
+
 /**
- * VIP discount on a line: 50% of the product margin, in HT.
+ * VIP discount on a line: a share of the product margin (half by default), in HT.
  * Ammunition (and any excluded category) gets no discount.
  */
 export function calculateVipDiscount(
   lineHt: number,
   marginPct: number,
   categorySlug: string,
+  marginSharePct: number = DEFAULT_VIP_MARGIN_SHARE_PCT,
 ): { discountPct: number; discountAmount: number } {
-  if (marginPct <= 0 || VIP_DISCOUNT_EXCLUDED_CATEGORIES.includes(categorySlug)) {
+  if (marginPct <= 0 || marginSharePct <= 0 || VIP_DISCOUNT_EXCLUDED_CATEGORIES.includes(categorySlug)) {
     return { discountPct: 0, discountAmount: 0 }
   }
-  const discountPct = round2(marginPct * 0.5)
+  const discountPct = round2((marginPct * marginSharePct) / 100)
   return { discountPct, discountAmount: round2(lineHt * (discountPct / 100)) }
+}
+
+/** An order line as the VIP rule reads it (the `items_json` snapshot). */
+export interface VipOrderLine {
+  qty: number
+  category: string
+  legalCategory?: string | null
+  tags?: string[]
+}
+
+/**
+ * Whether an order still holds a new firearm once its returns are counted
+ * (story 12.9e, Franck 2026-10-22): returning the firearm that unlocked VIP —
+ * in a partial refund too — takes the order out of the running. `returned`
+ * lists the goods-return refund lines (`item` = index in the order's lines).
+ */
+export function keepsQualifyingFirearm(
+  lines: readonly VipOrderLine[],
+  returned: ReadonlyArray<{ item: number; qty: number }>,
+): boolean {
+  return lines.some((line, index) => {
+    if (!isNewFirearmQualifying(line.legalCategory, line.category, line.tags ?? [])) return false
+    const returnedQty = returned.filter((r) => r.item === index).reduce((sum, r) => sum + r.qty, 0)
+    return line.qty - returnedQty > 0
+  })
 }
