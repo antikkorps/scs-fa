@@ -47,6 +47,13 @@ const cards = computed(() => {
       tone: s.invoicesNeedingAttention > 0 ? "bad" : "ok",
     },
     {
+      label: "Paiements en retard",
+      value: s.overduePayments,
+      hint: "échéance passée, à traiter",
+      to: "/admin/orders?payments=overdue",
+      tone: s.overduePayments > 0 ? "bad" : "ok",
+    },
+    {
       label: "Remboursées",
       value: s.refunded,
       hint: "totalement",

@@ -2,7 +2,7 @@
 import { orderReference } from "@armurier/shared"
 import type { OrderDetail } from "~/types/checkout"
 import { formatEuros } from "~/utils/format"
-import { legalStatusLabel, paymentStatusLabel, statusTone } from "~/utils/order"
+import { legalStatusLabel, paymentDeadlineNote, paymentStatusLabel, statusTone } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
 useHead({ title: "Votre commande — SCS Firearms" })
@@ -36,6 +36,9 @@ const carte = computed(() => order.value?.payment.carte ?? null)
 const carteAmount = computed(() => carte.value?.amountTtc ?? 0)
 const cardSettled = computed(() => cardPaidLocal.value || carte.value?.status === "received")
 const virementPending = computed(() => virement.value?.status === "awaiting_transfer")
+// Story 12.9a: an order left unpaid past its deadline is cancelled, its items back on sale.
+const cancelled = computed(() => order.value?.paymentStatus === "cancelled")
+const deadlineNote = computed(() => paymentDeadlineNote(order.value?.paymentDueAt))
 
 // The legal-verification status is only worth surfacing once the document
 // workflow is actually under way. Before that (e.g. "payment_pending"), it would
@@ -79,13 +82,18 @@ async function declareTransfer() {
 
       <template v-else-if="order">
         <header class="order__head">
-          <p class="eyebrow">Commande confirmée</p>
-          <h1 class="order__title">Merci pour votre commande</h1>
+          <p class="eyebrow">{{ cancelled ? "Commande annulée" : "Commande confirmée" }}</p>
+          <h1 class="order__title">{{ cancelled ? "Cette commande n'a pas été réglée" : "Merci pour votre commande" }}</h1>
           <p class="order__ref">Référence&nbsp;: {{ orderReference(order.id) }} · Total {{ formatEuros(order.totalTtc) }} TTC</p>
+          <p v-if="cancelled" class="order__deadline" role="status">
+            Faute de paiement dans le délai prévu, elle a été annulée et ses articles remis en vente. Aucune somme ne vous a
+            été prélevée.
+          </p>
+          <p v-else-if="deadlineNote" class="order__deadline">{{ deadlineNote }}</p>
         </header>
 
         <!-- Virement bucket -->
-        <section v-if="virement" class="pay" aria-labelledby="vir-h">
+        <section v-if="virement && !cancelled" class="pay" aria-labelledby="vir-h">
           <h2 id="vir-h" class="pay__h">Paiement par virement — {{ formatEuros(virement.amountTtc) }}</h2>
           <p class="pay__lede">
             Les armes réglementées se règlent par virement bancaire. Indiquez impérativement la référence ci-dessous.
@@ -109,7 +117,7 @@ async function declareTransfer() {
         </section>
 
         <!-- Carte bucket -->
-        <section v-if="carte" class="pay" aria-labelledby="cb-h">
+        <section v-if="carte && !cancelled" class="pay" aria-labelledby="cb-h">
           <h2 id="cb-h" class="pay__h">Paiement par carte — {{ formatEuros(carteAmount) }}</h2>
           <p v-if="cardSettled" class="pay__done" role="status">Paiement par carte reçu. Merci&nbsp;!</p>
           <StripeCardPayment v-else :order-id="orderId" :amount="carteAmount" @paid="onCardPaid" />
@@ -166,6 +174,10 @@ async function declareTransfer() {
 .order__ref {
   color: var(--paper-dim);
   margin: 0;
+}
+.order__deadline {
+  color: var(--brass);
+  margin: 0.75rem 0 0;
 }
 .pay {
   margin-bottom: 1.75rem;

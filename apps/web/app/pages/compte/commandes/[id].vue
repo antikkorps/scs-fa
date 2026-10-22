@@ -8,6 +8,7 @@ import { needsUpload, requiredDocStatusLabel, requiredDocTone } from "~/utils/le
 import {
   legalStatusLabel,
   parcelItemLabel,
+  paymentDeadlineNote,
   paymentStatusLabel,
   shipmentStatusLabel,
   shippingStatusLabel,
@@ -41,9 +42,13 @@ const billing = computed<OrderAddressSnapshot | null>(
 
 // An order with an outstanding payment still needs the payment flow on the
 // confirmation page; surface a link to it rather than duplicating the tunnel.
+// A cancelled or refunded order owes nothing (story 12.9a).
 const paymentOutstanding = computed(
-  () => order.value !== null && !["received", "reconciled", "partially_refunded"].includes(order.value.paymentStatus),
+  () =>
+    order.value !== null &&
+    !["received", "reconciled", "partially_refunded", "refunded", "cancelled"].includes(order.value.paymentStatus),
 )
+const cancelled = computed(() => order.value?.paymentStatus === "cancelled")
 
 async function loadOrder() {
   try {
@@ -151,10 +156,14 @@ function toggleUpload(docType: string) {
         <p v-if="paymentOutstanding" class="cta-pay">
           Un règlement est en attente pour cette commande.
           <NuxtLink :to="`/commande/${order.id}`" class="link">Procéder au paiement</NuxtLink>
+          <span v-if="order.paymentDueAt" class="cta-pay__deadline">{{ paymentDeadlineNote(order.paymentDueAt) }}</span>
+        </p>
+        <p v-else-if="cancelled" class="cta-pay">
+          Commande annulée faute de paiement dans le délai prévu : ses articles ont été remis en vente.
         </p>
 
         <!-- Legal checklist -->
-        <section v-if="legal?.requiresVerification" class="block" aria-labelledby="legal-h">
+        <section v-if="legal?.requiresVerification && !cancelled" class="block" aria-labelledby="legal-h">
           <h2 id="legal-h" class="block__h">Documents légaux</h2>
           <p class="block__lede">
             Les articles réglementés de cette commande nécessitent la vérification des documents ci-dessous. Votre
@@ -386,6 +395,11 @@ function toggleUpload(docType: string) {
   background: var(--ink-soft);
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
+}
+.cta-pay__deadline {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--paper-dim);
 }
 .block {
   margin-bottom: 1.75rem;

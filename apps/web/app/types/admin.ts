@@ -222,6 +222,8 @@ export interface OrdersSummary {
   docsRejected: number
   /** Henrri documents blocked, or still on their way an hour on (story 12.6). */
   invoicesNeedingAttention: number
+  /** Unpaid orders past their payment deadline, left to SCS: money declared or partly in (story 12.9a). */
+  overduePayments: number
   byPaymentStatus: Record<string, number>
   byLegalStatus: Record<string, number>
 }
