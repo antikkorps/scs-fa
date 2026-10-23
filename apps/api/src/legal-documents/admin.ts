@@ -1,7 +1,9 @@
 import {
+  isLegalDocExpired,
   type LegalDocRejectionReason,
   type LegalDocType,
   legalDocQueueQuerySchema,
+  parisToday,
   rejectLegalDocumentSchema,
   uuidParamSchema,
 } from "@armurier/shared"
@@ -169,6 +171,12 @@ export const adminLegalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
         error: "Conflict",
         message: `Cannot approve a document whose antivirus scan is "${doc.scanStatus}"`,
       })
+    }
+    // An expired document proves nothing: reject it as "document_expired" instead (story 12.9f).
+    if (isLegalDocExpired(doc.expiresAt, parisToday())) {
+      return reply
+        .code(409)
+        .send({ error: "DocumentExpired", message: "Cannot approve a document past its expiry date" })
     }
 
     const [updated] = await db

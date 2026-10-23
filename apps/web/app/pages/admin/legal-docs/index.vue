@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import { isLegalDocExpired, parisToday } from "@armurier/shared"
 import type { LegalDocDetail, LegalDocQueueItem, Pagination } from "~/types/admin"
-import { formatDateTime } from "~/utils/format"
+import { formatDate, formatDateTime } from "~/utils/format"
 import { docTypeLabel, docVerificationStatus, REJECTION_REASON_OPTIONS, rejectionLabel } from "~/utils/status"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Documents — Administration SCS" })
 
 const api = useApi()
-const status = ref<"pending" | "approved" | "rejected" | "all">("pending")
+const status = ref<"pending" | "approved" | "rejected" | "expired" | "all">("pending")
 const page = ref(1)
 
 const { data, pending, error, refresh } = await useAsyncData(
@@ -29,6 +30,13 @@ const actionError = ref("")
 const rejectReason = ref(REJECTION_REASON_OPTIONS[0]?.value ?? "other")
 const rejectNotes = ref("")
 const mode = ref<"view" | "reject">("view")
+// The API refuses to approve a document past its expiry date (story 12.9f).
+const selectedExpired = computed(() => isLegalDocExpired(selected.value?.expiresAt, parisToday()))
+
+function startReject() {
+  if (selectedExpired.value) rejectReason.value = "document_expired"
+  mode.value = "reject"
+}
 
 async function open(id: string) {
   mode.value = "view"
@@ -103,8 +111,8 @@ function setStatus(s: typeof status.value) {
     </header>
 
     <div class="tabs">
-      <button v-for="t in (['pending', 'approved', 'rejected', 'all'] as const)" :key="t" class="tab" :class="{ 'tab--on': status === t }" @click="setStatus(t)">
-        {{ { pending: "À vérifier", approved: "Approuvés", rejected: "Rejetés", all: "Tous" }[t] }}
+      <button v-for="t in (['pending', 'approved', 'rejected', 'expired', 'all'] as const)" :key="t" class="tab" :class="{ 'tab--on': status === t }" @click="setStatus(t)">
+        {{ { pending: "À vérifier", approved: "Approuvés", rejected: "Rejetés", expired: "Expirés", all: "Tous" }[t] }}
       </button>
     </div>
 
@@ -163,7 +171,7 @@ function setStatus(s: typeof status.value) {
             <div><dt>Statut</dt><dd><AdminStatusTag v-bind="docVerificationStatus(selected.verificationStatus)" /></dd></div>
             <div v-if="selected.docNumber"><dt>N° document</dt><dd>{{ selected.docNumber }}</dd></div>
             <div><dt>Antivirus</dt><dd>{{ selected.scanStatus }}</dd></div>
-            <div v-if="selected.expiresAt"><dt>Expire le</dt><dd>{{ formatDateTime(selected.expiresAt) }}</dd></div>
+            <div v-if="selected.expiresAt"><dt>Expire le</dt><dd>{{ formatDate(selected.expiresAt) }}</dd></div>
           </dl>
 
           <a :href="selected.downloadUrl" target="_blank" rel="noopener" class="btn btn-ghost dl">Ouvrir le document ↗</a>
@@ -172,13 +180,20 @@ function setStatus(s: typeof status.value) {
 
           <template v-if="selected.verificationStatus === 'pending'">
             <div v-if="mode === 'view'" class="actions">
-              <button class="btn btn-primary" :disabled="acting || selected.scanStatus !== 'clean'" @click="approve">
+              <button
+                class="btn btn-primary"
+                :disabled="acting || selected.scanStatus !== 'clean' || selectedExpired"
+                @click="approve"
+              >
                 Approuver
               </button>
-              <button class="btn btn-ghost danger" :disabled="acting" @click="mode = 'reject'">Rejeter</button>
+              <button class="btn btn-ghost danger" :disabled="acting" @click="startReject">Rejeter</button>
             </div>
             <p v-if="mode === 'view' && selected.scanStatus !== 'clean'" class="hint">
               Approbation bloquée tant que l'antivirus n'est pas « clean ».
+            </p>
+            <p v-if="mode === 'view' && selectedExpired" class="hint">
+              Document expiré : il ne peut pas être approuvé, rejetez-le pour demander une pièce valide.
             </p>
 
             <form v-else class="reject-form" @submit.prevent="reject">
