@@ -36,7 +36,7 @@ import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
 import { adminMediaRoutes, mediaRoutes } from "./media/index.js"
 import { adminMetricsRoutes } from "./metrics/admin.js"
-import { isInternalCall, trustDirectPrivatePeer } from "./net/client-ip.js"
+import { isInternalCall, rateLimitKey, trustDirectPrivatePeer } from "./net/client-ip.js"
 import { newsletterRoutes } from "./newsletter/index.js"
 import { startNewsletterPurgeScheduler } from "./newsletter/retention.js"
 import { adminOrderRoutes } from "./orders/admin.js"
@@ -101,9 +101,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   if (env.NODE_ENV !== "test") {
     await fastify.register(fastifyRateLimit, {
-      // Keyed on request.ip — the visitor, even when the Nuxt server calls on
-      // their behalf. Those calls get a larger budget: one server-rendered page
-      // fans out into several API requests.
+      // Keyed on the visitor (request.ip), even when the Nuxt server calls on
+      // their behalf — by /64 on IPv6 (story 12.9f). Those calls get a larger
+      // budget: one server-rendered page fans out into several API requests.
+      keyGenerator: (request) => rateLimitKey(request.ip),
       max: (request) => (isInternalCall(request, env.INTERNAL_API_SECRET) ? 300 : 100),
       timeWindow: "1 minute",
     })

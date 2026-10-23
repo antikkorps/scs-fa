@@ -1,6 +1,6 @@
 import Fastify from "fastify"
 import { describe, expect, it } from "vitest"
-import { isInternalCall, isPrivateAddress, trustDirectPrivatePeer } from "./client-ip.js"
+import { isInternalCall, isPrivateAddress, rateLimitKey, trustDirectPrivatePeer } from "./client-ip.js"
 
 describe("isPrivateAddress", () => {
   it("recognises loopback and the private ranges Docker networks use", () => {
@@ -62,5 +62,27 @@ describe("isInternalCall", () => {
 
   it("never matches when no secret is configured — not even an empty header", () => {
     expect(isInternalCall(req(""), undefined)).toBe(false)
+  })
+})
+
+describe("rateLimitKey (story 12.9f)", () => {
+  it("keeps an IPv4 address as is, even mapped on a dual-stack socket", () => {
+    expect(rateLimitKey("203.0.113.7")).toBe("203.0.113.7")
+    expect(rateLimitKey("::ffff:203.0.113.7")).toBe("203.0.113.7")
+  })
+
+  it("groups an IPv6 address by its /64: one subscriber holds the whole prefix", () => {
+    expect(rateLimitKey("2001:db8:1:2:aaaa:bbbb:cccc:dddd")).toBe("2001:db8:1:2::/64")
+    expect(rateLimitKey("2001:db8:1:2::1")).toBe(rateLimitKey("2001:0db8:0001:0002:ffff::9"))
+    expect(rateLimitKey("2001:db8:1:3::1")).not.toBe(rateLimitKey("2001:db8:1:2::1"))
+  })
+
+  it("expands a compressed prefix", () => {
+    expect(rateLimitKey("2001:db8::1")).toBe("2001:db8:0:0::/64")
+    expect(rateLimitKey("::1")).toBe("0:0:0:0::/64")
+  })
+
+  it("passes anything else through", () => {
+    expect(rateLimitKey("not-an-ip")).toBe("not-an-ip")
   })
 })
