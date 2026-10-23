@@ -18,6 +18,7 @@ import { sendLegalDocApprovedEmail, sendLegalDocRejectedEmail } from "../email.j
 import { validationError } from "../http.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { storage } from "../storage/index.js"
+import { expireLegalDocuments } from "./expiry.js"
 
 // Reviewer-facing fields — raw storage URL stays internal, reads go through
 // a short-lived presigned URL on the detail route.
@@ -178,6 +179,10 @@ export const adminLegalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
         .code(409)
         .send({ error: "DocumentExpired", message: "Cannot approve a document past its expiry date" })
     }
+
+    // An approval past its expiry date the daily job has not marked yet would
+    // still hold the customer's single approved slot for this type.
+    await expireLegalDocuments(parisToday(), doc.user.id)
 
     const [updated] = await db
       .update(legalDocuments)

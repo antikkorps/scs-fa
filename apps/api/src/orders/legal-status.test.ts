@@ -354,9 +354,12 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     const cni = (await getLegal(orderId)).json().data.requiredDocs.find((d: { docType: string }) => d.docType === "cni")
     expect(cni).toMatchObject({ documentId: cniId, status: "rejected", rejectionReason: "document_expired" })
 
-    // A fresh upload takes over from the expired approval
-    await uploadDoc("cni")
+    // A fresh upload takes over from the expired approval, and can be approved
+    // before the daily job has marked the old one
+    const freshId = await uploadDoc("cni")
     expect((await orderStatusInDb(orderId)).status).toBe("docs_verifying")
+    expect((await decide(freshId, "approve")).statusCode).toBe(200)
+    expect((await orderStatusInDb(orderId)).status).toBe("docs_verified")
   })
 
   it("flags an infected document and keeps the order pending (self-healing read)", async () => {
