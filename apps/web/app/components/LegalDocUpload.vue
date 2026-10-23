@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import {
-  ALLOWED_LEGAL_DOC_MIME_TYPES,
-  type LegalDocType,
-  MAX_LEGAL_DOC_SIZE_BYTES,
-  parisToday,
-} from "@armurier/shared"
+import { ALLOWED_LEGAL_DOC_MIME_TYPES, type LegalDocType, MAX_LEGAL_DOC_SIZE_BYTES, parisToday } from "@armurier/shared"
 import type { LegalDocument } from "~/types/account"
 import { formatFileSize, legalDocUploadMessage } from "~/utils/legal"
 
