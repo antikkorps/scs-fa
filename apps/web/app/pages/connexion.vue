@@ -42,12 +42,14 @@ async function submitPassword() {
   } catch (err) {
     const status = authErrorStatus(err)
     if (status === 401) error.value = "Email ou mot de passe invalide."
-    else if (status === 423) error.value = "Trop de tentatives. Réessayez dans quelques minutes."
+    else if (status === 423) error.value = LOCKED_MESSAGE
     else error.value = "Connexion impossible. Réessayez."
   } finally {
     loading.value = false
   }
 }
+
+const LOCKED_MESSAGE = "Trop de tentatives. Réessayez dans quelques minutes."
 
 /** Back to the password: the code can no longer be used. */
 function restart(message: string) {
@@ -73,6 +75,9 @@ async function submitCode() {
     const remaining = apiErrorField<number>(err, "remainingAttempts")
     if (apiErrorCode(err) === "InvalidLoginCode" && remaining !== undefined && remaining > 0) {
       error.value = `Code incorrect. Encore ${remaining} essai${remaining > 1 ? "s" : ""}.`
+    } else if (authErrorStatus(err) === 423) {
+      // Wrong passwords and wrong codes add up on the account (story 12.9f).
+      restart(LOCKED_MESSAGE)
     } else if (authErrorStatus(err) === 401) {
       restart("Ce code ne peut plus servir. Reconnectez-vous avec votre mot de passe.")
     } else {
@@ -94,6 +99,7 @@ async function resend() {
     const wait = apiErrorField<number | null>(err, "retryAfterSeconds")
     if (authErrorStatus(err) === 429 && wait) error.value = `Patientez encore ${wait} secondes avant un nouveau code.`
     else if (authErrorStatus(err) === 429) restart("Plus de nouveau code pour cette connexion. Reconnectez-vous.")
+    else if (authErrorStatus(err) === 423) restart(LOCKED_MESSAGE)
     else if (authErrorStatus(err) === 401) restart("Cette connexion a expiré. Reconnectez-vous.")
     else error.value = "Envoi impossible. Réessayez."
   }

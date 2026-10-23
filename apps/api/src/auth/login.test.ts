@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, refreshTokens, users } from "../db/schema.js"
-import { FAILED_ATTEMPTS_WINDOW_MS, LOCKOUT_DURATION_MS, MAX_FAILED_ATTEMPTS } from "./login.js"
+import { FAILED_ATTEMPTS_WINDOW_MS, LOCKOUT_DURATION_MS, MAX_FAILED_ATTEMPTS } from "./lockout.js"
 import { hashRefreshToken } from "./tokens.js"
 
 const TEST_EMAIL_SUFFIX = "@login-test.local"

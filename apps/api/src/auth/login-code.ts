@@ -8,7 +8,7 @@
 
 import { createHmac, hkdfSync, randomInt, timingSafeEqual } from "node:crypto"
 import { loginCodeResendSchema, loginCodeVerifySchema } from "@armurier/shared"
-import { and, eq, gt, isNull, lt, sql } from "drizzle-orm"
+import { and, eq, gt, isNull, lt, lte, sql } from "drizzle-orm"
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { startDailyPurge } from "../daily-purge.js"
@@ -16,6 +16,7 @@ import { db } from "../db/client.js"
 import { loginChallenges, users } from "../db/schema.js"
 import { sendLoginCodeEmail } from "../email.js"
 import { env } from "../env.js"
+import { clearFailedLogins, countFailedLogin, lockoutRemainingSeconds, MAX_FAILED_ATTEMPTS } from "./lockout.js"
 import {
   generateRefreshToken as generateChallengeToken,
   hashRefreshToken as hashChallengeToken,
@@ -52,6 +53,41 @@ function validationError(reply: FastifyReply, issues: { path: PropertyKey[]; mes
     error: "ValidationError",
     issues: issues.map((i) => ({ path: i.path.map(String).join("."), message: i.message })),
   })
+}
+
+function accountLocked(reply: FastifyReply, retryAfter: number) {
+  return reply.code(423).send({
+    error: "AccountLocked",
+    message: "Too many failed attempts. Try again later.",
+    retryAfter,
+  })
+}
+
+/**
+ * Take one of the challenge's attempts, in one statement: requests racing on
+ * the same challenge each get their own, and none past the last (story 12.9f).
+ */
+async function takeAttempt(challengeId: string): Promise<number | null> {
+  const [taken] = await db
+    .update(loginChallenges)
+    .set({ attempts: sql`${loginChallenges.attempts} + 1` })
+    .where(
+      and(
+        eq(loginChallenges.id, challengeId),
+        isNull(loginChallenges.consumedAt),
+        gt(loginChallenges.expiresAt, new Date()),
+        lt(loginChallenges.attempts, LOGIN_CODE_MAX_ATTEMPTS),
+      ),
+    )
+    .returning({ attempts: loginChallenges.attempts })
+  return taken?.attempts ?? null
+}
+
+/** What a wrong code ended: the account, the challenge, or nothing yet. */
+function wrongCodeAction(accountLocked: boolean, challengeSpent: boolean): string {
+  if (accountLocked) return "user.login_locked"
+  if (challengeSpent) return "user.login_code_exhausted"
+  return "user.login_code_failed"
 }
 
 function invalidChallenge(reply: FastifyReply) {
@@ -124,19 +160,29 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
       if (!challenge) return invalidChallenge(reply)
       const [user] = await db.select().from(users).where(eq(users.id, challenge.userId)).limit(1)
       if (!user) return invalidChallenge(reply)
+      const lockedFor = lockoutRemainingSeconds(user)
+      if (lockedFor !== null) return accountLocked(reply, lockedFor)
+
+      const attempts = await takeAttempt(challenge.id)
+      if (attempts === null) return invalidChallenge(reply)
 
       if (!sameDigest(digestCode(parsed.data.code), challenge.codeHash)) {
-        const attempts = challenge.attempts + 1
         const spent = attempts >= LOGIN_CODE_MAX_ATTEMPTS
-        await db
-          .update(loginChallenges)
-          .set({ attempts, ...(spent ? { consumedAt: new Date() } : {}) })
-          .where(eq(loginChallenges.id, challenge.id))
-        await journal(request, user, spent ? "user.login_code_exhausted" : "user.login_code_failed", { attempts })
+        if (spent) {
+          await db.update(loginChallenges).set({ consumedAt: new Date() }).where(eq(loginChallenges.id, challenge.id))
+        }
+        // A wrong code counts against the account too, across all its challenges.
+        const account = await countFailedLogin(user.id)
+        await journal(request, user, wrongCodeAction(account.locked, spent), {
+          attempts,
+          accountAttempts: account.attempts,
+        })
         return reply.code(401).send({
           error: "InvalidLoginCode",
           message: "Invalid code",
-          remainingAttempts: LOGIN_CODE_MAX_ATTEMPTS - attempts,
+          remainingAttempts: account.locked
+            ? 0
+            : Math.min(LOGIN_CODE_MAX_ATTEMPTS - attempts, MAX_FAILED_ATTEMPTS - account.attempts),
         })
       }
 
@@ -149,7 +195,7 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
         .returning({ id: loginChallenges.id })
       if (!spent) return invalidChallenge(reply)
 
-      await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id))
+      await clearFailedLogins(user.id)
       const tokens = await issueTokens(fastify, user, challenge.deviceLabel)
       await journal(request, user, "user.login", { method: "password+email_code" })
 
@@ -172,22 +218,14 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
       if (!challenge) return invalidChallenge(reply)
       const [user] = await db.select().from(users).where(eq(users.id, challenge.userId)).limit(1)
       if (!user) return invalidChallenge(reply)
+      const lockedFor = lockoutRemainingSeconds(user)
+      if (lockedFor !== null) return accountLocked(reply, lockedFor)
 
       const now = new Date()
-      const waitMs = challenge.lastSentAt.getTime() + RESEND_AFTER_MS - now.getTime()
-      if (challenge.sendCount >= LOGIN_CODE_MAX_SENDS || waitMs > 0) {
-        return reply.code(429).send({
-          error: "LoginCodeResendRefused",
-          message:
-            challenge.sendCount >= LOGIN_CODE_MAX_SENDS
-              ? "No more codes for this login. Sign in again with your password."
-              : "Wait a moment before asking for a new code.",
-          retryAfterSeconds: challenge.sendCount >= LOGIN_CODE_MAX_SENDS ? null : Math.ceil(waitMs / 1000),
-        })
-      }
-
       const code = newCode()
-      await db
+      // The limits are checked by the update itself: of resends racing on the
+      // same challenge, one only goes out (story 12.9f).
+      const [resent] = await db
         .update(loginChallenges)
         .set({
           codeHash: digestCode(code),
@@ -196,9 +234,29 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
           lastSentAt: now,
           expiresAt: new Date(now.getTime() + TTL_MS),
         })
-        .where(eq(loginChallenges.id, challenge.id))
+        .where(
+          and(
+            eq(loginChallenges.id, challenge.id),
+            isNull(loginChallenges.consumedAt),
+            lt(loginChallenges.sendCount, LOGIN_CODE_MAX_SENDS),
+            lte(loginChallenges.lastSentAt, new Date(now.getTime() - RESEND_AFTER_MS)),
+          ),
+        )
+        .returning({ sendCount: loginChallenges.sendCount })
+      if (!resent) {
+        const exhausted = challenge.sendCount >= LOGIN_CODE_MAX_SENDS
+        const waitMs = Math.max(challenge.lastSentAt.getTime() + RESEND_AFTER_MS - now.getTime(), 1000)
+        return reply.code(429).send({
+          error: "LoginCodeResendRefused",
+          message: exhausted
+            ? "No more codes for this login. Sign in again with your password."
+            : "Wait a moment before asking for a new code.",
+          retryAfterSeconds: exhausted ? null : Math.ceil(waitMs / 1000),
+        })
+      }
+
       await sendLoginCodeEmail(user.email, code, LOGIN_CODE_TTL_MINUTES, { userId: user.id })
-      await journal(request, user, "user.login_code_resent", { sendCount: challenge.sendCount + 1 })
+      await journal(request, user, "user.login_code_resent", { sendCount: resent.sendCount })
 
       return reply.code(202).send({ expiresIn: TTL_MS / 1000 })
     },

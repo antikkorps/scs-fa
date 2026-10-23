@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, loginChallenges, refreshTokens, users } from "../db/schema.js"
+import { MAX_FAILED_ATTEMPTS } from "./lockout.js"
 import { LOGIN_CODE_MAX_ATTEMPTS, LOGIN_CODE_MAX_SENDS, purgeLoginChallenges } from "./login-code.js"
 
 // The policy (members of an organisation, story 12.8b) is tested on its own;
@@ -132,6 +133,45 @@ describe("login by password + e-mailed code (story 12.8a)", () => {
     expect((await verify(challengeToken, code)).statusCode).toBe(401)
   })
 
+  it("counts wrong codes sent in parallel one by one (story 12.9f)", async () => {
+    const { challengeToken, code } = await challenge()
+
+    const answers = await Promise.all(
+      Array.from({ length: LOGIN_CODE_MAX_ATTEMPTS * 3 }, () => verify(challengeToken, wrong(code))),
+    )
+
+    const compared = answers.filter((res) => res.json().error === "InvalidLoginCode")
+    expect(compared.length).toBeLessThanOrEqual(LOGIN_CODE_MAX_ATTEMPTS)
+    const [row] = await db.select().from(loginChallenges).where(eq(loginChallenges.userId, userId))
+    expect(row.attempts).toBeLessThanOrEqual(LOGIN_CODE_MAX_ATTEMPTS)
+  })
+
+  it("caps wrong codes per account across challenges: the account locks (story 12.9f)", async () => {
+    const first = await challenge()
+    for (let attempt = 1; attempt < MAX_FAILED_ATTEMPTS; attempt++) {
+      expect((await verify(first.challengeToken, wrong(first.code))).statusCode).toBe(401)
+    }
+    // The right password again opens a new challenge, but does not wipe the trail
+    const second = await challenge()
+    expect((await verify(second.challengeToken, wrong(second.code))).statusCode).toBe(401)
+
+    expect((await verify(second.challengeToken, second.code)).statusCode).toBe(423)
+    expect((await login()).statusCode).toBe(423)
+    const [user] = await db.select({ lockedUntil: users.lockedUntil }).from(users).where(eq(users.id, userId))
+    expect(user.lockedUntil?.getTime()).toBeGreaterThan(Date.now())
+  })
+
+  it("clears the failure trail once the right code opens the session (story 12.9f)", async () => {
+    const { challengeToken, code } = await challenge()
+    await verify(challengeToken, wrong(code))
+    expect((await verify(challengeToken, code)).statusCode).toBe(200)
+    const [user] = await db
+      .select({ failedLoginAttempts: users.failedLoginAttempts, lastFailedLoginAt: users.lastFailedLoginAt })
+      .from(users)
+      .where(eq(users.id, userId))
+    expect(user).toEqual({ failedLoginAttempts: 0, lastFailedLoginAt: null })
+  })
+
   it("refuses a code past its 10 minutes", async () => {
     const { challengeToken, code } = await challenge()
     await db
@@ -181,6 +221,19 @@ describe("login by password + e-mailed code (story 12.8a)", () => {
       expect((await resend(challengeToken)).statusCode).toBe(send <= LOGIN_CODE_MAX_SENDS ? 202 : 429)
     }
     expect(sentCodes).toHaveLength(LOGIN_CODE_MAX_SENDS)
+  })
+
+  it("sends one code only for resends asked in parallel (story 12.9f)", async () => {
+    const { challengeToken } = await challenge()
+    await db
+      .update(loginChallenges)
+      .set({ lastSentAt: new Date(Date.now() - 61_000) })
+      .where(eq(loginChallenges.userId, userId))
+
+    const answers = await Promise.all(Array.from({ length: 4 }, () => resend(challengeToken)))
+
+    expect(answers.filter((res) => res.statusCode === 202)).toHaveLength(1)
+    expect(sentCodes).toHaveLength(2)
   })
 
   it("logs an account without a code policy straight in, as before", async () => {

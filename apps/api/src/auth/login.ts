@@ -1,22 +1,14 @@
 import { loginSchema } from "@armurier/shared"
 import { hash, verify } from "@node-rs/argon2"
-import { eq, sql } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
+import { clearFailedLogins, countFailedLogin, lockoutRemainingSeconds } from "./lockout.js"
 import { startLoginChallenge } from "./login-code.js"
 import { requiresLoginCode } from "./login-code-policy.js"
 import { issueTokens } from "./tokens.js"
-
-export const MAX_FAILED_ATTEMPTS = 5
-export const LOCKOUT_DURATION_MS = 15 * 60 * 1000
-/**
- * Only failures this recent count towards the lockout. Without a window the
- * counter never decayed: typos from weeks ago plus two today locked the
- * account (seen on the dev admin, 2026-10-03).
- */
-export const FAILED_ATTEMPTS_WINDOW_MS = 15 * 60 * 1000
 
 // Pre-computed argon2id hash of a random string. Used to keep response time
 // roughly constant when the email does not exist, mitigating user enumeration.
@@ -44,11 +36,12 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
 
     const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
 
-    if (user?.lockedUntil && user.lockedUntil > new Date()) {
+    const lockedFor = user ? lockoutRemainingSeconds(user) : null
+    if (lockedFor !== null) {
       return reply.code(423).send({
         error: "AccountLocked",
         message: "Too many failed attempts. Try again later.",
-        retryAfter: Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000),
+        retryAfter: lockedFor,
       })
     }
 
@@ -56,27 +49,7 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
 
     if (!user || !passwordOk) {
       if (user) {
-        // Counted in SQL, in one statement: a failure outside the window starts
-        // a new count, and concurrent attempts cannot overwrite each other.
-        const windowStart = new Date(Date.now() - FAILED_ATTEMPTS_WINDOW_MS)
-        const [counted] = await db
-          .update(users)
-          .set({
-            // The bound is encoded like the column itself (UTC, no zone): a raw
-            // Date would carry the session's offset and skew the comparison.
-            failedLoginAttempts: sql`case when ${users.lastFailedLoginAt} > ${sql.param(windowStart, users.lastFailedLoginAt)} then ${users.failedLoginAttempts} + 1 else 1 end`,
-            lastFailedLoginAt: new Date(),
-          })
-          .where(eq(users.id, user.id))
-          .returning({ attempts: users.failedLoginAttempts })
-        const attempts = counted?.attempts ?? 1
-        const locked = attempts >= MAX_FAILED_ATTEMPTS
-        if (locked) {
-          await db
-            .update(users)
-            .set({ failedLoginAttempts: 0, lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) })
-            .where(eq(users.id, user.id))
-        }
+        const { attempts, locked } = await countFailedLogin(user.id)
         // Journaled so a lockout can be explained afterwards. Never the
         // password tried; an unknown e-mail is not journaled at all (it would
         // store whatever an attacker typed, against no account).
@@ -97,20 +70,12 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
       })
     }
 
-    // The password is right: the failure trail goes, whatever comes next.
-    const needsCode = await requiresLoginCode(user)
-    await db
-      .update(users)
-      .set({
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastFailedLoginAt: null,
-        ...(needsCode ? {} : { lastLoginAt: new Date() }),
-      })
-      .where(eq(users.id, user.id))
-
     // Story 12.8a: no session yet for these accounts — the mailed code opens it.
-    if (needsCode) return reply.code(200).send(await startLoginChallenge(user, deviceLabel ?? null))
+    // The failure trail stays until then: wrong codes add to it (story 12.9f).
+    if (await requiresLoginCode(user)) {
+      return reply.code(200).send(await startLoginChallenge(user, deviceLabel ?? null))
+    }
+    await clearFailedLogins(user.id)
 
     const tokens = await issueTokens(fastify, user, deviceLabel ?? null)
 

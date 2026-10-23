@@ -137,6 +137,27 @@ describe("connexion.vue", () => {
       expect(wrapper.text()).toContain("Reconnectez-vous")
     })
 
+    it("says the account is locked once wrong codes add up (story 12.9f)", async () => {
+      verifyLoginCode.mockRejectedValue({
+        response: { status: 423 },
+        data: { error: "AccountLocked", retryAfter: 900 },
+      })
+      const wrapper = await passwordAccepted()
+      await typeCode(wrapper, "000000")
+
+      expect(wrapper.find('input[type="password"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain("Trop de tentatives. Réessayez dans quelques minutes.")
+    })
+
+    it("says the account is locked when asking for a new code (story 12.9f)", async () => {
+      resendLoginCode.mockRejectedValue({ response: { status: 423 }, data: { error: "AccountLocked" } })
+      const wrapper = await passwordAccepted()
+      await wrapper.find("button.auth-resend").trigger("click")
+      await flushPromises()
+
+      expect(wrapper.text()).toContain("Trop de tentatives. Réessayez dans quelques minutes.")
+    })
+
     it("sends a new code on request, and says so", async () => {
       resendLoginCode.mockResolvedValue(undefined)
       const wrapper = await passwordAccepted()
