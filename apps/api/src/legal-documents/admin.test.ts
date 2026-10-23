@@ -260,6 +260,16 @@ describe("admin legal document validation (/api/admin/legal-documents)", () => {
     expect(sendLegalDocApprovedEmail).not.toHaveBeenCalled()
   })
 
+  it("refuses to approve a document past its expiry date (story 12.9f)", async () => {
+    const doc = await seedDoc({ userId: customerId, docType: "cni", expiresAt: "2020-01-31" })
+    const res = await decide(doc.id, "approve")
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error).toBe("DocumentExpired")
+    const [kept] = await db.select().from(legalDocuments).where(eq(legalDocuments.id, doc.id))
+    expect(kept.verificationStatus).toBe("pending")
+    expect(sendLegalDocApprovedEmail).not.toHaveBeenCalled()
+  })
+
   it("refuses to approve an already-decided document", async () => {
     const doc = await seedDoc({ userId: customerId, docType: "cni", verificationStatus: "rejected" })
     const res = await decide(doc.id, "approve")

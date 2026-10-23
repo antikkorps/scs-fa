@@ -1,5 +1,5 @@
 import { computePriceTtc, searchQuerySchema } from "@armurier/shared"
-import { and, desc, eq, sql } from "drizzle-orm"
+import { and, desc, eq, or, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { artists, artworkPrints, artworks, legalCategories, productCategories, products } from "../db/schema.js"
@@ -92,8 +92,13 @@ export const globalSearchRoute: FastifyPluginAsync = async (fastify) => {
           // column can only read its own row — the artist name is therefore no
           // longer inside `search_vector`. Matching it through the join keeps
           // "Sylvain" finding his works; without this clause searching an
-          // artist would silently return nothing.
-          sql`${artworks.searchVector} @@ ${tsquery} or to_tsvector('french', coalesce(${artists.name}, '')) @@ ${tsquery}`,
+          // artist would silently return nothing. Built with `or()`, which
+          // parenthesises: a bare `a or b` inside `and()` let unpublished
+          // works through by their artist's name (story 12.9f).
+          or(
+            sql`${artworks.searchVector} @@ ${tsquery}`,
+            sql`to_tsvector('french', coalesce(${artists.name}, '')) @@ ${tsquery}`,
+          ),
         ),
       )
       .groupBy(artworks.id, artists.name, artists.slug)

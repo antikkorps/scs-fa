@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ALLOWED_LEGAL_DOC_MIME_TYPES, type LegalDocType, MAX_LEGAL_DOC_SIZE_BYTES } from "@armurier/shared"
+import { ALLOWED_LEGAL_DOC_MIME_TYPES, type LegalDocType, MAX_LEGAL_DOC_SIZE_BYTES, parisToday } from "@armurier/shared"
 import type { LegalDocument } from "~/types/account"
-import { formatFileSize } from "~/utils/legal"
+import { formatFileSize, legalDocUploadMessage } from "~/utils/legal"
 
 const props = defineProps<{ docType: LegalDocType }>()
 const emit = defineEmits<{ uploaded: [doc: LegalDocument] }>()
@@ -16,6 +16,8 @@ const error = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const ACCEPT = ALLOWED_LEGAL_DOC_MIME_TYPES.join(",")
+// An already-expired document is refused by the API (story 12.9f).
+const minExpiry = parisToday()
 
 function onFileChange(e: Event) {
   error.value = null
@@ -39,16 +41,6 @@ function validate(f: File): boolean {
   return true
 }
 
-// Maps the API's error envelope to French copy for the customer.
-function messageFor(err: unknown): string {
-  const status = authErrorStatus(err)
-  const code = apiErrorCode(err)
-  if (status === 413) return `Fichier trop volumineux (max ${formatFileSize(MAX_LEGAL_DOC_SIZE_BYTES)}).`
-  if (code === "UnsupportedMediaType") return "Format de fichier non accepté ou contenu non conforme."
-  if (status === 400) return "Document invalide. Vérifiez le fichier et les informations saisies."
-  return "L'envoi a échoué. Veuillez réessayer."
-}
-
 async function submit() {
   if (!file.value || submitting.value) return
   submitting.value = true
@@ -65,7 +57,7 @@ async function submit() {
     if (fileInput.value) fileInput.value.value = ""
     emit("uploaded", doc)
   } catch (err) {
-    error.value = messageFor(err)
+    error.value = legalDocUploadMessage(err)
   } finally {
     submitting.value = false
   }
@@ -88,7 +80,7 @@ async function submit() {
       </label>
       <label class="up__field">
         <span>Date d'expiration <em>(facultatif)</em></span>
-        <input v-model="expiresAt" class="input" type="date" />
+        <input v-model="expiresAt" class="input" type="date" :min="minExpiry" />
       </label>
     </div>
 
