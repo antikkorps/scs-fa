@@ -3,12 +3,14 @@ import {
   ALLOWED_LEGAL_DOC_MIME_TYPES,
   type AllowedLegalDocMimeType,
   fileContentMatchesDeclaredMime,
+  isLegalDocExpired,
   LEGAL_DOC_REVIEW_SLA_HOURS,
   legalDocumentMetaSchema,
   MAX_LEGAL_DOC_SIZE_BYTES,
+  parisToday,
   uuidParamSchema,
 } from "@armurier/shared"
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, ne } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { db } from "../db/client.js"
@@ -105,6 +107,9 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     if (!meta.success) {
       return reply.code(400).send(validationError(meta.error.issues))
     }
+    if (isLegalDocExpired(meta.data.expiresAt, parisToday())) {
+      return reply.code(400).send({ error: "DocumentExpired", message: "This document has already expired" })
+    }
 
     const userId = request.user.sub
     const id = randomUUID()
@@ -187,11 +192,20 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(400).send(validationError(params.error.issues))
     }
 
+    const owned = and(eq(legalDocuments.id, params.data.id), eq(legalDocuments.userId, request.user.sub))
+    // An approved document is the proof behind a cleared purchase: SCS must keep
+    // it, so only a pending, rejected or expired one may go (story 12.9f).
     const [deleted] = await db
       .delete(legalDocuments)
-      .where(and(eq(legalDocuments.id, params.data.id), eq(legalDocuments.userId, request.user.sub)))
+      .where(and(owned, ne(legalDocuments.verificationStatus, "approved")))
       .returning({ id: legalDocuments.id, s3Key: legalDocuments.s3Key })
     if (!deleted) {
+      const [approved] = await db.select({ id: legalDocuments.id }).from(legalDocuments).where(owned)
+      if (approved) {
+        return reply
+          .code(409)
+          .send({ error: "DocumentApproved", message: "An approved document is kept as proof of the purchase" })
+      }
       return reply.code(404).send({ error: "NotFound", message: "Document not found" })
     }
 
