@@ -7,7 +7,7 @@ import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, refreshTokens, users } from "../db/schema.js"
 import { FAILED_ATTEMPTS_WINDOW_MS, LOCKOUT_DURATION_MS, MAX_FAILED_ATTEMPTS } from "./lockout.js"
-import { hashRefreshToken } from "./tokens.js"
+import { hashRefreshToken, ROTATION_GRACE_MS } from "./tokens.js"
 
 const TEST_EMAIL_SUFFIX = "@login-test.local"
 const PLAINTEXT_PASSWORD = "MotDePasseTresLong123!"
@@ -251,6 +251,11 @@ describe("auth/login + refresh + logout", () => {
       const newRefresh = rotated.json().refreshToken
       expect(newRefresh).not.toBe(oldRefresh)
 
+      // Past the grace given to parallel refreshes (story 12.9f), the old one is dead.
+      await db
+        .update(refreshTokens)
+        .set({ revokedAt: new Date(Date.now() - ROTATION_GRACE_MS - 1000) })
+        .where(eq(refreshTokens.tokenHash, hashRefreshToken(oldRefresh)))
       const replay = await app.inject({
         method: "POST",
         url: "/api/auth/refresh",

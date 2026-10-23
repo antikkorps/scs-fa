@@ -1,11 +1,12 @@
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
-import { and, eq, inArray, like } from "drizzle-orm"
+import { and, eq, inArray, isNull, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, refreshTokens, users } from "../db/schema.js"
+import { hashRefreshToken, ROTATION_GRACE_MS } from "./tokens.js"
 
 const SUFFIX = "@rtr-test.local"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -57,7 +58,15 @@ describe("auth/refresh — reuse detection (RTR)", () => {
   const refresh = (refreshToken: string) =>
     app.inject({ method: "POST", url: "/api/auth/refresh", payload: { refreshToken } })
 
-  it("revokes the whole family when a rotated token is replayed", async () => {
+  /** Move a rotation back in time, past the grace given to parallel refreshes. */
+  async function pastGrace(token: string) {
+    await db
+      .update(refreshTokens)
+      .set({ revokedAt: new Date(Date.now() - ROTATION_GRACE_MS - 1000) })
+      .where(eq(refreshTokens.tokenHash, hashRefreshToken(token)))
+  }
+
+  it("revokes the whole family when a rotated token is replayed past the grace", async () => {
     const email = `rtr-${Date.now()}${SUFFIX}`
     const userId = await seedUser(email)
 
@@ -65,6 +74,7 @@ describe("auth/refresh — reuse detection (RTR)", () => {
     const rotated = await refresh(r1)
     expect(rotated.statusCode).toBe(200)
     const r2 = (rotated.json() as { refreshToken: string }).refreshToken
+    await pastGrace(r1)
 
     // Replay the already-rotated r1 → rejected, and the family is revoked.
     expect((await refresh(r1)).statusCode).toBe(401)
@@ -90,5 +100,48 @@ describe("auth/refresh — reuse detection (RTR)", () => {
     expect(rot1.statusCode).toBe(200)
     const r2 = (rot1.json() as { refreshToken: string }).refreshToken
     expect((await refresh(r2)).statusCode).toBe(200)
+  })
+
+  it("gives parallel refreshes of one token the same successor: the session does not fork (story 12.9f)", async () => {
+    const email = `rtr3-${Date.now()}${SUFFIX}`
+    const userId = await seedUser(email)
+    const r1 = await login(email)
+
+    const answers = await Promise.all(Array.from({ length: 5 }, () => refresh(r1)))
+
+    expect(answers.map((res) => res.statusCode)).toEqual([200, 200, 200, 200, 200])
+    const successors = new Set(answers.map((res) => (res.json() as { refreshToken: string }).refreshToken))
+    expect(successors.size).toBe(1)
+    const live = await db
+      .select({ id: refreshTokens.id })
+      .from(refreshTokens)
+      .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)))
+    expect(live).toHaveLength(1)
+    const [r2] = successors
+    expect((await refresh(r2)).statusCode).toBe(200)
+  })
+
+  it("never stores the successor in clear (story 12.9f)", async () => {
+    const email = `rtr4-${Date.now()}${SUFFIX}`
+    await seedUser(email)
+    const r1 = await login(email)
+    const r2 = ((await refresh(r1)).json() as { refreshToken: string }).refreshToken
+
+    const [rotated] = await db
+      .select()
+      .from(refreshTokens)
+      .where(eq(refreshTokens.tokenHash, hashRefreshToken(r1)))
+    expect(rotated.successorSealed).toBeTruthy()
+    expect(JSON.stringify(rotated)).not.toContain(r2)
+  })
+
+  it("does not bring back a successor that has since been logged out (story 12.9f)", async () => {
+    const email = `rtr5-${Date.now()}${SUFFIX}`
+    await seedUser(email)
+    const r1 = await login(email)
+    const r2 = ((await refresh(r1)).json() as { refreshToken: string }).refreshToken
+    await db.delete(refreshTokens).where(eq(refreshTokens.tokenHash, hashRefreshToken(r2)))
+
+    expect((await refresh(r1)).statusCode).toBe(401)
   })
 })
