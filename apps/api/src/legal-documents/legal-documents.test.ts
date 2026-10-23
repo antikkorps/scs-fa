@@ -166,6 +166,12 @@ describe("legal documents (/api/legal-documents)", () => {
     expect(res.json().error).toBe("ValidationError")
   })
 
+  it("refuses a document that has already expired (story 12.9f)", async () => {
+    const res = await upload({ fields: { docType: "cni", expiresAt: "2020-01-31" }, file: validPdf })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toBe("DocumentExpired")
+  })
+
   it("rejects a file larger than the size limit", async () => {
     const big = Buffer.alloc(MAX_LEGAL_DOC_SIZE_BYTES + 1024, 0x41)
     const res = await upload({
@@ -262,6 +268,20 @@ describe("legal documents (/api/legal-documents)", () => {
       headers: { authorization: `Bearer ${token}` },
     })
     expect(after.statusCode).toBe(404)
+  })
+
+  it("keeps an approved document: it backs a cleared purchase (story 12.9f)", async () => {
+    const created = (await upload({ fields: { docType: "cni" }, file: validPdf })).json().data
+    await db.update(legalDocuments).set({ verificationStatus: "approved" }).where(eq(legalDocuments.id, created.id))
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/api/legal-documents/${created.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(del.statusCode).toBe(409)
+    expect(del.json().error).toBe("DocumentApproved")
+    const [kept] = await db.select().from(legalDocuments).where(eq(legalDocuments.id, created.id))
+    expect(kept).toBeDefined()
   })
 
   it("returns 404 when deleting an unknown document", async () => {

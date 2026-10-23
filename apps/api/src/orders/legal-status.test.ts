@@ -332,12 +332,33 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     await decide(cniId, "approve")
     expect((await orderStatusInDb(orderId)).status).toBe("docs_verified")
 
-    // Deleting the approved doc afterwards must not undo the order verification
-    await app.inject({
-      method: "DELETE",
-      url: `/api/legal-documents/${cniId}`,
-      headers: { authorization: `Bearer ${customerToken}` },
-    })
+    // The approved document expiring afterwards must not undo the order verification
+    await db.update(legalDocuments).set({ expiresAt: "2020-01-31" }).where(eq(legalDocuments.id, cniId))
+    await recomputeOrderLegalStatus(customerId)
+    expect((await orderStatusInDb(orderId)).status).toBe("docs_verified")
+  })
+
+  it("no longer clears an order with an approved document past its expiry date (story 12.9f)", async () => {
+    const orderId = await seedOrder(customerId, ["C"])
+    const cniId = await uploadDoc("cni")
+    const permisId = await uploadDoc("permis_chasse")
+    const siaId = await uploadDoc("sia")
+    await decide(cniId, "approve")
+    await db.update(legalDocuments).set({ expiresAt: "2020-01-31" }).where(eq(legalDocuments.id, cniId))
+    await decide(permisId, "approve")
+    await decide(siaId, "approve")
+
+    const row = await orderStatusInDb(orderId)
+    expect(row.status).toBe("docs_rejected")
+    expect(row.rejectionReason).toBe("document_expired")
+    const cni = (await getLegal(orderId)).json().data.requiredDocs.find((d: { docType: string }) => d.docType === "cni")
+    expect(cni).toMatchObject({ documentId: cniId, status: "rejected", rejectionReason: "document_expired" })
+
+    // A fresh upload takes over from the expired approval, and can be approved
+    // before the daily job has marked the old one
+    const freshId = await uploadDoc("cni")
+    expect((await orderStatusInDb(orderId)).status).toBe("docs_verifying")
+    expect((await decide(freshId, "approve")).statusCode).toBe(200)
     expect((await orderStatusInDb(orderId)).status).toBe("docs_verified")
   })
 

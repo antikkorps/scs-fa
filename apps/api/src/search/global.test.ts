@@ -109,6 +109,36 @@ describe("GET /api/search", () => {
       })
       .returning({ id: artworks.id })
 
+    // An unpublished artwork of the same artist — it must not surface through
+    // the artist-name match either (story 12.9f, security audit).
+    const [draftProduct] = await db
+      .insert(products)
+      .values({
+        sku: `${PREFIX}draft`,
+        slug: `${PREFIX}draft`,
+        name: "Brouillon",
+        categoryId: gunArt,
+        priceHt: "300.00",
+        vatPct: "20",
+        requiresLegalVerification: false,
+        published: false,
+      })
+      .returning({ id: products.id })
+    await db.insert(artworks).values({
+      productId: draftProduct.id,
+      slug: `${PREFIX}draft`,
+      sku: `${PREFIX}draft`,
+      title: "Brouillon",
+      artistId: artist.id,
+      editionLimit: 10,
+      availableFormats: [{ id: "A4", name: "A4", widthCm: 21, heightCm: 29.7, priceFactor: 1 }],
+      basePriceHt: "300.00",
+      priceIncrementHt: "10.00",
+      vatPct: "20",
+      orientation: "square",
+      published: false,
+    })
+
     await db.insert(artworkPrints).values({
       artworkId: artwork.id,
       printNumber: 1,
@@ -178,6 +208,12 @@ describe("GET /api/search", () => {
     const art = body.artworks.find((a: { slug: string }) => a.slug === `${PREFIX}art`)
     expect(art.artistName).toBe(`Peintre ${ARTIST_TOKEN}`)
     expect(art.artistSlug).toBe(`${PREFIX.toLowerCase()}artist`)
+  })
+
+  it("never returns an unpublished artwork, even matched by its artist's name (story 12.9f)", async () => {
+    const res = await app.inject({ method: "GET", url: `/api/search?q=${ARTIST_TOKEN}` })
+    const slugs = res.json().artworks.map((a: { slug: string }) => a.slug)
+    expect(slugs).not.toContain(`${PREFIX}draft`)
   })
 
   it("returns empty arrays for a non-matching query", async () => {

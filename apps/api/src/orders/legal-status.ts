@@ -1,8 +1,10 @@
 import {
+  isLegalDocExpired,
   LEGAL_DOC_TYPES,
   type LegalDocType,
   type OrderRequiredDocStatus,
   PAID_PAYMENT_STATUSES,
+  parisToday,
 } from "@armurier/shared"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { recordOrderStatusChange } from "../audit/record.js"
@@ -58,30 +60,41 @@ export async function requiredDocTypesFor(
   return LEGAL_DOC_TYPES.filter((t) => types.has(t))
 }
 
-/**
- * The document that represents a doc type for review purposes: an approved one
- * if it exists, otherwise the latest upload (so re-uploading after a rejection
- * supersedes the rejected document — clarification D1).
- */
-function representativeDoc(docs: OwnedDoc[], docType: LegalDocType): OwnedDoc | undefined {
-  const ofType = docs.filter((d) => d.docType === docType)
-  return ofType.find((d) => d.verificationStatus === "approved") ?? ofType[0]
+/** An approval no longer counts once the document's expiry date has passed (story 12.9f). */
+function isValidApproval(doc: OwnedDoc, today: string): boolean {
+  return doc.verificationStatus === "approved" && !isLegalDocExpired(doc.expiresAt, today)
 }
 
-function docStatus(doc: OwnedDoc | undefined): OrderRequiredDocStatus {
+/**
+ * The document that represents a doc type for review purposes: a still-valid
+ * approved one if it exists, otherwise the latest upload (so re-uploading after
+ * a rejection or an expiry supersedes the old document — clarification D1).
+ */
+function representativeDoc(docs: OwnedDoc[], docType: LegalDocType, today: string): OwnedDoc | undefined {
+  const ofType = docs.filter((d) => d.docType === docType)
+  return ofType.find((d) => isValidApproval(d, today)) ?? ofType[0]
+}
+
+function docStatus(doc: OwnedDoc | undefined, today: string): OrderRequiredDocStatus {
   if (!doc) return "missing"
+  if (doc.verificationStatus === "rejected") return "rejected"
+  // An expired document needs a re-upload, exactly like a rejected one,
+  // whether the daily job has already marked it or not.
+  if (doc.verificationStatus === "expired" || isLegalDocExpired(doc.expiresAt, today)) return "rejected"
   if (doc.verificationStatus === "approved") return "approved"
-  // "expired" documents need a re-upload, exactly like rejected ones
-  if (doc.verificationStatus === "rejected" || doc.verificationStatus === "expired") return "rejected"
   if (doc.scanStatus === "infected") return "infected"
   if (doc.scanStatus === "pending") return "pending_scan"
   return "pending_review"
 }
 
-export function buildRequiredDocsView(requiredTypes: LegalDocType[], docs: OwnedDoc[]): RequiredDocView[] {
+export function buildRequiredDocsView(
+  requiredTypes: LegalDocType[],
+  docs: OwnedDoc[],
+  today = parisToday(),
+): RequiredDocView[] {
   return requiredTypes.map((docType) => {
-    const doc = representativeDoc(docs, docType)
-    const status = docStatus(doc)
+    const doc = representativeDoc(docs, docType, today)
+    const status = docStatus(doc, today)
     return {
       docType,
       status,

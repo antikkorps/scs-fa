@@ -30,6 +30,7 @@ import type { HenrriClient } from "./henrri/client.js"
 import { henrriClientFromEnv, startHenrriScheduler } from "./henrri/queue.js"
 import { legalCategoryRoutes } from "./legal-categories/index.js"
 import { adminLegalDocumentRoutes } from "./legal-documents/admin.js"
+import { startLegalDocExpiryScheduler } from "./legal-documents/expiry.js"
 import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
@@ -184,6 +185,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   // SLA 4.4: in-process breach alerting (no-op under tests / when interval is 0)
   startLegalDocSlaScheduler(fastify)
+  startLegalDocExpiryScheduler(fastify)
   startAuditPurgeScheduler(fastify)
   startNewsletterPurgeScheduler(fastify)
   startLoginChallengePurgeScheduler(fastify)
