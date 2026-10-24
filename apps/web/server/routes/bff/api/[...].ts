@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
 
   const method = event.method
   const query = getQuery(event)
-  const contentType = getRequestHeader(event, "content-type")
+  const forwarded = forwardedRequestHeaders((name) => getRequestHeader(event, name))
   const body = method === "GET" || method === "HEAD" ? undefined : await readRawBody(event, false)
 
   const call = (token: string | undefined) =>
@@ -21,8 +21,8 @@ export default defineEventHandler(async (event) => {
       body,
       headers: {
         ...upstream.headers,
+        ...forwarded,
         ...(token ? { authorization: `Bearer ${token}` } : {}),
-        ...(contentType ? { "content-type": contentType } : {}),
       },
       // Forward upstream 4xx/5xx to the client instead of throwing here, so page
       // code still sees the real status + error payload.

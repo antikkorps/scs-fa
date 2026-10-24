@@ -89,7 +89,13 @@ function refundForm(): RefundForm {
   }
 }
 
+// Story 12.9g — the name of the refund being prepared. A resend after no
+// answer (network cut, timeout) keeps it, so the API answers with the refund
+// already made rather than a second one; any answer starts a new one.
+let refundKey = crypto.randomUUID()
+
 function openRefund() {
+  refundKey = crypto.randomUUID()
   refundError.value = ""
   refundSuggestions.value = []
   refundPreview.value = null
@@ -134,10 +140,16 @@ async function submitRefund() {
   refundError.value = ""
   refundSuggestions.value = []
   try {
-    await api(`/admin/payments/orders/${id}/refunds`, { method: "POST", body: refundRequestBody(refundForm()) })
+    await api(`/admin/payments/orders/${id}/refunds`, {
+      method: "POST",
+      body: refundRequestBody(refundForm()),
+      headers: { "Idempotency-Key": refundKey },
+    })
+    refundKey = crypto.randomUUID()
     showRefund.value = false
     await refresh()
   } catch (err) {
+    if (!isNetworkFailure(err)) refundKey = crypto.randomUUID()
     const failure = refundFailure(err)
     refundError.value = failure.message
     refundSuggestions.value = failure.suggestions

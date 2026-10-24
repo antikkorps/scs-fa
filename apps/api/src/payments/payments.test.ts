@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { CURRENT_RGPD_CONSENT_VERSION, CURRENT_TERMS_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { and, eq, inArray, like } from "drizzle-orm"
@@ -368,6 +369,72 @@ describe("payments — Stripe card (Story 6.1)", () => {
       expect(await historyEvent(orderId, "payment.stripe.init")).toMatchObject({ userId, result: "success" })
     })
 
+    // Story 12.9g — two initialisations at once (double click, two tabs) must end
+    // on one intent: the one stored is the one the customer pays.
+    it("ends concurrent initialisations on a single, stored PaymentIntent", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { amountTtc: "120.00" })
+      // Stripe answers the same idempotency key with the same intent. Each call
+      // waits for the others (or 300 ms), so the three really overlap.
+      const byKey = new Map<string, string>()
+      let arrived = 0
+      let releaseAll = () => {}
+      const allArrived = new Promise<void>((resolve) => {
+        releaseAll = resolve
+      })
+      vi.mocked(createPaymentIntent).mockImplementation(async (_params, options) => {
+        arrived += 1
+        if (arrived === 3) releaseAll()
+        await Promise.race([allArrived, new Promise((resolve) => setTimeout(resolve, 300))])
+        const key = options?.idempotencyKey ?? `no-key-${byKey.size}-${Math.random()}`
+        const id = byKey.get(key) ?? `pi_conc_${byKey.size + 1}`
+        byKey.set(key, id)
+        return { id, client_secret: `${id}_secret`, status: "requires_payment_method" } as never
+      })
+      // A caller arriving once the intent is stored reuses it.
+      vi.mocked(retrievePaymentIntent).mockImplementation(
+        async (id) => ({ id, client_secret: `${id}_secret`, status: "requires_payment_method" }) as never,
+      )
+
+      const init = () =>
+        app.inject({
+          method: "POST",
+          url: "/api/payments/stripe/intent",
+          headers: { authorization: `Bearer ${token}` },
+          payload: { orderId },
+        })
+      const responses = await Promise.all([init(), init(), init()])
+
+      expect(responses.map((res) => res.statusCode)).not.toContain(500)
+      const ids = new Set(responses.map((res) => res.json().data?.paymentIntentId))
+      expect(ids.size).toBe(1)
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(ids.has(carte.stripePaymentIntentId)).toBe(true)
+    })
+
+    it("asks Stripe for a fresh intent once the previous one failed", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { amountTtc: "120.00", intentId: "pi_dead" })
+      vi.mocked(retrievePaymentIntent).mockResolvedValue({ id: "pi_dead", status: "canceled" } as never)
+      vi.mocked(createPaymentIntent).mockResolvedValue({
+        id: "pi_fresh",
+        client_secret: "pi_fresh_secret",
+        status: "requires_payment_method",
+      } as never)
+
+      await app.inject({
+        method: "POST",
+        url: "/api/payments/stripe/intent",
+        headers: { authorization: `Bearer ${token}` },
+        payload: { orderId },
+      })
+
+      const key = vi.mocked(createPaymentIntent).mock.calls[0]?.[1]?.idempotencyKey
+      expect(key).toContain("pi_dead")
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(carte.stripePaymentIntentId).toBe("pi_fresh")
+    })
+
     it("reuses an existing pending intent instead of creating a duplicate", async () => {
       const orderId = await insertOrder(userId, [CARD_ITEM])
       await insertCarte(orderId, { amountTtc: "120.00", intentId: "pi_existing" })
@@ -575,6 +642,27 @@ describe("payments — Stripe card (Story 6.1)", () => {
         result: "failure",
         error: "stripe.payment_failed",
       })
+    })
+
+    // Story 12.9g — Stripe does not promise delivery order: an earlier attempt's
+    // failure may arrive after the success, and must not undo it.
+    it("keeps a settled card payment when a failure or cancellation arrives late", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { intentId: "pi_late_1" })
+      await post({ type: "payment_intent.succeeded", data: { object: { id: "pi_late_1" } } })
+
+      await post({
+        type: "payment_intent.payment_failed",
+        data: { object: { id: "pi_late_1", last_payment_error: { code: "card_declined" } } },
+      })
+      await post({ type: "payment_intent.canceled", data: { object: { id: "pi_late_1" } } })
+
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(carte.paymentStatus).toBe("received")
+      expect(carte.failureReason).toBeNull()
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+      expect(order.paymentStatus).toBe("received")
+      expect(await historyEvent(orderId, "payment.stripe.failed")).toBeUndefined()
     })
 
     it("records Stripe's decline code, never its message, on a failed card payment", async () => {
@@ -1252,14 +1340,66 @@ describe("payments — Stripe card (Story 6.1)", () => {
       return o.id
     }
 
-    function refund(orderId: string, body: object, t = adminToken) {
+    // Each call is a new refund unless it names the key of an earlier one (story 12.9g).
+    function refund(orderId: string, body: object, t = adminToken, idempotencyKey = randomUUID()) {
       return app.inject({
         method: "POST",
         url: `/api/admin/payments/orders/${orderId}/refunds`,
-        headers: { authorization: `Bearer ${t}` },
+        headers: { authorization: `Bearer ${t}`, "idempotency-key": idempotencyKey },
         payload: body,
       })
     }
+
+    // Story 12.9g — a double click, a retried request, two admins at once.
+    describe("refunds issued twice", () => {
+      it("requires an idempotency key", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_idem_0")
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/orders/${orderId}/refunds`,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: { channel: "carte", amount: 10 },
+        })
+        expect(res.statusCode).toBe(400)
+        expect(res.json().error).toBe("IdempotencyKeyRequired")
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+      })
+
+      it("answers a repeated key with the refund it already made", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_idem_1")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_idem_1", status: "succeeded" } as never)
+        const key = randomUUID()
+
+        const first = await refund(orderId, { channel: "carte", amount: 30 }, adminToken, key)
+        const again = await refund(orderId, { channel: "carte", amount: 30 }, adminToken, key)
+
+        expect(first.statusCode).toBe(201)
+        expect(again.statusCode).toBe(200)
+        expect(again.json().data.id).toBe(first.json().data.id)
+        expect(vi.mocked(createRefund)).toHaveBeenCalledTimes(1)
+        expect(vi.mocked(createRefund).mock.calls[0]?.[1]).toEqual({ idempotencyKey: `refund:${key}` })
+        expect(await db.select().from(refunds).where(eq(refunds.orderId, orderId))).toHaveLength(1)
+      })
+
+      it("issues concurrent refunds one at a time, so together they never exceed what is refundable", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_idem_2")
+        let counter = 0
+        vi.mocked(createRefund).mockImplementation(async () => {
+          counter += 1
+          // Long enough for the other request to plan its refund meanwhile, unless it waits.
+          await new Promise((resolve) => setTimeout(resolve, 50))
+          return { id: `re_idem_2_${counter}`, status: "succeeded" } as never
+        })
+
+        const responses = await Promise.all([
+          refund(orderId, { channel: "carte", amount: 80 }),
+          refund(orderId, { channel: "carte", amount: 80 }),
+        ])
+
+        expect(responses.map((res) => res.statusCode).sort()).toEqual([201, 400])
+        expect(vi.mocked(createRefund)).toHaveBeenCalledTimes(1)
+      })
+    })
 
     describe("card refunds (Stripe)", () => {
       it("refuses, before calling Stripe, an amount Henrri could not issue a credit note for", async () => {
@@ -1296,6 +1436,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         })
         expect(vi.mocked(createRefund)).toHaveBeenCalledWith(
           expect.objectContaining({ payment_intent: "pi_rf_p1", amount: 4000 }),
+          { idempotencyKey: expect.stringMatching(/^refund:/) },
         )
         const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(order.paymentStatus).toBe("partially_refunded")
@@ -1523,7 +1664,10 @@ describe("payments — Stripe card (Story 6.1)", () => {
         const res = await refund(orderId, { kind: "goods_return", channel: "carte", lines: [{ item: 1, qty: 1 }] })
         expect(res.statusCode).toBe(201)
         expect(res.json().data).toMatchObject({ amountTtc: "105.50", kind: "goods_return" })
-        expect(vi.mocked(createRefund)).toHaveBeenCalledWith(expect.objectContaining({ amount: 10550 }))
+        expect(vi.mocked(createRefund)).toHaveBeenCalledWith(
+          expect.objectContaining({ amount: 10550 }),
+          expect.anything(),
+        )
         const [row] = await db.select().from(refunds).where(eq(refunds.orderId, orderId))
         expect(row).toMatchObject({ kind: "goods_return", lines: [{ item: 1, qty: 1 }], includesShipping: false })
         expect(await creditNotesOf(orderId)).toEqual([expect.objectContaining({ expectedTotalTtc: "105.50" })])

@@ -18,6 +18,17 @@ const paying = ref(false)
 let stripe: Stripe | null = null
 let elements: StripeElements | null = null
 
+// Story 12.9g — another tab or click started the payment at the same moment: the
+// server refuses one of them, which then finds the intent already in place.
+async function initIntent() {
+  try {
+    return await createStripeIntent(props.orderId)
+  } catch (err) {
+    if (apiErrorCode(err) !== "PaymentInitConflict") throw err
+    return createStripeIntent(props.orderId)
+  }
+}
+
 // Stripe.js is browser-only; onMounted runs client-side only in Nuxt.
 onMounted(async () => {
   if (!pk) {
@@ -25,7 +36,7 @@ onMounted(async () => {
     return
   }
   try {
-    const { clientSecret } = await createStripeIntent(props.orderId)
+    const { clientSecret } = await initIntent()
     stripe = await loadStripe(pk)
     if (!stripe) {
       reportClientError("stripe", new Error("Stripe.js did not load"))
@@ -40,9 +51,14 @@ onMounted(async () => {
     if (elRef.value) paymentEl.mount(elRef.value)
     ready.value = true
   } catch (err) {
-    // 409 = the card bucket is already settled (e.g. page reloaded after paying).
-    if (authErrorStatus(err) === 409) {
+    // The card bucket is already settled (e.g. page reloaded after paying).
+    const code = apiErrorCode(err)
+    if (code === "AlreadyPaid") {
       emit("paid")
+      return
+    }
+    if (code === "OrderCancelled") {
+      loadError.value = "Cette commande a été annulée : elle ne peut plus être payée."
       return
     }
     // An unreachable API was reported by useApi; an API refusal is the server's to log.

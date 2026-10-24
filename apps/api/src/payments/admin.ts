@@ -17,6 +17,8 @@ import { createOrderRefund, listOrderRefunds, planRefund } from "./refunds.js"
 import { importBankStatement, PaymentError, reconcileVirementManually } from "./service.js"
 
 const orderIdParamSchema = z.object({ orderId: z.string().uuid() })
+/** One refund's name, chosen by the admin form (a UUID there). */
+const idempotencyKeySchema = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/)
 
 // Reconciliation-facing columns of a bank-transfer bucket, joined to the order's
 // owner so the admin sees who is waiting on the transfer.
@@ -155,10 +157,23 @@ export const adminPaymentRoutes: FastifyPluginAsync = async (fastify) => {
     if (!body.success) {
       return reply.code(400).send(validationError(body.error.issues))
     }
+    // Story 12.9g — the admin form names each refund, so a repeat cannot issue a second one.
+    const idempotencyKey = idempotencyKeySchema.safeParse(request.headers["idempotency-key"])
+    if (!idempotencyKey.success) {
+      return reply.code(400).send({
+        error: "IdempotencyKeyRequired",
+        message: "Send an Idempotency-Key header (8 to 64 letters, digits, - or _) naming this refund",
+      })
+    }
 
     try {
-      const result = await createOrderRefund(params.data.orderId, body.data, request.user.sub)
-      return reply.code(201).send({ data: result })
+      const { refund, replayed } = await createOrderRefund(
+        params.data.orderId,
+        body.data,
+        request.user.sub,
+        idempotencyKey.data,
+      )
+      return reply.code(replayed ? 200 : 201).send({ data: refund })
     } catch (err) {
       if (err instanceof PaymentError) {
         return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message, ...err.details })

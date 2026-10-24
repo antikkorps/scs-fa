@@ -225,6 +225,25 @@ export interface RefundResult {
   orderPaymentStatus: string
 }
 
+/** A refund issued, or found already issued under the same idempotency key. */
+export interface RefundOutcome {
+  refund: RefundResult
+  replayed: boolean
+}
+
+function refundResult(row: typeof refunds.$inferSelect, orderPaymentStatus: string): RefundResult {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    kind: row.kind,
+    channel: row.channel,
+    amountTtc: row.amountTtc,
+    status: row.status,
+    stripeRefundId: row.stripeRefundId,
+    orderPaymentStatus,
+  }
+}
+
 /**
  * Issue a refund on a paid order, on the card (Stripe) or bank-transfer channel.
  *
@@ -234,93 +253,116 @@ export interface RefundResult {
  * The amount is capped at what is still refundable on the channel. A refund that
  * settles immediately triggers the order-level effects (full → `refunded` with
  * stock/print restock + VIP recompute; partial → `partially_refunded`).
+ *
+ * Story 12.9g — refunds of one order are issued one at a time (the order row
+ * is locked until the refund is recorded), so two at once can never together
+ * exceed what is refundable. And `idempotencyKey`, chosen by the admin form for
+ * one refund, makes a repeated request (double click, retry) answer with the
+ * refund already made; Stripe gets the same key.
  */
 export async function createOrderRefund(
   orderId: string,
   input: CreateRefundInput,
   adminId: string,
-): Promise<RefundResult> {
-  const plan = await planRefund(orderId, input)
-  const [order] = await db
-    .select({ paymentStatus: orders.paymentStatus })
-    .from(orders)
-    .where(eq(orders.id, orderId))
-    .limit(1)
+  idempotencyKey: string,
+): Promise<RefundOutcome> {
+  const issued = await db.transaction(async (tx) => {
+    const [order] = await tx
+      .select({ paymentStatus: orders.paymentStatus })
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .for("update")
+    if (!order) throw new PaymentError(404, "NotFound", "Order not found")
 
-  const amountTtc = plan.amountTtc.toFixed(2)
-  let status: "pending" | "succeeded" | "failed" | "cancelled" = "succeeded"
-  let stripeRefundId: string | null = null
-  let failureReason: string | null = null
-
-  if (input.channel === "carte") {
-    const [carte] = await db
-      .select({ intentId: paymentCarte.stripePaymentIntentId })
-      .from(paymentCarte)
-      .where(eq(paymentCarte.orderId, orderId))
-      .limit(1)
-    if (!carte?.intentId) {
-      throw new PaymentError(409, "NoPaymentIntent", "Card payment has no Stripe PaymentIntent to refund")
+    const [earlier] = await tx.select().from(refunds).where(eq(refunds.idempotencyKey, idempotencyKey))
+    if (earlier) {
+      if (earlier.orderId !== orderId) {
+        throw new PaymentError(409, "IdempotencyKeyReused", "This idempotency key belongs to another order's refund")
+      }
+      return { row: earlier, orderPaymentStatus: order.paymentStatus, replayed: true }
     }
-    const refund = await stripeCreateRefund({
-      payment_intent: carte.intentId,
-      amount: toCents(plan.amountTtc),
-      metadata: { orderId, initiatedBy: adminId },
-    })
-    stripeRefundId = refund.id
-    // Stripe statuses: succeeded | pending | failed | canceled | requires_action
-    status = refund.status === "succeeded" ? "succeeded" : refund.status === "pending" ? "pending" : "failed"
-    if (status === "failed") failureReason = refund.failure_reason ?? "Stripe refund did not succeed"
-  }
-  const failed = status === "failed"
 
-  const settledNow = status === "succeeded"
-  const [row] = await db
-    .insert(refunds)
-    .values({
-      orderId,
-      channel: input.channel,
-      kind: input.kind,
-      lines: plan.record.lines,
-      includesShipping: plan.record.includesShipping,
-      amountTtc,
-      currency: "EUR",
-      reason: input.reason ?? null,
-      notes: input.notes ?? null,
-      status,
-      stripeRefundId,
-      failureReason,
-      initiatedBy: adminId,
-      processedAt: settledNow ? new Date() : null,
-    })
-    .returning()
+    // Planned once the lock is held: it sees every refund recorded before this one.
+    const plan = await planRefund(orderId, input)
+    const amountTtc = plan.amountTtc.toFixed(2)
+    let status: "pending" | "succeeded" | "failed" | "cancelled" = "succeeded"
+    let stripeRefundId: string | null = null
+    let failureReason: string | null = null
 
-  await recordAuditEvent({
-    userId: adminId,
-    userRole: "admin",
-    entityType: "refund",
-    entityId: row.id,
-    orderId,
-    action: `payment.refund.${status}`,
-    result: failed ? "failure" : "success",
-    error: failed ? stripeRefundError(failureReason) : null,
-    newValue: { channel: input.channel, amountTtc, stripeRefundId },
+    if (input.channel === "carte") {
+      const [carte] = await tx
+        .select({ intentId: paymentCarte.stripePaymentIntentId })
+        .from(paymentCarte)
+        .where(eq(paymentCarte.orderId, orderId))
+        .limit(1)
+      if (!carte?.intentId) {
+        throw new PaymentError(409, "NoPaymentIntent", "Card payment has no Stripe PaymentIntent to refund")
+      }
+      const refund = await stripeCreateRefund(
+        {
+          payment_intent: carte.intentId,
+          amount: toCents(plan.amountTtc),
+          metadata: { orderId, initiatedBy: adminId },
+        },
+        { idempotencyKey: `refund:${idempotencyKey}` },
+      )
+      stripeRefundId = refund.id
+      // Stripe statuses: succeeded | pending | failed | canceled | requires_action
+      status = refund.status === "succeeded" ? "succeeded" : refund.status === "pending" ? "pending" : "failed"
+      if (status === "failed") failureReason = refund.failure_reason ?? "Stripe refund did not succeed"
+    }
+    const failed = status === "failed"
+
+    const [row] = await tx
+      .insert(refunds)
+      .values({
+        orderId,
+        channel: input.channel,
+        kind: input.kind,
+        lines: plan.record.lines,
+        includesShipping: plan.record.includesShipping,
+        amountTtc,
+        currency: "EUR",
+        reason: input.reason ?? null,
+        notes: input.notes ?? null,
+        status,
+        stripeRefundId,
+        failureReason,
+        idempotencyKey,
+        initiatedBy: adminId,
+        processedAt: status === "succeeded" ? new Date() : null,
+      })
+      .returning()
+    if (!row) throw new Error("refund insert returned no row")
+
+    await recordAuditEvent(
+      {
+        userId: adminId,
+        userRole: "admin",
+        entityType: "refund",
+        entityId: row.id,
+        orderId,
+        action: `payment.refund.${status}`,
+        result: failed ? "failure" : "success",
+        error: failed ? stripeRefundError(failureReason) : null,
+        newValue: { channel: input.channel, amountTtc, stripeRefundId },
+      },
+      tx,
+    )
+    return { row, orderPaymentStatus: order.paymentStatus, replayed: false }
   })
+
+  if (issued.replayed) {
+    return { refund: refundResult(issued.row, issued.orderPaymentStatus), replayed: true }
+  }
 
   // A refund that is already settled moves the order and gets its credit note; a
   // pending card refund waits for the webhook before any of it.
-  const orderPaymentStatus = settledNow ? await applyRefundEffects(orderId) : (order?.paymentStatus ?? "unknown")
-  if (settledNow) await enqueueCreditNote(row.id)
+  const settledNow = issued.row.status === "succeeded"
+  const orderPaymentStatus = settledNow ? await applyRefundEffects(orderId) : issued.orderPaymentStatus
+  if (settledNow) await enqueueCreditNote(issued.row.id)
 
-  return {
-    id: row.id,
-    orderId,
-    kind: input.kind,
-    channel: input.channel,
-    amountTtc,
-    status,
-    stripeRefundId,
-    orderPaymentStatus,
-  }
+  return { refund: refundResult(issued.row, orderPaymentStatus), replayed: false }
 }
 
 /**

@@ -77,3 +77,30 @@ describe("StripeCardPayment — browser errors (story 12.7d)", () => {
     })
   })
 })
+
+// Story 12.9g — a 409 on init is not always "already paid".
+describe("StripeCardPayment — refused initialisation", () => {
+  const refused = (error: string) => ({ response: { status: 409 }, data: { error } })
+
+  it("treats an already settled card payment as paid", async () => {
+    createStripeIntentMock.mockRejectedValue(refused("AlreadyPaid"))
+    const wrapper = await mounted()
+    expect(wrapper.emitted("paid")).toHaveLength(1)
+  })
+
+  it("retries once when another payment attempt started at the same time", async () => {
+    createStripeIntentMock.mockRejectedValueOnce(refused("PaymentInitConflict"))
+    loadStripeMock.mockResolvedValue(fakeStripe())
+    const wrapper = await mounted()
+    expect(createStripeIntentMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.emitted("paid")).toBeUndefined()
+    expect(wrapper.find(".card-pay__btn").exists()).toBe(true)
+  })
+
+  it("never calls a cancelled order paid", async () => {
+    createStripeIntentMock.mockRejectedValue(refused("OrderCancelled"))
+    const wrapper = await mounted()
+    expect(wrapper.emitted("paid")).toBeUndefined()
+    expect(wrapper.text()).toContain("Cette commande a été annulée")
+  })
+})
