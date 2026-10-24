@@ -4,9 +4,8 @@ import { resetPasswordSchema } from "@armurier/shared"
 useHead({ title: "Réinitialiser le mot de passe — SCS Firearms" })
 
 const { resetPassword } = useAuth()
-const route = useRoute()
-
-const token = computed(() => (route.query.token as string) || "")
+// Read from the link's fragment once mounted (story 12.9g): null until then.
+const token = useLinkToken()
 
 const password = ref("")
 const confirm = ref("")
@@ -24,7 +23,7 @@ async function submit() {
     return
   }
 
-  const parsed = resetPasswordSchema.safeParse({ token: token.value, password: password.value })
+  const parsed = resetPasswordSchema.safeParse({ token: token.value ?? "", password: password.value })
   if (!parsed.success) {
     fieldErrors.value = zodFieldErrors(parsed.error)
     return
@@ -59,6 +58,8 @@ async function submit() {
           <NuxtLink to="/connexion">Se connecter</NuxtLink>
         </p>
       </template>
+
+      <p v-else-if="token === null" class="auth-card__lede" role="status">Vérification du lien…</p>
 
       <template v-else-if="!token">
         <p class="auth-error" role="alert">Lien invalide : aucun jeton fourni.</p>

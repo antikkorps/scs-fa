@@ -89,7 +89,8 @@ async function deliver(type: EmailType, about: EmailAbout, mail: SendMailOptions
 }
 
 export async function sendPasswordResetEmail(to: string, token: string, about: EmailAbout = {}): Promise<void> {
-  const resetUrl = `${env.WEB_BASE_URL}/reset-password?token=${token}`
+  // In the fragment, which no server, proxy or audience measurement sees (story 12.9g).
+  const resetUrl = `${env.WEB_BASE_URL}/reset-password#token=${token}`
 
   await deliver("password_reset", about, {
     from: env.SMTP_FROM,
@@ -484,7 +485,9 @@ export async function sendNewsletterConfirmationEmail(
   params: { confirmToken: string; unsubscribeToken: string; segmentLabels: string[] },
   about: EmailAbout = {},
 ): Promise<void> {
-  const confirmUrl = `${env.WEB_BASE_URL}/newsletter/confirmation?token=${params.confirmToken}`
+  // The confirmation token rides in the fragment (story 12.9g); the unsubscribe
+  // one stays in the query, since one-click unsubscribe posts to that URL.
+  const confirmUrl = `${env.WEB_BASE_URL}/newsletter/confirmation#token=${params.confirmToken}`
   const unsubscribeUrl = `${env.WEB_BASE_URL}/newsletter/desabonnement?token=${params.unsubscribeToken}`
   const listText = params.segmentLabels.map((label) => `- ${label}`).join("\n")
   const listHtml = params.segmentLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")
