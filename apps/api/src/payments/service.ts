@@ -6,7 +6,7 @@ import {
   parseBankStatementCsv,
   type ReconcileVirementInput,
 } from "@armurier/shared"
-import { and, eq, inArray } from "drizzle-orm"
+import { and, eq, inArray, notInArray } from "drizzle-orm"
 import type { FastifyBaseLogger } from "fastify"
 import type Stripe from "stripe"
 import { recordAuditEvent, recordOrderStatusChange } from "../audit/record.js"
@@ -543,6 +543,11 @@ export async function handleStripeEvent(event: Stripe.Event, log: Logger): Promi
 
 type CarteUpdate = Partial<typeof paymentCarte.$inferInsert>
 
+/** PAID_PAYMENT_STATUSES, typed as the card bucket's own statuses for queries. */
+const SETTLED_CARTE_STATUSES = paymentCarte.paymentStatus.enumValues.filter((status) =>
+  PAID_PAYMENT_STATUSES.includes(status),
+)
+
 interface CarteSettlement {
   /** What Stripe reports as collected, checked against what is due. */
   paidAmountCents?: number
@@ -600,10 +605,26 @@ async function settleCartePayment(
     }
   }
 
-  await db
+  // Story 12.9g — Stripe does not promise delivery order: a failure or a
+  // cancellation that lands after the success must not undo a settled payment.
+  const settles = update.paymentStatus !== undefined && PAID_PAYMENT_STATUSES.includes(update.paymentStatus)
+  const [applied] = await db
     .update(paymentCarte)
     .set({ ...update, updatedAt: new Date() })
-    .where(eq(paymentCarte.id, carte.id))
+    .where(
+      and(
+        eq(paymentCarte.id, carte.id),
+        settles ? undefined : notInArray(paymentCarte.paymentStatus, SETTLED_CARTE_STATUSES),
+      ),
+    )
+    .returning({ id: paymentCarte.id })
+  if (!applied) {
+    log.warn(
+      { orderId: carte.orderId, paymentIntentId, status: update.paymentStatus },
+      "Stripe event arrived after the card payment settled — ignored",
+    )
+    return
+  }
 
   await recordAuditEvent({
     userRole: "system",

@@ -577,6 +577,27 @@ describe("payments — Stripe card (Story 6.1)", () => {
       })
     })
 
+    // Story 12.9g — Stripe does not promise delivery order: an earlier attempt's
+    // failure may arrive after the success, and must not undo it.
+    it("keeps a settled card payment when a failure or cancellation arrives late", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { intentId: "pi_late_1" })
+      await post({ type: "payment_intent.succeeded", data: { object: { id: "pi_late_1" } } })
+
+      await post({
+        type: "payment_intent.payment_failed",
+        data: { object: { id: "pi_late_1", last_payment_error: { code: "card_declined" } } },
+      })
+      await post({ type: "payment_intent.canceled", data: { object: { id: "pi_late_1" } } })
+
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(carte.paymentStatus).toBe("received")
+      expect(carte.failureReason).toBeNull()
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+      expect(order.paymentStatus).toBe("received")
+      expect(await historyEvent(orderId, "payment.stripe.failed")).toBeUndefined()
+    })
+
     it("records Stripe's decline code, never its message, on a failed card payment", async () => {
       const orderId = await insertOrder(userId, [CARD_ITEM])
       await insertCarte(orderId, { intentId: "pi_fail_2" })
