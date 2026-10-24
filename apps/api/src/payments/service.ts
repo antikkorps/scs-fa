@@ -6,7 +6,7 @@ import {
   parseBankStatementCsv,
   type ReconcileVirementInput,
 } from "@armurier/shared"
-import { and, eq, inArray, notInArray } from "drizzle-orm"
+import { and, eq, inArray, isNull, notInArray } from "drizzle-orm"
 import type { FastifyBaseLogger } from "fastify"
 import type Stripe from "stripe"
 import { recordAuditEvent, recordOrderStatusChange } from "../audit/record.js"
@@ -109,21 +109,53 @@ export async function initStripePayment(orderId: string, userId: string): Promis
     }
   }
 
-  const intent = await createPaymentIntent({
-    amount: amountCents,
-    currency: currency.toLowerCase(),
-    metadata: { orderId, userId },
-    automatic_payment_methods: { enabled: true },
-  })
+  // Story 12.9g — concurrent initialisations (double click, two tabs) must end
+  // on one intent. They share this idempotency key, so Stripe hands them all
+  // the same intent; the key moves on once the stored intent is spent.
+  const previousIntentId = carte.stripePaymentIntentId
+  const intent = await createPaymentIntent(
+    {
+      amount: amountCents,
+      currency: currency.toLowerCase(),
+      metadata: { orderId, userId },
+      automatic_payment_methods: { enabled: true },
+    },
+    { idempotencyKey: `payment-intent:${carte.id}:${previousIntentId ?? "first"}:${amountCents}` },
+  )
 
   if (!intent.client_secret) {
     throw new PaymentError(502, "StripeError", "Stripe did not return a client secret")
   }
 
-  await db
+  // Compare-and-set: the first of them stores the intent, the others find it there.
+  const [stored] = await db
     .update(paymentCarte)
     .set({ stripePaymentIntentId: intent.id, updatedAt: new Date() })
-    .where(eq(paymentCarte.id, carte.id))
+    .where(
+      and(
+        eq(paymentCarte.id, carte.id),
+        previousIntentId
+          ? eq(paymentCarte.stripePaymentIntentId, previousIntentId)
+          : isNull(paymentCarte.stripePaymentIntentId),
+      ),
+    )
+    .returning({ id: paymentCarte.id })
+  if (!stored) {
+    const [current] = await db
+      .select({ intentId: paymentCarte.stripePaymentIntentId })
+      .from(paymentCarte)
+      .where(eq(paymentCarte.id, carte.id))
+    if (current?.intentId !== intent.id) {
+      throw new PaymentError(409, "PaymentInitConflict", "Another payment attempt started meanwhile; try again")
+    }
+    return {
+      clientSecret: intent.client_secret,
+      paymentIntentId: intent.id,
+      amountTtc: carte.amountTtc,
+      currency,
+      reused: true,
+    }
+  }
 
   await recordAuditEvent({
     userId,

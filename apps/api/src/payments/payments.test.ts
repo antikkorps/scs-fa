@@ -368,6 +368,72 @@ describe("payments — Stripe card (Story 6.1)", () => {
       expect(await historyEvent(orderId, "payment.stripe.init")).toMatchObject({ userId, result: "success" })
     })
 
+    // Story 12.9g — two initialisations at once (double click, two tabs) must end
+    // on one intent: the one stored is the one the customer pays.
+    it("ends concurrent initialisations on a single, stored PaymentIntent", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { amountTtc: "120.00" })
+      // Stripe answers the same idempotency key with the same intent. Each call
+      // waits for the others (or 300 ms), so the three really overlap.
+      const byKey = new Map<string, string>()
+      let arrived = 0
+      let releaseAll = () => {}
+      const allArrived = new Promise<void>((resolve) => {
+        releaseAll = resolve
+      })
+      vi.mocked(createPaymentIntent).mockImplementation(async (_params, options) => {
+        arrived += 1
+        if (arrived === 3) releaseAll()
+        await Promise.race([allArrived, new Promise((resolve) => setTimeout(resolve, 300))])
+        const key = options?.idempotencyKey ?? `no-key-${byKey.size}-${Math.random()}`
+        const id = byKey.get(key) ?? `pi_conc_${byKey.size + 1}`
+        byKey.set(key, id)
+        return { id, client_secret: `${id}_secret`, status: "requires_payment_method" } as never
+      })
+      // A caller arriving once the intent is stored reuses it.
+      vi.mocked(retrievePaymentIntent).mockImplementation(
+        async (id) => ({ id, client_secret: `${id}_secret`, status: "requires_payment_method" }) as never,
+      )
+
+      const init = () =>
+        app.inject({
+          method: "POST",
+          url: "/api/payments/stripe/intent",
+          headers: { authorization: `Bearer ${token}` },
+          payload: { orderId },
+        })
+      const responses = await Promise.all([init(), init(), init()])
+
+      expect(responses.map((res) => res.statusCode)).not.toContain(500)
+      const ids = new Set(responses.map((res) => res.json().data?.paymentIntentId))
+      expect(ids.size).toBe(1)
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(ids.has(carte.stripePaymentIntentId)).toBe(true)
+    })
+
+    it("asks Stripe for a fresh intent once the previous one failed", async () => {
+      const orderId = await insertOrder(userId, [CARD_ITEM])
+      await insertCarte(orderId, { amountTtc: "120.00", intentId: "pi_dead" })
+      vi.mocked(retrievePaymentIntent).mockResolvedValue({ id: "pi_dead", status: "canceled" } as never)
+      vi.mocked(createPaymentIntent).mockResolvedValue({
+        id: "pi_fresh",
+        client_secret: "pi_fresh_secret",
+        status: "requires_payment_method",
+      } as never)
+
+      await app.inject({
+        method: "POST",
+        url: "/api/payments/stripe/intent",
+        headers: { authorization: `Bearer ${token}` },
+        payload: { orderId },
+      })
+
+      const key = vi.mocked(createPaymentIntent).mock.calls[0]?.[1]?.idempotencyKey
+      expect(key).toContain("pi_dead")
+      const [carte] = await db.select().from(paymentCarte).where(eq(paymentCarte.orderId, orderId))
+      expect(carte.stripePaymentIntentId).toBe("pi_fresh")
+    })
+
     it("reuses an existing pending intent instead of creating a duplicate", async () => {
       const orderId = await insertOrder(userId, [CARD_ITEM])
       await insertCarte(orderId, { amountTtc: "120.00", intentId: "pi_existing" })

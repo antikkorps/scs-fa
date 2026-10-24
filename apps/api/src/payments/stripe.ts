@@ -14,8 +14,12 @@ function client(): Stripe {
   return _client
 }
 
-export function createPaymentIntent(params: Stripe.PaymentIntentCreateParams): Promise<Stripe.PaymentIntent> {
-  return client().paymentIntents.create(params)
+/** `options.idempotencyKey`: Stripe answers a repeated key with the same intent (story 12.9g). */
+export function createPaymentIntent(
+  params: Stripe.PaymentIntentCreateParams,
+  options?: Stripe.RequestOptions,
+): Promise<Stripe.PaymentIntent> {
+  return client().paymentIntents.create(params, options)
 }
 
 export function retrievePaymentIntent(id: string): Promise<Stripe.PaymentIntent> {
@@ -32,8 +36,11 @@ export function retrieveCharge(id: string): Promise<Stripe.Charge> {
 }
 
 /** Issue a refund against a PaymentIntent (full when `amount` is omitted, else partial, in cents). */
-export function createRefund(params: Stripe.RefundCreateParams): Promise<Stripe.Refund> {
-  return client().refunds.create(params)
+export function createRefund(
+  params: Stripe.RefundCreateParams,
+  options?: Stripe.RequestOptions,
+): Promise<Stripe.Refund> {
+  return client().refunds.create(params, options)
 }
 
 /** Verify a webhook payload's signature and return the parsed event. Throws on a bad signature. */
