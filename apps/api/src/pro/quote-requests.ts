@@ -1,5 +1,5 @@
 import { CANCELLABLE_QUOTE_STATUSES, quoteRequestSubmitSchema, uuidParamSchema } from "@armurier/shared"
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, gt, inArray, sql } from "drizzle-orm"
 import type { FastifyPluginAsync, FastifyRequest } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
@@ -10,6 +10,13 @@ import { proOrganisationOf } from "./access.js"
 import { loadBasket } from "./quote-basket.js"
 
 const NOT_FOUND = { error: "NotFound", message: "Quote request not found" }
+
+/**
+ * Story 12.9g — each request mails every admin, so an organisation may send so
+ * many in a rolling hour; past that, the basket waits. Generous for a real
+ * buyer, and it bounds what one account can make SCS's inbox receive.
+ */
+export const QUOTE_REQUESTS_PER_HOUR = 20
 
 /** DR-<year>-<n>: the sequence never resets, the year only reads better. */
 const NEXT_NUMBER = sql<string>`'DR-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('quote_request_number_seq')::text, 4, '0')`
@@ -91,7 +98,7 @@ async function announce(
 /** A pro's quote requests (story 12.8c): sent from the basket, followed, cancelled while untouched. */
 export const quoteRequestRoutes: FastifyPluginAsync = async (fastify) => {
   /** POST / — the basket becomes a numbered request, all at once or not at all. */
-  fastify.post("/", async (request, reply) => {
+  fastify.post("/", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
     const parsed = quoteRequestSubmitSchema.safeParse(request.body ?? {})
     if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
     const organisation = proOrganisationOf(request)
@@ -106,6 +113,21 @@ export const quoteRequestRoutes: FastifyPluginAsync = async (fastify) => {
           .from(users)
           .where(eq(users.id, userId))
           .for("update")
+        const [recent] = await tx
+          .select({ total: count() })
+          .from(quoteRequests)
+          .where(
+            and(
+              eq(quoteRequests.organisationId, organisation.id),
+              gt(quoteRequests.createdAt, sql`now() - interval '1 hour'`),
+            ),
+          )
+        if ((recent?.total ?? 0) >= QUOTE_REQUESTS_PER_HOUR) {
+          throw new SubmitRefusal(429, {
+            error: "TooManyQuoteRequests",
+            message: "Too many quote requests in the last hour; the basket is kept",
+          })
+        }
         const lines = await loadBasket(userId, tx)
         if (lines.length === 0) {
           throw new SubmitRefusal(400, { error: "EmptyBasket", message: "The quote basket is empty" })
