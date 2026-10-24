@@ -5,7 +5,7 @@ import * as schema from "./schema.js"
 
 const { Pool } = pg
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: env.DATABASE_URL,
 })
 

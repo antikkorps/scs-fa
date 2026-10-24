@@ -16,5 +16,8 @@ if [ "$(psql -d "$PGDATABASE" -tAc "SELECT 1 FROM pg_database WHERE datname = '$
 fi
 
 echo "[umami-purge] deleting audience data older than 25 months"
-psql -d "$UMAMI_DATABASE" -v ON_ERROR_STOP=1 -f /usr/local/share/umami-purge.sql
+# As Umami's own role: the backup role may not delete anything (story 12.9f).
+: "${UMAMI_PGPASSWORD:?UMAMI_PGPASSWORD required}"
+PGUSER="${UMAMI_PGUSER:-umami}" PGPASSWORD="${UMAMI_PGPASSWORD}" \
+  psql -d "$UMAMI_DATABASE" -v ON_ERROR_STOP=1 -f /usr/local/share/umami-purge.sql
 echo "[umami-purge] done"

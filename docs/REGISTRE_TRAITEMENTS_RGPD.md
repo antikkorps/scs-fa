@@ -155,9 +155,9 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 |---|---|
 | Finalité | Pouvoir restaurer le site en cas d'incident |
 | Base légale | Intérêt légitime : continuité du service |
-| Données | Copie complète de la base de données |
-| Destinataires | Scaleway (stockage) |
-| Durée | Les 14 dernières sauvegardes quotidiennes, les plus anciennes supprimées au fur et à mesure |
+| Données | Copie complète de la base de données ; copie des fichiers stockés (pièces justificatives, images) |
+| Destinataires | Scaleway (stockage). Copies chiffrées : la clé qui déchiffre la base n'est pas sur le serveur |
+| Durée | Base : les 14 dernières sauvegardes quotidiennes, les plus anciennes supprimées au fur et à mesure. Fichiers : un fichier supprimé du site (purge de conservation comprise) reste 30 jours dans les sauvegardes, puis en est effacé |
 
 ### 12. Comptes professionnels et demandes de devis
 
@@ -177,7 +177,8 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 - Fichiers déposés chiffrés au repos ; pièces justificatives analysées par un antivirus.
 - Accès au back-office réservé aux administrateurs ; actions sensibles tracées (traitement 7).
 - Secrets (clés Stripe, Henrri, Brevo) hors du code, dans la configuration du serveur ; jamais écrits dans les journaux.
-- Sauvegardes quotidiennes ; une restauration complète est à tester avant la mise en production (checklist de `docs/DEPLOY.md`).
+- Sauvegardes quotidiennes et chiffrées (base et fichiers) ; une restauration complète est à tester avant la mise en production (checklist de `docs/DEPLOY.md`).
+- Accès à la base par des rôles distincts au strict nécessaire : le site lit et écrit les données sans pouvoir modifier la structure, les sauvegardes lisent sans pouvoir écrire.
 
 ## Historique du registre
 
