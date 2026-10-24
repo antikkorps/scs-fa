@@ -505,6 +505,10 @@ export const refreshTokens = pgTable(
     // onto every rotation, for the accounts whose session is capped (admins,
     // and the pro accounts of 12.8b). NULL: the sliding expiry alone applies.
     sessionExpiresAt: timestamp("session_expires_at"),
+    // Story 12.9f — the token this one was rotated into, sealed with this
+    // token's own value (AES-GCM): refreshes racing on it within the grace get
+    // that same successor instead of forking the session. Never in clear.
+    successorSealed: text("successor_sealed"),
   },
   (t) => [
     index("idx_refresh_tokens_user").on(t.userId),

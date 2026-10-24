@@ -4,7 +4,13 @@ import type { FastifyPluginAsync } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
-import { findRefreshTokenByHash, issueTokens, markRefreshTokenRevoked, revokeRefreshFamily } from "./tokens.js"
+import {
+  findRefreshTokenByHash,
+  revokeRefreshFamily,
+  rotateRefreshToken,
+  successorWithinGrace,
+  tokensFor,
+} from "./tokens.js"
 
 export const refreshRoute: FastifyPluginAsync = async (fastify) => {
   fastify.post("/refresh", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
@@ -19,7 +25,8 @@ export const refreshRoute: FastifyPluginAsync = async (fastify) => {
       })
     }
 
-    const stored = await findRefreshTokenByHash(parsed.data.refreshToken)
+    const presented = parsed.data.refreshToken
+    let stored = await findRefreshTokenByHash(presented)
     const now = new Date()
     if (!stored || stored.expiresAt <= now || (stored.sessionExpiresAt && stored.sessionExpiresAt <= now)) {
       return reply.code(401).send({
@@ -33,46 +40,45 @@ export const refreshRoute: FastifyPluginAsync = async (fastify) => {
       return reply.code(401).send({ error: "InvalidRefreshToken" })
     }
 
-    // Reuse detection (RTR): the token was already rotated out (revoked) and is
-    // being replayed → treat it as theft and revoke the whole session family, so
-    // the attacker AND the legitimate holder are logged out everywhere.
-    if (stored.revokedAt) {
-      const revoked = await revokeRefreshFamily(stored.familyId)
-      await recordAuditEvent({
+    const journal = (action: string, newValue?: unknown) =>
+      recordAuditEvent({
         userId: user.id,
         userRole: user.role,
         entityType: "user",
         entityId: user.id,
-        action: "user.token_reuse_detected",
-        newValue: { familyId: stored.familyId, revokedCount: revoked },
+        action,
+        newValue,
         ipAddress: request.ip,
         userAgent: request.headers["user-agent"] ?? null,
       })
-      return reply.code(401).send({
-        error: "InvalidRefreshToken",
-        message: "Refresh token is invalid or expired",
-      })
+
+    // Rotate: the used token is kept, revoked, so a later replay is detectable,
+    // and a new one is issued within the same family.
+    if (!stored.revokedAt) {
+      const successor = await rotateRefreshToken(stored, presented, user)
+      if (successor) {
+        await journal("user.token_refreshed")
+        return reply.code(200).send(await tokensFor(fastify, user, successor))
+      }
+      // A concurrent refresh rotated it first: read what it left.
+      stored = (await findRefreshTokenByHash(presented)) ?? stored
     }
 
-    // Rotate: mark the used token revoked (kept, not deleted, so a later replay
-    // is detectable) and issue a new pair within the same family.
-    await markRefreshTokenRevoked(stored.id)
+    // Story 12.9f — a refresh racing the rotation gets the same successor.
+    const successor = await successorWithinGrace(stored, presented)
+    if (successor) {
+      await journal("user.token_refreshed", { withinGrace: true })
+      return reply.code(200).send(await tokensFor(fastify, user, successor))
+    }
 
-    const tokens = await issueTokens(fastify, user, stored.deviceLabel, {
-      familyId: stored.familyId,
-      sessionExpiresAt: stored.sessionExpiresAt,
+    // Reuse detection (RTR): the token was already rotated out (revoked) and is
+    // being replayed → treat it as theft and revoke the whole session family, so
+    // the attacker AND the legitimate holder are logged out everywhere.
+    const revoked = await revokeRefreshFamily(stored.familyId)
+    await journal("user.token_reuse_detected", { familyId: stored.familyId, revokedCount: revoked })
+    return reply.code(401).send({
+      error: "InvalidRefreshToken",
+      message: "Refresh token is invalid or expired",
     })
-
-    await recordAuditEvent({
-      userId: user.id,
-      userRole: user.role,
-      entityType: "user",
-      entityId: user.id,
-      action: "user.token_refreshed",
-      ipAddress: request.ip,
-      userAgent: request.headers["user-agent"] ?? null,
-    })
-
-    return reply.code(200).send(tokens)
   })
 }

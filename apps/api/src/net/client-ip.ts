@@ -32,6 +32,31 @@ export function isPrivateAddress(address: string): boolean {
   return PRIVATE.check(ip, family === 4 ? "ipv4" : "ipv6")
 }
 
+/** The 16-bit groups of an IPv6 address, the `::` run expanded. */
+function ipv6Groups(ip: string): string[] {
+  const [head, tail] = ip.split("::")
+  const headGroups = head ? head.split(":") : []
+  const tailGroups = tail ? tail.split(":") : []
+  // An embedded IPv4 tail (::ffff:1.2.3.4, 64:ff9b::1.2.3.4) fills two groups.
+  const width = (groups: string[]) => groups.reduce((sum, group) => sum + (group.includes(".") ? 2 : 1), 0)
+  const missing = tail === undefined ? 0 : 8 - width(headGroups) - width(tailGroups)
+  return [...headGroups, ...Array<string>(missing).fill("0"), ...tailGroups]
+}
+
+/**
+ * Whose budget a request spends (story 12.9f). An IPv4 address is one
+ * subscriber; on IPv6 a subscriber gets a whole /64 and can pick any address
+ * in it, so the /64 prefix is the key — else one line has unlimited budgets.
+ */
+export function rateLimitKey(address: string): string {
+  const ip = address.startsWith("::ffff:") ? address.slice(7) : address
+  if (isIP(ip) !== 6) return ip
+  const prefix = ipv6Groups(ip.split("%")[0])
+    .slice(0, 4)
+    .map((group) => Number.parseInt(group, 16).toString(16))
+  return `${prefix.join(":")}::/64`
+}
+
 /** Fastify `trustProxy`: trust the direct peer, if private — and nothing beyond it. */
 export function trustDirectPrivatePeer(address: string, hop: number): boolean {
   return hop === 0 && isPrivateAddress(address)

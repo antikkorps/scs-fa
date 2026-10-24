@@ -6,6 +6,7 @@
 import type { FastifyPluginAsync } from "fastify"
 import { z } from "zod"
 import { validationError } from "../http.js"
+import { rateLimitKey } from "../net/client-ip.js"
 import { createWindowLimiter } from "../net/window-limiter.js"
 
 export const CLIENT_ERRORS_PER_MINUTE = 10
@@ -57,7 +58,7 @@ export const clientErrorRoutes: FastifyPluginAsync = async (fastify) => {
   const limiter = createWindowLimiter({ max: CLIENT_ERRORS_PER_MINUTE, windowMs: 60_000 })
 
   fastify.post("/", { bodyLimit: 8 * 1024 }, async (request, reply) => {
-    if (!limiter.hit(request.ip)) {
+    if (!limiter.hit(rateLimitKey(request.ip))) {
       return reply.code(429).send({ error: "TooManyRequests", message: "Too many error reports" })
     }
     const parsed = reportSchema.safeParse(request.body)
