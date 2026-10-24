@@ -351,7 +351,14 @@ tracker **only after the visitor accepts** the consent banner (Franck's choice,
 
 One-time setup:
 
-1. Secrets in `.env`: `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` (`openssl rand -hex 32`).
+1. Secrets in `.env`: `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` (`openssl rand -hex 32`),
+   and the HTTP login Caddy puts in front of the whole dashboard (story 12.9g:
+   a fresh Umami answers `admin` / `umami` until step 3):
+   `UMAMI_BASIC_AUTH_USER`, and `UMAMI_BASIC_AUTH_HASH` from
+   `docker run --rm caddy:2-alpine caddy hash-password --plaintext '<password>'`,
+   **in single quotes** in `.env` (the hash is full of `$` that compose would
+   expand). Caddy refuses to start on the sample value. Give the client this
+   login too; the tracker is not behind it (it goes through `www`).
 2. Database and role (Umami migrates its own schema on start):
    ```sh
    docker compose -f docker-compose.prod.yml exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
