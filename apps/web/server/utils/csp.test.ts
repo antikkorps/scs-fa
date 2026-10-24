@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { contentSecurityPolicy, withScriptNonce } from "./csp"
+import { contentSecurityPolicy, withDocumentNonce, withScriptNonce } from "./csp"
 
 describe("contentSecurityPolicy", () => {
   it("trusts scripts by nonce, and what they load, rather than by host", () => {
@@ -85,5 +85,26 @@ describe("withScriptNonce", () => {
       '<script nonce="Q">a</script>',
       '<script nonce="Q">b</script>',
     ])
+  })
+})
+
+describe("withDocumentNonce (story 12.9g)", () => {
+  const rendered = () => ({
+    head: ['<script type="application/ld+json">{}</script>'],
+    bodyPrepend: ["<script>prepended()</script>"],
+    // The app's markup: rich text from the back office lands here through v-html.
+    body: ['<div id="__nuxt"><article><script>alert(1)</script></article></div>'],
+    bodyAppend: ['<script type="module" src="/_nuxt/entry.js"></script>'],
+  })
+
+  it("stamps the nonce on the scripts Nuxt renders around the app", () => {
+    const html = withDocumentNonce(rendered(), "N")
+    expect(html.head).toEqual(['<script nonce="N" type="application/ld+json">{}</script>'])
+    expect(html.bodyPrepend).toEqual(['<script nonce="N">prepended()</script>'])
+    expect(html.bodyAppend).toEqual(['<script nonce="N" type="module" src="/_nuxt/entry.js"></script>'])
+  })
+
+  it("never vouches for a script inside the app's own markup", () => {
+    expect(withDocumentNonce(rendered(), "N").body.join("")).not.toContain("nonce")
   })
 })
