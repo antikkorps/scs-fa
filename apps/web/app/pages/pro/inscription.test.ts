@@ -69,7 +69,7 @@ describe("pro/inscription.vue (story 12.8b)", () => {
     await wrapper.find("form").trigger("submit")
     await flushPromises()
 
-    expect(wrapper.text()).toContain("Ce SIRET a déjà un compte professionnel")
+    expect(wrapper.text()).toContain("Ce SIRET appartient déjà à un compte professionnel validé")
   })
 
   it("explains a taken e-mail and points to the request from an account", async () => {

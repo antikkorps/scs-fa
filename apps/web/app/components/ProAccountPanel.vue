@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { type OrganisationType, organisationRequestSchema } from "@armurier/shared"
 import type { MemberOrganisation } from "~/types/organisation"
-import { organisationTypeLabel } from "~/utils/organisation"
+import { organisationTypeLabel, SIRET_TAKEN_MESSAGE } from "~/utils/organisation"
 
 // Story 12.8b — the pro side of the account page: where a request stands, or
 // the form to file one (a refused request may be replaced by a new one).
@@ -43,7 +43,7 @@ async function submit() {
   } catch (err) {
     error.value =
       apiErrorCode(err) === "SiretAlreadyRegistered"
-        ? "Ce SIRET a déjà un compte professionnel, ou une demande est en cours d'examen."
+        ? SIRET_TAKEN_MESSAGE
         : "La demande n'a pas pu être envoyée. Réessayez."
   } finally {
     sending.value = false

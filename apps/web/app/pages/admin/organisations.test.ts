@@ -29,6 +29,7 @@ const DETAIL: AdminOrganisationDetail = {
   net30Allowed: false,
   showPrices: false,
   updatedAt: "2026-10-21T10:00:00Z",
+  sameSiret: [],
 }
 const PAGINATION = { page: 1, limit: 20, total: 1, totalPages: 1, hasMore: false }
 
@@ -86,6 +87,30 @@ describe("admin/organisations.vue (story 12.8b)", () => {
       method: "POST",
       body: { discountPct: 12.5, net30Allowed: false, showPrices: true },
     })
+  })
+
+  // Story 12.9g — requests may share a SIRET until SCS validates one.
+  it("warns of the other requests and accounts claiming the same SIRET", async () => {
+    serve({
+      ...DETAIL,
+      sameSiret: [{ id: "o2", legalName: "Armurerie Usurpée", status: "approved", createdAt: "2026-10-20T09:00:00Z" }],
+    })
+    const wrapper = await openFirst()
+
+    const warning = wrapper.find(".same-siret").text()
+    expect(warning).toContain("Armurerie Usurpée")
+    expect(warning).toContain("Validé")
+  })
+
+  it("explains in French why a SIRET already validated elsewhere cannot be approved", async () => {
+    serve(DETAIL)
+    const wrapper = await openFirst()
+    apiMock.mockRejectedValueOnce({ data: { error: "SiretAlreadyApproved", message: "Another organisation…" } })
+
+    await wrapper.find("button.approve").trigger("click")
+    await flushPromises()
+
+    expect(wrapper.find(".drawer").text()).toContain("Une autre organisation avec ce SIRET est déjà validée")
   })
 
   it("offers administrations the 30-day payment by default", async () => {

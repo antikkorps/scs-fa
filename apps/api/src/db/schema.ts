@@ -291,8 +291,12 @@ export const organisations = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [
-    // A refused request may be filed again under the same SIRET; anything else is a duplicate.
-    uniqueIndex("uq_organisations_siret_open").on(t.siret).where(sql`${t.status} <> 'rejected'`),
+    // Story 12.9g — only a validated organisation (approved, or suspended for a
+    // while) holds its SIRET: requests under review may share one, so a first
+    // claimant cannot lock the real company out. SCS validates one of them.
+    uniqueIndex("uq_organisations_siret_validated")
+      .on(t.siret)
+      .where(sql`${t.status} in ('approved', 'suspended')`),
     index("idx_organisations_status").on(t.status),
     foreignKey({ columns: [t.reviewedBy], foreignColumns: [users.id] }).onDelete("set null"),
     check("chk_organisations_discount_pct", sql`${t.discountPct} >= 0 AND ${t.discountPct} <= 100`),

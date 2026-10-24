@@ -49,13 +49,17 @@ describe("pro accounts in the back-office (/api/admin/organisations, story 12.8b
   }
 
   async function proRequest(
-    overrides: { type?: OrganisationType; status?: "pending" | "approved" | "rejected" | "suspended" } = {},
+    overrides: {
+      type?: OrganisationType
+      status?: "pending" | "approved" | "rejected" | "suspended"
+      siret?: string
+    } = {},
   ) {
     const [organisation] = await db
       .insert(organisations)
       .values({
         legalName: "Armurerie Armand",
-        siret: nextSiret(),
+        siret: overrides.siret ?? nextSiret(),
         type: overrides.type ?? "armurier",
         status: overrides.status ?? "pending",
         registryCheck: "verified",
@@ -134,6 +138,20 @@ describe("pro accounts in the back-office (/api/admin/organisations, story 12.8b
       expect(res.json().pagination).toMatchObject({ page: 1, limit: 100 })
     })
 
+    it("names the other requests and accounts that claim the same SIRET (story 12.9g)", async () => {
+      const siret = nextSiret()
+      const { organisation } = await proRequest({ siret })
+      const rival = await proRequest({ siret, status: "approved" })
+      await proRequest()
+
+      const res = await call("GET", `/${organisation.id}`)
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().data.sameSiret).toEqual([
+        expect.objectContaining({ id: rival.organisation.id, status: "approved", legalName: "Armurerie Armand" }),
+      ])
+    })
+
     it("shows one request with the registry's answer and the terms", async () => {
       const { organisation, member } = await proRequest()
 
@@ -183,6 +201,20 @@ describe("pro accounts in the back-office (/api/admin/organisations, story 12.8b
       const declined = await proRequest({ type: "administration" })
       await call("POST", `/${declined.organisation.id}/approve`, { net30Allowed: false })
       expect((await stored(declined.organisation.id))?.net30Allowed).toBe(false)
+    })
+
+    // Story 12.9g — requests may share a SIRET; only one can be validated.
+    it("refuses to approve a request whose SIRET a validated organisation holds", async () => {
+      const siret = nextSiret()
+      await proRequest({ siret, status: "approved" })
+      const { organisation } = await proRequest({ siret })
+
+      const res = await call("POST", `/${organisation.id}/approve`, {})
+
+      expect(res.statusCode).toBe(409)
+      expect(res.json().error).toBe("SiretAlreadyApproved")
+      const [still] = await db.select().from(organisations).where(eq(organisations.id, organisation.id))
+      expect(still?.status).toBe("pending")
     })
 
     it("refuses to approve anything but a pending request", async () => {
