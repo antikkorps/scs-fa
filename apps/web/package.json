@@ -34,7 +34,7 @@
     "@vitest/coverage-v8": "^4.1.0",
     "@vue/language-core": "3.3.8",
     "@vue/test-utils": "2.4.11",
-    "happy-dom": "20.11.1",
+    "happy-dom": "21.0.4",
     "typescript": "5.9.3",
     "vitest": "^4.1.0",
     "vue-tsc": "3.3.8"
