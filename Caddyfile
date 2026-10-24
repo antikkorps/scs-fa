@@ -80,10 +80,16 @@ stats.{$DOMAIN} {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		# No page may frame the dashboard (clickjacking, story 12.9f).
+		X-Frame-Options "DENY"
 		-Server
 	}
 	reverse_proxy umami:3000 {
 		header_up X-Forwarded-For {client_ip}
+		# Umami sends its own CSP with `frame-ancestors 'self'`: tighten that
+		# directive in place rather than replace the header, which would drop
+		# the rest of Umami's policy.
+		header_down Content-Security-Policy "frame-ancestors 'self'" "frame-ancestors 'none'"
 	}
 }
 
