@@ -201,4 +201,42 @@ describe("admin order — refunds (decisions 2026-10-14)", () => {
     const suggestions = wrapper.findAll(".modal__suggestions button").map((button) => button.text().replace(/\s/g, " "))
     expect(suggestions).toEqual(["33,32 €", "33,34 €"])
   })
+
+  // Story 12.9g — each refund carries its own key: a resend never refunds twice.
+  describe("idempotency key", () => {
+    const refundCalls = () => apiMock.mock.calls.filter(([url]) => url === `/admin/payments/orders/${ORDER_ID}/refunds`)
+    const keyOf = (call: unknown[] | undefined) =>
+      (call?.[1] as { headers?: Record<string, string> } | undefined)?.headers?.["Idempotency-Key"]
+
+    async function submitGesture(wrapper: Awaited<ReturnType<typeof openRefund>>) {
+      await wrapper.find(".modal select").setValue("goodwill")
+      await wrapper.find('.modal input[type="number"]').setValue(20)
+      await wrapper.find(".modal form").trigger("submit")
+      await flushPromises()
+    }
+
+    it("sends the same key again when the first request got no answer", async () => {
+      const wrapper = await openRefund()
+      apiMock.mockRejectedValueOnce(Object.assign(new Error("fetch failed"), { name: "FetchError" }))
+      await submitGesture(wrapper)
+      await wrapper.find(".modal form").trigger("submit")
+      await flushPromises()
+
+      const [first, second] = refundCalls()
+      expect(keyOf(first)).toMatch(/^[0-9a-f-]{36}$/)
+      expect(keyOf(second)).toBe(keyOf(first))
+    })
+
+    it("uses a new key once the API has answered", async () => {
+      const wrapper = await openRefund()
+      apiMock.mockRejectedValueOnce({ response: { status: 400 }, data: { error: "AmountExceedsRefundable" } })
+      await submitGesture(wrapper)
+      await wrapper.find(".modal form").trigger("submit")
+      await flushPromises()
+
+      const [first, second] = refundCalls()
+      expect(keyOf(second)).toBeDefined()
+      expect(keyOf(second)).not.toBe(keyOf(first))
+    })
+  })
 })

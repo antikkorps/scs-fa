@@ -2048,6 +2048,9 @@ export const refunds = pgTable(
     // Set for card refunds; null for manually-recorded bank-transfer refunds.
     stripeRefundId: varchar("stripe_refund_id", { length: 255 }).unique(),
     failureReason: text("failure_reason"),
+    // Story 12.9g — the admin form's key for this refund: a repeated request
+    // (double click, retry) is answered with this refund instead of a second one.
+    idempotencyKey: varchar("idempotency_key", { length: 64 }).unique(),
 
     initiatedBy: uuid("initiated_by"),
     processedAt: timestamp("processed_at"),

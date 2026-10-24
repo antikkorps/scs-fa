@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { CURRENT_RGPD_CONSENT_VERSION, CURRENT_TERMS_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { and, eq, inArray, like } from "drizzle-orm"
@@ -1339,14 +1340,66 @@ describe("payments — Stripe card (Story 6.1)", () => {
       return o.id
     }
 
-    function refund(orderId: string, body: object, t = adminToken) {
+    // Each call is a new refund unless it names the key of an earlier one (story 12.9g).
+    function refund(orderId: string, body: object, t = adminToken, idempotencyKey = randomUUID()) {
       return app.inject({
         method: "POST",
         url: `/api/admin/payments/orders/${orderId}/refunds`,
-        headers: { authorization: `Bearer ${t}` },
+        headers: { authorization: `Bearer ${t}`, "idempotency-key": idempotencyKey },
         payload: body,
       })
     }
+
+    // Story 12.9g — a double click, a retried request, two admins at once.
+    describe("refunds issued twice", () => {
+      it("requires an idempotency key", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_idem_0")
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/admin/payments/orders/${orderId}/refunds`,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: { channel: "carte", amount: 10 },
+        })
+        expect(res.statusCode).toBe(400)
+        expect(res.json().error).toBe("IdempotencyKeyRequired")
+        expect(vi.mocked(createRefund)).not.toHaveBeenCalled()
+      })
+
+      it("answers a repeated key with the refund it already made", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_idem_1")
+        vi.mocked(createRefund).mockResolvedValue({ id: "re_idem_1", status: "succeeded" } as never)
+        const key = randomUUID()
+
+        const first = await refund(orderId, { channel: "carte", amount: 30 }, adminToken, key)
+        const again = await refund(orderId, { channel: "carte", amount: 30 }, adminToken, key)
+
+        expect(first.statusCode).toBe(201)
+        expect(again.statusCode).toBe(200)
+        expect(again.json().data.id).toBe(first.json().data.id)
+        expect(vi.mocked(createRefund)).toHaveBeenCalledTimes(1)
+        expect(vi.mocked(createRefund).mock.calls[0]?.[1]).toEqual({ idempotencyKey: `refund:${key}` })
+        expect(await db.select().from(refunds).where(eq(refunds.orderId, orderId))).toHaveLength(1)
+      })
+
+      it("issues concurrent refunds one at a time, so together they never exceed what is refundable", async () => {
+        const orderId = await seedPaidCardOrder(userId, "100.00", [CARD_ITEM], "pi_idem_2")
+        let counter = 0
+        vi.mocked(createRefund).mockImplementation(async () => {
+          counter += 1
+          // Long enough for the other request to plan its refund meanwhile, unless it waits.
+          await new Promise((resolve) => setTimeout(resolve, 50))
+          return { id: `re_idem_2_${counter}`, status: "succeeded" } as never
+        })
+
+        const responses = await Promise.all([
+          refund(orderId, { channel: "carte", amount: 80 }),
+          refund(orderId, { channel: "carte", amount: 80 }),
+        ])
+
+        expect(responses.map((res) => res.statusCode).sort()).toEqual([201, 400])
+        expect(vi.mocked(createRefund)).toHaveBeenCalledTimes(1)
+      })
+    })
 
     describe("card refunds (Stripe)", () => {
       it("refuses, before calling Stripe, an amount Henrri could not issue a credit note for", async () => {
@@ -1383,6 +1436,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         })
         expect(vi.mocked(createRefund)).toHaveBeenCalledWith(
           expect.objectContaining({ payment_intent: "pi_rf_p1", amount: 4000 }),
+          { idempotencyKey: expect.stringMatching(/^refund:/) },
         )
         const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
         expect(order.paymentStatus).toBe("partially_refunded")
@@ -1610,7 +1664,10 @@ describe("payments — Stripe card (Story 6.1)", () => {
         const res = await refund(orderId, { kind: "goods_return", channel: "carte", lines: [{ item: 1, qty: 1 }] })
         expect(res.statusCode).toBe(201)
         expect(res.json().data).toMatchObject({ amountTtc: "105.50", kind: "goods_return" })
-        expect(vi.mocked(createRefund)).toHaveBeenCalledWith(expect.objectContaining({ amount: 10550 }))
+        expect(vi.mocked(createRefund)).toHaveBeenCalledWith(
+          expect.objectContaining({ amount: 10550 }),
+          expect.anything(),
+        )
         const [row] = await db.select().from(refunds).where(eq(refunds.orderId, orderId))
         expect(row).toMatchObject({ kind: "goods_return", lines: [{ item: 1, qty: 1 }], includesShipping: false })
         expect(await creditNotesOf(orderId)).toEqual([expect.objectContaining({ expectedTotalTtc: "105.50" })])
