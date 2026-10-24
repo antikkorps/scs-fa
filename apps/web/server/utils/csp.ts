@@ -15,8 +15,10 @@ export function contentSecurityPolicy(nonce: string): string {
     // or was loaded by one that does ('strict-dynamic' — Nuxt's lazy chunks,
     // Stripe.js and Umami are all inserted by our own code). A host allowlist
     // alone can be bypassed through any script an allowed origin serves, so
-    // browsers that know 'strict-dynamic' ignore 'self', the Stripe origin and
-    // 'unsafe-inline'; those are only the fallback for browsers that do not.
+    // browsers that know 'strict-dynamic' ignore 'self' and the Stripe origin,
+    // which only serve browsers that do not. 'unsafe-inline' is dropped by any
+    // browser that knows nonces (CSP 2), 'strict-dynamic' or not: it only
+    // reaches browsers older than nonces.
     `script-src 'nonce-${nonce}' 'strict-dynamic' 'self' ${STRIPE_JS} 'unsafe-inline'`,
     // Styles keep 'unsafe-inline': Nuxt inlines component CSS into <style>
     // blocks of the SSR document, and Vue `:style` bindings render `style`

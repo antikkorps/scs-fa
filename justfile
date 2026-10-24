@@ -20,6 +20,14 @@ default:
 deploy:
     {{ compose }} up -d --build
 
+# Create or update the least-privilege database roles (story 12.9f); safe to re-run
+db-roles:
+    {{ compose }} --profile db-roles run --rm db-roles
+
+# Check infra/postgres/roles.sql against a throwaway Postgres (needs Docker; dev machine)
+check-db-roles:
+    ./infra/postgres/check-roles.sh
+
 # Apply the DB schema (profile-gated migrate service)
 migrate:
     {{ compose }} --profile migrate run --rm migrate
@@ -67,18 +75,33 @@ restart service="caddy":
 psql:
     {{ compose }} exec postgres psql -U ${POSTGRES_USER:-armurier} -d ${POSTGRES_DB:-armurier_prod}
 
-# On-demand backup (same path the cron uses) → off-site S3
+# On-demand backup (same path the cron uses): the encrypted dump, then the objects
 backup:
     {{ compose }} run --rm backup backup.sh
+    {{ compose }} run --rm backup backup-objects.sh
 
-# List the dumps currently in the backup bucket
+# Check the backup image end to end: dump, restore, objects (needs Docker; dev machine)
+check-backup:
+    ./infra/backup/check-backup.sh
+
+# List the encrypted dumps currently in the bucket
 backups:
     {{ compose }} run --rm backup sh -c 'aws --endpoint-url "$S3_ENDPOINT" --region "$S3_REGION" s3 ls "s3://$S3_BUCKET/$BACKUP_S3_PREFIX/"'
 
-# Restore a dump — DESTRUCTIVE (pg_restore --clean). Latest by default, or `just restore <dump>`.
-restore dump="":
+# Runs as the schema owner, since the backup role may not write; the age private
+# key is kept off the server and only mounted for the run.
+# Restore a dump — DESTRUCTIVE. `just restore <age key file> [dump]`, latest by default
+restore key dump="":
     #!/usr/bin/env bash
     set -euo pipefail
+    [ -r "{{ key }}" ] || { echo "No readable age private key at {{ key }}"; exit 1; }
     read -rp "⚠️  This OVERWRITES the current database. Type 'yes' to continue: " ok
     [ "$ok" = "yes" ] || { echo "Aborted."; exit 1; }
-    {{ compose }} run --rm backup restore.sh {{ dump }}
+    {{ compose }} run --rm -e PGUSER=scs_owner -e PGPASSWORD="$DB_OWNER_PASSWORD" \
+      -v "$(realpath "{{ key }}"):/run/age-identity:ro" backup restore.sh {{ dump }}
+
+# Adds and overwrites, never deletes. With a day, restores what that day's run
+# saw deleted or overwritten.
+# Copy backed-up objects back into the bucket: `just restore-objects [YYYY-MM-DD]`
+restore-objects day="":
+    {{ compose }} run --rm backup restore-objects.sh {{ day }}

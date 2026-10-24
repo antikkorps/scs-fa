@@ -17,7 +17,7 @@ internet ──443──▶ caddy ──/api/*, /health──▶ api:8080
 > go-live steps are runnable, not copy-pasted. Install with `brew install just`
 > (or your distro package), then run `just` from the repo root to list them:
 > `just deploy` · `just migrate` · `just seed` · `just update` · `just logs api` ·
-> `just ps` · `just psql` · `just backup` · `just restore [dump]`. They complement
+> `just ps` · `just psql` · `just db-roles` · `just backup` · `just restore <key> [dump]`. They complement
 > the pnpm scripts (dev/build/test stay in `package.json`).
 
 ## 1. Provision the server
@@ -62,8 +62,10 @@ git checkout main
 
 cp .env.prod.example .env
 nano .env            # fill EVERY secret; set DOMAIN + ACME_EMAIL
+                     # BACKUP_AGE_RECIPIENT: § 6 (the key pair is made off the server)
 
-# First-time schema push (creates all tables from schema.ts).
+# Least-privilege database roles (§ Database roles below), then the schema.
+docker compose -f docker-compose.prod.yml --profile db-roles run --rm db-roles
 docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
 
 # Build + start the stack.
@@ -82,6 +84,27 @@ docker compose -f docker-compose.prod.yml ps          # all healthy
 curl -fsS https://www.<DOMAIN>/health                  # API behind Caddy → ok
 curl -fsSI https://<DOMAIN> | grep -i location         # apex 301 → www
 ```
+
+### Database roles
+
+The Postgres superuser (`POSTGRES_USER`) is for administration only (story
+12.9f, `infra/postgres/roles.sql`). Each service has its own role:
+
+| Role | Used by | May |
+|---|---|---|
+| `scs_owner` | `migrate` (and `just restore`) | own the schema: DDL |
+| `scs_app` | the API | read and write rows; no DDL, no `TRUNCATE`, nothing in the `drizzle` schema |
+| `scs_backup` | the `backup` service | read everything (`pg_read_all_data`), write nothing |
+
+No other role (Umami's included) may connect to the shop's database. In
+production the API **refuses to start** as a superuser, a table owner or a role
+that may create objects: point `DATABASE_URL` at `scs_app` (compose does).
+
+`just db-roles` creates the roles and (re)applies their passwords and grants;
+re-run it after changing a `DB_*_PASSWORD`, then restart the services that use
+it. It is safe to re-run, and hands objects the superuser created earlier over
+to `scs_owner`. `just check-db-roles` (dev machine, Docker) checks the script
+against a throwaway Postgres with the real migrations.
 
 > Tip: while DNS/setup is in flux, uncomment `acme_ca …staging…` in the
 > `Caddyfile` to use Let's Encrypt **staging** and avoid hitting prod rate
@@ -153,33 +176,69 @@ matches regardless of case.
 
 ## 6. Backups (automated)
 
-The `backup` service runs `pg_dump` on a cron schedule (default **03:00 UTC
-daily**) and uploads a compressed custom-format dump to S3 — off-site, separate
-from the VM. It reuses the app's `S3_*` credentials and keeps the newest
-`BACKUP_RETENTION_COUNT` dumps (default 14), pruning older ones. Tunables live in
-`.env` (`BACKUP_CRON`, `BACKUP_RETENTION_COUNT`, `BACKUP_S3_PREFIX`, optional
-`BACKUP_S3_BUCKET`). It starts with the stack — no extra step.
+The `backup` service runs two daily jobs (story 8.4, hardened in 12.9f). Both
+write under `backups/` in the app's bucket (`BACKUP_S3_BUCKET` moves them to
+another one):
+
+- **03:00 UTC — database.** `pg_dump` as `scs_backup`, piped into
+  [age](https://age-encryption.org) and uploaded as
+  `backups/postgres/<db>_<timestamp>.dump.age`. The newest
+  `BACKUP_RETENTION_COUNT` dumps (default 14) are kept.
+- **03:15 UTC — objects** (identity documents, images). `rclone sync`
+  copies the bucket, encrypted (names and content), into
+  `backups/objects/current/`. What a run sees deleted or overwritten moves to
+  `backups/objects/deleted/<YYYY-MM-DD>/`, kept `BACKUP_OBJECTS_RETENTION_DAYS`
+  (default 30): an object purged from the shop leaves the backups that long
+  after (privacy register, § Sauvegardes).
+
+**Same bucket, same keys (Franck's choice, 2026-10-24).** The backups share the
+app's bucket and credentials: whoever holds the server's S3 keys can **delete**
+the backups along with the data. The encryption keeps them unreadable, not safe
+from deletion. Moving them later is one variable (`BACKUP_S3_BUCKET`) plus a
+second bucket and key without delete rights, with a lifecycle rule for expiry.
+
+### Keys — made once, kept off the server
 
 ```bash
-# On-demand backup (same path the cron uses)
-docker compose -f docker-compose.prod.yml run --rm backup backup.sh
-
-# List dumps in the bucket
-docker compose -f docker-compose.prod.yml run --rm backup \
-  sh -c 'aws --endpoint-url "$S3_ENDPOINT" --region "$S3_REGION" s3 ls "s3://$S3_BUCKET/$BACKUP_S3_PREFIX/"'
-
-# Restore — latest, or a named dump. DESTRUCTIVE (pg_restore --clean).
-docker compose -f docker-compose.prod.yml run --rm backup restore.sh
-docker compose -f docker-compose.prod.yml run --rm backup restore.sh armurier_prod_20260617T030000Z.dump
+# On your own machine, not the server:
+age-keygen -o scs-backup-identity.txt     # prints "Public key: age1…"
 ```
 
-Verify scheduling and the last run in the logs: `docker compose -f
-docker-compose.prod.yml logs -f backup`. **Test a restore periodically** — a
-backup you've never restored is a hypothesis, not a backup.
+- `BACKUP_AGE_RECIPIENT` in `.env` = the **public** key (`age1…`).
+- The **identity file** (private key) goes in the password manager / a vault,
+  with a second copy held by the client. Never on the server: a compromised
+  server then cannot read the dumps it wrote. **Lose it, and the dumps are
+  unreadable.**
+- `BACKUP_OBJECTS_PASSWORD` (`openssl rand -hex 32`) encrypts the object copy.
+  It must be on the server, but keep a copy next to the identity file: a lost
+  server takes `.env` with it.
 
-> The dump contains customer PII. The bucket should be private with scoped
-> credentials; consider enabling object-lock/versioning and, for extra
-> defence-in-depth, at-rest encryption (e.g. SSE) on the backup bucket.
+### Operations
+
+```bash
+just backup                        # both jobs now (the cron's path)
+just backups                       # list the encrypted dumps
+
+# Restore the database — DESTRUCTIVE (pg_restore --clean). Copy the identity
+# file to the server for the run only, then delete it.
+just restore ~/scs-backup-identity.txt                                   # latest
+just restore ~/scs-backup-identity.txt armurier_prod_20261024T030000Z.dump.age
+shred -u ~/scs-backup-identity.txt
+
+# Restore objects (adds and overwrites, never deletes)
+just restore-objects               # the latest copy
+just restore-objects 2026-10-24    # what that day's run saw deleted or overwritten
+```
+
+`just restore` runs as `scs_owner` (the backup role may not write); the
+restored tables are owned by it and `scs_app` gets its grants back through the
+default privileges.
+
+Verify scheduling and the last runs in the logs: `docker compose -f
+docker-compose.prod.yml logs -f backup`. **Test a restore periodically** — a
+backup you've never restored is a hypothesis, not a backup. On a dev machine,
+`just check-backup` runs the whole cycle (dump, restore, objects, retention)
+against a throwaway Postgres and S3.
 
 ## 7. Migration OVH → Hetzner + Cloudflare (go-live)
 
@@ -222,8 +281,11 @@ below is the recommended path.
 - [ ] **Henrri production** API key in `.env` (`HENRRI_BASE_URL=https://api.henrri.io`,
       `HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`) → `pnpm henrri:check` green. See the
       Henrri section below.
-- [ ] Backups verified: on-demand `backup.sh` produces a dump **and** a
-      `restore.sh` round-trip works (a backup you've never restored is a hypothesis).
+- [ ] Backups verified: `just backup` produces an encrypted dump and the object
+      copy, **and** a `just restore` round-trip works with the identity file
+      fetched from where it is kept (a backup you've never restored is a hypothesis).
+- [ ] age identity file and `BACKUP_OBJECTS_PASSWORD` stored off the server, with
+      a second copy held by the client (§ 6 Keys).
 - [ ] Content parity check with the old OVH site (products, artworks, legal pages).
 - [ ] `smtp` deliverability from the VM IP (or relay) confirmed — regulated-domain
       mail is easily flagged as spam.
@@ -273,7 +335,9 @@ below is the recommended path.
 
 ### Security hardening at go-live (currently deferred — see BACKLOG Phase 8.6)
 
-- [ ] **Least-privilege S3 key** scoped to the backup bucket (not the app's key).
+- [ ] **Least-privilege S3 key** scoped to a separate backup bucket (not the app's
+      key). Declined for now (Franck, 2026-10-24: backups stay in the app's bucket,
+      encrypted; § 6) — revisit if the client agrees to a second bucket.
 - [x] **Migration baseline** (Drizzle) instead of `push --force` — done 2026-09-06. `just migrate` now runs `drizzle-kit migrate`, applying the committed `apps/api/drizzle/*.sql` in order and recording them, so re-running is a no-op and the deployed schema is always a known revision.
 - [ ] **CSP nonces** to drop `'unsafe-inline'` on script/style (Caddyfile CSP).
 - [ ] **Secret rotation** post-launch (initial secrets were shared during setup).

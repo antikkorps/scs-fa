@@ -4,6 +4,7 @@
 # everything else → web:3000 (see Caddyfile) — one public origin, no browser CORS.
 #
 # Setup:  cp .env.prod.example .env  &&  edit .env  (secrets + DOMAIN + ACME_EMAIL)
+# Roles:  docker compose -f docker-compose.prod.yml --profile db-roles run --rm db-roles
 # Schema: docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
 # Up:     docker compose -f docker-compose.prod.yml up -d --build
 # Seed:   docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/db/seed-cli.ts
@@ -44,6 +45,38 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
+  # Least-privilege database roles (story 12.9f, infra/postgres/roles.sql):
+  # scs_owner (migrations), scs_app (API), scs_backup (pg_dump). Run once
+  # before the first migration, then after any role password change:
+  # `just db-roles`. Re-running it is safe. Connects as the superuser, which
+  # nothing else uses.
+  db-roles:
+    logging: *logging
+    image: postgres:18-alpine
+    profiles: ["db-roles"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-armurier}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-armurier_prod}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD in .env}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}
+      DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:?set DB_BACKUP_PASSWORD in .env}
+    volumes:
+      - ./infra/postgres/roles.sql:/roles.sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # $$ keeps the variables for the container's shell, not compose.
+    command:
+      - sh
+      - -c
+      - >-
+        psql -q -v db="$$PGDATABASE" -v owner_password="$$DB_OWNER_PASSWORD"
+        -v app_password="$$DB_APP_PASSWORD" -v backup_password="$$DB_BACKUP_PASSWORD"
+        -f /roles.sql
+    networks: [internal]
+
   # One-off schema migration (drizzle-kit lives in dev deps → use the build
   # stage, which has the full workspace and the `drizzle/` migration files).
   # Gated behind the `migrate` profile so it never runs on a normal `up`.
@@ -58,7 +91,8 @@ services:
       target: build
     profiles: ["migrate"]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-armurier}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-armurier_prod}
+      # The schema owner, the only role allowed DDL (story 12.9f).
+      DATABASE_URL: postgresql://scs_owner:${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-armurier_prod}
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,7 +113,8 @@ services:
       NODE_ENV: production
       API_HOST: 0.0.0.0
       API_PORT: 8080
-      DATABASE_URL: postgresql://${POSTGRES_USER:-armurier}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-armurier_prod}
+      # Rows only, no DDL (story 12.9f); the API refuses to start as a stronger role.
+      DATABASE_URL: postgresql://scs_app:${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-armurier_prod}
       # Antivirus on uploaded legal docs (Story 8.6) — scan via the clamd sidecar.
       CLAMAV_ENABLED: "true"
       CLAMAV_HOST: clamav
@@ -171,10 +206,11 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [internal]
 
-  # Automated logical backups: pg_dump on a cron schedule → S3 (off-site), with
-  # rotation. Reuses the app's S3 credentials. On-demand:
-  #   docker compose -f docker-compose.prod.yml run --rm backup backup.sh
-  #   docker compose -f docker-compose.prod.yml run --rm backup restore.sh [file]
+  # Automated backups (story 8.4, hardened in 12.9f): a daily pg_dump, encrypted
+  # to an age public key (the server cannot read it back), and a daily
+  # encrypted copy of the app's S3 objects; both under backups/ in the app's
+  # bucket. On-demand and restore: `just backup`, `just restore`,
+  # `just restore-objects` (docs/DEPLOY.md § Backups).
   backup:
     logging: *logging
     build:
@@ -183,9 +219,12 @@ services:
     restart: unless-stopped
     environment:
       PGHOST: postgres
-      PGUSER: ${POSTGRES_USER:-armurier}
-      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Reads everything, writes nothing (story 12.9f).
+      PGUSER: scs_backup
+      PGPASSWORD: ${DB_BACKUP_PASSWORD:?set DB_BACKUP_PASSWORD in .env}
       PGDATABASE: ${POSTGRES_DB:-armurier_prod}
+      # The Umami purge deletes as Umami's own role.
+      UMAMI_PGPASSWORD: ${UMAMI_DB_PASSWORD}
       # aws-cli reads the standard AWS_* names; map the app's S3_* secrets.
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
@@ -196,6 +235,14 @@ services:
       BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-backups/postgres}
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
       RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
+      # Public key only: the private one is kept off the server (story 12.9f).
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?set BACKUP_AGE_RECIPIENT in .env}
+      # Objects: the app's bucket → backups/objects/, encrypted with this passphrase.
+      APP_S3_BUCKET: ${S3_BUCKET}
+      BACKUP_OBJECTS_PASSWORD: ${BACKUP_OBJECTS_PASSWORD:?set BACKUP_OBJECTS_PASSWORD in .env}
+      BACKUP_OBJECTS_PREFIX: ${BACKUP_OBJECTS_PREFIX:-backups/objects}
+      BACKUP_OBJECTS_CRON: ${BACKUP_OBJECTS_CRON:-15 3 * * *}
+      BACKUP_OBJECTS_RETENTION_DAYS: ${BACKUP_OBJECTS_RETENTION_DAYS:-30}
       # Audience data older than 25 months is deleted daily (privacy policy).
       UMAMI_PURGE_CRON: ${UMAMI_PURGE_CRON:-30 3 * * *}
     depends_on:
