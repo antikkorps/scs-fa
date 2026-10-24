@@ -233,15 +233,24 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
       expect(await db.select().from(organisations).where(eq(organisations.siret, siret))).toHaveLength(0)
     })
 
-    it("refuses a SIRET another open organisation holds, not one that was refused", async () => {
+    // Story 12.9g — a first claimant must not lock the real company out: only a
+    // validated organisation (approved, or suspended) holds its SIRET.
+    it("lets pending requests share a SIRET, and refuses only one a validated organisation holds", async () => {
       const siret = newSiret()
       const first = await signup(signupPayload(siret))
-      expect((await signup(signupPayload(siret))).json().error).toBe("SiretAlreadyRegistered")
+      const second = await signup(signupPayload(siret))
+      expect([first.statusCode, second.statusCode]).toEqual([201, 201])
 
-      await db
-        .update(organisations)
-        .set({ status: "rejected" })
-        .where(eq(organisations.id, first.json().data.organisation.id))
+      const firstId = first.json().data.organisation.id
+      await db.update(organisations).set({ status: "approved" }).where(eq(organisations.id, firstId))
+      const refused = await signup(signupPayload(siret))
+      expect(refused.statusCode).toBe(409)
+      expect(refused.json().error).toBe("SiretAlreadyRegistered")
+
+      await db.update(organisations).set({ status: "suspended" }).where(eq(organisations.id, firstId))
+      expect((await signup(signupPayload(siret))).statusCode).toBe(409)
+
+      await db.update(organisations).set({ status: "rejected" }).where(eq(organisations.id, firstId))
       expect((await signup(signupPayload(siret))).statusCode).toBe(201)
     })
   })

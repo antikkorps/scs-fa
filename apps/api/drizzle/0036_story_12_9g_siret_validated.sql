@@ -1,0 +1,2 @@
+DROP INDEX "uq_organisations_siret_open";--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_organisations_siret_validated" ON "organisations" USING btree ("siret") WHERE "organisations"."status" in ('approved', 'suspended');

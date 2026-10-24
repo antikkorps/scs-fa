@@ -262,6 +262,9 @@ services:
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN in .env}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      # The lock in front of the Umami dashboard (story 12.9g).
+      UMAMI_BASIC_AUTH_USER: ${UMAMI_BASIC_AUTH_USER:?set UMAMI_BASIC_AUTH_USER in .env}
+      UMAMI_BASIC_AUTH_HASH: ${UMAMI_BASIC_AUTH_HASH:?set UMAMI_BASIC_AUTH_HASH in .env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data # certificates + ACME account — must persist

@@ -9,6 +9,8 @@ vi.mock("./audit/record.js", () => ({ recordAuditEvent: vi.fn().mockResolvedValu
 const {
   sendInvoiceAvailableEmail,
   sendLoginCodeEmail,
+  sendNewsletterConfirmationEmail,
+  sendPasswordResetEmail,
   sendOrderConfirmationEmail,
   sendTransferReminderEmail,
   sendUnpaidOrderCancelledEmail,
@@ -42,6 +44,8 @@ async function send(overrides: Partial<typeof base> = {}) {
   const mail = sendMail.mock.calls[0]?.[0] as { to: string; subject: string; text: string; html: string }
   return mail
 }
+
+const sent = () => sendMail.mock.calls[0]?.[0] as { subject: string; text: string; html: string }
 
 beforeEach(() => {
   sendMail.mockReset().mockResolvedValue(undefined)
@@ -134,8 +138,6 @@ describe("sendLoginCodeEmail (story 12.8a)", () => {
 })
 
 describe("unpaid order e-mails (story 12.9a)", () => {
-  const sent = () => sendMail.mock.calls[0]?.[0] as { subject: string; text: string; html: string }
-
   it("reminds the transfer: amount, reference, deadline, where the bank details are", async () => {
     await sendTransferReminderEmail("jean@example.fr", {
       orderId: base.orderId,
@@ -164,5 +166,31 @@ describe("unpaid order e-mails (story 12.9a)", () => {
     expect(mail.subject).toBe("Commande 0B7D1F3E annulée")
     expect(mail.text).toContain("Bonjour,")
     expect(mail.text).toContain("Aucune somme ne vous a été prélevée")
+  })
+})
+
+// Story 12.9g — single-use tokens travel in the URL fragment, which no server,
+// proxy or audience measurement sees. Unsubscribing keeps its query token: the
+// mailbox's one-click unsubscribe posts to that very URL.
+describe("link tokens", () => {
+  const TOKEN = "t".repeat(43)
+
+  it("puts the reset token in the link's fragment", async () => {
+    await sendPasswordResetEmail("jean@example.fr", TOKEN)
+    const mail = sent()
+    expect(mail.text).toContain(`/reset-password#token=${TOKEN}`)
+    expect(mail.text).not.toContain("?token=")
+  })
+
+  it("puts the confirmation token in the fragment, the unsubscribe token in the query", async () => {
+    await sendNewsletterConfirmationEmail("jean@example.fr", {
+      confirmToken: TOKEN,
+      unsubscribeToken: "u".repeat(43),
+      segmentLabels: ["Armurerie"],
+    })
+    const mail = sent()
+    expect(mail.text).toContain(`/newsletter/confirmation#token=${TOKEN}`)
+    expect(mail.text).not.toContain(`?token=${TOKEN}`)
+    expect(mail.text).toContain(`/newsletter/desabonnement?token=${"u".repeat(43)}`)
   })
 })

@@ -1,7 +1,7 @@
 // Story 12.8b — opening a pro request, whether from the signup form or from a
 // customer's account: one organisation, pending, with what the registry said.
 import type { OrganisationRequestInput } from "@armurier/shared"
-import { eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 import type { DbExecutor } from "../artworks/reservation.js"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
@@ -15,6 +15,21 @@ export function registryVerdict(lookup: RegistryLookup) {
   return {
     registryCheck: lookup.establishment.active ? ("verified" as const) : ("inactive" as const),
     registrySnapshot: lookup.establishment,
+  }
+}
+
+/**
+ * Story 12.9g — only a validated organisation (approved, or suspended) holds
+ * its SIRET: requests under review may share one, so a first claimant cannot
+ * lock the real company out. The unique index enforces it on approval.
+ */
+export const SIRET_HELD_INDEX = "uq_organisations_siret_validated"
+const SIRET_HOLDING_STATUSES = ["approved", "suspended"] as const
+
+/** A new request for a SIRET a validated organisation already holds. */
+export class SiretHeldError extends Error {
+  constructor() {
+    super("This SIRET already belongs to a validated organisation")
   }
 }
 
@@ -42,6 +57,13 @@ export async function openOrganisation(
   lookup: RegistryLookup,
   context: RequestContext,
 ) {
+  const [holder] = await tx
+    .select({ id: organisations.id })
+    .from(organisations)
+    .where(and(eq(organisations.siret, input.siret), inArray(organisations.status, SIRET_HOLDING_STATUSES)))
+    .limit(1)
+  if (holder) throw new SiretHeldError()
+
   const verdict = registryVerdict(lookup)
   const [organisation] = await tx
     .insert(organisations)

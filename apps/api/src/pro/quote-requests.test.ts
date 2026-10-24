@@ -6,6 +6,7 @@ import { db } from "../db/client.js"
 import { auditLogs, products, quoteBasketItems, quoteRequestItems, quoteRequests } from "../db/schema.js"
 import { sendQuoteRequestAlertEmail, sendQuoteRequestReceivedEmail } from "../email.js"
 import { type Account, type FixtureProduct, proFixtures } from "../test/pro-fixtures.js"
+import { QUOTE_REQUESTS_PER_HOUR } from "./quote-requests.js"
 
 vi.mock("../email.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../email.js")>()),
@@ -134,6 +135,29 @@ describe("quote requests, the pro's side (story 12.8c)", () => {
       await fill([[product.vest, 1]])
       const second = (await submit()).json().data.number
       expect(second).not.toBe(first)
+    })
+
+    // Story 12.9g — each request mails every admin: a pro account cannot flood them.
+    it("refuses a request past the organisation's hourly cap, mailing no one", async () => {
+      const busy = await fixtures.account({ organisation: "approved" })
+      const { organisationId } = busy
+      if (!organisationId) throw new Error("fixture account without an organisation")
+      await db.insert(quoteRequests).values(
+        Array.from({ length: QUOTE_REQUESTS_PER_HOUR }, (_, index) => ({
+          number: `CAP-${Date.now() % 1_000_000}-${index}`,
+          organisationId,
+          requestedBy: busy.id,
+        })),
+      )
+      await fill([[product.vest, 1]], busy)
+
+      const res = await submit({}, busy.token)
+
+      expect(res.statusCode).toBe(429)
+      expect(res.json().error).toBe("TooManyQuoteRequests")
+      expect(sendQuoteRequestAlertEmail).not.toHaveBeenCalled()
+      // The basket is kept for later.
+      expect(await db.select().from(quoteBasketItems).where(eq(quoteBasketItems.userId, busy.id))).toHaveLength(1)
     })
 
     it("refuses an empty basket", async () => {

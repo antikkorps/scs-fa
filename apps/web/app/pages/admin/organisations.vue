@@ -79,8 +79,14 @@ function close() {
   selected.value = null
 }
 
+// The API's own codes the back-office explains in French (story 12.9g).
+const ERROR_MESSAGES: Record<string, string> = {
+  SiretAlreadyApproved: "Une autre organisation avec ce SIRET est déjà validée : voir la liste sous le SIRET.",
+}
+
 function errorMessage(err: unknown, fallback: string): string {
-  return (err as { data?: { message?: string } })?.data?.message ?? fallback
+  const data = (err as { data?: { error?: string; message?: string } })?.data
+  return (data?.error && ERROR_MESSAGES[data.error]) || data?.message || fallback
 }
 
 const termsBody = () => ({
@@ -212,6 +218,14 @@ const memberName = (row: AdminOrganisationRow) =>
                 target="_blank"
                 rel="noopener noreferrer"
               >{{ selected.siret }} ↗</a>
+            </dd>
+          </div>
+          <div v-if="selected.sameSiret.length > 0" class="same-siret" role="note">
+            <dt>Même SIRET</dt>
+            <dd>
+              <span v-for="other in selected.sameSiret" :key="other.id" class="same-siret__item">
+                {{ other.legalName }} — {{ organisationStatus(other.status).label }}, {{ formatDateTime(other.createdAt) }}
+              </span>
             </dd>
           </div>
           <div><dt>Contact</dt><dd>{{ memberName(selected) }}<br /><span class="sub">{{ selected.member?.email }}</span></dd></div>
@@ -413,6 +427,12 @@ const memberName = (row: AdminOrganisationRow) =>
 }
 .meta a {
   color: var(--brass);
+}
+.same-siret dt {
+  color: var(--danger);
+}
+.same-siret__item {
+  display: block;
 }
 .block {
   margin: 1.4rem 0;

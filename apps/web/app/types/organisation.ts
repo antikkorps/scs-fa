@@ -55,4 +55,13 @@ export interface AdminOrganisationDetail extends AdminOrganisationRow {
   net30Allowed: boolean
   showPrices: boolean
   updatedAt: string
+  /** Other organisations claiming the same SIRET (story 12.9g), oldest first. */
+  sameSiret: SameSiretOrganisation[]
+}
+
+export interface SameSiretOrganisation {
+  id: string
+  legalName: string
+  status: OrganisationStatus
+  createdAt: string
 }

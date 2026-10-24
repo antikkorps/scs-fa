@@ -8,24 +8,25 @@ useHead({ title: "Confirmation d'inscription — SCS Firearms" })
 // A confirmation link is single-use and personal: it has nothing to do in an index.
 useSeoMeta({ robots: "noindex, nofollow" })
 
-const route = useRoute()
 const api = useApi()
 
 const state = ref<"loading" | "confirmed" | "invalid">("loading")
 const segments = ref<NewsletterSegment[]>([])
 const unsubscribeToken = ref("")
 
-const token = typeof route.query.token === "string" ? route.query.token : ""
+// From the link's fragment (story 12.9g); read by the composable's own
+// onMounted, which runs before this one.
+const token = useLinkToken()
 
 onMounted(async () => {
-  if (!token) {
+  if (!token.value) {
     state.value = "invalid"
     return
   }
   try {
     const res = await api<{ data: { segments: NewsletterSegment[]; unsubscribeToken: string } }>(
       "/newsletter/confirm",
-      { method: "POST", body: { token } },
+      { method: "POST", body: { token: token.value } },
     )
     segments.value = res.data.segments
     unsubscribeToken.value = res.data.unsubscribeToken

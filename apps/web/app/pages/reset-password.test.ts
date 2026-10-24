@@ -10,7 +10,8 @@ const { resetPassword } = vi.hoisted(() => ({ resetPassword: vi.fn() }))
 mockNuxtImport("useAuth", () => () => ({ resetPassword }))
 
 const TOKEN = "a".repeat(32)
-const withToken = { route: `/reset-password?token=${TOKEN}` }
+// Story 12.9g — the mailed link carries its token in the fragment.
+const withToken = { route: `/reset-password#token=${TOKEN}` }
 
 beforeEach(() => {
   resetPassword.mockReset()
@@ -27,6 +28,17 @@ describe("reset-password.vue", () => {
     const wrapper = await mountSuspended(ResetPassword, { route: "/reset-password" })
     expect(wrapper.text()).toContain("Lien invalide")
     expect(wrapper.find('input[type="password"]').exists()).toBe(false)
+  })
+
+  it("ignores a token in the query string", async () => {
+    const wrapper = await mountSuspended(ResetPassword, { route: `/reset-password?token=${TOKEN}` })
+    expect(wrapper.text()).toContain("Lien invalide")
+  })
+
+  it("takes the token out of the address bar once read", async () => {
+    await mountSuspended(ResetPassword, withToken)
+    await flushPromises()
+    expect(window.location.hash).not.toContain(TOKEN)
   })
 
   it("blocks submit when the two passwords differ", async () => {

@@ -23,6 +23,12 @@ const STATUSES: Record<OrganisationStatus, StatusMeta> = {
   suspended: { label: "Suspendu", severity: "bad" },
 }
 
+/**
+ * A new request for a SIRET that a validated pro account already holds (story
+ * 12.9g: requests under review may share one; SCS validates a single one).
+ */
+export const SIRET_TAKEN_MESSAGE = "Ce SIRET appartient déjà à un compte professionnel validé."
+
 export type RegistryCheck = "verified" | "inactive" | "not_found" | "unavailable"
 
 const REGISTRY_CHECKS: Record<RegistryCheck, StatusMeta> = {

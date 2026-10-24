@@ -253,6 +253,13 @@
       "when": 1792786024048,
       "tag": "0035_story_12_9f_refresh_successor",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792865859965,
+      "tag": "0036_story_12_9g_siret_validated",
+      "breakpoints": true
     }
   ]
 }

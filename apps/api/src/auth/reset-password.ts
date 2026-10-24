@@ -1,12 +1,19 @@
 import { resetPasswordSchema } from "@armurier/shared"
 import { verify } from "@node-rs/argon2"
 import { and, eq, gt, isNull } from "drizzle-orm"
-import type { FastifyPluginAsync } from "fastify"
+import type { FastifyPluginAsync, FastifyReply } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { passwordResetTokens, refreshTokens, users } from "../db/schema.js"
+import { loginChallenges, passwordResetTokens, refreshTokens, users } from "../db/schema.js"
 import { hashPassword } from "./password.js"
 import { hashRefreshToken } from "./tokens.js"
+
+function sendInvalidLink(reply: FastifyReply) {
+  return reply.code(400).send({
+    error: "InvalidOrExpiredToken",
+    message: "This reset link is invalid or has expired.",
+  })
+}
 
 export const resetPasswordRoute: FastifyPluginAsync = async (fastify) => {
   fastify.post(
@@ -44,10 +51,7 @@ export const resetPasswordRoute: FastifyPluginAsync = async (fastify) => {
         .limit(1)
 
       if (!resetToken) {
-        return reply.code(400).send({
-          error: "InvalidOrExpiredToken",
-          message: "This reset link is invalid or has expired.",
-        })
+        return sendInvalidLink(reply)
       }
 
       const [existing] = await db
@@ -67,12 +71,41 @@ export const resetPasswordRoute: FastifyPluginAsync = async (fastify) => {
 
       const passwordHash = await hashPassword(password)
 
-      await db.update(users).set({ passwordHash }).where(eq(users.id, resetToken.userId))
+      // Story 12.9g — one transaction, and the link is claimed by a conditional
+      // update: of concurrent requests with the same link, one resets the
+      // password and the others find it spent. The reset then ends everything
+      // the old password could still lead to: the account's other reset links,
+      // its pending login codes, and every session.
+      const claimed = await db.transaction(async (tx) => {
+        const [claim] = await tx
+          .update(passwordResetTokens)
+          .set({ usedAt: new Date() })
+          .where(
+            and(
+              eq(passwordResetTokens.id, resetToken.id),
+              isNull(passwordResetTokens.usedAt),
+              gt(passwordResetTokens.expiresAt, new Date()),
+            ),
+          )
+          .returning({ id: passwordResetTokens.id })
+        if (!claim) return false
 
-      await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, resetToken.id))
+        await tx.update(users).set({ passwordHash }).where(eq(users.id, resetToken.userId))
+        await tx
+          .update(passwordResetTokens)
+          .set({ usedAt: new Date() })
+          .where(and(eq(passwordResetTokens.userId, resetToken.userId), isNull(passwordResetTokens.usedAt)))
+        await tx
+          .update(loginChallenges)
+          .set({ consumedAt: new Date() })
+          .where(and(eq(loginChallenges.userId, resetToken.userId), isNull(loginChallenges.consumedAt)))
+        await tx.delete(refreshTokens).where(eq(refreshTokens.userId, resetToken.userId))
+        return true
+      })
 
-      // Revoke all refresh tokens to force re-login on all devices
-      await db.delete(refreshTokens).where(eq(refreshTokens.userId, resetToken.userId))
+      if (!claimed) {
+        return sendInvalidLink(reply)
+      }
 
       const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, resetToken.userId)).limit(1)
 

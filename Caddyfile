@@ -76,6 +76,12 @@ www.{$DOMAIN} {
 # stats.DOMAIN (proxied through Cloudflare like www).
 stats.{$DOMAIN} {
 	encode zstd gzip
+	# A first lock in front of Umami's login (story 12.9g): a fresh install
+	# answers admin / umami until someone changes it. The tracker is not
+	# concerned, it goes through www (/_a/ above).
+	basic_auth {
+		{$UMAMI_BASIC_AUTH_USER} {$UMAMI_BASIC_AUTH_HASH}
+	}
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"

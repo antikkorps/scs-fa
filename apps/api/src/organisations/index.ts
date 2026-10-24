@@ -18,12 +18,17 @@ import { isUniqueViolation } from "../db/errors.js"
 import { organisations, refreshTokens, users } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { lookUpEstablishment } from "./registry.js"
-import { announceOrganisationRequest, MEMBER_ORGANISATION_COLUMNS, openOrganisation } from "./service.js"
+import {
+  announceOrganisationRequest,
+  MEMBER_ORGANISATION_COLUMNS,
+  openOrganisation,
+  SiretHeldError,
+} from "./service.js"
 
 const EMAIL_TAKEN = { error: "EmailAlreadyRegistered", message: "An account with this email already exists" }
 const SIRET_TAKEN = {
   error: "SiretAlreadyRegistered",
-  message: "This SIRET already belongs to a pro account, or a request for it is under review",
+  message: "This SIRET already belongs to a validated pro account",
 }
 const ALREADY_MEMBER = { error: "AlreadyInOrganisation", message: "This account already belongs to an organisation" }
 const NO_ORGANISATION = { error: "NotFound", message: "This account belongs to no organisation" }
@@ -102,7 +107,7 @@ export const organisationRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(201).send({ data: { ...user, organisation } })
     } catch (err) {
       if (isUniqueViolation(err, "users_email_unique")) return reply.code(409).send(EMAIL_TAKEN)
-      if (isUniqueViolation(err, "uq_organisations_siret_open")) return reply.code(409).send(SIRET_TAKEN)
+      if (err instanceof SiretHeldError) return reply.code(409).send(SIRET_TAKEN)
       throw err
     }
   })
@@ -166,7 +171,7 @@ export const organisationRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(201).send({ data: organisation })
       } catch (err) {
         if (err instanceof AlreadyMemberError) return reply.code(409).send(ALREADY_MEMBER)
-        if (isUniqueViolation(err, "uq_organisations_siret_open")) return reply.code(409).send(SIRET_TAKEN)
+        if (err instanceof SiretHeldError) return reply.code(409).send(SIRET_TAKEN)
         throw err
       }
     },

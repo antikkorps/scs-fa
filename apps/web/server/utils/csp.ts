@@ -64,3 +64,30 @@ export function withScriptNonce(fragments: unknown[], nonce: string): string[] {
         .replace(SCRIPT_LINK, `<link nonce="${nonce}"`),
     )
 }
+
+/** The parts of a rendered document Nitro's `render:html` hook hands over. */
+interface RenderedDocument {
+  head: unknown[]
+  bodyPrepend: unknown[]
+  body: unknown[]
+  bodyAppend: unknown[]
+}
+
+/**
+ * Stamps the nonce on the scripts Nuxt renders around the app: the head (JSON-
+ * LD, preloads) and the ends of the body (hydration payload, entry module).
+ * Never on `body` itself, the app's own markup (story 12.9g): back-office rich
+ * text reaches it through `v-html`, and a script slipped in there must stay
+ * blocked rather than be vouched for.
+ */
+export function withDocumentNonce<Document extends RenderedDocument>(
+  html: Document,
+  nonce: string,
+): Document & { head: string[]; bodyPrepend: string[]; bodyAppend: string[] } {
+  return {
+    ...html,
+    head: withScriptNonce(html.head, nonce),
+    bodyPrepend: withScriptNonce(html.bodyPrepend, nonce),
+    bodyAppend: withScriptNonce(html.bodyAppend, nonce),
+  }
+}

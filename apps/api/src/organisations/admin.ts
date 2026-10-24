@@ -6,13 +6,14 @@ import {
   updateOrganisationTermsSchema,
   uuidParamSchema,
 } from "@armurier/shared"
-import { and, count, desc, eq, type SQL, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, ne, type SQL, sql } from "drizzle-orm"
 import type { PgUpdateSetSource } from "drizzle-orm/pg-core"
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
+import { isUniqueViolation } from "../db/errors.js"
 import { organisations, users } from "../db/schema.js"
 import {
   sendOrganisationApprovedEmail,
@@ -21,6 +22,7 @@ import {
   sendOrganisationSuspendedEmail,
 } from "../email.js"
 import { validationError } from "../http.js"
+import { SIRET_HELD_INDEX } from "./service.js"
 
 const NOT_FOUND = { error: "NotFound", message: "Organisation not found" }
 
@@ -40,6 +42,12 @@ const LIST_COLUMNS = {
   registryCheck: organisations.registryCheck,
   createdAt: organisations.createdAt,
 } as const
+
+const SIRET_HELD = {
+  error: "SiretAlreadyApproved",
+  message: "Another organisation with this SIRET is already validated",
+}
+const SIRET_CONFLICT: unique symbol = Symbol("siret conflict")
 
 const DETAIL_COLUMNS = {
   ...LIST_COLUMNS,
@@ -167,7 +175,19 @@ export const adminOrganisationRoutes: FastifyPluginAsync = async (fastify) => {
       .leftJoin(users, eq(users.organisationId, organisations.id))
       .where(eq(organisations.id, params.data.id))
     if (!row) return reply.code(404).send(NOT_FOUND)
-    return reply.send({ data: withNumericDiscount(row) })
+
+    // Story 12.9g — requests may share a SIRET until SCS validates one: show the others.
+    const sameSiret = await db
+      .select({
+        id: organisations.id,
+        legalName: organisations.legalName,
+        status: organisations.status,
+        createdAt: organisations.createdAt,
+      })
+      .from(organisations)
+      .where(and(eq(organisations.siret, row.siret), ne(organisations.id, row.id)))
+      .orderBy(asc(organisations.createdAt))
+    return reply.send({ data: { ...withNumericDiscount(row), sameSiret } })
   })
 
   /**
@@ -185,37 +205,44 @@ export const adminOrganisationRoutes: FastifyPluginAsync = async (fastify) => {
     const { action, from, to, notify } = REVIEWS[kind]
     const adminId = request.user.sub
 
-    const updated = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .update(organisations)
-        .set({
-          reviewReason: null,
-          ...changes,
-          status: to,
-          reviewedBy: adminId,
-          reviewedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(and(eq(organisations.id, params.data.id), eq(organisations.status, from)))
-        .returning(DETAIL_COLUMNS)
-      if (!row) return null
-      await recordAuditEvent(
-        {
-          userId: adminId,
-          userRole: "admin",
-          entityType: "organisation",
-          entityId: row.id,
-          action,
-          oldValue: { status: from },
-          newValue: kind === "approve" ? { status: to, ...termsOf(row) } : { status: to },
-          reason: row.reviewReason,
-          ipAddress: request.ip,
-          userAgent: request.headers["user-agent"] ?? null,
-        },
-        tx,
-      )
-      return row
-    })
+    const updated = await db
+      .transaction(async (tx) => {
+        const [row] = await tx
+          .update(organisations)
+          .set({
+            reviewReason: null,
+            ...changes,
+            status: to,
+            reviewedBy: adminId,
+            reviewedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(organisations.id, params.data.id), eq(organisations.status, from)))
+          .returning(DETAIL_COLUMNS)
+        if (!row) return null
+        await recordAuditEvent(
+          {
+            userId: adminId,
+            userRole: "admin",
+            entityType: "organisation",
+            entityId: row.id,
+            action,
+            oldValue: { status: from },
+            newValue: kind === "approve" ? { status: to, ...termsOf(row) } : { status: to },
+            reason: row.reviewReason,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+          tx,
+        )
+        return row
+      })
+      .catch((err): typeof SIRET_CONFLICT => {
+        // Story 12.9g — another organisation with this SIRET is validated already.
+        if (isUniqueViolation(err, SIRET_HELD_INDEX)) return SIRET_CONFLICT
+        throw err
+      })
+    if (updated === SIRET_CONFLICT) return reply.code(409).send(SIRET_HELD)
 
     if (!updated) {
       const [current] = await db

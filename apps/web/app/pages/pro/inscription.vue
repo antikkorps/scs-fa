@@ -50,7 +50,7 @@ async function submit() {
   } catch (err) {
     const code = apiErrorCode(err)
     if (code === "SiretAlreadyRegistered") {
-      fieldErrors.value = { siret: "Ce SIRET a déjà un compte professionnel, ou une demande est en cours d'examen." }
+      fieldErrors.value = { siret: SIRET_TAKEN_MESSAGE }
     } else if (code === "EmailAlreadyRegistered") {
       error.value =
         "Un compte existe déjà avec cette adresse. Connectez-vous et faites la demande depuis votre espace client."

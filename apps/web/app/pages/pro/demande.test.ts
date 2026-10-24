@@ -96,4 +96,13 @@ describe("pro/demande (story 12.8c)", () => {
     await flushPromises()
     expect(wrapper.find('[role="alert"]').text()).toContain("Gilet niveau IIIA")
   })
+
+  it("asks to wait when the hourly cap is reached (story 12.9g)", async () => {
+    quotes.submit.mockRejectedValue({ response: { status: 429 }, data: { error: "TooManyQuoteRequests" } })
+    const wrapper = await mountPage()
+
+    await wrapper.find("form.quote-send").trigger("submit")
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').text()).toContain("dans une heure")
+  })
 })
