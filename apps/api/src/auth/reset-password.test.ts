@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { auditLogs, passwordResetTokens, refreshTokens, users } from "../db/schema.js"
+import { auditLogs, loginChallenges, passwordResetTokens, refreshTokens, users } from "../db/schema.js"
 import { sendPasswordResetEmail } from "../email.js"
 import { generateRefreshToken, hashRefreshToken } from "./tokens.js"
 
@@ -72,6 +72,7 @@ describe("forgot-password + reset-password", () => {
     if (stale.length > 0) {
       const ids = stale.map((u) => u.id)
       await db.delete(passwordResetTokens).where(inArray(passwordResetTokens.userId, ids))
+      await db.delete(loginChallenges).where(inArray(loginChallenges.userId, ids))
       await db.delete(refreshTokens).where(inArray(refreshTokens.userId, ids))
       await db.delete(auditLogs).where(inArray(auditLogs.userId, ids))
       await db.delete(users).where(inArray(users.id, ids))
@@ -277,6 +278,61 @@ describe("forgot-password + reset-password", () => {
         payload: { email, password: PLAINTEXT_PASSWORD },
       })
       expect(login.statusCode).toBe(200)
+    })
+
+    // Story 12.9g — a reset ends everything the old password could still lead to.
+    it("voids the account's other reset links", async () => {
+      const userId = await seedUser(`other-links-${Date.now()}${TEST_EMAIL_SUFFIX}`)
+      const used = await seedResetToken(userId)
+      const other = await seedResetToken(userId)
+
+      const first = await app.inject({
+        method: "POST",
+        url: "/api/auth/reset-password",
+        payload: { token: used, password: "UnAutreMotDePasse456!" },
+      })
+      expect(first.statusCode).toBe(200)
+
+      const second = await app.inject({
+        method: "POST",
+        url: "/api/auth/reset-password",
+        payload: { token: other, password: "EncoreUnAutre789!" },
+      })
+      expect(second.statusCode).toBe(400)
+      expect(second.json().error).toBe("InvalidOrExpiredToken")
+    })
+
+    it("voids the account's pending login codes", async () => {
+      const userId = await seedUser(`challenges-${Date.now()}${TEST_EMAIL_SUFFIX}`)
+      const token = await seedResetToken(userId)
+      await db.insert(loginChallenges).values({
+        userId,
+        tokenHash: hashRefreshToken(generateRefreshToken()),
+        codeHash: hashRefreshToken("123456"),
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      })
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/auth/reset-password",
+        payload: { token, password: "UnAutreMotDePasse456!" },
+      })
+      expect(res.statusCode).toBe(200)
+
+      const pending = await db.select().from(loginChallenges).where(eq(loginChallenges.userId, userId))
+      expect(pending.every((challenge) => challenge.consumedAt !== null)).toBe(true)
+    })
+
+    it("lets a link reset the password once, even under concurrent requests", async () => {
+      const userId = await seedUser(`race-${Date.now()}${TEST_EMAIL_SUFFIX}`)
+      const token = await seedResetToken(userId)
+
+      const responses = await Promise.all(
+        ["CourseNumeroUn111!", "CourseNumeroDeux222!", "CourseNumeroTrois333!"].map((password) =>
+          app.inject({ method: "POST", url: "/api/auth/reset-password", payload: { token, password } }),
+        ),
+      )
+      expect(responses.map((res) => res.statusCode).sort()).toEqual([200, 400, 400])
     })
   })
 })
