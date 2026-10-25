@@ -156,7 +156,7 @@ function toggleUpload(docType: string) {
         <p v-if="paymentOutstanding" class="cta-pay">
           Un règlement est en attente pour cette commande.
           <NuxtLink :to="`/commande/${order.id}`" class="link">Procéder au paiement</NuxtLink>
-          <span v-if="order.paymentDueAt" class="cta-pay__deadline">{{ paymentDeadlineNote(order.paymentDueAt) }}</span>
+          <span v-if="order.paymentDueAt" class="cta-pay__deadline">{{ paymentDeadlineNote(order.paymentDueAt, order.paymentTerms) }}</span>
         </p>
         <p v-else-if="cancelled" class="cta-pay">
           Commande annulée faute de paiement dans le délai prévu : ses articles ont été remis en vente.

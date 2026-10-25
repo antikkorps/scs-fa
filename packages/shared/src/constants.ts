@@ -85,6 +85,21 @@ export type OrderRequiredDocStatus = (typeof ORDER_REQUIRED_DOC_STATUS)[number]
 export const LEGAL_DOC_TYPES = ["cni", "permis_chasse", "autorisation_det", "sia", "expertise"] as const
 export type LegalDocType = (typeof LEGAL_DOC_TYPES)[number]
 
+// Story 12.8d — what an organisation files on its own account, judged by SCS
+// on the quotes with category A, B or C items (indicative list, to correct in use).
+export const ORGANISATION_DOC_TYPES = [
+  "agrement_armurier",
+  "autorisation_commerce",
+  "affiliation_federale",
+  "autorisation_prefectorale",
+  "autorisation_cnaps",
+  "bon_de_commande",
+] as const
+export type OrganisationDocType = (typeof ORGANISATION_DOC_TYPES)[number]
+
+/** Every value of the `doc_type` DB enum: a person's types and an organisation's. */
+export type AnyLegalDocType = LegalDocType | OrganisationDocType
+
 // Antivirus scan lifecycle (matches the `doc_scan_status` DB enum)
 export const LEGAL_DOC_SCAN_STATUS = ["pending", "clean", "infected"] as const
 export type LegalDocScanStatus = (typeof LEGAL_DOC_SCAN_STATUS)[number]

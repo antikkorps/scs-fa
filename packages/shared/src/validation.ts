@@ -6,6 +6,7 @@ import {
   LEGAL_DOC_TYPES,
   LEGAL_DOC_VERIFICATION_STATUS,
   MAX_TAG_FILTERS,
+  ORGANISATION_DOC_TYPES,
   PRODUCT_AUDIENCES,
   TAG_FACETS,
 } from "./constants.js"
@@ -191,20 +192,28 @@ export const createOrderSchema = z
 // Multipart values arrive as strings, so dates are validated as ISO YYYY-MM-DD.
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected an ISO date (YYYY-MM-DD)")
 
-export const legalDocumentMetaSchema = z
-  .object({
-    docType: z.enum(LEGAL_DOC_TYPES),
-    docNumber: z.string().min(1).max(100).optional(),
-    issuedAt: isoDateSchema.optional(),
-    expiresAt: isoDateSchema.optional(),
-  })
-  .strict()
-  .refine((d) => d.issuedAt === undefined || d.expiresAt === undefined || d.expiresAt >= d.issuedAt, {
-    message: "expiresAt must be on or after issuedAt",
-    path: ["expiresAt"],
-  })
+function documentMetaSchema<T extends readonly [string, ...string[]]>(types: T) {
+  return z
+    .object({
+      docType: z.enum(types),
+      docNumber: z.string().min(1).max(100).optional(),
+      issuedAt: isoDateSchema.optional(),
+      expiresAt: isoDateSchema.optional(),
+    })
+    .strict()
+    .refine((d) => d.issuedAt === undefined || d.expiresAt === undefined || d.expiresAt >= d.issuedAt, {
+      message: "expiresAt must be on or after issuedAt",
+      path: ["expiresAt"],
+    })
+}
+
+export const legalDocumentMetaSchema = documentMetaSchema(LEGAL_DOC_TYPES)
+
+/** Story 12.8d — an organisation's document: only the professional types. */
+export const organisationDocumentMetaSchema = documentMetaSchema(ORGANISATION_DOC_TYPES)
 
 export type LegalDocumentMetaInput = z.infer<typeof legalDocumentMetaSchema>
+export type OrganisationDocumentMetaInput = z.infer<typeof organisationDocumentMetaSchema>
 
 // Admin review queue filters (status defaults to the actionable pending queue)
 export const legalDocQueueQuerySchema = z.object({

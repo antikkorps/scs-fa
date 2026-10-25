@@ -7,6 +7,7 @@ import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import {
   auditLogs,
+  henrriDocuments,
   legalCategories,
   orders,
   productCategories,
@@ -39,7 +40,9 @@ describe("multi-parcel shipping (story 11.9)", () => {
   async function cleanup() {
     const userIds = db.select({ id: users.id }).from(users).where(like(users.email, "testship-%"))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
-    // Parcels and their content go with the order (ON DELETE CASCADE).
+    // Parcels and their content go with the order (ON DELETE CASCADE); an invoice holds it back.
+    const orderIds = db.select({ id: orders.id }).from(orders).where(inArray(orders.userId, userIds))
+    await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, orderIds))
     await db.delete(orders).where(inArray(orders.userId, userIds))
     await db.delete(users).where(like(users.email, "testship-%"))
     await db.delete(products).where(like(products.sku, `${PREFIX}%`))
@@ -172,6 +175,8 @@ describe("multi-parcel shipping (story 11.9)", () => {
   })
 
   beforeEach(async () => {
+    const orderIds = db.select({ id: orders.id }).from(orders).where(eq(orders.userId, customerId))
+    await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, orderIds))
     await db.delete(orders).where(eq(orders.userId, customerId))
     orderId = await placeOrder()
     vi.mocked(sendShipmentShippedEmail).mockClear()
@@ -279,6 +284,32 @@ describe("multi-parcel shipping (story 11.9)", () => {
     expect(res.statusCode).toBe(409)
     expect(res.json().message).toMatch(/documents/)
     expect((await orderDetail()).shipGate).toEqual({ ok: false, reason: "legal" })
+  })
+
+  // Story 12.8d — an organisation on invoice pays 30 days after the invoice, issued at dispatch.
+  it("lets an order on invoice leave unpaid, then dates its payment and queues its invoice", async () => {
+    await db
+      .update(orders)
+      .set({ paymentTerms: "net30", paymentStatus: "pending", legalVerificationStatus: "docs_verified" })
+      .where(eq(orders.id, orderId))
+    expect((await orderDetail()).shipGate).toEqual({ ok: true })
+
+    const parcel = (await createParcel([scopes()])).json().data
+    const res = await setStatus(parcel.id, "shipped")
+
+    expect(res.statusCode).toBe(200)
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+    const thirtyDays = Date.now() + 30 * 24 * 60 * 60 * 1000
+    expect(Math.abs((order?.paymentDueAt?.getTime() ?? 0) - thirtyDays)).toBeLessThan(60_000)
+    const invoices = await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))
+    expect(invoices.map((invoice) => invoice.kind)).toEqual(["invoice"])
+
+    // A second parcel moves neither the due date nor the invoice.
+    const second = (await createParcel([rifle(1)])).json().data
+    await setStatus(second.id, "shipped")
+    const [again] = await db.select().from(orders).where(eq(orders.id, orderId))
+    expect(again?.paymentDueAt).toEqual(order?.paymentDueAt)
+    expect(await db.select().from(henrriDocuments).where(eq(henrriDocuments.orderId, orderId))).toHaveLength(1)
   })
 
   /**

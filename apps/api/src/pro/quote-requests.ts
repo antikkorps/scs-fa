@@ -1,4 +1,9 @@
-import { CANCELLABLE_QUOTE_STATUSES, quoteRequestSubmitSchema, uuidParamSchema } from "@armurier/shared"
+import {
+  acceptQuoteSchema,
+  CANCELLABLE_QUOTE_STATUSES,
+  quoteRequestSubmitSchema,
+  uuidParamSchema,
+} from "@armurier/shared"
 import { and, asc, count, desc, eq, gt, inArray, sql } from "drizzle-orm"
 import type { FastifyPluginAsync, FastifyRequest } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
@@ -7,7 +12,10 @@ import { products, quoteBasketItems, quoteRequestItems, quoteRequests, users } f
 import { sendQuoteRequestAlertEmail, sendQuoteRequestReceivedEmail } from "../email.js"
 import { HenrriError } from "../henrri/client.js"
 import { validationError } from "../http.js"
+import { sendOrderConfirmation } from "../orders/confirmation.js"
+import { OrderError } from "../orders/placement.js"
 import { proOrganisationOf } from "./access.js"
+import { acceptQuote } from "./quote-acceptance.js"
 import { loadBasket } from "./quote-basket.js"
 import { issuedQuotation, memberQuoteView, validityDay } from "./quotes.js"
 
@@ -70,7 +78,12 @@ function withValidityDay<T extends { validUntil: Date | null }>(row: T) {
 
 async function memberRequest(id: string, organisationId: string) {
   const [request] = await db
-    .select({ ...MEMBER_REQUEST_COLUMNS, shippingPortions: quoteRequests.shippingPortions })
+    .select({
+      ...MEMBER_REQUEST_COLUMNS,
+      shippingPortions: quoteRequests.shippingPortions,
+      documentsSufficientAt: quoteRequests.documentsSufficientAt,
+      organisationId: quoteRequests.organisationId,
+    })
     .from(quoteRequests)
     .where(and(eq(quoteRequests.id, id), eq(quoteRequests.organisationId, organisationId)))
   if (!request) return null
@@ -83,7 +96,12 @@ async function memberRequest(id: string, organisationId: string) {
       .orderBy(asc(quoteRequestItems.position)),
     memberQuoteView(request),
   ])
-  const { shippingPortions: _shippingPortions, ...visible } = request
+  const {
+    shippingPortions: _shippingPortions,
+    documentsSufficientAt: _documentsSufficientAt,
+    organisationId: _organisationId,
+    ...visible
+  } = request
   return { ...withValidityDay(visible), items, quote }
 }
 
@@ -254,6 +272,40 @@ export const quoteRequestRoutes: FastifyPluginAsync = async (fastify) => {
       .header("cache-control", "private, no-store")
       .send(Buffer.from(pdf))
   })
+
+  /**
+   * POST /:id/accept — the pro accepts the quote (story 12.8d-2): its order is
+   * placed at the quote's prices, the stock taken, the request converted.
+   */
+  fastify.post(
+    "/:id/accept",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const params = uuidParamSchema.safeParse(request.params)
+      if (!params.success) return reply.code(400).send(validationError(params.error.issues))
+      const parsed = acceptQuoteSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
+
+      let placed: { orderId: string; totalTtc: number }
+      try {
+        placed = await acceptQuote({
+          quoteRequestId: params.data.id,
+          organisationId: proOrganisationOf(request).id,
+          userId: request.user.sub,
+          ipAddress: request.ip,
+          input: parsed.data,
+        })
+      } catch (err) {
+        if (err instanceof OrderError)
+          return reply.code(err.statusCode).send({ error: err.errorCode, message: err.message })
+        throw err
+      }
+
+      // Confirmation on a durable medium (story 12.1); never throws, retried later on failure.
+      void sendOrderConfirmation(placed.orderId, request.log)
+      return reply.code(201).send({ data: { id: placed.orderId, totalTtc: placed.totalTtc } })
+    },
+  )
 
   /** POST /:id/cancel — only while SCS has not started on it. */
   fastify.post("/:id/cancel", async (request, reply) => {

@@ -362,6 +362,65 @@ describe("Henrri client — documents", () => {
     })
   })
 
+  // Story 12.8d — the pro's acceptance, recorded on the quote in Henrri.
+  it("validates a quote on the signer's behalf", async () => {
+    // The sandbox answers 200 with an empty body (2026-10-25).
+    const fake = fakeHenrri({ "POST /v1/documents/42/validate": () => ({ status: 200 }) })
+    await clientFor(fake).validateQuotation(42, {
+      email: "jeanne@stand.fr",
+      firstName: "Jeanne",
+      lastName: "Armand",
+      at: new Date("2026-10-25T14:30:00Z"),
+      ip: "203.0.113.7",
+    })
+    expect(fake.apiCalls()[0].body).toEqual({
+      email: "jeanne@stand.fr",
+      firstName: "Jeanne",
+      lastName: "Armand",
+      validationDate: "2026-10-25T14:30:00.000Z",
+      // Paris is UTC+1 on 25 October 2026 at 14:30 UTC (winter time from that morning).
+      timeOffset: 3600,
+      ip: "203.0.113.7",
+    })
+  })
+
+  it("still reports a quote Henrri does not know, or refuses to validate", async () => {
+    const missing = fakeHenrri({})
+    await expect(
+      clientFor(missing).validateQuotation(42, {
+        email: "a@b.fr",
+        firstName: "A",
+        lastName: "B",
+        at: new Date(),
+        ip: "::1",
+      }),
+    ).rejects.toMatchObject({ code: "NotFound", status: 404 })
+    const refused = fakeHenrri({
+      "POST /v1/documents/42/validate": () => ({ status: 400, body: { errorCode: "DOCUMENT_NOT_QUOTATION" } }),
+    })
+    await expect(
+      clientFor(refused).validateQuotation(42, {
+        email: "a@b.fr",
+        firstName: "A",
+        lastName: "B",
+        at: new Date(),
+        ip: "::1",
+      }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_NOT_QUOTATION" })
+  })
+
+  it("writes a custom payment-terms text on a draft", async () => {
+    const fake = fakeHenrri({ "PUT /v1/documents/42/paymenttermsdisplay": () => ({ status: 200 }) })
+    await clientFor(fake).setPaymentTermsLabel(42, "Paiement à 30 jours")
+    expect(fake.apiCalls()[0].body).toEqual({
+      showAmounts: true,
+      showPercentages: false,
+      showConditions: true,
+      showDueDates: true,
+      dueLabel: "Paiement à 30 jours",
+    })
+  })
+
   it("deletes a draft", async () => {
     const fake = fakeHenrri({ "DELETE /v1/documents/42": () => ({ status: 204 }) })
     await clientFor(fake).deleteDocument(42)

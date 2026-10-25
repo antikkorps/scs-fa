@@ -73,6 +73,9 @@ export interface OrderDetail {
   paymentStatus: string
   /** Past this, an unpaid order is cancelled (story 12.9a); null once paid or cancelled. */
   paymentDueAt: string | null
+  /** Story 12.8d — an order born of a pro quote; "net30" when paid on invoice. */
+  quoteRequestId?: string | null
+  paymentTerms?: "immediate" | "net30"
   subtotalHt: number
   vatAmount: number
   totalTtc: number

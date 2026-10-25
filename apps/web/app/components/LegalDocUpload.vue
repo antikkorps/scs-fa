@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ALLOWED_LEGAL_DOC_MIME_TYPES, type LegalDocType, MAX_LEGAL_DOC_SIZE_BYTES, parisToday } from "@armurier/shared"
+import {
+  ALLOWED_LEGAL_DOC_MIME_TYPES,
+  type AnyLegalDocType,
+  MAX_LEGAL_DOC_SIZE_BYTES,
+  parisToday,
+} from "@armurier/shared"
 import type { LegalDocument } from "~/types/account"
 import { formatFileSize, legalDocUploadMessage } from "~/utils/legal"
 
-const props = defineProps<{ docType: LegalDocType }>()
+// `base`: "/pro/documents" files it on the organisation (story 12.8d).
+const props = defineProps<{ docType: AnyLegalDocType; base?: string }>()
 const emit = defineEmits<{ uploaded: [doc: LegalDocument] }>()
 
-const { upload } = useDocuments()
+const { upload } = useDocuments(props.base)
 
 const file = ref<File | null>(null)
 const docNumber = ref("")

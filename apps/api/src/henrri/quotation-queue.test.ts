@@ -199,6 +199,32 @@ describe("Henrri quotes (story 12.8d)", () => {
     expect((await documentOf(request.id)).customerNotifiedAt).toBeInstanceOf(Date)
   })
 
+  // Story 12.8d-2 — the pro's acceptance becomes the quote's validation in Henrri.
+  it("validates the issued quote in Henrri once the pro has accepted it, and only then", async () => {
+    const request = await sentQuote()
+    await pass()
+    expect(henrri.calls).not.toContain("validateQuotation")
+
+    const acceptedAt = new Date("2026-10-25T15:00:00Z")
+    await db
+      .update(quoteRequests)
+      .set({ status: "converted", acceptedAt, acceptedBy: pro.id, acceptedIp: "203.0.113.7" })
+      .where(eq(quoteRequests.id, request.id))
+    await pass()
+    await pass()
+
+    const document = await documentOf(request.id)
+    expect(document.validatedAt).toBeInstanceOf(Date)
+    expect(henrri.documents.get(document.henrriDocumentId as number)?.validatedBy).toEqual({
+      email: pro.email,
+      firstName: "Jeanne",
+      lastName: "Armand",
+      at: acceptedAt,
+      ip: "203.0.113.7",
+    })
+    expect(henrri.calls.filter((call) => call === "validateQuotation")).toHaveLength(1)
+  })
+
   it("queues one quote at a time per request", async () => {
     const request = await sentQuote()
     await enqueueQuotation(request.id)

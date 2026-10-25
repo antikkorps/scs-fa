@@ -98,6 +98,13 @@ export const docTypeEnum = pgEnum("doc_type", [
   "autorisation_det",
   "sia",
   "expertise",
+  // Story 12.8d — an organisation's documents, judged by SCS on its quotes.
+  "agrement_armurier",
+  "autorisation_commerce",
+  "affiliation_federale",
+  "autorisation_prefectorale",
+  "autorisation_cnaps",
+  "bon_de_commande",
 ])
 export const docVerificationEnum = pgEnum("doc_verification_status", [
   "pending",
@@ -118,6 +125,8 @@ export const orderLegalStatusEnum = pgEnum("order_legal_status", [
   "payment_pending", // docs OK, attente paiement
   "completed", // complètement traité (paiement + livraison)
 ])
+// Story 12.8d — an organisation "on invoice" pays 30 days after the invoice.
+export const orderPaymentTermsEnum = pgEnum("order_payment_terms", ["immediate", "net30"])
 export const paymentStatusEnum = pgEnum("payment_status", [
   "pending",
   "awaiting_transfer",
@@ -360,6 +369,10 @@ export const quoteRequests = pgTable(
     documentsSufficientAt: timestamp("documents_sufficient_at"),
     documentsSufficientBy: uuid("documents_sufficient_by"),
     sentAt: timestamp("sent_at"),
+    // Acceptance (12.8d-2): who, when, from where — Henrri's quote validation asks for them.
+    acceptedAt: timestamp("accepted_at"),
+    acceptedBy: uuid("accepted_by"),
+    acceptedIp: varchar("accepted_ip", { length: 45 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     // Last activity: a request never converted is purged 3 years after it.
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -369,6 +382,7 @@ export const quoteRequests = pgTable(
     index("idx_quote_requests_status").on(t.status),
     foreignKey({ columns: [t.organisationId], foreignColumns: [organisations.id] }),
     foreignKey({ columns: [t.requestedBy], foreignColumns: [users.id] }),
+    foreignKey({ columns: [t.acceptedBy], foreignColumns: [users.id] }),
   ],
 )
 
@@ -556,7 +570,9 @@ export const legalDocuments = pgTable(
   "legal_documents",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull(),
+    // A person's document, or (story 12.8d) an organisation's: exactly one of the two.
+    userId: uuid("user_id"),
+    organisationId: uuid("organisation_id"),
 
     // Type document
     docType: docTypeEnum("doc_type").notNull(), // 'cni', 'permis_chasse', 'autorisation_det', 'sia'
@@ -602,9 +618,18 @@ export const legalDocuments = pgTable(
      uniqueIndex("uniq_user_doc_type")
       .on(t.userId, t.docType)
       .where(sql`${t.verificationStatus} = 'approved'`),
+     uniqueIndex("uniq_organisation_doc_type")
+      .on(t.organisationId, t.docType)
+      .where(sql`${t.verificationStatus} = 'approved'`),
+     index("idx_legal_docs_organisation").on(t.organisationId),
+     check("chk_legal_docs_owner", sql`(${t.userId} IS NULL) <> (${t.organisationId} IS NULL)`),
      foreignKey({
       columns: [t.userId],
       foreignColumns: [users.id],
+    }).onDelete("cascade"),
+     foreignKey({
+      columns: [t.organisationId],
+      foreignColumns: [organisations.id],
     }).onDelete("cascade"),
      foreignKey({
       columns: [t.verifiedBy],
@@ -1601,6 +1626,13 @@ export const orders = pgTable(
 
     // Paiement
     paymentStatus: paymentStatusEnum("payment_status").notNull().default("pending"),
+    // Story 12.8d — a pro order born of a quote: its terms, its due date once
+    // invoiced "on invoice", and the Chorus Pro references the invoice carries.
+    quoteRequestId: uuid("quote_request_id"),
+    paymentTerms: orderPaymentTermsEnum("payment_terms").notNull().default("immediate"),
+    paymentDueAt: timestamp("payment_due_at"),
+    chorusServiceCode: varchar("chorus_service_code", { length: 100 }),
+    chorusCommitmentNumber: varchar("chorus_commitment_number", { length: 100 }),
     // Rappel « virement non reçu » envoyé (story 12.9a, J+4) : posé avant l'envoi,
     // il garantit un seul rappel par commande, même si deux balayages se croisent.
     paymentReminderSentAt: timestamp("payment_reminder_sent_at"),
@@ -1689,6 +1721,11 @@ export const orders = pgTable(
      index("idx_orders_payment_status").on(t.paymentStatus),
      index("idx_orders_created").on(t.createdAt),
      index("idx_orders_shipping_status").on(t.shippingStatus),
+     // One live order per quote; a cancelled one leaves the quote open again.
+     uniqueIndex("uq_orders_quote_request_live")
+      .on(t.quoteRequestId)
+      .where(sql`${t.paymentStatus} <> 'cancelled'`),
+     foreignKey({ columns: [t.quoteRequestId], foreignColumns: [quoteRequests.id] }).onDelete("set null"),
      foreignKey({
       columns: [t.userId],
       foreignColumns: [users.id],
@@ -2137,6 +2174,8 @@ export const henrriDocuments = pgTable(
     paymentRecordedAt: timestamp("payment_recorded_at"),
     // L'e-mail « facture / avoir disponible » parti (relancé au passage suivant sinon).
     customerNotifiedAt: timestamp("customer_notified_at"),
+    // Devis seulement (12.8d-2) : la validation du client enregistrée chez Henrri.
+    validatedAt: timestamp("validated_at"),
 
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),

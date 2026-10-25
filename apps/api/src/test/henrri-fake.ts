@@ -3,7 +3,14 @@
 // payment milestone per document, a partial payment carrying the rest over.
 
 import { computeVatTotals } from "@armurier/shared"
-import type { HenrriClient, HenrriCustomer, HenrriDocument, HenrriMilestone, HenrriPayment } from "../henrri/client.js"
+import type {
+  HenrriClient,
+  HenrriCustomer,
+  HenrriDocument,
+  HenrriMilestone,
+  HenrriPayment,
+  HenrriQuoteSigner,
+} from "../henrri/client.js"
 import { HenrriError } from "../henrri/client.js"
 import type { DraftLine } from "../henrri/documents.js"
 
@@ -13,6 +20,8 @@ interface FakeDocument {
   customerId: number
   title: string
   lines: DraftLine[]
+  dueLabel: string | null
+  validatedBy: HenrriQuoteSigner | null
   finalized: boolean
   number: string | null
   milestones: Array<HenrriMilestone & { paymentModeId: number | null; date: string | null }>
@@ -80,7 +89,16 @@ export function createFakeHenrri() {
     async createDocument(input) {
       await track("createDocument")
       nextId += 1
-      documents.set(nextId, { id: nextId, ...input, lines: [], finalized: false, number: null, milestones: [] })
+      documents.set(nextId, {
+        id: nextId,
+        ...input,
+        lines: [],
+        dueLabel: null,
+        validatedBy: null,
+        finalized: false,
+        number: null,
+        milestones: [],
+      })
       return nextId
     },
     async addLine(documentId, line) {
@@ -116,6 +134,18 @@ export function createFakeHenrri() {
       nextId += 1
       document.milestones = [{ id: nextId, amount: totalOf(document), paid: false, paymentModeId: null, date: null }]
       return view(document)
+    },
+    async validateQuotation(documentId, signer) {
+      await track("validateQuotation")
+      const document = documentOf(documentId)
+      if (!document.finalized) throw new HenrriError("DOCUMENT_NOT_FINALIZED", 400, "Draft")
+      document.validatedBy = signer
+    },
+    async setPaymentTermsLabel(documentId, label) {
+      await track("setPaymentTermsLabel")
+      const document = documentOf(documentId)
+      if (document.finalized) throw new HenrriError("DOCUMENT_FINALIZED", 400, "Finalized")
+      document.dueLabel = label
     },
     async pdf(documentId) {
       await track("pdf")

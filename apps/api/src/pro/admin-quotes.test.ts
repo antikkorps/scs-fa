@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { auditLogs, henrriDocuments, organisations, quoteRequests } from "../db/schema.js"
+import { auditLogs, henrriDocuments, legalDocuments, organisations, quoteRequests } from "../db/schema.js"
 import { type Account, type FixtureProduct, proFixtures } from "../test/pro-fixtures.js"
 import { purgeStaleQuoteRequests } from "./retention.js"
 
@@ -160,6 +160,32 @@ describe("quote requests in the back-office (story 12.8c)", () => {
 
       const events = await db.select().from(auditLogs).where(eq(auditLogs.entityId, request.id))
       expect(events.filter((event) => event.action === "quote_request.updated")).toHaveLength(2)
+    })
+
+    it("shows SCS the organisation's documents, to judge them", async () => {
+      const request = await inReview()
+      const [document] = await db
+        .insert(legalDocuments)
+        .values({
+          organisationId: pro.organisationId,
+          docType: "agrement_armurier",
+          s3Key: "legal-documents/organisations/x/test.pdf",
+          s3Url: "memory://x",
+          scanStatus: "clean",
+          verificationStatus: "approved",
+          expiresAt: "2030-12-31",
+        })
+        .returning({ id: legalDocuments.id })
+
+      const quote = (await asAdmin("GET", `/${request.id}`)).json().data
+
+      expect(quote.organisationDocuments).toContainEqual({
+        id: document.id,
+        docType: "agrement_armurier",
+        verificationStatus: "approved",
+        expiresAt: "2030-12-31",
+      })
+      await db.delete(legalDocuments).where(eq(legalDocuments.id, document.id))
     })
 
     it("records who judged the organisation's documents sufficient, and when", async () => {

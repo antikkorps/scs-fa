@@ -1,4 +1,4 @@
-import type { QuoteBasket, QuoteRequestDetail, QuoteRequestSummary } from "~/types/quote"
+import type { AcceptQuoteBody, QuoteBasket, QuoteRequestDetail, QuoteRequestSummary } from "~/types/quote"
 
 // Story 12.8c — a pro's quote basket and requests. `basketCount` is shared
 // app-wide, like the cart's, so the header can show it.
@@ -50,6 +50,16 @@ export function useQuotes() {
     return (await api<{ data: QuoteRequestDetail }>(`/pro/quote-requests/${id}`)).data
   }
 
+  /** Story 12.8d-2 — the order placed from the accepted quote. */
+  async function acceptQuote(id: string, body: AcceptQuoteBody): Promise<{ id: string; totalTtc: number }> {
+    return (
+      await api<{ data: { id: string; totalTtc: number } }>(`/pro/quote-requests/${id}/accept`, {
+        method: "POST",
+        body,
+      })
+    ).data
+  }
+
   async function cancelRequest(id: string): Promise<QuoteRequestDetail> {
     return (await api<{ data: QuoteRequestDetail }>(`/pro/quote-requests/${id}/cancel`, { method: "POST" })).data
   }
@@ -64,5 +74,6 @@ export function useQuotes() {
     listRequests,
     getRequest,
     cancelRequest,
+    acceptQuote,
   }
 }

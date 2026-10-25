@@ -16,17 +16,28 @@
 
 import { randomUUID } from "node:crypto"
 import { orderReference } from "@armurier/shared"
-import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm"
+import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
 import type { DbExecutor } from "../artworks/reservation.js"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { henrriDocuments, orders, paymentCarte, paymentVirement, quoteRequests, refunds, users } from "../db/schema.js"
+import {
+  henrriDocuments,
+  orders,
+  organisations,
+  paymentCarte,
+  paymentVirement,
+  quoteRequests,
+  refunds,
+  users,
+} from "../db/schema.js"
 import { sendInvoiceAvailableEmail, sendQuoteAvailableEmail } from "../email.js"
 import { env } from "../env.js"
+import { BILLING_ADDRESS_COLUMNS, completeBillingAddress } from "../organisations/service.js"
 import {
   type HenrriBuyer,
   type HenrriClient,
+  type HenrriCompany,
   type HenrriCustomer,
   type HenrriDocumentKind,
   HenrriError,
@@ -147,10 +158,12 @@ export async function enqueueMissingDocuments(): Promise<void> {
   await db.execute(sql`
     INSERT INTO henrri_documents (order_id, kind, expected_total_ttc)
     SELECT o.id, 'invoice', o.total_ttc FROM orders o
-    WHERE o.payment_status IN (${sql.join(
+    WHERE (o.payment_status IN (${sql.join(
       PAID_STATUSES.map((status) => sql`${status}`),
       sql`, `,
     )})
+        -- Story 12.8d: on invoice, the invoice goes out with the first parcel.
+        OR (o.payment_terms = 'net30' AND o.shipping_status <> 'unshipped' AND o.payment_status <> 'cancelled'))
       AND o.shipping_portions IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM henrri_documents d WHERE d.order_id = o.id AND d.kind = 'invoice')
     ON CONFLICT DO NOTHING`)
@@ -177,9 +190,23 @@ function euros(cents: number): string {
   return (cents / 100).toFixed(2)
 }
 
-/** The rows a pass works on: unfinished documents, unrecorded payments, untold buyers. */
+/** Quotes accepted by the pro, whose validation Henrri has not recorded yet (story 12.8d-2). */
+function acceptedQuoteToValidate() {
+  return and(
+    eq(henrriDocuments.kind, "quotation"),
+    eq(henrriDocuments.status, "finalized"),
+    isNull(henrriDocuments.validatedAt),
+    inArray(
+      henrriDocuments.quoteRequestId,
+      db.select({ id: quoteRequests.id }).from(quoteRequests).where(isNotNull(quoteRequests.acceptedAt)),
+    ),
+  )
+}
+
+/** The rows a pass works on: unfinished documents, unrecorded payments, untold buyers, accepted quotes. */
 function workToDo() {
   return or(
+    acceptedQuoteToValidate(),
     inArray(henrriDocuments.status, ["pending", "draft"]),
     and(
       eq(henrriDocuments.status, "finalized"),
@@ -296,6 +323,23 @@ interface OrderContext {
   source: Parameters<typeof buildInvoiceDraft>[0]
   card: Payment
   transfer: Payment
+  /** Whether the money is in: an order on invoice gets its invoice before. */
+  paid: boolean
+  /** Story 12.8d — an order born of a quote is invoiced to the organisation. */
+  quote: QuoteOrderContext | null
+}
+
+interface QuoteOrderContext {
+  organisationId: string
+  /** Null while the organisation has no complete billing address. */
+  company: HenrriCompany | null
+  henrriCustomerId: number | null
+  henrriCustomerFingerprint: string | null
+  net30: boolean
+  paymentDueAt: Date | null
+  transferReference: string | null
+  chorusServiceCode: string | null
+  chorusCommitmentNumber: string | null
 }
 
 async function loadOrder(orderId: string): Promise<OrderContext | null> {
@@ -310,11 +354,25 @@ async function loadOrder(orderId: string): Promise<OrderContext | null> {
       transferExpectedTtc: paymentVirement.amountExpectedTtc,
       transferReceivedTtc: paymentVirement.amountReceivedTtc,
       transferReceivedAt: paymentVirement.receivedAt,
+      transferReference: paymentVirement.paymentReference,
+      firstName: users.firstname,
+      lastName: users.lastname,
+      organisation: {
+        id: organisations.id,
+        legalName: organisations.legalName,
+        siret: organisations.siret,
+        net30Allowed: organisations.net30Allowed,
+        henrriCustomerId: organisations.henrriCustomerId,
+        henrriCustomerFingerprint: organisations.henrriCustomerFingerprint,
+      },
+      billing: BILLING_ADDRESS_COLUMNS,
     })
     .from(orders)
     .innerJoin(users, eq(users.id, orders.userId))
     .leftJoin(paymentCarte, eq(paymentCarte.orderId, orders.id))
     .leftJoin(paymentVirement, eq(paymentVirement.orderId, orders.id))
+    .leftJoin(quoteRequests, eq(quoteRequests.id, orders.quoteRequestId))
+    .leftJoin(organisations, eq(organisations.id, quoteRequests.organisationId))
     .where(eq(orders.id, orderId))
     .limit(1)
   if (!row) return null
@@ -345,6 +403,45 @@ async function loadOrder(orderId: string): Promise<OrderContext | null> {
       cents: toCents(row.transferReceivedTtc ?? row.transferExpectedTtc ?? 0),
       date: parisDate(row.transferReceivedAt),
     },
+    paid: (PAID_STATUSES as readonly string[]).includes(order.paymentStatus),
+    quote:
+      row.organisation && row.billing
+        ? quoteOrderContext(order, row.organisation, row.billing, row, row.transferReference)
+        : null,
+  }
+}
+
+function quoteOrderContext(
+  order: typeof orders.$inferSelect,
+  organisation: {
+    id: string
+    legalName: string
+    siret: string
+    henrriCustomerId: number | null
+    henrriCustomerFingerprint: string | null
+  },
+  billing: Parameters<typeof completeBillingAddress>[0],
+  contact: { firstName: string | null; lastName: string | null },
+  transferReference: string | null,
+): QuoteOrderContext {
+  const address = completeBillingAddress(billing)
+  return {
+    organisationId: organisation.id,
+    company: address
+      ? {
+          companyName: organisation.legalName,
+          siret: organisation.siret,
+          contact: { firstName: contact.firstName ?? "", lastName: contact.lastName ?? "" },
+          address,
+        }
+      : null,
+    henrriCustomerId: organisation.henrriCustomerId,
+    henrriCustomerFingerprint: organisation.henrriCustomerFingerprint,
+    net30: order.paymentTerms === "net30",
+    paymentDueAt: order.paymentDueAt,
+    transferReference,
+    chorusServiceCode: order.chorusServiceCode,
+    chorusCommitmentNumber: order.chorusCommitmentNumber,
   }
 }
 
@@ -415,6 +512,7 @@ async function recoverDraft(
   const existing = await client.getDocument(document.henrriDocumentId)
   if (existing?.finalized) return numberOf(existing)
   if (existing && toCents(existing.totalTtc) === toCents(draft.expectedTotalTtc)) {
+    if (draft.dueLabel) await client.setPaymentTermsLabel(existing.id, draft.dueLabel)
     return numberOf(await client.finalizeDocument(existing.id))
   }
   if (existing) await client.deleteDocument(existing.id)
@@ -448,6 +546,7 @@ async function issue(
     )
     return { blocked: true }
   }
+  if (draft.dueLabel) await client.setPaymentTermsLabel(henrriDocumentId, draft.dueLabel)
   await write(claimed, {})
   return { number: numberOf(await client.finalizeDocument(henrriDocumentId)) }
 }
@@ -578,11 +677,45 @@ async function issueDocument(
 
 async function orderIssuance(document: OrderDocumentRow, context: OrderContext): Promise<Issuance> {
   const ref = orderReference(context.orderId)
-  return {
-    draft: await draftFor(document, context),
-    customer: context.buyer ? buyerLink(context, context.buyer) : null,
-    title: document.kind === "invoice" ? `Commande ${ref}` : `Avoir — commande ${ref}`,
+  const draft = await draftFor(document, context)
+  const { quote } = context
+  if (!quote) {
+    return {
+      draft,
+      customer: context.buyer ? buyerLink(context, context.buyer) : null,
+      title: document.kind === "invoice" ? `Commande ${ref}` : `Avoir — commande ${ref}`,
+    }
   }
+
+  // Story 12.8d — the organisation is billed; an administration's Chorus Pro
+  // references ride in the title, and an order on invoice says when it is due.
+  const references = [
+    quote.chorusServiceCode && `service ${quote.chorusServiceCode}`,
+    quote.chorusCommitmentNumber && `engagement ${quote.chorusCommitmentNumber}`,
+  ].filter(Boolean)
+  const base = document.kind === "invoice" ? `Commande ${ref}` : `Avoir — commande ${ref}`
+  const dueLabel = document.kind === "invoice" && quote.net30 ? net30Label(quote) : undefined
+  return {
+    draft: draft.ok && dueLabel ? { ok: true, draft: { ...draft.draft, dueLabel } } : draft,
+    customer: quote.company
+      ? {
+          customer: quote.company,
+          henrriCustomerId: quote.henrriCustomerId,
+          fingerprint: quote.henrriCustomerFingerprint,
+          save: (customerId, fingerprint) => saveOrganisationCustomer(quote.organisationId, customerId, fingerprint),
+        }
+      : null,
+    title: [base, ...references].join(" — "),
+  }
+}
+
+const DUE_DAY = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeZone: "Europe/Paris" })
+
+/** What an invoice on 30 days says of its payment, in place of Henrri's "paiement comptant". */
+function net30Label(quote: QuoteOrderContext): string {
+  const due = quote.paymentDueAt ? `, au plus tard le ${DUE_DAY.format(quote.paymentDueAt)}` : ""
+  const reference = quote.transferReference ? ` (référence ${quote.transferReference})` : ""
+  return `Paiement à 30 jours${due}, par virement${reference}.`
 }
 
 function quotationIssuance(context: QuotationContext): Issuance {
@@ -633,7 +766,8 @@ async function runSteps(
     await notifyBuyer(claimed, issued, context, log)
   }
 
-  if (issued.kind === "invoice" && issued.paymentRecordedAt === null && issued.heldAt === null) {
+  // An order on invoice is invoiced before it is paid: its payment is recorded once the money is in.
+  if (issued.kind === "invoice" && issued.paymentRecordedAt === null && issued.heldAt === null && context.paid) {
     if (issued.henrriDocumentId === null) return hold(claimed, "PaymentNotRecorded: no Henrri document")
     const mismatch = await recordPayment(client, issued.henrriDocumentId, context)
     if (mismatch) return hold(claimed, mismatch)
@@ -645,8 +779,9 @@ async function runSteps(
 
 /**
  * A quote is issued, then the request turns `sent` and the requester hears of
- * it — the e-mail tried again on later passes until it leaves. No payment is
- * ever recorded against a quote.
+ * it — the e-mail tried again on later passes until it leaves; once the pro
+ * accepts it, Henrri records the acceptance. No payment is ever recorded
+ * against a quote.
  */
 async function runQuotationSteps(
   client: HenrriClient,
@@ -682,6 +817,12 @@ async function runQuotationSteps(
       if (err instanceof ClaimLost) throw err
       log.warn({ err, documentId: document.id }, "Quote e-mail failed — retried on the next pass")
     }
+  }
+
+  // The pro accepted it (12.8d-2): Henrri records the acceptance as the quote's validation.
+  if (context.acceptance && issued.validatedAt === null && issued.henrriDocumentId !== null) {
+    await client.validateQuotation(issued.henrriDocumentId, context.acceptance)
+    await write(claimed, { validatedAt: new Date() })
   }
   await release(claimed, { lastError: null })
   return "finalized"

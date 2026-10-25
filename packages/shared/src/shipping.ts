@@ -299,9 +299,12 @@ export function canShipOrder(order: {
   paymentStatus: string
   legalVerificationStatus: string
   shippingMethod?: string | null
+  /** Story 12.8d — "net30": an organisation on invoice, paid 30 days after the invoice issued at dispatch. */
+  paymentTerms?: string
 }): ShipGate {
   if (isPickupOrder(order.shippingMethod)) return { ok: false, reason: "pickup" }
-  if (!PAID_PAYMENT_STATUSES.includes(order.paymentStatus)) return { ok: false, reason: "unpaid" }
+  const onInvoice = order.paymentTerms === "net30" && order.paymentStatus !== "cancelled"
+  if (!onInvoice && !PAID_PAYMENT_STATUSES.includes(order.paymentStatus)) return { ok: false, reason: "unpaid" }
   if (!LEGAL_CLEARED_STATES.includes(order.legalVerificationStatus)) return { ok: false, reason: "legal" }
   return { ok: true }
 }

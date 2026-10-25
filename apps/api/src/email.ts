@@ -1,7 +1,7 @@
 import {
+  type AnyLegalDocType,
   escapeHtml,
   type LegalDocRejectionReason,
-  type LegalDocType,
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
   type OrganisationType,
   renderInlinesHtml,
@@ -43,6 +43,7 @@ type EmailType =
   | "organisation_reinstated"
   | "quote_request_received"
   | "quote_available"
+  | "invoice_due_reminder"
   | "transfer_reminder"
   | "unpaid_order_cancelled"
 
@@ -312,12 +313,18 @@ export async function sendOrganisationRequestAlertEmail(
   })
 }
 
-const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
+const DOC_TYPE_LABELS: Record<AnyLegalDocType, string> = {
   cni: "identity card",
   permis_chasse: "hunting permit",
   autorisation_det: "detention authorization",
   sia: "SIA certificate",
   expertise: "expertise certificate",
+  agrement_armurier: "gunsmith licence",
+  autorisation_commerce: "arms trade authorisation",
+  affiliation_federale: "federation affiliation",
+  autorisation_prefectorale: "prefectoral authorisation",
+  autorisation_cnaps: "CNAPS authorisation",
+  bon_de_commande: "signed purchase order",
 }
 
 const REJECTION_REASON_LABELS: Record<LegalDocRejectionReason, string> = {
@@ -333,7 +340,7 @@ const REJECTION_REASON_LABELS: Record<LegalDocRejectionReason, string> = {
 
 export async function sendLegalDocApprovedEmail(
   to: string,
-  doc: { docType: LegalDocType },
+  doc: { docType: AnyLegalDocType },
   about: EmailAbout = {},
 ): Promise<void> {
   const label = DOC_TYPE_LABELS[doc.docType]
@@ -352,7 +359,7 @@ export async function sendLegalDocApprovedEmail(
 
 export type SlaBreachItem = {
   customerName: string
-  docType: LegalDocType
+  docType: AnyLegalDocType
   deadline: Date
   hoursOverdue: number
 }
@@ -427,7 +434,7 @@ export async function sendErrorAlertEmail(to: string[], item: ErrorAlertItem): P
 
 export async function sendLegalDocRejectedEmail(
   to: string,
-  doc: { docType: LegalDocType; reason: LegalDocRejectionReason; notes?: string | null },
+  doc: { docType: AnyLegalDocType; reason: LegalDocRejectionReason; notes?: string | null },
   about: EmailAbout = {},
 ): Promise<void> {
   const label = DOC_TYPE_LABELS[doc.docType]
@@ -618,6 +625,32 @@ export async function sendTransferReminderEmail(to: string, r: TransferReminderE
       `Vos articles restent réservés jusqu'au ${PARIS_DATETIME.format(r.deadline)}. Sans paiement à cette date, la commande sera annulée et les articles remis en vente.`,
       `Les coordonnées bancaires figurent sur la page de votre commande : ${orderUrl}`,
       "Si vous avez déjà fait le virement, signalez-le depuis cette page : nous le rapprocherons dès son arrivée.",
+    ],
+  )
+}
+
+export interface InvoiceDueReminderEmail {
+  orderId: string
+  orderRef: string
+  firstname: string | null
+  amountTtc: number
+  reference: string | null
+  dueAt: Date
+}
+
+/** Story 12.8d — an organisation on invoice, five days before its invoice falls due. */
+export async function sendInvoiceDueReminderEmail(to: string, r: InvoiceDueReminderEmail): Promise<void> {
+  const orderUrl = `${env.WEB_BASE_URL}/compte/commandes/${r.orderId}`
+  await deliverParagraphs(
+    "invoice_due_reminder",
+    { orderId: r.orderId },
+    to,
+    `Échéance de votre facture — commande ${r.orderRef}`,
+    [
+      r.firstname ? `Bonjour ${r.firstname},` : "Bonjour,",
+      `La facture de la commande ${r.orderRef}, d'un montant de ${EUROS.format(r.amountTtc)}, arrive à échéance le ${PARIS_DATE.format(r.dueAt)}.`,
+      `Merci de régler par virement${r.reference ? ` en indiquant la référence ${r.reference}` : ""}. Les coordonnées bancaires et la facture figurent sur la page de la commande : ${orderUrl}`,
+      "Si le virement est déjà parti, ne tenez pas compte de ce message.",
     ],
   )
 }

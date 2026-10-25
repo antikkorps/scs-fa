@@ -90,6 +90,13 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   autorisation_det: "Autorisation détention",
   sia: "SIA",
   expertise: "Expertise",
+  // Story 12.8d — an organisation's documents.
+  agrement_armurier: "Agrément d'armurier",
+  autorisation_commerce: "Autorisation de commerce (AFCI)",
+  affiliation_federale: "Affiliation fédérale",
+  autorisation_prefectorale: "Autorisation préfectorale",
+  autorisation_cnaps: "Autorisation CNAPS",
+  bon_de_commande: "Bon de commande signé",
 }
 export function docTypeLabel(value: string): string {
   return DOC_TYPE_LABELS[value] ?? value

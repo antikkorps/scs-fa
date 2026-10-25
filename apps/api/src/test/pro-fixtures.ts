@@ -9,6 +9,7 @@ import {
   ancientWeapons,
   auditLogs,
   legalCategories,
+  legalDocuments,
   organisations,
   productCategories,
   products,
@@ -147,6 +148,13 @@ export function proFixtures(app: FastifyInstance, tag: string): ProFixtures {
         .where(inArray(quoteRequests.organisationId, organisationIds))
       await db.delete(auditLogs).where(inArray(auditLogs.entityId, requestIds))
       await db.delete(quoteRequests).where(inArray(quoteRequests.organisationId, organisationIds))
+      // Before the accounts: an admin of the suite may have reviewed them (story 12.8d).
+      const documentIds = db
+        .select({ id: legalDocuments.id })
+        .from(legalDocuments)
+        .where(inArray(legalDocuments.organisationId, organisationIds))
+      await db.delete(auditLogs).where(inArray(auditLogs.entityId, documentIds))
+      await db.delete(legalDocuments).where(inArray(legalDocuments.organisationId, organisationIds))
     }
     if (userIds.length > 0) {
       await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))

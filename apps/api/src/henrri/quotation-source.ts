@@ -5,7 +5,7 @@ import { asc, eq } from "drizzle-orm"
 import { db } from "../db/client.js"
 import { organisations, quoteRequestItems, quoteRequests, users } from "../db/schema.js"
 import { BILLING_ADDRESS_COLUMNS, completeBillingAddress } from "../organisations/service.js"
-import type { HenrriCompany } from "./client.js"
+import type { HenrriCompany, HenrriQuoteSigner } from "./client.js"
 import type { QuotationSource } from "./quotations.js"
 
 export interface QuotationContext {
@@ -20,6 +20,8 @@ export interface QuotationContext {
   /** Null until SCS has set the delivery and frozen the total. */
   source: QuotationSource | null
   requester: { id: string; email: string }
+  /** Set once the pro accepted the quote (12.8d-2): Henrri records it as the quote's validation. */
+  acceptance: HenrriQuoteSigner | null
 }
 
 export async function loadQuotation(quoteRequestId: string): Promise<QuotationContext | null> {
@@ -40,6 +42,13 @@ export async function loadQuotation(quoteRequestId: string): Promise<QuotationCo
     .limit(1)
   if (!row) return null
   const { request, requester } = row
+
+  const [signer] = request.acceptedBy
+    ? await db
+        .select({ email: users.email, firstName: users.firstname, lastName: users.lastname })
+        .from(users)
+        .where(eq(users.id, request.acceptedBy))
+    : []
 
   const items = await db
     .select()
@@ -79,6 +88,16 @@ export async function loadQuotation(quoteRequestId: string): Promise<QuotationCo
           }
         : null,
     requester: { id: requester.id, email: requester.email },
+    acceptance:
+      signer && request.acceptedAt && request.acceptedIp
+        ? {
+            email: signer.email,
+            firstName: signer.firstName ?? "",
+            lastName: signer.lastName ?? "",
+            at: request.acceptedAt,
+            ip: request.acceptedIp,
+          }
+        : null,
   }
 }
 

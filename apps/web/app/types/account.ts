@@ -1,4 +1,4 @@
-import type { LegalDocType, OrderRequiredDocStatus } from "@armurier/shared"
+import type { AnyLegalDocType, LegalDocType, OrderRequiredDocStatus } from "@armurier/shared"
 
 // Authenticated user profile (GET/PATCH /auth/me — returned without a `data` envelope).
 export interface Profile {
@@ -79,7 +79,7 @@ export interface OrderAddressSnapshot {
 // A legal document uploaded by the user (GET /legal-documents, POST, GET /:id).
 export interface LegalDocument {
   id: string
-  docType: LegalDocType
+  docType: AnyLegalDocType
   docNumber: string | null
   mimeType: string
   fileSize: number
@@ -95,7 +95,7 @@ export interface LegalDocument {
 
 // Metadata accompanying a document upload (all optional besides docType).
 export interface LegalDocumentMeta {
-  docType: LegalDocType
+  docType: AnyLegalDocType
   docNumber?: string
   issuedAt?: string
   expiresAt?: string

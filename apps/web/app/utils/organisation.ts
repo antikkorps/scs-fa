@@ -71,3 +71,36 @@ const QUOTE_REQUEST_STATUS: Record<QuoteRequestStatus, StatusMeta> = {
 export function quoteRequestStatus(status: QuoteRequestStatus): StatusMeta {
   return QUOTE_REQUEST_STATUS[status]
 }
+
+// Story 12.8d — a supporting document belongs to a person or to an organisation.
+
+export interface LegalDocOwnerSource {
+  user: { email: string; firstname: string | null; lastname: string | null } | null
+  organisation: { legalName: string } | null
+}
+
+/** Who a document belongs to, as the back-office names it. */
+export function legalDocOwner(doc: LegalDocOwnerSource): { name: string; contact: string } {
+  if (doc.organisation) return { name: doc.organisation.legalName, contact: "Compte pro" }
+  const user = doc.user
+  if (!user) return { name: "—", contact: "" }
+  return { name: [user.firstname, user.lastname].filter(Boolean).join(" ") || user.email, contact: user.email }
+}
+
+// Story 12.8d-2 — why a quote cannot be accepted, as the page or the API says it.
+const ACCEPTANCE_MESSAGES: Record<string, string> = {
+  DocumentsRequired:
+    "Notre équipe doit d'abord valider les justificatifs de votre organisation pour les articles de catégorie A, B ou C.",
+  QuoteExpired: "Ce devis n'est plus valable : demandez-nous de le mettre à jour.",
+  InsufficientStock: "Le stock ne couvre plus ce devis : notre équipe vous recontacte avec un devis mis à jour.",
+  QuoteChanged: "Ce devis a été modifié depuis son envoi : notre équipe vous recontacte.",
+  QuoteLineUnavailable: "Un article du devis n'est plus disponible : notre équipe vous recontacte.",
+  TermsOutdated:
+    "Nos conditions générales de vente ont changé depuis l'ouverture de cette page. Rechargez la page pour lire la nouvelle version.",
+  UndeliverableAddress: "Nous livrons uniquement en France métropolitaine, Corse comprise.",
+  InvalidStatusTransition: "Ce devis a déjà été accepté ou n'est plus ouvert.",
+}
+
+export function quoteAcceptanceMessage(code: string | null | undefined): string {
+  return (code && ACCEPTANCE_MESSAGES[code]) || "L'acceptation a échoué. Réessayez."
+}

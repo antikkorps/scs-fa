@@ -54,8 +54,9 @@ export async function scanDocument(documentId: string): Promise<ScanOutcome> {
     .where(eq(legalDocuments.id, documentId))
     .returning({ userId: legalDocuments.userId })
 
-  // An infected verdict pushes orders back to pending (re-upload required)
-  if (updated) await recomputeOrderLegalStatus(updated.userId)
+  // An infected verdict pushes orders back to pending (re-upload required); an
+  // organisation's document clears no order by itself (story 12.8d).
+  if (updated?.userId) await recomputeOrderLegalStatus(updated.userId)
 
   return outcome
 }

@@ -64,6 +64,29 @@ export const adminQuoteUpdateSchema = z
 
 export type AdminQuoteUpdateInput = z.infer<typeof adminQuoteUpdateSchema>
 
+const chorusReferenceSchema = z
+  .string()
+  .trim()
+  .max(100)
+  .optional()
+  .transform((value) => value || null)
+
+/**
+ * The pro accepts the quote (story 12.8d-2): where to deliver, the terms of
+ * sale they ticked, and the Chorus Pro references an administration needs on
+ * its invoice — free and optional.
+ */
+export const acceptQuoteSchema = z
+  .object({
+    shippingAddressId: z.string().uuid(),
+    acceptedTermsVersion: z.string().min(1).max(32),
+    chorusServiceCode: chorusReferenceSchema,
+    chorusCommitmentNumber: chorusReferenceSchema,
+  })
+  .strict()
+
+export type AcceptQuoteInput = z.infer<typeof acceptQuoteSchema>
+
 /** Where an organisation is billed: Henrri wants a structured address on every quote and invoice. */
 export const organisationBillingAddressSchema = z
   .object({

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { CURRENT_TERMS_VERSION, isDeliverableAddress } from "@armurier/shared"
 import type { CartChange, CartView } from "~/types/cart"
-import type { Address, NewAddress } from "~/types/checkout"
+import type { Address } from "~/types/checkout"
 import { cartChangeLabel, earliestHold } from "~/utils/cart"
 import { formatDate, formatEuros } from "~/utils/format"
+import { addressLine, UNDELIVERABLE_MESSAGE } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
 useHead({ title: "Commande — SCS Firearms" })
 
 const { fetchCart, count: cartCount } = useCart()
-const { list: listAddresses, create: createAddress } = useAddresses()
+const { list: listAddresses } = useAddresses()
 const { create: createOrder } = useOrders()
 const router = useRouter()
 
@@ -21,19 +22,6 @@ const loadError = ref(false)
 const shippingId = ref<string>("")
 const billingDifferent = ref(false)
 const billingId = ref<string>("")
-
-const showAddressForm = ref(false)
-const form = reactive<NewAddress>({
-  firstName: "",
-  lastName: "",
-  line1: "",
-  line2: "",
-  postal: "",
-  city: "",
-  phone: "",
-})
-const formError = ref("")
-const savingAddress = ref(false)
 
 // CGV acceptance (story 12.1): explicit, never pre-ticked, and the version
 // shown here is the one sent — and stored — with the order.
@@ -63,7 +51,6 @@ async function load() {
     addresses.value = a
     const def = a.find((x) => x.isDefault) ?? a[0]
     if (def) shippingId.value = def.id
-    showAddressForm.value = a.length === 0
   } catch {
     loadError.value = true
   } finally {
@@ -72,29 +59,11 @@ async function load() {
 }
 onMounted(load)
 
-async function saveAddress() {
-  formError.value = ""
-  if (!form.firstName || !form.lastName || !form.line1 || !form.postal || !form.city) {
-    formError.value = "Renseignez les champs obligatoires."
-    return
-  }
-  savingAddress.value = true
-  try {
-    const created = await createAddress({ ...form, line2: form.line2 || undefined, phone: form.phone || undefined })
-    addresses.value = await listAddresses()
-    shippingId.value = created.id
-    showAddressForm.value = false
-    Object.assign(form, { firstName: "", lastName: "", line1: "", line2: "", postal: "", city: "", phone: "" })
-  } catch {
-    formError.value = "Impossible d'enregistrer l'adresse."
-  } finally {
-    savingAddress.value = false
-  }
+/** A new address was added in the picker: the book is read again (billing lists it too). */
+async function reloadAddresses() {
+  addresses.value = await listAddresses()
 }
 
-// Delivery: metropolitan France, Corsica included (story 12.3). The API refuses
-// anything else; saying so here spares the customer a failed order.
-const UNDELIVERABLE = "Nous livrons uniquement en France métropolitaine, Corse comprise."
 const shippingAddress = computed(() => addresses.value.find((a) => a.id === shippingId.value) ?? null)
 const shippingUndeliverable = computed(
   () => shippingAddress.value !== null && !isDeliverableAddress(shippingAddress.value),
@@ -108,7 +77,7 @@ async function placeOrder() {
     return
   }
   if (shippingUndeliverable.value) {
-    placeError.value = UNDELIVERABLE
+    placeError.value = UNDELIVERABLE_MESSAGE
     return
   }
   if (!termsAccepted.value) {
@@ -145,16 +114,13 @@ async function placeOrder() {
       status === 409 && apiErrorCode(err) === "TermsOutdated"
         ? "Nos conditions générales de vente ont changé depuis l'ouverture de cette page. Rechargez la page pour lire la nouvelle version."
         : status === 422 && apiErrorCode(err) === "UndeliverableAddress"
-          ? UNDELIVERABLE
+          ? UNDELIVERABLE_MESSAGE
           : status === 400
             ? "Votre panier est vide ou invalide."
             : "Impossible de créer la commande."
     placing.value = false
   }
 }
-
-const addressLine = (a: Address) =>
-  `${a.firstName} ${a.lastName} — ${a.line1}${a.line2 ? `, ${a.line2}` : ""}, ${a.postal} ${a.city}`
 </script>
 
 <template>
@@ -172,47 +138,7 @@ const addressLine = (a: Address) =>
         <div class="checkout__main">
           <section aria-labelledby="addr-h">
             <h2 id="addr-h" class="section__h">Adresse de livraison</h2>
-            <p class="addr-zone">Livraison en France métropolitaine, Corse comprise.</p>
-
-            <ul v-if="addresses.length > 0" class="addr-list" role="list">
-              <li v-for="a in addresses" :key="a.id">
-                <label class="addr">
-                  <input v-model="shippingId" type="radio" name="shipping" :value="a.id" />
-                  <span>
-                    <strong v-if="a.label">{{ a.label }}</strong>
-                    {{ addressLine(a) }}
-                  </span>
-                </label>
-              </li>
-            </ul>
-            <p v-if="shippingUndeliverable" class="err" role="alert">{{ UNDELIVERABLE }} Choisissez ou ajoutez une autre adresse.</p>
-
-            <button v-if="!showAddressForm" type="button" class="btn btn-ghost add-btn" @click="showAddressForm = true">
-              Ajouter une adresse
-            </button>
-
-            <form v-else class="addr-form" @submit.prevent="saveAddress">
-              <div class="row">
-                <input v-model="form.firstName" class="input" placeholder="Prénom *" />
-                <input v-model="form.lastName" class="input" placeholder="Nom *" />
-              </div>
-              <input v-model="form.line1" class="input" placeholder="Adresse *" />
-              <input v-model="form.line2" class="input" placeholder="Complément" />
-              <div class="row">
-                <input v-model="form.postal" class="input" placeholder="Code postal *" />
-                <input v-model="form.city" class="input" placeholder="Ville *" />
-              </div>
-              <input v-model="form.phone" class="input" type="tel" placeholder="Téléphone" />
-              <p v-if="formError" class="err" role="alert">{{ formError }}</p>
-              <div class="addr-form__actions">
-                <button type="submit" class="btn btn-primary" :disabled="savingAddress">
-                  {{ savingAddress ? "Enregistrement…" : "Enregistrer" }}
-                </button>
-                <button v-if="addresses.length > 0" type="button" class="btn btn-ghost" @click="showAddressForm = false">
-                  Annuler
-                </button>
-              </div>
-            </form>
+            <ShippingAddressPicker v-model="shippingId" :addresses="addresses" @created="reloadAddresses" />
 
             <label class="billing-toggle">
               <input v-model="billingDifferent" type="checkbox" />
@@ -311,38 +237,6 @@ const addressLine = (a: Address) =>
   color: var(--paper);
   display: block;
 }
-.add-btn {
-  margin-bottom: 1rem;
-}
-.addr-form {
-  display: grid;
-  gap: 0.7rem;
-  margin-bottom: 1rem;
-}
-.row {
-  display: grid;
-  gap: 0.7rem;
-  grid-template-columns: 1fr 1fr;
-}
-.input {
-  width: 100%;
-  height: 46px;
-  padding: 0 0.85rem;
-  color: var(--paper);
-  background: var(--ink-soft);
-  border: 1px solid var(--ink-line);
-  border-radius: var(--radius);
-  font-family: inherit;
-  font-size: var(--fs-base);
-}
-.input:focus {
-  outline: none;
-  border-color: var(--brass);
-}
-.addr-form__actions {
-  display: flex;
-  gap: 0.7rem;
-}
 .billing-toggle {
   display: flex;
   gap: 0.5rem;
@@ -367,11 +261,6 @@ const addressLine = (a: Address) =>
   border-radius: var(--radius);
   padding: 1.5rem;
   align-self: start;
-}
-.addr-zone {
-  margin: -0.4rem 0 0.8rem;
-  font-size: var(--fs-sm);
-  color: var(--paper-dim);
 }
 .cart-changes {
   margin: 0 0 1rem;

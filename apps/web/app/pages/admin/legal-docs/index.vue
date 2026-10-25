@@ -2,6 +2,7 @@
 import { isLegalDocExpired, parisToday } from "@armurier/shared"
 import type { LegalDocDetail, LegalDocQueueItem, Pagination } from "~/types/admin"
 import { formatDate, formatDateTime } from "~/utils/format"
+import { legalDocOwner } from "~/utils/organisation"
 import { docTypeLabel, docVerificationStatus, REJECTION_REASON_OPTIONS, rejectionLabel } from "~/utils/status"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
@@ -136,7 +137,7 @@ function setStatus(s: typeof status.value) {
           <tr v-for="d in docs" :key="d.id" class="row" @click="open(d.id)">
             <td>{{ formatDateTime(d.uploadedAt) }}</td>
             <td>{{ docTypeLabel(d.docType) }}</td>
-            <td class="email">{{ d.user.email }}</td>
+            <td class="email">{{ legalDocOwner(d).name }}<span v-if="d.organisation" class="muted"> · {{ legalDocOwner(d).contact }}</span></td>
             <td>
               <span class="scan" :class="`scan--${d.scanStatus}`">{{ d.scanStatus }}</span>
             </td>
@@ -164,8 +165,8 @@ function setStatus(s: typeof status.value) {
 
         <template v-else-if="selected">
           <p class="eyebrow">{{ docTypeLabel(selected.docType) }}</p>
-          <h2 class="drawer__title">{{ selected.user.firstname }} {{ selected.user.lastname }}</h2>
-          <p class="drawer__email">{{ selected.user.email }}</p>
+          <h2 class="drawer__title">{{ legalDocOwner(selected).name }}</h2>
+          <p class="drawer__email">{{ legalDocOwner(selected).contact }}</p>
 
           <dl class="meta">
             <div><dt>Statut</dt><dd><AdminStatusTag v-bind="docVerificationStatus(selected.verificationStatus)" /></dd></div>
