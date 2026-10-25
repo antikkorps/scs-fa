@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { CANCELLABLE_QUOTE_STATUSES, type QuoteRequestStatus } from "@armurier/shared"
 import type { QuoteRequestDetail } from "~/types/quote"
-import { formatDateTime } from "~/utils/format"
+import { formatDate, formatDateTime, formatEuros } from "~/utils/format"
+import { quoteDownloadUrl } from "~/utils/henrri"
 import { quoteRequestStatus } from "~/utils/organisation"
 import { legalCategoryLabel } from "~/utils/product"
 
 // Story 12.8c — one quote request: its lines as asked, and its cancellation
-// while SCS has not started on it.
+// while SCS has not started on it; then (12.8d) the quote SCS sent, its
+// prices and its PDF.
 definePageMeta({ middleware: "auth" })
 
 const route = useRoute()
@@ -35,6 +37,9 @@ onMounted(async () => {
     else loadError.value = true
   }
 })
+
+const quote = computed(() => request.value?.quote ?? null)
+const quotedLine = (lineId: string) => quote.value?.items.find((item) => item.id === lineId)
 
 const cancellable = computed(() =>
   (CANCELLABLE_QUOTE_STATUSES as readonly QuoteRequestStatus[]).includes(request.value?.status ?? "cancelled"),
@@ -93,9 +98,36 @@ async function cancel() {
                 {{ legalCategoryLabel(line.legalCategory) }}
               </span>
             </span>
-            <span class="line__qty">× {{ line.qty }}</span>
+            <span class="line__qty">
+              × {{ line.qty }}
+              <span v-if="quotedLine(line.id)" class="line__price">
+                {{ formatEuros(quotedLine(line.id)?.unitPriceHt) }} HT l'unité
+              </span>
+            </span>
           </li>
         </ul>
+
+        <p v-if="request.status === 'in_review'" class="meta">
+          Notre équipe prépare votre devis : vous le recevrez par e-mail et le retrouverez ici.
+        </p>
+
+        <section v-if="quote" class="quote" aria-labelledby="quote-title">
+          <h2 id="quote-title" class="quote__h">Devis {{ quote.number }}</h2>
+          <p class="meta">
+            Émis le {{ formatDate(quote.issuedAt) }}<template v-if="quote.validUntil">,
+              valable jusqu'au {{ formatDate(quote.validUntil) }}</template>.
+          </p>
+          <dl class="totals">
+            <div>
+              <dt>Port</dt>
+              <dd>{{ quote.shippingTtc > 0 ? `${formatEuros(quote.shippingTtc)} TTC` : "Port offert" }}</dd>
+            </div>
+            <div><dt>Total HT</dt><dd>{{ formatEuros(quote.totals.totalHt) }}</dd></div>
+            <div><dt>TVA</dt><dd>{{ formatEuros(quote.totals.vatAmount) }}</dd></div>
+            <div class="totals__ttc"><dt>Total TTC</dt><dd>{{ formatEuros(quote.totals.totalTtc) }}</dd></div>
+          </dl>
+          <a :href="quoteDownloadUrl(request.id)" class="btn btn-primary download" download>Télécharger le devis (PDF)</a>
+        </section>
 
         <section v-if="request.message" class="message">
           <h2 class="message__h">Votre message</h2>
@@ -176,6 +208,43 @@ async function cancel() {
 .line__qty {
   white-space: nowrap;
   font-weight: var(--fw-semibold);
+}
+.line__price {
+  display: block;
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
+  text-align: right;
+}
+.quote {
+  margin: 0 0 1.8rem;
+  padding: 1.2rem;
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+}
+.quote__h {
+  font-size: var(--fs-lg);
+  margin: 0 0 0.3rem;
+}
+.totals {
+  margin: 0 0 1.2rem;
+}
+.totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--ink-line);
+}
+.totals dt {
+  color: var(--paper-dim);
+}
+.totals dd {
+  margin: 0;
+}
+.totals__ttc dd {
+  font-weight: var(--fw-semibold);
+  color: var(--brass);
 }
 .message {
   margin-bottom: 1.5rem;

@@ -80,8 +80,19 @@ export interface QuoteRequestLine {
   qty: number
 }
 
+/** The quote as the pro sees it, once Henrri has issued it (story 12.8d). */
+export interface MemberQuote {
+  number: string
+  issuedAt: string | null
+  validUntil: string | null
+  items: Array<{ id: string; qty: number; unitPriceHt: number; lineHt: number }>
+  shippingTtc: number
+  totals: QuoteTotals
+}
+
 export interface QuoteRequestDetail extends Omit<QuoteRequestSummary, "lineCount"> {
   items: QuoteRequestLine[]
+  quote: MemberQuote | null
 }
 
 export interface AdminQuoteRequestRow extends QuoteRequestSummary {
@@ -96,7 +107,29 @@ export interface AdminQuoteRequestLine extends QuoteRequestLine {
   lineDiscountPct: number | null
 }
 
-export interface AdminQuoteRequestDetail extends Omit<QuoteRequestDetail, "items"> {
+export interface QuoteTotals {
+  totalHt: number
+  vatAmount: number
+  totalTtc: number
+}
+
+export interface BillingAddress {
+  line1: string | null
+  line2: string | null
+  postal: string | null
+  city: string | null
+  country: string
+}
+
+/** Story 12.8d — the Henrri quote last queued for the request. */
+export interface HenrriQuoteState {
+  status: "pending" | "draft" | "finalized" | "blocked"
+  number: string | null
+  lastError: string | null
+  finalizedAt: string | null
+}
+
+export interface AdminQuoteRequestDetail extends Omit<QuoteRequestDetail, "items" | "quote"> {
   organisation: {
     id: string
     legalName: string
@@ -106,7 +139,29 @@ export interface AdminQuoteRequestDetail extends Omit<QuoteRequestDetail, "items
     discountPct: number
     net30Allowed: boolean
     showPrices: boolean
+    billingAddress: BillingAddress
+    billingAddressComplete: boolean
   }
   requester: AdminQuoteRequestRow["requester"]
   items: AdminQuoteRequestLine[]
+  sentAt: string | null
+  shippingTtc: number
+  /** Null while a line is unpriced. */
+  totals: QuoteTotals | null
+  /** Frozen when the quote is sent. */
+  totalTtc: number | null
+  /** A line of category A, B or C: the organisation's documents must be judged before acceptance. */
+  requiresDocuments: boolean
+  documentsSufficient: { at: string; by: string } | null
+  henrri: HenrriQuoteState | null
+  /** A Henrri quote is on its way: the quote is locked. */
+  sending: boolean
+}
+
+/** What SCS changes on a quote (adminQuoteUpdateSchema). */
+export interface AdminQuoteChanges {
+  items?: Array<{ id: string; unitPriceHt?: number; discountPct?: number }>
+  shippingTtc?: number
+  validUntil?: string
+  documentsSufficient?: boolean
 }

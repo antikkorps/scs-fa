@@ -1,5 +1,6 @@
 import type { OrganisationStatus, OrganisationType } from "@armurier/shared"
 import type { RegistryCheck } from "~/utils/organisation"
+import type { BillingAddress } from "./quote"
 
 // Story 12.8b — pro accounts, as the API returns them.
 
@@ -55,6 +56,8 @@ export interface AdminOrganisationDetail extends AdminOrganisationRow {
   net30Allowed: boolean
   showPrices: boolean
   updatedAt: string
+  /** Where quotes and invoices are made out to (story 12.8d); prefilled from the registry. */
+  billingAddress: BillingAddress
   /** Other organisations claiming the same SIRET (story 12.9g), oldest first. */
   sameSiret: SameSiretOrganisation[]
 }

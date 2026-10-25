@@ -33,6 +33,8 @@ const REASONS: Record<string, string> = {
   InvalidRefundAmount: "Le montant du remboursement dépasse celui de la commande.",
   MissingBillingAddress: "La commande n'a pas d'adresse de facturation.",
   OrderNotFound: "La commande est introuvable.",
+  UnpricedLine: "Une ligne du devis n'a pas de prix.",
+  QuoteRequestNotFound: "La demande de devis est introuvable.",
   InternalError: "Erreur interne : voir les journaux du serveur.",
 }
 
@@ -74,4 +76,9 @@ export function henrriBlockReason(lastError: string | null): string {
 /** Where a customer downloads an issued invoice or credit note (the BFF adds the session). */
 export function invoiceDownloadUrl(orderId: string, documentId: string): string {
   return `/bff/api/orders/${encodeURIComponent(orderId)}/invoices/${encodeURIComponent(documentId)}/pdf`
+}
+
+/** Where a pro downloads their issued quote (story 12.8d; the BFF adds the session). */
+export function quoteDownloadUrl(quoteRequestId: string): string {
+  return `/bff/api/pro/quote-requests/${encodeURIComponent(quoteRequestId)}/quote.pdf`
 }
