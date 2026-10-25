@@ -14,6 +14,7 @@ import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { orders, shipmentItems, shipments } from "../db/schema.js"
+import { enqueueInvoice } from "../henrri/queue.js"
 import { validationError } from "../http.js"
 import {
   allocatedItems,
@@ -48,6 +49,9 @@ const GATE_MESSAGES = {
  *
  * Every change re-derives the order's shipping status in the same transaction.
  */
+const DAY_MS = 24 * 60 * 60 * 1000
+const NET30_DAYS = 30
+
 export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
   fastify.addHook("preHandler", requireRole("admin"))
@@ -158,6 +162,8 @@ export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
           paymentStatus: orders.paymentStatus,
           legalVerificationStatus: orders.legalVerificationStatus,
           shippingMethod: orders.shippingMethod,
+          paymentTerms: orders.paymentTerms,
+          paymentDueAt: orders.paymentDueAt,
         })
         .from(orders)
         .where(eq(orders.id, current.orderId))
@@ -216,10 +222,20 @@ export const adminShipmentRoutes: FastifyPluginAsync = async (fastify) => {
         tx,
       )
       await recomputeOrderShippingStatus(current.orderId, tx)
-      return { orderId: current.orderId, leftNow: next === "shipped" && current.status !== "shipped" }
+      const leftNow = next === "shipped" && current.status !== "shipped"
+      // Story 12.8d — on invoice, the first dispatch issues the invoice: payment due 30 days on.
+      const invoiceNow = leftNow && order.paymentTerms === "net30" && order.paymentDueAt === null
+      if (invoiceNow) {
+        await tx
+          .update(orders)
+          .set({ paymentDueAt: new Date(Date.now() + NET30_DAYS * DAY_MS), updatedAt: new Date() })
+          .where(eq(orders.id, current.orderId))
+      }
+      return { orderId: current.orderId, leftNow, invoiceNow }
     })
 
     // After the commit: the customer is only told about a dispatch that is recorded.
+    if (outcome.invoiceNow) await enqueueInvoice(outcome.orderId)
     if (outcome.leftNow) await notifyShipmentShipped(params.data.id, request.log)
     return reply.send({ data: await reload(outcome.orderId, params.data.id) })
   })

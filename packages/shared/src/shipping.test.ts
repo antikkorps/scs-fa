@@ -179,6 +179,22 @@ describe("suggestShipmentSplit", () => {
 })
 
 describe("canShipOrder", () => {
+  // Story 12.8d — an organisation "on invoice" pays 30 days after the invoice, issued at dispatch.
+  it("lets an order on invoice leave before it is paid, its documents still in order", () => {
+    expect(
+      canShipOrder({ paymentStatus: "pending", legalVerificationStatus: "docs_verified", paymentTerms: "net30" }),
+    ).toEqual({ ok: true })
+    expect(
+      canShipOrder({ paymentStatus: "pending", legalVerificationStatus: "pending", paymentTerms: "net30" }),
+    ).toEqual({ ok: false, reason: "legal" })
+    expect(
+      canShipOrder({ paymentStatus: "cancelled", legalVerificationStatus: "docs_verified", paymentTerms: "net30" }),
+    ).toEqual({ ok: false, reason: "unpaid" })
+    expect(
+      canShipOrder({ paymentStatus: "pending", legalVerificationStatus: "docs_verified", paymentTerms: "immediate" }),
+    ).toEqual({ ok: false, reason: "unpaid" })
+  })
+
   it("lets a paid order whose dossier is cleared leave", () => {
     expect(canShipOrder({ paymentStatus: "received", legalVerificationStatus: "completed" })).toEqual({ ok: true })
     expect(canShipOrder({ paymentStatus: "partially_refunded", legalVerificationStatus: "docs_verified" })).toEqual({

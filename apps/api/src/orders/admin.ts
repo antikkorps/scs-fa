@@ -147,6 +147,12 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
         items: orders.itemsJson,
         shippingAddress: orders.shippingAddress,
         billingAddress: orders.billingAddress,
+        // Story 12.8d — an order born of a pro quote.
+        quoteRequestId: orders.quoteRequestId,
+        paymentTerms: orders.paymentTerms,
+        paymentDueAt: orders.paymentDueAt,
+        chorusServiceCode: orders.chorusServiceCode,
+        chorusCommitmentNumber: orders.chorusCommitmentNumber,
         user: { id: users.id, email: users.email, firstname: users.firstname, lastname: users.lastname },
       })
       .from(orders)

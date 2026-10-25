@@ -46,6 +46,40 @@ function isCompany(customer: HenrriCustomer): customer is HenrriCompany {
 
 export type HenrriPaymentModeType = "bankCard" | "transfer"
 
+/** Who accepted a quote (story 12.8d): Henrri records it on the quote as its validation. */
+export interface HenrriQuoteSigner {
+  email: string
+  firstName: string
+  lastName: string
+  at: Date
+  ip: string
+}
+
+const PARIS_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Europe/Paris",
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+})
+
+/** Paris' offset from UTC at `at`, in seconds — Henrri asks for it with a validation. */
+export function parisOffsetSeconds(at: Date): number {
+  const parts = Object.fromEntries(PARIS_PARTS.formatToParts(at).map((part) => [part.type, part.value]))
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  )
+  return Math.round((asUtc - Math.floor(at.getTime() / 1000) * 1000) / 1000)
+}
+
 export interface HenrriMilestone {
   id: number
   amount: number
@@ -451,6 +485,29 @@ export function createHenrriClient(options: HenrriClientOptions) {
 
     async deleteDocument(documentId: number): Promise<void> {
       await call("DELETE", `/v1/documents/${documentId}`)
+    },
+
+    /** The quote accepted by its signer: Henrri's "validation" (2 credits). */
+    async validateQuotation(documentId: number, signer: HenrriQuoteSigner): Promise<void> {
+      await required("POST", `/v1/documents/${documentId}/validate`, {
+        email: signer.email,
+        firstName: signer.firstName,
+        lastName: signer.lastName,
+        validationDate: signer.at.toISOString(),
+        timeOffset: parisOffsetSeconds(signer.at),
+        ip: signer.ip,
+      })
+    },
+
+    /** A custom payment-terms text on a draft (a finalized document cannot change). */
+    async setPaymentTermsLabel(documentId: number, label: string): Promise<void> {
+      await required("PUT", `/v1/documents/${documentId}/paymenttermsdisplay`, {
+        showAmounts: true,
+        showPercentages: false,
+        showConditions: true,
+        showDueDates: true,
+        dueLabel: label,
+      })
     },
 
     async finalizeDocument(documentId: number): Promise<HenrriDocument> {

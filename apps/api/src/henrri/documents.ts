@@ -34,6 +34,8 @@ export interface DraftLine {
 export interface DocumentDraft {
   lines: DraftLine[]
   expectedTotalTtc: number
+  /** Story 12.8d — a payment-terms text replacing Henrri's own (an order on invoice). */
+  dueLabel?: string
 }
 
 export type DraftRefusal =

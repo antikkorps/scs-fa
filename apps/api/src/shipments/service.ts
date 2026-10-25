@@ -163,6 +163,7 @@ export async function adminShippingView(order: {
   paymentStatus: string
   legalVerificationStatus: string
   shippingMethod?: string | null
+  paymentTerms?: string
 }) {
   const list = await loadShipments(order.id)
   const gate = canShipOrder(order)
