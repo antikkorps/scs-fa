@@ -189,7 +189,7 @@ export const createOrderSchema = z
 
 // Legal document metadata (the non-file fields of the multipart upload).
 // Multipart values arrive as strings, so dates are validated as ISO YYYY-MM-DD.
-const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected an ISO date (YYYY-MM-DD)")
+export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected an ISO date (YYYY-MM-DD)")
 
 export const legalDocumentMetaSchema = z
   .object({

@@ -1,6 +1,7 @@
 // Story 12.6 — the queue that turns paid orders into Henrri invoices and
-// refunds into credit notes. A Henrri outage never blocks a sale: documents wait
-// in `henrri_documents` and each pass picks up where the last one stopped.
+// refunds into credit notes, and (story 12.8d) the quotes SCS sends to pros. A
+// Henrri outage never blocks a sale: documents wait in `henrri_documents` and
+// each pass picks up where the last one stopped.
 //
 // Idempotence rests on the Henrri draft id, stored as soon as the draft exists
 // (the API has no external reference): a later pass reads it back first and
@@ -19,15 +20,36 @@ import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { henrriDocuments, orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
-import { sendInvoiceAvailableEmail } from "../email.js"
+import { henrriDocuments, orders, paymentCarte, paymentVirement, quoteRequests, refunds, users } from "../db/schema.js"
+import { sendInvoiceAvailableEmail, sendQuoteAvailableEmail } from "../email.js"
 import { env } from "../env.js"
-import { type HenrriBuyer, type HenrriClient, HenrriError, henrriClientFromConfig } from "./client.js"
+import {
+  type HenrriBuyer,
+  type HenrriClient,
+  type HenrriCustomer,
+  type HenrriDocumentKind,
+  HenrriError,
+  henrriClientFromConfig,
+} from "./client.js"
 import { creditNoteFor, type RefundRecord } from "./credit-notes.js"
 import { buildInvoiceDraft, type DocumentDraft, type DraftResult } from "./documents.js"
+import { loadQuotation, type QuotationContext, saveOrganisationCustomer } from "./quotation-source.js"
+import { buildQuotationDraft } from "./quotations.js"
 
 type Logger = Pick<FastifyBaseLogger, "info" | "warn" | "error">
 type HenrriDocumentRow = typeof henrriDocuments.$inferSelect
+/** An invoice or a credit note: the documents of an order. */
+type OrderDocumentRow = HenrriDocumentRow & { orderId: string; kind: "invoice" | "credit_note" }
+
+function isOrderDocument(document: HenrriDocumentRow): document is OrderDocumentRow {
+  return document.kind !== "quotation" && document.orderId !== null
+}
+
+const HENRRI_KINDS: Record<HenrriDocumentRow["kind"], HenrriDocumentKind> = {
+  invoice: "invoice",
+  credit_note: "creditNote",
+  quotation: "quotation",
+}
 
 /** A claim not renewed for this long is considered abandoned (process killed mid-pass). */
 const CLAIM_TIMEOUT_MINUTES = 10
@@ -77,6 +99,37 @@ export async function enqueueCreditNote(refundId: string): Promise<void> {
   await db
     .insert(henrriDocuments)
     .values({ orderId: refund.orderId, refundId, kind: "credit_note", expectedTotalTtc: refund.amountTtc })
+    .onConflictDoNothing()
+}
+
+/**
+ * Queue the quote SCS has just sent (story 12.8d). Idempotent while one is on
+ * its way; a quote Henrri refused goes back to the queue with the request's
+ * current total, and a revision of an issued quote queues a new one.
+ */
+export async function enqueueQuotation(quoteRequestId: string): Promise<void> {
+  const [request] = await db
+    .select({ totalTtc: quoteRequests.totalTtc })
+    .from(quoteRequests)
+    .where(eq(quoteRequests.id, quoteRequestId))
+    .limit(1)
+  if (!request?.totalTtc) return
+  const retried = await db
+    .update(henrriDocuments)
+    .set({
+      status: "pending",
+      expectedTotalTtc: request.totalTtc,
+      lastError: null,
+      claimedAt: null,
+      claimToken: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(henrriDocuments.quoteRequestId, quoteRequestId), eq(henrriDocuments.status, "blocked")))
+    .returning({ id: henrriDocuments.id })
+  if (retried.length > 0) return
+  await db
+    .insert(henrriDocuments)
+    .values({ quoteRequestId, kind: "quotation", expectedTotalTtc: request.totalTtc })
     .onConflictDoNothing()
 }
 
@@ -200,15 +253,22 @@ async function recordDocumentStep(
   detail: { number?: string; reason?: string },
 ) {
   const [document] = await db
-    .select({ orderId: henrriDocuments.orderId, kind: henrriDocuments.kind })
+    .select({
+      orderId: henrriDocuments.orderId,
+      quoteRequestId: henrriDocuments.quoteRequestId,
+      kind: henrriDocuments.kind,
+    })
     .from(henrriDocuments)
     .where(eq(henrriDocuments.id, documentId))
   if (!document) return
   const code = detail.reason?.split(":")[0].trim()
+  // A quote's steps belong to its request's history; an invoice's to its order's.
+  const subject = document.quoteRequestId
+    ? { entityType: "quote_request", entityId: document.quoteRequestId }
+    : { entityType: "henrri_document", entityId: documentId }
   await recordAuditEvent({
     userRole: "system",
-    entityType: "henrri_document",
-    entityId: documentId,
+    ...subject,
     orderId: document.orderId,
     action: `henrri.${document.kind}.${step}`,
     result: step === "issued" ? "success" : "failure",
@@ -284,30 +344,49 @@ async function loadOrder(orderId: string): Promise<OrderContext | null> {
   }
 }
 
+/** Who a document is made out to, and where its Henrri customer id is kept. */
+interface CustomerLink {
+  customer: HenrriCustomer
+  henrriCustomerId: number | null
+  fingerprint: string | null
+  save(customerId: number, fingerprint: string): Promise<void>
+}
+
 /**
- * The buyer's Henrri customer: created once, then rewritten only when the name
- * or billing address changed (each call counts against Henrri's hourly limit),
- * and created again if Henrri no longer knows it.
+ * The Henrri customer — a buyer, or a pro's organisation: created once, then
+ * rewritten only when what we send changed (each call counts against Henrri's
+ * hourly limit), and created again if Henrri no longer knows it.
  */
-async function ensureCustomer(client: HenrriClient, context: OrderContext, buyer: HenrriBuyer): Promise<number> {
-  const fingerprint = JSON.stringify(buyer)
-  let customerId = context.henrriCustomerId
-  if (customerId !== null && fingerprint === context.henrriCustomerFingerprint) return customerId
+async function ensureCustomer(client: HenrriClient, link: CustomerLink): Promise<number> {
+  const fingerprint = JSON.stringify(link.customer)
+  let customerId = link.henrriCustomerId
+  if (customerId !== null && fingerprint === link.fingerprint) return customerId
 
   if (customerId !== null) {
     try {
-      await client.updateCustomer(customerId, buyer)
+      await client.updateCustomer(customerId, link.customer)
     } catch (error) {
       if (!(error instanceof HenrriError) || error.status !== 404) throw error
       customerId = null
     }
   }
-  customerId ??= await client.createCustomer(buyer)
-  await db
-    .update(users)
-    .set({ henrriCustomerId: customerId, henrriCustomerFingerprint: fingerprint })
-    .where(eq(users.id, context.userId))
+  customerId ??= await client.createCustomer(link.customer)
+  await link.save(customerId, fingerprint)
   return customerId
+}
+
+function buyerLink(context: OrderContext, buyer: HenrriBuyer): CustomerLink {
+  return {
+    customer: buyer,
+    henrriCustomerId: context.henrriCustomerId,
+    fingerprint: context.henrriCustomerFingerprint,
+    async save(customerId, fingerprint) {
+      await db
+        .update(users)
+        .set({ henrriCustomerId: customerId, henrriCustomerFingerprint: fingerprint })
+        .where(eq(users.id, context.userId))
+    },
+  }
 }
 
 function numberOf(document: { number: string | null }): string {
@@ -347,9 +426,8 @@ async function issue(
   title: string,
   draft: DocumentDraft,
 ): Promise<{ number: string } | { blocked: true }> {
-  const kind = document.kind === "invoice" ? "invoice" : "creditNote"
   const henrriDocumentId = await client.createDocument({
-    documentTypeId: await client.documentTypeId(kind),
+    documentTypeId: await client.documentTypeId(HENRRI_KINDS[document.kind]),
     customerId,
     title,
   })
@@ -433,7 +511,7 @@ async function creditNoteDraft(document: HenrriDocumentRow, context: OrderContex
   return creditNoteFor(context.source, records[index], records.slice(0, index), orderReference(context.orderId))
 }
 
-async function draftFor(document: HenrriDocumentRow, context: OrderContext): Promise<DraftResult> {
+async function draftFor(document: OrderDocumentRow, context: OrderContext): Promise<DraftResult> {
   if (document.kind === "invoice") return buildInvoiceDraft(context.source)
   return creditNoteDraft(document, context)
 }
@@ -449,39 +527,74 @@ async function invoiceGate(orderId: string): Promise<"ready" | "waiting" | "bloc
   return invoice.status === "finalized" ? "ready" : "waiting"
 }
 
+/** What a document is issued from: its draft, its customer and its title. */
+interface Issuance {
+  draft: DraftResult
+  customer: CustomerLink | null
+  title: string
+}
+
 async function issueDocument(
   client: HenrriClient,
   claimed: Claim,
   document: HenrriDocumentRow,
-  context: OrderContext,
+  issuance: Issuance,
   log: Logger,
 ): Promise<"issued" | "blocked"> {
-  const draft = await draftFor(document, context)
+  const { draft, customer } = issuance
   if (!draft.ok) {
     await block(claimed, draft.reason)
     return "blocked"
   }
-  if (!context.buyer) {
+  if (!customer) {
     await block(claimed, "MissingBillingAddress")
     return "blocked"
   }
 
   let number = await recoverDraft(client, claimed, document, draft.draft)
   if (number === null) {
-    const customerId = await ensureCustomer(client, context, context.buyer)
-    const ref = orderReference(context.orderId)
-    const title = document.kind === "invoice" ? `Commande ${ref}` : `Avoir — commande ${ref}`
-    const issued = await issue(client, claimed, document, customerId, title, draft.draft)
+    const customerId = await ensureCustomer(client, customer)
+    const issued = await issue(client, claimed, document, customerId, issuance.title, draft.draft)
     if ("blocked" in issued) return "blocked"
     number = issued.number
   }
   await write(claimed, { status: "finalized", henrriNumber: number, finalizedAt: new Date(), lastError: null })
   await recordDocumentStep(document.id, "issued", { number })
   log.info(
-    { documentId: document.id, orderId: document.orderId, kind: document.kind, number },
+    {
+      documentId: document.id,
+      ...(document.quoteRequestId ? { quoteRequestId: document.quoteRequestId } : { orderId: document.orderId }),
+      kind: document.kind,
+      number,
+    },
     "Henrri document issued",
   )
   return "issued"
+}
+
+async function orderIssuance(document: OrderDocumentRow, context: OrderContext): Promise<Issuance> {
+  const ref = orderReference(context.orderId)
+  return {
+    draft: await draftFor(document, context),
+    customer: context.buyer ? buyerLink(context, context.buyer) : null,
+    title: document.kind === "invoice" ? `Commande ${ref}` : `Avoir — commande ${ref}`,
+  }
+}
+
+function quotationIssuance(context: QuotationContext): Issuance {
+  const { company } = context
+  return {
+    draft: context.source ? buildQuotationDraft(context.source) : { ok: false, reason: "UnpricedLine" },
+    customer: company
+      ? {
+          customer: company,
+          henrriCustomerId: context.henrriCustomerId,
+          fingerprint: context.henrriCustomerFingerprint,
+          save: (customerId, fingerprint) => saveOrganisationCustomer(context.organisationId, customerId, fingerprint),
+        }
+      : null,
+    title: `Devis ${context.number}`,
+  }
 }
 
 async function runSteps(
@@ -490,16 +603,22 @@ async function runSteps(
   document: HenrriDocumentRow,
   log: Logger,
 ): Promise<ProcessOutcome> {
+  if (!isOrderDocument(document)) return runQuotationSteps(client, claimed, document, log)
   const context = await loadOrder(document.orderId)
   if (!context) return block(claimed, "OrderNotFound")
 
-  if (document.status !== "finalized" && (await issueDocument(client, claimed, document, context, log)) === "blocked") {
+  if (
+    document.status !== "finalized" &&
+    (await issueDocument(client, claimed, document, await orderIssuance(document, context), log)) === "blocked"
+  ) {
     return "blocked"
   }
 
   const [issued] = await db.select().from(henrriDocuments).where(eq(henrriDocuments.id, document.id))
   // The buyer hears of the document as soon as it exists, whatever happens to its payment.
-  if (issued.customerNotifiedAt === null && issued.henrriNumber) await notifyBuyer(claimed, issued, context, log)
+  if (issued.customerNotifiedAt === null && issued.henrriNumber && isOrderDocument(issued)) {
+    await notifyBuyer(claimed, issued, context, log)
+  }
 
   if (issued.kind === "invoice" && issued.paymentRecordedAt === null && issued.heldAt === null) {
     if (issued.henrriDocumentId === null) return hold(claimed, "PaymentNotRecorded: no Henrri document")
@@ -512,10 +631,73 @@ async function runSteps(
 }
 
 /**
+ * A quote is issued, then the request turns `sent` and the requester hears of
+ * it — the e-mail tried again on later passes until it leaves. No payment is
+ * ever recorded against a quote.
+ */
+async function runQuotationSteps(
+  client: HenrriClient,
+  claimed: Claim,
+  document: HenrriDocumentRow,
+  log: Logger,
+): Promise<ProcessOutcome> {
+  const context = document.quoteRequestId ? await loadQuotation(document.quoteRequestId) : null
+  if (!context) return block(claimed, "QuoteRequestNotFound")
+
+  if (document.status !== "finalized") {
+    if ((await issueDocument(client, claimed, document, quotationIssuance(context), log)) === "blocked")
+      return "blocked"
+    await markQuoteSent(context.quoteRequestId)
+  }
+
+  const [issued] = await db.select().from(henrriDocuments).where(eq(henrriDocuments.id, document.id))
+  if (issued.customerNotifiedAt === null && issued.henrriNumber) {
+    try {
+      await sendQuoteAvailableEmail(
+        context.requester.email,
+        {
+          quoteRequestId: context.quoteRequestId,
+          number: context.number,
+          henrriNumber: issued.henrriNumber,
+          amountTtc: Number(issued.expectedTotalTtc),
+          validUntil: context.validUntil,
+        },
+        { userId: context.requester.id },
+      )
+      await write(claimed, { customerNotifiedAt: new Date() })
+    } catch (err) {
+      if (err instanceof ClaimLost) throw err
+      log.warn({ err, documentId: document.id }, "Quote e-mail failed — retried on the next pass")
+    }
+  }
+  await release(claimed, { lastError: null })
+  return "finalized"
+}
+
+/** The request the issued quote answers is now `sent`: the pro can read and accept it. */
+async function markQuoteSent(quoteRequestId: string) {
+  const now = new Date()
+  const [sent] = await db
+    .update(quoteRequests)
+    .set({ status: "sent", sentAt: now, updatedAt: now })
+    .where(and(eq(quoteRequests.id, quoteRequestId), eq(quoteRequests.status, "in_review")))
+    .returning({ id: quoteRequests.id })
+  if (!sent) return
+  await recordAuditEvent({
+    userRole: "system",
+    entityType: "quote_request",
+    entityId: quoteRequestId,
+    action: "quote_request.sent",
+    oldValue: { status: "in_review" },
+    newValue: { status: "sent" },
+  })
+}
+
+/**
  * "Your invoice / credit note is available". A mail failure is no Henrri
  * failure: the document stays issued and the next pass tries the mail again.
  */
-async function notifyBuyer(claimed: Claim, document: HenrriDocumentRow, context: OrderContext, log: Logger) {
+async function notifyBuyer(claimed: Claim, document: OrderDocumentRow, context: OrderContext, log: Logger) {
   try {
     await sendInvoiceAvailableEmail(context.email, {
       orderId: context.orderId,
@@ -580,7 +762,7 @@ export async function processHenrriDocument(
 async function processDocument(client: HenrriClient, documentId: string, log: Logger): Promise<ProcessOutcome> {
   const [queued] = await db.select().from(henrriDocuments).where(eq(henrriDocuments.id, documentId)).limit(1)
   if (!queued) return "skipped"
-  if (queued.kind === "credit_note" && queued.status !== "finalized") {
+  if (queued.kind === "credit_note" && queued.orderId && queued.status !== "finalized") {
     const gate = await invoiceGate(queued.orderId)
     if (gate === "waiting") return "waiting"
     if (gate === "blocked") {

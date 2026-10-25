@@ -4,7 +4,7 @@
 
 import type { DraftArticle, DraftLine } from "./documents.js"
 
-export type HenrriDocumentKind = "invoice" | "creditNote"
+export type HenrriDocumentKind = "invoice" | "creditNote" | "quotation"
 
 export interface HenrriDocument {
   id: number
@@ -15,11 +15,33 @@ export interface HenrriDocument {
   totalTtc: number
 }
 
+export interface HenrriAddress {
+  line1: string
+  line2: string | null
+  postal: string
+  city: string
+  country: string
+}
+
 /** Who the invoice is made out to. No e-mail: not needed on an invoice (decision 2026-10-14). */
 export interface HenrriBuyer {
   firstName: string
   lastName: string
-  address: { line1: string; line2: string | null; postal: string; city: string; country: string }
+  address: HenrriAddress
+}
+
+/** A pro's organisation (story 12.8d): its quotes are made out to the company, the requester its contact. */
+export interface HenrriCompany {
+  companyName: string
+  siret: string
+  contact: { firstName: string; lastName: string }
+  address: HenrriAddress
+}
+
+export type HenrriCustomer = HenrriBuyer | HenrriCompany
+
+function isCompany(customer: HenrriCustomer): customer is HenrriCompany {
+  return "siret" in customer
 }
 
 export type HenrriPaymentModeType = "bankCard" | "transfer"
@@ -150,18 +172,35 @@ function errorFrom(status: number, body: unknown): HenrriError {
   return new HenrriError(code, status, message)
 }
 
-function customerBody(buyer: HenrriBuyer) {
-  const { address } = buyer
+function addressBody(address: HenrriAddress) {
   return {
-    name: `${buyer.firstName} ${buyer.lastName}`,
-    type: "individual",
-    address: {
-      address: address.line2 ? `${address.line1}\n${address.line2}` : address.line1,
-      postCode: address.postal,
-      city: address.city,
-      country: COUNTRY_NAMES.of(address.country) ?? address.country,
-    },
+    address: address.line2 ? `${address.line1}\n${address.line2}` : address.line1,
+    postCode: address.postal,
+    city: address.city,
+    country: COUNTRY_NAMES.of(address.country) ?? address.country,
   }
+}
+
+function customerBody(customer: HenrriCustomer) {
+  if (isCompany(customer)) {
+    return {
+      name: customer.companyName,
+      type: "professional",
+      companyIdentifierType: "siret",
+      siret: customer.siret,
+      address: addressBody(customer.address),
+    }
+  }
+  return {
+    name: `${customer.firstName} ${customer.lastName}`,
+    type: "individual",
+    address: addressBody(customer.address),
+  }
+}
+
+function primaryContact(customer: HenrriCustomer) {
+  const { firstName, lastName } = isCompany(customer) ? customer.contact : customer
+  return { firstName, lastName, isPrimary: true }
 }
 
 function lineBody(typeId: number, itemId: number, line: DraftLine) {
@@ -361,21 +400,21 @@ export function createHenrriClient(options: HenrriClientOptions) {
       return id
     },
 
-    async createCustomer(buyer: HenrriBuyer): Promise<number> {
+    async createCustomer(customer: HenrriCustomer): Promise<number> {
       const created = await required<{ id: number }>("POST", "/v1/customers", {
-        ...customerBody(buyer),
-        contacts: [{ firstName: buyer.firstName, lastName: buyer.lastName, isPrimary: true }],
+        ...customerBody(customer),
+        contacts: [primaryContact(customer)],
       })
       return created.id
     },
 
     /**
      * A customer PUT replaces the whole record, so the stored one is read first and
-     * only the name and address change: what the accountant set in Henrri (account
+     * only the name, SIRET and address change: what the accountant set in Henrri (account
      * number, VAT number, comment…) is kept. Contacts cannot travel in a PUT
      * (PUT_WITH_CUSTOMER), nor links.
      */
-    async updateCustomer(customerId: number, buyer: HenrriBuyer): Promise<void> {
+    async updateCustomer(customerId: number, customer: HenrriCustomer): Promise<void> {
       const {
         contacts: _contacts,
         links: _links,
@@ -384,7 +423,7 @@ export function createHenrriClient(options: HenrriClientOptions) {
       // Henrri reads empty fields back ("" for a VAT number) but refuses to write
       // them (sandbox, 2026-10-14): only the filled ones are sent back.
       const filled = Object.fromEntries(Object.entries(stored).filter(([, value]) => value !== "" && value !== null))
-      await required("PUT", `/v1/customers/${customerId}`, { ...filled, id: customerId, ...customerBody(buyer) })
+      await required("PUT", `/v1/customers/${customerId}`, { ...filled, id: customerId, ...customerBody(customer) })
     },
 
     async createDocument(input: { documentTypeId: number; customerId: number; title: string }): Promise<number> {

@@ -3,7 +3,7 @@
 // payment milestone per document, a partial payment carrying the rest over.
 
 import { computeVatTotals } from "@armurier/shared"
-import type { HenrriBuyer, HenrriClient, HenrriDocument, HenrriMilestone, HenrriPayment } from "../henrri/client.js"
+import type { HenrriClient, HenrriCustomer, HenrriDocument, HenrriMilestone, HenrriPayment } from "../henrri/client.js"
 import { HenrriError } from "../henrri/client.js"
 import type { DraftLine } from "../henrri/documents.js"
 
@@ -20,11 +20,11 @@ interface FakeDocument {
 
 type Method = keyof HenrriClient
 
-export const FAKE_TYPES = { invoice: 1, creditNote: 2 } as const
+export const FAKE_TYPES = { invoice: 1, creditNote: 2, quotation: 5 } as const
 export const FAKE_MODES = { bankCard: 3, transfer: 4 } as const
 
 export function createFakeHenrri() {
-  const customers = new Map<number, HenrriBuyer>()
+  const customers = new Map<number, HenrriCustomer>()
   const documents = new Map<number, FakeDocument>()
   const failures = new Map<Method, HenrriError[]>()
   const hooks = new Map<Method, Array<() => Promise<void>>>()

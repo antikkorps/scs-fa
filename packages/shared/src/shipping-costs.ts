@@ -130,6 +130,12 @@ function allocate(amountTtc: number, lines: ShippableLine[]): ShippingPortion[] 
     .filter((p) => p.amountTtc > 0)
 }
 
+/** A delivery amount typed by hand on a quote (story 12.8d), split as the grid would split it. */
+export function spreadShippingTtc(amountTtc: number, lines: ShippableLine[]): ShippingPortion[] {
+  if (amountTtc <= 0 || lines.length === 0) return []
+  return allocate(amountTtc, lines)
+}
+
 /** Price the delivery of a cart (or an order being placed) against a rate grid. */
 export function computeShippingCost(lines: readonly ShippableLine[], rates: ShippingRates): ShippingQuote {
   const breakdown: ShippingBreakdownEntry[] = []
