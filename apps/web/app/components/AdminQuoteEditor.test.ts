@@ -55,6 +55,10 @@ const quote = (overrides: Partial<AdminQuoteRequestDetail> = {}): AdminQuoteRequ
   documentsSufficient: null,
   henrri: null,
   sending: false,
+  organisationDocuments: [
+    { id: "doc1", docType: "agrement_armurier", verificationStatus: "approved", expiresAt: "2030-12-31" },
+    { id: "doc2", docType: "autorisation_commerce", verificationStatus: "pending", expiresAt: null },
+  ],
   ...overrides,
 })
 
@@ -116,6 +120,20 @@ describe("AdminQuoteEditor (story 12.8d)", () => {
     expect(callTo("/admin/quote-requests/r1")?.[1]).toEqual({ method: "PATCH", body: { documentsSufficient: true } })
     const free = await mountEditor(quote({ requiresDocuments: false }))
     expect(free.find("input[name='documents-sufficient']").exists()).toBe(false)
+  })
+
+  it("shows the organisation's documents beside the verdict, and where to review them", async () => {
+    const wrapper = await mountEditor()
+
+    const documents = wrapper.find(".org-docs")
+    expect(documents.text()).toContain("Agrément d'armurier")
+    expect(documents.text()).toContain("Approuvé")
+    expect(documents.text()).toContain("Autorisation de commerce (AFCI)")
+    expect(documents.text()).toContain("À vérifier")
+    expect(documents.find("a[href='/admin/legal-docs']").exists()).toBe(true)
+
+    const none = await mountEditor(quote({ organisationDocuments: [] }))
+    expect(none.find(".org-docs").text()).toContain("Aucun justificatif")
   })
 
   it("sends the quote through Henrri", async () => {

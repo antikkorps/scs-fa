@@ -38,7 +38,9 @@ const cardSettled = computed(() => cardPaidLocal.value || carte.value?.status ==
 const virementPending = computed(() => virement.value?.status === "awaiting_transfer")
 // Story 12.9a: an order left unpaid past its deadline is cancelled, its items back on sale.
 const cancelled = computed(() => order.value?.paymentStatus === "cancelled")
-const deadlineNote = computed(() => paymentDeadlineNote(order.value?.paymentDueAt))
+const deadlineNote = computed(() => paymentDeadlineNote(order.value?.paymentDueAt, order.value?.paymentTerms))
+// Story 12.8d — a pro order born of a quote: its documents were judged on the quote.
+const fromQuote = computed(() => Boolean(order.value?.quoteRequestId))
 
 // The legal-verification status is only worth surfacing once the document
 // workflow is actually under way. Before that (e.g. "payment_pending"), it would
@@ -96,7 +98,11 @@ async function declareTransfer() {
         <section v-if="virement && !cancelled" class="pay" aria-labelledby="vir-h">
           <h2 id="vir-h" class="pay__h">Paiement par virement — {{ formatEuros(virement.amountTtc) }}</h2>
           <p class="pay__lede">
-            Les armes réglementées se règlent par virement bancaire. Indiquez impérativement la référence ci-dessous.
+            <template v-if="order.paymentTerms === 'net30'">
+              Réglez la facture par virement dans les 30 jours suivant l'expédition.
+            </template>
+            <template v-else>Les armes réglementées se règlent par virement bancaire.</template>
+            Indiquez impérativement la référence ci-dessous.
           </p>
           <dl class="rib">
             <div><dt>Bénéficiaire</dt><dd>{{ virement.accountHolder ?? "—" }}</dd></div>
@@ -138,7 +144,11 @@ async function declareTransfer() {
           </div>
         </section>
 
-        <p class="order__next">
+        <p v-if="fromQuote" class="order__next">
+          Suivez votre commande depuis
+          <NuxtLink :to="`/compte/commandes/${order.id}`" class="link">son détail</NuxtLink>.
+        </p>
+        <p v-else class="order__next">
           Pour les articles réglementés, envoyez vos documents légaux depuis
           <NuxtLink :to="`/compte/commandes/${order.id}`" class="link">le détail de votre commande</NuxtLink>.
           <NuxtLink to="/boutique" class="link">Retour à la boutique</NuxtLink>

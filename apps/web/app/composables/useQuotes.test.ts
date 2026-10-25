@@ -64,4 +64,21 @@ describe("useQuotes (story 12.8c)", () => {
     await quotes.cancelRequest("r1")
     expect(apiMock).toHaveBeenCalledWith("/pro/quote-requests/r1/cancel", { method: "POST" })
   })
+
+  // Story 12.8d-2 — accepting a quote places its order.
+  it("accepts a quote with the delivery address, the terms and the Chorus Pro references", async () => {
+    apiMock.mockResolvedValueOnce({ data: { id: "o1", totalTtc: 1365.6 } })
+    const quotes = useQuotes()
+    const body = {
+      shippingAddressId: "a1",
+      acceptedTermsVersion: "2026-10-22",
+      chorusServiceCode: "SRV-42",
+      chorusCommitmentNumber: "",
+    }
+
+    const order = await quotes.acceptQuote("r1", body)
+
+    expect(apiMock).toHaveBeenCalledWith("/pro/quote-requests/r1/accept", { method: "POST", body })
+    expect(order.id).toBe("o1")
+  })
 })

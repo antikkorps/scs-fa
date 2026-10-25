@@ -71,6 +71,7 @@ async function submit() {
         <NuxtLink to="/pro/catalogue" class="btn btn-primary">Catalogue professionnel</NuxtLink>
         <NuxtLink to="/pro/demande" class="btn btn-ghost">Ma demande en cours</NuxtLink>
         <NuxtLink to="/pro/demandes" class="btn btn-ghost">Mes demandes de devis</NuxtLink>
+        <NuxtLink to="/pro/documents" class="btn btn-ghost">Justificatifs de l'organisation</NuxtLink>
       </nav>
     </template>
 

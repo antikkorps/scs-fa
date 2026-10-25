@@ -1,4 +1,4 @@
-import { formatDateTime } from "./format"
+import { formatDate, formatDateTime } from "./format"
 
 // French labels for order statuses shown to the customer (mirror the API enums
 // ORDER_PAYMENT_STATUSES / ORDER_LEGAL_STATUSES).
@@ -81,7 +81,29 @@ export function statusTone(status: string | null | undefined): "positive" | "neg
 }
 
 /** Until when an unpaid order can be paid (story 12.9a); empty once there is no deadline. */
-export function paymentDeadlineNote(paymentDueAt: string | null | undefined): string {
+export function paymentDeadlineNote(paymentDueAt: string | null | undefined, paymentTerms?: string): string {
+  // Story 12.8d — on invoice: due 30 days after the invoice, issued at dispatch; never cancelled.
+  if (paymentTerms === "net30") {
+    return paymentDueAt
+      ? `Facture à régler par virement avant le ${formatDate(paymentDueAt)}.`
+      : "Paiement à 30 jours : la facture vous est envoyée à l'expédition, à régler par virement dans les 30 jours."
+  }
   if (!paymentDueAt) return ""
   return `À régler avant le ${formatDateTime(paymentDueAt)}. Passé ce délai, la commande est annulée et les articles remis en vente.`
+}
+
+// Delivery: metropolitan France, Corsica included (story 12.3). The API refuses
+// anything else; saying so in the page spares the customer a failed order.
+export const UNDELIVERABLE_MESSAGE = "Nous livrons uniquement en France métropolitaine, Corse comprise."
+
+/** One address of the book on one line: "Jeanne Armand — 3 quai du Stand, 69002 Lyon". */
+export function addressLine(a: {
+  firstName: string
+  lastName: string
+  line1: string
+  line2: string | null
+  postal: string
+  city: string
+}): string {
+  return `${a.firstName} ${a.lastName} — ${a.line1}${a.line2 ? `, ${a.line2}` : ""}, ${a.postal} ${a.city}`
 }

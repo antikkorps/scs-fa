@@ -285,7 +285,7 @@ useHead({
                 <dt>Âge minimum</dt>
                 <dd>{{ product.ageMinRequired ?? legal.minAge }} ans</dd>
               </div>
-              <div v-if="legal.requiredDocTypes.length > 0">
+              <div v-if="legal.requiredDocTypes.length > 0 && !asksForQuote">
                 <dt>Documents requis</dt>
                 <dd>
                   <ul class="legal__docs">
@@ -294,10 +294,7 @@ useHead({
                 </dd>
               </div>
             </dl>
-            <p v-if="legal.requiresVerification" class="legal__note">
-              La vente est soumise à la vérification de vos documents après la commande.
-              <NuxtLink to="/reglementation" class="legal__more">Comprendre la réglementation</NuxtLink>
-            </p>
+            <ProductLegalNote v-if="legal.requiresVerification" :pro="asksForQuote" />
             <p v-if="product.hasAccessoryRestrictions && product.accessoryRestrictionNotes" class="legal__note">
               {{ product.accessoryRestrictionNotes }}
             </p>
@@ -542,13 +539,6 @@ useHead({
   margin: 1rem 0 0;
   font-size: var(--fs-sm);
   color: var(--paper-dim);
-}
-.legal__more {
-  color: var(--brass);
-  white-space: nowrap;
-  /* Colour alone does not tell a link from the sentence around it (WCAG 1.4.1). */
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 .detail__cta {
   margin-top: 1.75rem;

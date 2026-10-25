@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AdminOrderDetail } from "~/types/admin"
-import { formatDateTime, formatEuros } from "~/utils/format"
+import { formatDate, formatDateTime, formatEuros } from "~/utils/format"
 import { henrriBlockReason, henrriDocumentLabel, henrriDocumentStatus } from "~/utils/henrri"
 import {
   REFUND_KIND_OPTIONS,
@@ -217,6 +217,29 @@ function num(v: unknown): number | null {
       </div>
 
       <div v-else id="panel-detail" role="tabpanel" aria-labelledby="tab-detail">
+      <!-- Story 12.8d — an order born of a pro quote. -->
+      <section v-if="order.quoteRequestId" class="panel pro-order">
+        <h2 class="panel__title">Commande pro, née d'un devis</h2>
+        <dl class="pro-order__meta">
+          <div>
+            <dt>Paiement</dt>
+            <dd>{{ order.paymentTerms === "net30" ? "Sur facture, à 30 jours" : "Immédiat (7 jours)" }}</dd>
+          </div>
+          <div v-if="order.paymentTerms === 'net30'">
+            <dt>Échéance</dt>
+            <dd>
+              <template v-if="order.paymentDueAt">{{ formatDate(order.paymentDueAt) }}</template>
+              <template v-else>Fixée à l'expédition (facture)</template>
+              <span v-if="order.paymentLate" class="late">En retard</span>
+            </dd>
+          </div>
+          <div v-if="order.chorusServiceCode"><dt>Code service</dt><dd>{{ order.chorusServiceCode }}</dd></div>
+          <div v-if="order.chorusCommitmentNumber">
+            <dt>N° d'engagement</dt><dd>{{ order.chorusCommitmentNumber }}</dd>
+          </div>
+        </dl>
+        <NuxtLink to="/admin/devis" class="pro-order__link">Voir les devis</NuxtLink>
+      </section>
       <div class="grid">
         <section class="panel">
           <h2 class="panel__title">Articles</h2>
@@ -452,6 +475,35 @@ function num(v: unknown): number | null {
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   padding: 1.3rem 1.4rem;
+}
+.pro-order {
+  margin-bottom: 1.2rem;
+}
+.pro-order__meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--ink-line);
+}
+.pro-order__meta dt {
+  color: var(--paper-faint);
+  font-size: var(--fs-sm);
+}
+.pro-order__meta dd {
+  margin: 0;
+  text-align: right;
+}
+.late {
+  margin-left: 0.6rem;
+  color: var(--danger);
+  font-weight: var(--fw-semibold);
+}
+.pro-order__link {
+  display: inline-block;
+  margin-top: 0.8rem;
+  color: var(--brass);
+  font-size: var(--fs-sm);
 }
 .panel__title {
   font-size: var(--fs-md);

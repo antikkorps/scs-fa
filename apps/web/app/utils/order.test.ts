@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatDateTime } from "./format.js"
+import { formatDate, formatDateTime } from "./format.js"
 import {
   legalStatusLabel,
   parcelItemLabel,
@@ -56,6 +56,17 @@ describe("statusTone", () => {
     expect(statusTone("failed")).toBe("negative")
     expect(statusTone("docs_rejected")).toBe("negative")
     expect(statusTone("pending")).toBe("neutral")
+  })
+})
+
+describe("paymentDeadlineNote on invoice (story 12.8d)", () => {
+  it("speaks of 30 days after the invoice, never of a cancellation", () => {
+    const before = paymentDeadlineNote(null, "net30")
+    expect(before).toContain("30 jours")
+    expect(before).not.toContain("annulée")
+    const due = paymentDeadlineNote("2026-11-25T10:00:00.000Z", "net30")
+    expect(due).toContain(formatDate("2026-11-25T10:00:00.000Z"))
+    expect(due).not.toContain("annulée")
   })
 })
 

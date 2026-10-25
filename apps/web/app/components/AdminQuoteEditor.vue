@@ -3,6 +3,7 @@ import type { AdminQuoteChanges, AdminQuoteRequestDetail } from "~/types/quote"
 import { formatDate, formatDateTime, formatEuros } from "~/utils/format"
 import { henrriBlockReason } from "~/utils/henrri"
 import { legalCategoryLabel } from "~/utils/product"
+import { docTypeLabel, docVerificationStatus } from "~/utils/status"
 
 // Story 12.8d — SCS prices a quote: each line by discount on the public price
 // or by hand, the delivery (the grid's, editable), the validity, and its
@@ -161,6 +162,21 @@ const canSend = computed(
         </label>
       </div>
 
+      <div v-if="quote.requiresDocuments" class="org-docs">
+        <p class="org-docs__h">Justificatifs de l'organisation</p>
+        <ul v-if="quote.organisationDocuments.length > 0" class="org-docs__list" role="list">
+          <li v-for="doc in quote.organisationDocuments" :key="doc.id" class="org-docs__item">
+            <span>
+              {{ docTypeLabel(doc.docType) }}
+              <span v-if="doc.expiresAt" class="sub">expire le {{ formatDate(doc.expiresAt) }}</span>
+            </span>
+            <AdminStatusTag v-bind="docVerificationStatus(doc.verificationStatus)" />
+          </li>
+        </ul>
+        <p v-else class="sub">Aucun justificatif déposé par l'organisation.</p>
+        <NuxtLink to="/admin/legal-docs" class="sub org-docs__link">Les vérifier dans Documents</NuxtLink>
+      </div>
+
       <label v-if="quote.requiresDocuments" class="check">
         <input name="documents-sufficient" v-model="documentsSufficient" type="checkbox" :disabled="!editable" />
         <span>
@@ -263,6 +279,33 @@ const canSend = computed(
 }
 .field input:disabled {
   color: var(--paper-faint);
+}
+.org-docs {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+}
+.org-docs__h {
+  margin: 0 0 0.5rem;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+.org-docs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.org-docs__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.35rem 0;
+  font-size: var(--fs-sm);
+}
+.org-docs__link {
+  color: var(--brass);
 }
 .check {
   display: flex;

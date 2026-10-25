@@ -156,6 +156,15 @@ export interface AdminOrderDetail {
   }
   /** The order's Henrri invoice and credit notes (story 12.6), invoice first. */
   henrri: HenrriDocumentRow[]
+  /** Story 12.8d — an order born of a pro quote. */
+  quoteRequestId?: string | null
+  paymentTerms?: "immediate" | "net30"
+  /** On invoice: due 30 days after the invoice issued at dispatch. */
+  paymentDueAt?: string | null
+  /** On invoice, past its due date, unpaid. */
+  paymentLate?: boolean
+  chorusServiceCode?: string | null
+  chorusCommitmentNumber?: string | null
 }
 
 export interface HenrriDocumentRow {
@@ -260,7 +269,9 @@ export interface LegalDocQueueItem {
   rejectionReason: string | null
   uploadedAt: string
   overdue: boolean
-  user: OrderCustomer
+  /** A person's document, or (story 12.8d) an organisation's: the other is null. */
+  user: OrderCustomer | null
+  organisation: { id: string; legalName: string } | null
 }
 
 export interface LegalDocDetail extends LegalDocQueueItem {

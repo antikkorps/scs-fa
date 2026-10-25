@@ -27,6 +27,28 @@ import { sendOrderConfirmation } from "./confirmation.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 import { ADDRESS_FIELDS, decrementVariantStock, insertPaymentBuckets, OrderError, toSnapshot } from "./placement.js"
 
+/**
+ * When the customer must have paid. Story 12.9a: past this, an order with no
+ * money in is cancelled — a pro order born of a quote gets the transfer's week
+ * whatever the means. Story 12.8d: on invoice, 30 days after the invoice
+ * issued at dispatch, never cancelled (no date before the dispatch).
+ */
+function paymentDueDate(
+  order: {
+    paymentStatus: string
+    createdAt: Date | null
+    paymentTerms: string
+    invoiceDueAt: Date | null
+    quoteRequestId: string | null
+  },
+  hasTransfer: boolean,
+): Date | null {
+  if (order.paymentStatus !== "pending") return null
+  if (order.paymentTerms === "net30") return order.invoiceDueAt
+  if (!order.createdAt) return null
+  return orderPaymentDeadline(order.createdAt, { hasTransfer: hasTransfer || order.quoteRequestId !== null })
+}
+
 export const orderRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
 
@@ -371,6 +393,10 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         shippingAddress: orders.shippingAddress,
         billingAddress: orders.billingAddress,
         shippingStatus: orders.shippingStatus,
+        // Story 12.8d — an order born of a pro quote.
+        quoteRequestId: orders.quoteRequestId,
+        paymentTerms: orders.paymentTerms,
+        invoiceDueAt: orders.paymentDueAt,
       })
       .from(orders)
       .where(and(eq(orders.id, params.data.id), eq(orders.userId, userId)))
@@ -406,9 +432,10 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
 
     const invoices = await issuedDocumentsOfOrder(order.id)
 
+    const { invoiceDueAt, ...visible } = order
     return reply.code(200).send({
       data: {
-        ...order,
+        ...visible,
         subtotalHt: Number(order.subtotalHt),
         vatAmount: Number(order.vatAmount),
         totalTtc: Number(order.totalTtc),
@@ -417,11 +444,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         shippingCost: Number(order.shippingCost),
         shippingHt: Number(order.shippingHt),
         shipments,
-        // Story 12.9a: past this, an order with no money in is cancelled.
-        paymentDueAt:
-          order.paymentStatus === "pending" && order.createdAt
-            ? orderPaymentDeadline(order.createdAt, { hasTransfer: Boolean(virement) })
-            : null,
+        paymentDueAt: paymentDueDate(order, Boolean(virement)),
         payment: {
           carte: carte ? { status: carte.paymentStatus, amountTtc: Number(carte.amountTtc) } : null,
           virement: virement

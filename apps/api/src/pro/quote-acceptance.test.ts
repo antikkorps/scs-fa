@@ -223,6 +223,22 @@ describe("accepting a quote (story 12.8d)", () => {
     expect(transfer?.amountExpectedTtc).toBe(quote.totalTtc.toFixed(2))
   })
 
+  it("tells the pro, on the order, how long they have to pay", async () => {
+    const quote = await sentQuote()
+    const orderId = (await accept(quote.id)).json().data.id as string
+    const atOnce = (await call("GET", `/api/orders/${orderId}`, pro.token)).json().data
+    const days = (Date.parse(atOnce.paymentDueAt) - Date.parse(atOnce.createdAt)) / DAY_MS
+    expect(days).toBeCloseTo(7, 1)
+    expect(atOnce.paymentTerms).toBe("immediate")
+
+    await setOrganisation({ net30Allowed: true })
+    const onInvoice = await sentQuote({ product: sling, documentsSufficient: false })
+    const net30Id = (await accept(onInvoice.id)).json().data.id as string
+    const net30 = (await call("GET", `/api/orders/${net30Id}`, pro.token)).json().data
+    // Due 30 days after the invoice, issued at dispatch: no date before.
+    expect(net30).toMatchObject({ paymentTerms: "net30", paymentDueAt: null })
+  })
+
   it("asks for the organisation's documents to be judged first when a line is of category A, B or C", async () => {
     const quote = await sentQuote({ documentsSufficient: false })
 

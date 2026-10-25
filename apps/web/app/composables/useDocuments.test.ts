@@ -74,4 +74,14 @@ describe("useDocuments", () => {
     expect(apiMock).toHaveBeenCalledWith("/orders/o1/legal")
     expect(res.requiresVerification).toBe(true)
   })
+
+  // Story 12.8d — an organisation's documents, filed on its own account.
+  it("works on the organisation's documents from another base path", async () => {
+    apiMock.mockResolvedValue({ data: [] })
+    const docs = useDocuments("/pro/documents")
+    await docs.list()
+    expect(apiMock).toHaveBeenCalledWith("/pro/documents")
+    await docs.remove("d1")
+    expect(apiMock).toHaveBeenCalledWith("/pro/documents/d1", { method: "DELETE" })
+  })
 })

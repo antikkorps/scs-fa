@@ -101,6 +101,33 @@ beforeEach(() => {
 
 const mounted = () => mountSuspended(OrderPage, { route: `/admin/orders/${ORDER_ID}` })
 
+describe("admin order — born of a pro quote (story 12.8d)", () => {
+  it("shows payment on invoice, its due date, lateness and the Chorus Pro references", async () => {
+    current = order({
+      paymentStatus: "pending",
+      quoteRequestId: "q-1",
+      paymentTerms: "net30",
+      paymentDueAt: "2026-11-25T10:00:00.000Z",
+      paymentLate: true,
+      chorusServiceCode: "SRV-42",
+      chorusCommitmentNumber: "EJ-2026-118",
+    })
+    const wrapper = await mounted()
+
+    const pro = wrapper.find(".pro-order")
+    expect(pro.text()).toContain("Sur facture, à 30 jours")
+    expect(pro.text()).toContain("25 nov. 2026")
+    expect(pro.text()).toContain("En retard")
+    expect(pro.text()).toContain("SRV-42")
+    expect(pro.text()).toContain("EJ-2026-118")
+    expect(pro.find("a[href='/admin/devis']").exists()).toBe(true)
+  })
+
+  it("shows nothing of the kind for a shop order", async () => {
+    expect((await mounted()).find(".pro-order").exists()).toBe(false)
+  })
+})
+
 describe("admin order — Henrri invoicing (story 12.6)", () => {
   it("shows the invoice with its number and state", async () => {
     const wrapper = await mounted()

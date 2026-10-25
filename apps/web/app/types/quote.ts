@@ -88,6 +88,21 @@ export interface MemberQuote {
   items: Array<{ id: string; qty: number; unitPriceHt: number; lineHt: number }>
   shippingTtc: number
   totals: QuoteTotals
+  /** 12.8d-2 — whether it can be accepted now, and why not. */
+  acceptable: boolean
+  refusal: "QuoteExpired" | "DocumentsRequired" | null
+  /** The organisation pays on invoice, 30 days after the invoice. */
+  net30: boolean
+  /** The order placed from it, once accepted. */
+  orderId: string | null
+}
+
+/** What the pro sends to accept a quote (acceptQuoteSchema). */
+export interface AcceptQuoteBody {
+  shippingAddressId: string
+  acceptedTermsVersion: string
+  chorusServiceCode?: string
+  chorusCommitmentNumber?: string
 }
 
 export interface QuoteRequestDetail extends Omit<QuoteRequestSummary, "lineCount"> {
@@ -156,6 +171,13 @@ export interface AdminQuoteRequestDetail extends Omit<QuoteRequestDetail, "items
   henrri: HenrriQuoteState | null
   /** A Henrri quote is on its way: the quote is locked. */
   sending: boolean
+  /** 12.8d-2 — what SCS judges "sufficient" on. */
+  organisationDocuments: Array<{
+    id: string
+    docType: string
+    verificationStatus: string
+    expiresAt: string | null
+  }>
 }
 
 /** What SCS changes on a quote (adminQuoteUpdateSchema). */
