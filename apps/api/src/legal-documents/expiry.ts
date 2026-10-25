@@ -12,25 +12,33 @@ import { db } from "../db/client.js"
 import { legalDocuments } from "../db/schema.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { startPeriodicJob } from "../periodic-job.js"
+import type { DocumentOwner } from "./upload.js"
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+function ownedBy(owner: DocumentOwner | undefined) {
+  if (!owner) return undefined
+  return "userId" in owner
+    ? eq(legalDocuments.userId, owner.userId)
+    : eq(legalDocuments.organisationId, owner.organisationId)
+}
 // A rejected document is already out of the way: only these can still count.
 const EXPIRABLE_STATUSES = ["pending", "approved"] as const
 
 /**
- * Mark the documents past their expiry date — every customer's, or only one's
- * (`userId`). Idempotent: run it as often as you like.
+ * Mark the documents past their expiry date — every owner's, or only one's (a
+ * person's or, story 12.8d, an organisation's). Idempotent: run it as often as you like.
  */
 export async function expireLegalDocuments(
   today: string = parisToday(),
-  userId?: string,
+  owner?: DocumentOwner,
 ): Promise<{ expired: number }> {
   const expired = await db.transaction(async (tx) => {
     const pastExpiry = and(
       inArray(legalDocuments.verificationStatus, [...EXPIRABLE_STATUSES]),
       isNotNull(legalDocuments.expiresAt),
       lt(legalDocuments.expiresAt, today),
-      userId ? eq(legalDocuments.userId, userId) : undefined,
+      ownedBy(owner),
     )
     const due = await tx
       .select({ id: legalDocuments.id, verificationStatus: legalDocuments.verificationStatus })
@@ -69,8 +77,9 @@ export async function expireLegalDocuments(
   })
 
   // Outside the transaction: the recompute reads the documents just committed.
-  for (const owner of new Set(expired.map((doc) => doc.userId))) {
-    await recomputeOrderLegalStatus(owner)
+  // An organisation's document clears no order by itself: SCS judges it on the quote.
+  for (const userId of new Set(expired.flatMap((doc) => (doc.userId ? [doc.userId] : [])))) {
+    await recomputeOrderLegalStatus(userId)
   }
   return { expired: expired.length }
 }

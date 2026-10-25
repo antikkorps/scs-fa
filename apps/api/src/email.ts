@@ -1,7 +1,7 @@
 import {
+  type AnyLegalDocType,
   escapeHtml,
   type LegalDocRejectionReason,
-  type LegalDocType,
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
   type OrganisationType,
   renderInlinesHtml,
@@ -312,12 +312,18 @@ export async function sendOrganisationRequestAlertEmail(
   })
 }
 
-const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
+const DOC_TYPE_LABELS: Record<AnyLegalDocType, string> = {
   cni: "identity card",
   permis_chasse: "hunting permit",
   autorisation_det: "detention authorization",
   sia: "SIA certificate",
   expertise: "expertise certificate",
+  agrement_armurier: "gunsmith licence",
+  autorisation_commerce: "arms trade authorisation",
+  affiliation_federale: "federation affiliation",
+  autorisation_prefectorale: "prefectoral authorisation",
+  autorisation_cnaps: "CNAPS authorisation",
+  bon_de_commande: "signed purchase order",
 }
 
 const REJECTION_REASON_LABELS: Record<LegalDocRejectionReason, string> = {
@@ -333,7 +339,7 @@ const REJECTION_REASON_LABELS: Record<LegalDocRejectionReason, string> = {
 
 export async function sendLegalDocApprovedEmail(
   to: string,
-  doc: { docType: LegalDocType },
+  doc: { docType: AnyLegalDocType },
   about: EmailAbout = {},
 ): Promise<void> {
   const label = DOC_TYPE_LABELS[doc.docType]
@@ -352,7 +358,7 @@ export async function sendLegalDocApprovedEmail(
 
 export type SlaBreachItem = {
   customerName: string
-  docType: LegalDocType
+  docType: AnyLegalDocType
   deadline: Date
   hoursOverdue: number
 }
@@ -427,7 +433,7 @@ export async function sendErrorAlertEmail(to: string[], item: ErrorAlertItem): P
 
 export async function sendLegalDocRejectedEmail(
   to: string,
-  doc: { docType: LegalDocType; reason: LegalDocRejectionReason; notes?: string | null },
+  doc: { docType: AnyLegalDocType; reason: LegalDocRejectionReason; notes?: string | null },
   about: EmailAbout = {},
 ): Promise<void> {
   const label = DOC_TYPE_LABELS[doc.docType]

@@ -1,9 +1,9 @@
-import type { LegalDocType } from "@armurier/shared"
+import type { AnyLegalDocType } from "@armurier/shared"
 import { and, eq, inArray, isNull, lt } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { recordAuditEvents } from "../audit/record.js"
 import { db } from "../db/client.js"
-import { legalDocuments, users } from "../db/schema.js"
+import { legalDocuments, organisations, users } from "../db/schema.js"
 import { type SlaBreachItem, sendLegalDocSlaBreachEmail } from "../email.js"
 import { env } from "../env.js"
 
@@ -30,9 +30,12 @@ export async function runLegalDocSlaBreachCheck(now: Date = new Date()): Promise
       firstname: users.firstname,
       lastname: users.lastname,
       email: users.email,
+      // Story 12.8d — an organisation's document names the organisation.
+      organisationName: organisations.legalName,
     })
     .from(legalDocuments)
-    .innerJoin(users, eq(users.id, legalDocuments.userId))
+    .leftJoin(users, eq(users.id, legalDocuments.userId))
+    .leftJoin(organisations, eq(organisations.id, legalDocuments.organisationId))
     .where(
       and(
         eq(legalDocuments.verificationStatus, "pending"),
@@ -47,8 +50,8 @@ export async function runLegalDocSlaBreachCheck(now: Date = new Date()): Promise
   if (admins.length === 0) return { breached: breached.length, notified: false }
 
   const items: SlaBreachItem[] = breached.map((d) => ({
-    customerName: `${d.firstname} ${d.lastname}`.trim() || d.email,
-    docType: d.docType as LegalDocType,
+    customerName: d.organisationName ?? (`${d.firstname ?? ""} ${d.lastname ?? ""}`.trim() || d.email || ""),
+    docType: d.docType as AnyLegalDocType,
     deadline: d.deadline as Date,
     hoursOverdue: Math.floor((now.getTime() - (d.deadline as Date).getTime()) / HOUR_MS),
   }))
