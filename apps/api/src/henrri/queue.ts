@@ -213,6 +213,17 @@ function workToDo() {
       eq(henrriDocuments.kind, "invoice"),
       isNull(henrriDocuments.paymentRecordedAt),
       isNull(henrriDocuments.heldAt),
+      // On invoice, once its due date is set, nothing is left to do before the money is in.
+      or(
+        isNull(henrriDocuments.dueDateRecordedAt),
+        inArray(
+          henrriDocuments.orderId,
+          db
+            .select({ id: orders.id })
+            .from(orders)
+            .where(inArray(orders.paymentStatus, [...PAID_STATUSES])),
+        ),
+      ),
     ),
     and(eq(henrriDocuments.status, "finalized"), isNull(henrriDocuments.customerNotifiedAt)),
   )
@@ -764,6 +775,21 @@ async function runSteps(
   // The buyer hears of the document as soon as it exists, whatever happens to its payment.
   if (issued.customerNotifiedAt === null && issued.henrriNumber && isOrderDocument(issued)) {
     await notifyBuyer(claimed, issued, context, log)
+  }
+
+  // On invoice, Henrri's milestone falls due on the order's due date (the text alone said 30 days).
+  if (
+    issued.kind === "invoice" &&
+    issued.dueDateRecordedAt === null &&
+    issued.henrriDocumentId !== null &&
+    context.quote?.net30 &&
+    context.quote.paymentDueAt
+  ) {
+    const unpaid = (await client.paymentMilestones(issued.henrriDocumentId)).find((milestone) => !milestone.paid)
+    if (unpaid) {
+      await client.setMilestoneDueDate(unpaid, issued.henrriDocumentId, parisDate(context.quote.paymentDueAt))
+    }
+    await write(claimed, { dueDateRecordedAt: new Date() })
   }
 
   // An order on invoice is invoiced before it is paid: its payment is recorded once the money is in.

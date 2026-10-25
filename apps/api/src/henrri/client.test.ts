@@ -409,6 +409,18 @@ describe("Henrri client — documents", () => {
     ).rejects.toMatchObject({ code: "DOCUMENT_NOT_QUOTATION" })
   })
 
+  it("dates a payment milestone, keeping its amount", async () => {
+    const fake = fakeHenrri({ "PUT /v1/paymentmilestones/77": () => ({ status: 200, body: { elements: [] } }) })
+    await clientFor(fake).setMilestoneDueDate({ id: 77, amount: 1365.6 }, 42, "2026-11-24")
+    expect(fake.apiCalls()[0].body).toEqual({
+      id: 77,
+      documentId: 42,
+      amount: 1365.6,
+      // ISO with an offset: the spec's "2025-12-31 15:28:45" example is refused (sandbox, 2026-10-25).
+      dueDate: "2026-11-24T12:00:00Z",
+    })
+  })
+
   it("writes a custom payment-terms text on a draft", async () => {
     const fake = fakeHenrri({ "PUT /v1/documents/42/paymenttermsdisplay": () => ({ status: 200 }) })
     await clientFor(fake).setPaymentTermsLabel(42, "Paiement à 30 jours")

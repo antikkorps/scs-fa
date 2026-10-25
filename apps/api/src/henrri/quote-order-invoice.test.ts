@@ -163,6 +163,23 @@ describe("the invoice of an order born of a quote (story 12.8d)", () => {
     expect(henrri.calls).toContain("payMilestone")
   })
 
+  it("on invoice, dates Henrri's payment milestone 30 days on, once, and leaves it alone until paid", async () => {
+    const orderId = await quoteOrder({ net30: true, dueAt: new Date("2026-11-25T10:00:00Z"), shipped: true })
+    await enqueueInvoice(orderId)
+
+    await pass()
+
+    const invoice = await invoiceOf(orderId)
+    expect(invoice?.dueDateRecordedAt).toBeInstanceOf(Date)
+    const issued = henrri.documents.get(invoice?.henrriDocumentId as number)
+    expect(issued?.milestones[0]?.dueDate).toBe("2026-11-25")
+
+    // Unpaid, its work is done: later passes spend no call on it.
+    henrri.calls.length = 0
+    await pass()
+    expect(henrri.calls).toEqual([])
+  })
+
   it("catches up the invoice of an order on invoice that left without it", async () => {
     const orderId = await quoteOrder({ net30: true, dueAt: new Date("2026-11-25T10:00:00Z"), shipped: true })
 

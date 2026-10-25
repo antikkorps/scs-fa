@@ -1,0 +1,1 @@
+ALTER TABLE "henrri_documents" ADD COLUMN "due_date_recorded_at" timestamp;

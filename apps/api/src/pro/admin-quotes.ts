@@ -22,6 +22,7 @@ import {
   isQuoteExpired,
   isQuoteSending,
   quoteTotalOf,
+  retryQuotation,
   startQuote,
   UnknownQuoteLine,
 } from "./quotes.js"
@@ -273,5 +274,26 @@ export const adminQuoteRequestRoutes: FastifyPluginAsync = async (fastify) => {
       )
     }
     return replyWithQuote(reply, params.data.id, 202)
+  })
+
+  /** POST /:id/henrri/retry — the Henrri quote stopped (refused, or held after an incident) goes back to the queue. */
+  fastify.post("/:id/henrri/retry", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) return reply.code(400).send(validationError(params.error.issues))
+
+    const moved = await db.transaction(async (tx) => {
+      const count = await retryQuotation(tx, params.data.id)
+      if (count > 0) {
+        await recordAuditEvent(
+          { ...auditContext(request), entityId: params.data.id, action: "quote_request.henrri_retried" },
+          tx,
+        )
+      }
+      return count
+    })
+    if (moved === 0) {
+      return reply.code(409).send({ error: "NothingToRetry", message: "No Henrri quote is waiting for a retry" })
+    }
+    return replyWithQuote(reply, params.data.id)
   })
 }

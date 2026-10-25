@@ -551,6 +551,22 @@ export function createHenrriClient(options: HenrriClientOptions) {
       }))
     },
 
+    /** Story 12.8d — an invoice on 30 days: its milestone falls due on that day (amount unchanged). */
+    async setMilestoneDueDate(
+      milestone: { id: number; amount: number },
+      documentId: number,
+      day: string,
+    ): Promise<void> {
+      await command("PUT", `/v1/paymentmilestones/${milestone.id}`, {
+        id: milestone.id,
+        documentId,
+        amount: milestone.amount,
+        // Noon UTC is that very day in Paris, summer or winter; the spec's "yyyy-MM-dd HH:mm:ss"
+        // example is refused (sandbox, 2026-10-25).
+        dueDate: `${day}T12:00:00Z`,
+      })
+    },
+
     async payMilestone(milestoneId: number, payment: HenrriPayment): Promise<void> {
       const remainder = payment.amount === undefined ? {} : { amount: payment.amount, ecartDueDate: payment.date }
       await required("POST", `/v1/paymentmilestones/${milestoneId}/pay`, {

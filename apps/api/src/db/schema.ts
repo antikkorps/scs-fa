@@ -2176,6 +2176,8 @@ export const henrriDocuments = pgTable(
     customerNotifiedAt: timestamp("customer_notified_at"),
     // Devis seulement (12.8d-2) : la validation du client enregistrée chez Henrri.
     validatedAt: timestamp("validated_at"),
+    // Facture « sur facture » seulement (12.8d) : l'échéance à 30 jours posée sur le jalon Henrri.
+    dueDateRecordedAt: timestamp("due_date_recorded_at"),
 
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),

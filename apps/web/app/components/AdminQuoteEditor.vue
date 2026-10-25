@@ -42,6 +42,8 @@ const editable = computed(() => props.quote.status === "in_review" && !props.quo
 const blockedReason = computed(() =>
   props.quote.henrri?.status === "blocked" ? henrriBlockReason(props.quote.henrri.lastError) : null,
 )
+// Issued, then stopped for a human (e.g. Henrri refused the pro's acceptance): SCS retries it.
+const heldReason = computed(() => (props.quote.henrri?.held ? henrriBlockReason(props.quote.henrri.lastError) : null))
 const busy = ref(false)
 const error = ref("")
 
@@ -87,6 +89,12 @@ function save() {
   )
 }
 
+function retryHenrri() {
+  return run(() =>
+    api<{ data: AdminQuoteRequestDetail }>(`/admin/quote-requests/${props.quote.id}/henrri/retry`, { method: "POST" }),
+  )
+}
+
 function send() {
   return run(() =>
     api<{ data: AdminQuoteRequestDetail }>(`/admin/quote-requests/${props.quote.id}/send`, { method: "POST" }),
@@ -109,6 +117,11 @@ const canSend = computed(
     <p v-if="blockedReason" class="notice notice--error" role="alert">
       Henrri n'a pas émis le devis. {{ blockedReason }} Corrigez-le puis renvoyez-le.
     </p>
+
+    <div v-if="heldReason" class="notice notice--error" role="alert">
+      <p class="notice__text">Henrri a arrêté le traitement du devis émis. {{ heldReason }}</p>
+      <button type="button" class="btn btn-ghost retry" :disabled="busy" @click="retryHenrri">Relancer chez Henrri</button>
+    </div>
 
     <form v-if="quote.status === 'in_review'" class="form" @submit.prevent="save">
       <ul class="lines" role="list">
@@ -357,6 +370,9 @@ const canSend = computed(
   border-radius: var(--radius);
   padding: 0.7rem 0.9rem;
   margin: 0 0 1rem;
+}
+.notice__text {
+  margin: 0 0 0.6rem;
 }
 .notice--error {
   color: var(--danger);
