@@ -17,11 +17,13 @@ import {
   type ShippingPortion,
   spreadShippingTtc,
 } from "@armurier/shared"
-import { and, asc, desc, eq, inArray } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm"
 import type { DbExecutor } from "../artworks/reservation.js"
 import { db } from "../db/client.js"
 import {
   henrriDocuments,
+  legalDocuments,
+  orders,
   organisations,
   productCategories,
   products,
@@ -239,7 +241,7 @@ export async function adminQuoteView(quoteRequestId: string) {
   if (!row) return null
   const { request } = row
 
-  const [items, [henrri]] = await Promise.all([
+  const [items, [henrri], organisationDocuments] = await Promise.all([
     db
       .select()
       .from(quoteRequestItems)
@@ -256,6 +258,17 @@ export async function adminQuoteView(quoteRequestId: string) {
       .where(eq(henrriDocuments.quoteRequestId, quoteRequestId))
       .orderBy(desc(henrriDocuments.createdAt))
       .limit(1),
+    // Story 12.8d-2 — what SCS judges "sufficient" on: the organisation's documents.
+    db
+      .select({
+        id: legalDocuments.id,
+        docType: legalDocuments.docType,
+        verificationStatus: legalDocuments.verificationStatus,
+        expiresAt: legalDocuments.expiresAt,
+      })
+      .from(legalDocuments)
+      .where(eq(legalDocuments.organisationId, request.organisationId))
+      .orderBy(desc(legalDocuments.uploadedAt)),
   ])
 
   const shippingPortions = request.shippingPortions ?? []
@@ -295,6 +308,7 @@ export async function adminQuoteView(quoteRequestId: string) {
       billingAddressComplete: completeBillingAddress(row.billing) !== null,
     },
     requester: row.requester,
+    organisationDocuments,
     items: items.map((item) => ({
       ...item,
       publicPriceHt: Number(item.publicPriceHt),
@@ -342,20 +356,36 @@ export async function memberQuoteView(request: {
   status: string
   validUntil: Date | null
   shippingPortions: readonly Pick<ShippingPortion, "amountTtc" | "priceHt" | "vatPct">[] | null
+  documentsSufficientAt: Date | null
+  organisationId: string
 }) {
   if (!ISSUED_QUOTE_STATUSES.has(request.status)) return null
   const quotation = await issuedQuotation(request.id)
   if (!quotation) return null
-  const items = await db
-    .select({
-      id: quoteRequestItems.id,
-      qty: quoteRequestItems.qty,
-      quotedPriceHt: quoteRequestItems.quotedPriceHt,
-      vatPct: quoteRequestItems.vatPct,
-    })
-    .from(quoteRequestItems)
-    .where(eq(quoteRequestItems.quoteRequestId, request.id))
-    .orderBy(asc(quoteRequestItems.position))
+  const [items, [organisation], [liveOrder]] = await Promise.all([
+    db
+      .select({
+        id: quoteRequestItems.id,
+        qty: quoteRequestItems.qty,
+        quotedPriceHt: quoteRequestItems.quotedPriceHt,
+        vatPct: quoteRequestItems.vatPct,
+        legalCategory: quoteRequestItems.legalCategory,
+      })
+      .from(quoteRequestItems)
+      .where(eq(quoteRequestItems.quoteRequestId, request.id))
+      .orderBy(asc(quoteRequestItems.position)),
+    db
+      .select({ net30Allowed: organisations.net30Allowed })
+      .from(organisations)
+      .where(eq(organisations.id, request.organisationId)),
+    db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(and(eq(orders.quoteRequestId, request.id), ne(orders.paymentStatus, "cancelled")))
+      .limit(1),
+  ])
+  const regulated = items.some((item) => item.legalCategory !== null && REGULATED_CATEGORIES.has(item.legalCategory))
+  const refusal = acceptanceRefusal(request, regulated)
   const lines = items.map((item) => ({
     ...item,
     unitPriceHt: Number(item.quotedPriceHt ?? 0),
@@ -375,5 +405,22 @@ export async function memberQuoteView(request: {
     })),
     shippingTtc: sumTtc(shipping),
     totals: { totalHt: totals.totalHt, vatAmount: totals.vatAmount, totalTtc: totals.totalTtc },
+    // Story 12.8d-2 — what the pro needs to accept it, and the order once accepted.
+    acceptable: request.status === "sent" && refusal === null,
+    refusal,
+    net30: organisation?.net30Allowed === true,
+    orderId: liveOrder?.id ?? null,
   }
+}
+
+/** Why a quote cannot be accepted now, as the acceptance would refuse it; null when it can (or is done). */
+function acceptanceRefusal(
+  request: { status: string; validUntil: Date | null; documentsSufficientAt: Date | null },
+  regulated: boolean,
+): "QuoteExpired" | "DocumentsRequired" | null {
+  if (request.status === "expired") return "QuoteExpired"
+  if (request.status !== "sent") return null
+  if (isQuoteExpired(request.validUntil)) return "QuoteExpired"
+  if (regulated && !request.documentsSufficientAt) return "DocumentsRequired"
+  return null
 }

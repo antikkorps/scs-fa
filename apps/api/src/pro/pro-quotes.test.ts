@@ -121,6 +121,21 @@ describe("a pro's quote (story 12.8d)", () => {
     expect(JSON.stringify(body)).not.toMatch(/publicPriceHt|lineDiscountPct/)
   })
 
+  // Story 12.8d-2 — what the pro needs to accept it.
+  it("tells the pro whether the quote can be accepted, and why not", async () => {
+    const request = await inReview()
+    await issued(request.id)
+
+    const waiting = (await asPro(`/${request.id}`)).json().data.quote
+    expect(waiting).toMatchObject({ acceptable: false, refusal: "DocumentsRequired", net30: false, orderId: null })
+
+    await db
+      .update(quoteRequests)
+      .set({ documentsSufficientAt: new Date(), documentsSufficientBy: admin.id })
+      .where(eq(quoteRequests.id, request.id))
+    expect((await asPro(`/${request.id}`)).json().data.quote).toMatchObject({ acceptable: true, refusal: null })
+  })
+
   it("downloads the quote's PDF, as Henrri made it, and only for its organisation", async () => {
     const request = await inReview()
     const number = await issued(request.id)

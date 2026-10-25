@@ -78,7 +78,12 @@ function withValidityDay<T extends { validUntil: Date | null }>(row: T) {
 
 async function memberRequest(id: string, organisationId: string) {
   const [request] = await db
-    .select({ ...MEMBER_REQUEST_COLUMNS, shippingPortions: quoteRequests.shippingPortions })
+    .select({
+      ...MEMBER_REQUEST_COLUMNS,
+      shippingPortions: quoteRequests.shippingPortions,
+      documentsSufficientAt: quoteRequests.documentsSufficientAt,
+      organisationId: quoteRequests.organisationId,
+    })
     .from(quoteRequests)
     .where(and(eq(quoteRequests.id, id), eq(quoteRequests.organisationId, organisationId)))
   if (!request) return null
@@ -91,7 +96,12 @@ async function memberRequest(id: string, organisationId: string) {
       .orderBy(asc(quoteRequestItems.position)),
     memberQuoteView(request),
   ])
-  const { shippingPortions: _shippingPortions, ...visible } = request
+  const {
+    shippingPortions: _shippingPortions,
+    documentsSufficientAt: _documentsSufficientAt,
+    organisationId: _organisationId,
+    ...visible
+  } = request
   return { ...withValidityDay(visible), items, quote }
 }
 
