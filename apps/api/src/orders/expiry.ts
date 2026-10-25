@@ -13,7 +13,12 @@ import { type DbExecutor, releaseLapsedPrintHolds } from "../artworks/reservatio
 import { recordAuditEvent, recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { orders, paymentCarte, paymentVirement, quoteRequests, users } from "../db/schema.js"
-import { sendInvoiceDueReminderEmail, sendTransferReminderEmail, sendUnpaidOrderCancelledEmail } from "../email.js"
+import {
+  sendCardPaymentReminderEmail,
+  sendInvoiceDueReminderEmail,
+  sendTransferReminderEmail,
+  sendUnpaidOrderCancelledEmail,
+} from "../email.js"
 import { cancelPaymentIntent, retrievePaymentIntent } from "../payments/stripe.js"
 import { settlePayoutsForOrder } from "../payouts/service.js"
 import { startPeriodicJob } from "../periodic-job.js"
@@ -154,8 +159,10 @@ export async function sweepUnpaidOrders(
     const weekRule = hasTransfer || order.quoteRequestId !== null
     if (now >= orderPaymentDeadline(order.createdAt, { hasTransfer: weekRule })) {
       if (await cancelUnpaidOrder(order, log)) cancelled++
-    } else if (hasTransfer && now >= transferReminderDate(order.createdAt)) {
-      if (await remindTransfer(order, log)) reminded++
+    } else if (weekRule && now >= transferReminderDate(order.createdAt)) {
+      // A pro paying by card only (story 12.8d) is reminded too, on the same day.
+      const sent = hasTransfer ? await remindTransfer(order, log) : await remindCardPayment(order, log)
+      if (sent) reminded++
     }
   }
   return { cancelled, reminded }
@@ -183,6 +190,31 @@ async function remindTransfer(order: Candidate, log: Logger): Promise<boolean> {
   } catch (err) {
     await db.update(orders).set({ paymentReminderSentAt: null }).where(eq(orders.id, order.id))
     log.warn({ err, orderId: order.id }, "Transfer reminder e-mail failed — retried on the next sweep")
+    return false
+  }
+}
+
+/** Story 12.8d — a pro order born of a quote, paid by card only, on day 4 of its week. */
+async function remindCardPayment(order: Candidate, log: Logger): Promise<boolean> {
+  if (order.reminderSentAt || !order.createdAt) return false
+  const [claimed] = await db
+    .update(orders)
+    .set({ paymentReminderSentAt: new Date() })
+    .where(and(eq(orders.id, order.id), isNull(orders.paymentReminderSentAt)))
+    .returning({ id: orders.id, totalTtc: orders.totalTtc })
+  if (!claimed) return false
+  try {
+    await sendCardPaymentReminderEmail(order.email, {
+      orderId: order.id,
+      orderRef: orderReference(order.id),
+      firstname: order.firstname,
+      amountTtc: Number(claimed.totalTtc),
+      deadline: orderPaymentDeadline(order.createdAt, { hasTransfer: true }),
+    })
+    return true
+  } catch (err) {
+    await db.update(orders).set({ paymentReminderSentAt: null }).where(eq(orders.id, order.id))
+    log.warn({ err, orderId: order.id }, "Card payment reminder e-mail failed — retried on the next sweep")
     return false
   }
 }

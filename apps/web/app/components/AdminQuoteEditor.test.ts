@@ -138,7 +138,10 @@ describe("AdminQuoteEditor (story 12.8d)", () => {
 
   it("sends the quote through Henrri", async () => {
     apiMock.mockResolvedValue({
-      data: quote({ sending: true, henrri: { status: "pending", number: null, lastError: null, finalizedAt: null } }),
+      data: quote({
+        sending: true,
+        henrri: { status: "pending", number: null, lastError: null, finalizedAt: null, held: false },
+      }),
     })
     const wrapper = await mountEditor()
 
@@ -163,7 +166,10 @@ describe("AdminQuoteEditor (story 12.8d)", () => {
 
   it("locks the quote while Henrri issues it", async () => {
     const wrapper = await mountEditor(
-      quote({ sending: true, henrri: { status: "pending", number: null, lastError: null, finalizedAt: null } }),
+      quote({
+        sending: true,
+        henrri: { status: "pending", number: null, lastError: null, finalizedAt: null, held: false },
+      }),
     )
 
     expect(wrapper.text()).toContain("Émission en cours")
@@ -174,12 +180,39 @@ describe("AdminQuoteEditor (story 12.8d)", () => {
   it("says why Henrri refused the quote, and lets SCS fix it and send again", async () => {
     const wrapper = await mountEditor(
       quote({
-        henrri: { status: "blocked", number: null, lastError: "TotalMismatch: Henrri 10.00", finalizedAt: null },
+        henrri: {
+          status: "blocked",
+          number: null,
+          lastError: "TotalMismatch: Henrri 10.00",
+          finalizedAt: null,
+          held: false,
+        },
       }),
     )
 
     expect(wrapper.text()).toContain("TotalMismatch")
     expect(wrapper.find("button.send").attributes("disabled")).toBeUndefined()
+  })
+
+  it("shows a quote Henrri stopped on after issuing it, and retries it", async () => {
+    const wrapper = await mountEditor(
+      quote({
+        status: "converted",
+        henrri: {
+          status: "finalized",
+          number: "D-26-10-3",
+          lastError: "DOCUMENT_NOT_QUOTATION: refused",
+          finalizedAt: "2026-10-25T11:00:00Z",
+          held: true,
+        },
+      }),
+    )
+
+    expect(wrapper.text()).toContain("DOCUMENT_NOT_QUOTATION")
+    await wrapper.find("button.retry").trigger("click")
+    await flushPromises()
+    expect(callTo("/r1/henrri/retry")?.[1]).toEqual({ method: "POST" })
+    expect(wrapper.emitted("updated")).toHaveLength(1)
   })
 
   it("shows a sent quote read-only, with its Henrri number", async () => {
@@ -188,7 +221,13 @@ describe("AdminQuoteEditor (story 12.8d)", () => {
         status: "sent",
         sentAt: "2026-10-25T11:00:00Z",
         totalTtc: 3979.2,
-        henrri: { status: "finalized", number: "D-26-10-3", lastError: null, finalizedAt: "2026-10-25T11:00:00Z" },
+        henrri: {
+          status: "finalized",
+          number: "D-26-10-3",
+          lastError: null,
+          finalizedAt: "2026-10-25T11:00:00Z",
+          held: false,
+        },
       }),
     )
 

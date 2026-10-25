@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, orders, paymentCarte, paymentVirement, productVariants, quoteRequests } from "../db/schema.js"
-import { sendInvoiceDueReminderEmail, sendUnpaidOrderCancelledEmail } from "../email.js"
+import { sendCardPaymentReminderEmail, sendInvoiceDueReminderEmail, sendUnpaidOrderCancelledEmail } from "../email.js"
 import { remindInvoicesDue, sweepUnpaidOrders } from "../orders/expiry.js"
 import { type Account, type FixtureProduct, proFixtures } from "../test/pro-fixtures.js"
 import { validityDate } from "./quotes.js"
@@ -14,6 +14,7 @@ vi.mock("../email.js", async (importOriginal) => ({
   sendUnpaidOrderCancelledEmail: vi.fn().mockResolvedValue(undefined),
   sendTransferReminderEmail: vi.fn().mockResolvedValue(undefined),
   sendInvoiceDueReminderEmail: vi.fn().mockResolvedValue(undefined),
+  sendCardPaymentReminderEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
 const TAG = "quotepay"
@@ -110,6 +111,7 @@ describe("paying an order born of a quote (story 12.8d)", () => {
   beforeEach(() => {
     vi.mocked(sendUnpaidOrderCancelledEmail).mockClear()
     vi.mocked(sendInvoiceDueReminderEmail).mockClear()
+    vi.mocked(sendCardPaymentReminderEmail).mockClear()
   })
 
   afterAll(async () => {
@@ -143,6 +145,18 @@ describe("paying an order born of a quote (story 12.8d)", () => {
       const events = await db.select().from(auditLogs).where(eq(auditLogs.entityId, quoteRequestId))
       expect(events.map((event) => event.action)).toContain("quote_request.reopened")
       expect(sendUnpaidOrderCancelledEmail).toHaveBeenCalledOnce()
+    })
+
+    it("reminds a pro paying by card on day 4, once, with the payment deadline", async () => {
+      const { orderId } = await quoteOrder({ placedDaysAgo: 5 })
+
+      await sweepUnpaidOrders()
+      await sweepUnpaidOrders()
+
+      const calls = vi.mocked(sendCardPaymentReminderEmail).mock.calls.filter(([, r]) => r.orderId === orderId)
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.[1]).toMatchObject({ amountTtc: 43.2, deadline: expect.any(Date) })
+      expect((await orderOf(orderId))?.paymentReminderSentAt).toBeInstanceOf(Date)
     })
 
     it("leaves the quote expired when its validity has passed meanwhile", async () => {

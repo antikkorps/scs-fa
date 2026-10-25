@@ -24,7 +24,7 @@ interface FakeDocument {
   validatedBy: HenrriQuoteSigner | null
   finalized: boolean
   number: string | null
-  milestones: Array<HenrriMilestone & { paymentModeId: number | null; date: string | null }>
+  milestones: Array<HenrriMilestone & { paymentModeId: number | null; date: string | null; dueDate?: string }>
 }
 
 type Method = keyof HenrriClient
@@ -159,6 +159,17 @@ export function createFakeHenrri() {
     async paymentMilestones(documentId) {
       await track("paymentMilestones")
       return documentOf(documentId).milestones.map(({ id, amount, paid }) => ({ id, amount, paid }))
+    },
+    async setMilestoneDueDate(milestone, _documentId, day) {
+      await track("setMilestoneDueDate")
+      for (const document of documents.values()) {
+        const found = document.milestones.find((candidate) => candidate.id === milestone.id)
+        if (found) {
+          found.dueDate = day
+          return
+        }
+      }
+      throw new HenrriError("NotFound", 404, `No milestone ${milestone.id}`)
     },
     async payMilestone(milestoneId: number, payment: HenrriPayment) {
       await track("payMilestone")

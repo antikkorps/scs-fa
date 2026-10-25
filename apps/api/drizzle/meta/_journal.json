@@ -281,6 +281,13 @@
       "when": 1792942242995,
       "tag": "0039_story_12_8d_acceptance",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792950458135,
+      "tag": "0040_story_12_8d_due_date",
+      "breakpoints": true
     }
   ]
 }

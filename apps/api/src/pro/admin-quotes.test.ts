@@ -212,6 +212,42 @@ describe("quote requests in the back-office (story 12.8c)", () => {
       expect(refused.json().error).toBe("InvalidStatusTransition")
     })
 
+    // A quote Henrri stopped on after it was issued (e.g. a refused validation): SCS sees it and retries.
+    it("shows a quote held after a Henrri incident, and retries it", async () => {
+      const request = await inReview()
+      const [held] = await db
+        .insert(henrriDocuments)
+        .values({
+          quoteRequestId: request.id,
+          kind: "quotation",
+          status: "finalized",
+          henrriNumber: `HQ-${Date.now() % 1e6}`,
+          expectedTotalTtc: "100.00",
+          heldAt: new Date(),
+          lastError: "DOCUMENT_NOT_QUOTATION: refused",
+        })
+        .returning({ id: henrriDocuments.id })
+
+      const view = (await asAdmin("GET", `/${request.id}`)).json().data
+      expect(view.henrri).toMatchObject({
+        status: "finalized",
+        held: true,
+        lastError: "DOCUMENT_NOT_QUOTATION: refused",
+      })
+
+      const retried = await asAdmin("POST", `/${request.id}/henrri/retry`)
+      expect(retried.statusCode).toBe(200)
+      expect(retried.json().data.henrri).toMatchObject({ held: false, lastError: null })
+      const [row] = await db.select().from(henrriDocuments).where(eq(henrriDocuments.id, held.id))
+      expect(row?.heldAt).toBeNull()
+      const events = await db.select().from(auditLogs).where(eq(auditLogs.entityId, request.id))
+      expect(events.map((event) => event.action)).toContain("quote_request.henrri_retried")
+
+      const nothing = await asAdmin("POST", `/${request.id}/henrri/retry`)
+      expect(nothing.statusCode).toBe(409)
+      expect(nothing.json().error).toBe("NothingToRetry")
+    })
+
     describe("POST /:id/send", () => {
       it("needs the organisation's billing address", async () => {
         const request = await inReview()

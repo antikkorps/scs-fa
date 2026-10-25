@@ -44,6 +44,7 @@ type EmailType =
   | "quote_request_received"
   | "quote_available"
   | "invoice_due_reminder"
+  | "card_payment_reminder"
   | "transfer_reminder"
   | "unpaid_order_cancelled"
 
@@ -625,6 +626,31 @@ export async function sendTransferReminderEmail(to: string, r: TransferReminderE
       `Vos articles restent réservés jusqu'au ${PARIS_DATETIME.format(r.deadline)}. Sans paiement à cette date, la commande sera annulée et les articles remis en vente.`,
       `Les coordonnées bancaires figurent sur la page de votre commande : ${orderUrl}`,
       "Si vous avez déjà fait le virement, signalez-le depuis cette page : nous le rapprocherons dès son arrivée.",
+    ],
+  )
+}
+
+export interface CardPaymentReminderEmail {
+  orderId: string
+  orderRef: string
+  firstname: string | null
+  amountTtc: number
+  deadline: Date
+}
+
+/** Story 12.8d — a pro order born of a quote, paid by card, still unpaid on day 4. */
+export async function sendCardPaymentReminderEmail(to: string, r: CardPaymentReminderEmail): Promise<void> {
+  const orderUrl = `${env.WEB_BASE_URL}/commande/${r.orderId}`
+  await deliverParagraphs(
+    "card_payment_reminder",
+    { orderId: r.orderId },
+    to,
+    `Votre paiement pour la commande ${r.orderRef}`,
+    [
+      r.firstname ? `Bonjour ${r.firstname},` : "Bonjour,",
+      `Nous n'avons pas encore reçu le paiement de ${EUROS.format(r.amountTtc)} de la commande ${r.orderRef}, issue de votre devis.`,
+      `Les articles restent réservés jusqu'au ${PARIS_DATETIME.format(r.deadline)}. Sans paiement à cette date, la commande sera annulée ; le devis redeviendra acceptable tant qu'il est valable.`,
+      `Réglez par carte depuis la page de la commande : ${orderUrl}`,
     ],
   )
 }

@@ -142,6 +142,8 @@ export interface HenrriQuoteState {
   number: string | null
   lastError: string | null
   finalizedAt: string | null
+  /** Issued, then stopped for a human (e.g. a refused validation). */
+  held: boolean
 }
 
 export interface AdminQuoteRequestDetail extends Omit<QuoteRequestDetail, "items" | "quote"> {

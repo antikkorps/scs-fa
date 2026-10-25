@@ -17,7 +17,7 @@ import {
   type ShippingPortion,
   spreadShippingTtc,
 } from "@armurier/shared"
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm"
 import type { DbExecutor } from "../artworks/reservation.js"
 import { db } from "../db/client.js"
 import {
@@ -253,6 +253,7 @@ export async function adminQuoteView(quoteRequestId: string) {
         number: henrriDocuments.henrriNumber,
         lastError: henrriDocuments.lastError,
         finalizedAt: henrriDocuments.finalizedAt,
+        heldAt: henrriDocuments.heldAt,
       })
       .from(henrriDocuments)
       .where(eq(henrriDocuments.quoteRequestId, quoteRequestId))
@@ -299,7 +300,16 @@ export async function adminQuoteView(quoteRequestId: string) {
       request.documentsSufficientAt && request.documentsSufficientBy
         ? { at: request.documentsSufficientAt, by: request.documentsSufficientBy }
         : null,
-    henrri: henrri ?? null,
+    henrri: henrri
+      ? {
+          status: henrri.status,
+          number: henrri.number,
+          lastError: henrri.lastError,
+          finalizedAt: henrri.finalizedAt,
+          // Issued, then stopped for a human (e.g. a refused validation): SCS retries it.
+          held: henrri.heldAt !== null,
+        }
+      : null,
     sending: henrri !== undefined && (QUOTE_IN_FLIGHT as readonly string[]).includes(henrri.status),
     organisation: {
       ...row.organisation,
@@ -423,4 +433,22 @@ function acceptanceRefusal(
   if (isQuoteExpired(request.validUntil)) return "QuoteExpired"
   if (regulated && !request.documentsSufficientAt) return "DocumentsRequired"
   return null
+}
+
+/**
+ * Puts the request's Henrri quote back in the queue: a refused one is issued
+ * again, a held one resumes its next step. Returns how many rows moved.
+ */
+export async function retryQuotation(executor: DbExecutor, quoteRequestId: string): Promise<number> {
+  const released = await executor
+    .update(henrriDocuments)
+    .set({ heldAt: null, lastError: null, claimedAt: null, claimToken: null, updatedAt: new Date() })
+    .where(and(eq(henrriDocuments.quoteRequestId, quoteRequestId), isNotNull(henrriDocuments.heldAt)))
+    .returning({ id: henrriDocuments.id })
+  const reopened = await executor
+    .update(henrriDocuments)
+    .set({ status: "pending", lastError: null, claimedAt: null, claimToken: null, updatedAt: new Date() })
+    .where(and(eq(henrriDocuments.quoteRequestId, quoteRequestId), eq(henrriDocuments.status, "blocked")))
+    .returning({ id: henrriDocuments.id })
+  return released.length + reopened.length
 }
