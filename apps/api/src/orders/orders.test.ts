@@ -21,6 +21,7 @@ import {
 } from "../db/schema.js"
 import { sendOrderConfirmationEmail } from "../email.js"
 import { pinShippingRates } from "../test/shipping-rates.js"
+import { signIn } from "../test/sign-in.js"
 import { resendPendingConfirmations, sendOrderConfirmation } from "./confirmation.js"
 
 // The confirmation e-mail is sent in the background of every order (story 12.1):
@@ -243,9 +244,7 @@ describe("orders (POST /api/orders)", () => {
       .returning({ id: artworkPrints.id })
     printId = print.id
 
-    const loginAs = async (email: string) =>
-      (await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })).json()
-        .accessToken
+    const loginAs = async (email: string) => (await signIn(app, { email, password: PASSWORD })).json().accessToken
     token = await loginAs(EMAIL)
     otherToken = await loginAs(EMAIL_OTHER)
   })

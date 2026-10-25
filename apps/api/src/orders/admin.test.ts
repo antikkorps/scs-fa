@@ -9,6 +9,7 @@ import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { auditLogs, henrriDocuments, orders, paymentCarte, paymentVirement, refunds, users } from "../db/schema.js"
 import { createFakeHenrri } from "../test/henrri-fake.js"
+import { signIn } from "../test/sign-in.js"
 
 const PREFIX = "ADMORD-"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -60,7 +61,7 @@ describe("admin orders dashboard API (Story 7.1)", () => {
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
       .returning({ id: users.id })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return { id: u.id, token: login.json().accessToken as string }
   }
 

@@ -19,6 +19,7 @@ import {
   users,
 } from "../db/schema.js"
 import { storage } from "../storage/index.js"
+import { signIn } from "../test/sign-in.js"
 import { backfillAvifRenditions } from "./service.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
@@ -61,7 +62,7 @@ describe("catalogue media gallery (story 7.5b)", () => {
       rgpdConsentAt: new Date(),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
     })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return login.json().accessToken as string
   }
 

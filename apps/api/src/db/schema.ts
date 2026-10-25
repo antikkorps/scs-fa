@@ -5,6 +5,7 @@
 import { relations, sql } from "drizzle-orm"
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   check,
   customType,
@@ -92,6 +93,9 @@ export const orderShippingStatusEnum = pgEnum("order_shipping_status", [
   "shipped",
   "delivered",
 ])
+// Story 12.8e — what a login challenge waits for.
+export const loginChallengeMethodEnum = pgEnum("login_challenge_method", ["email_code", "totp", "totp_enrollment"])
+
 export const docTypeEnum = pgEnum("doc_type", [
   "cni",
   "permis_chasse",
@@ -212,6 +216,14 @@ export const users = pgTable(
     henrriCustomerId: integer("henrri_customer_id").unique(),
     // Empreinte du nom + adresse envoyés à Henrri : la fiche n'est réécrite que s'ils changent.
     henrriCustomerFingerprint: text("henrri_customer_fingerprint"),
+
+    // Story 12.8e — the authenticator app: secret encrypted (TOTP_ENCRYPTION_KEY),
+    // the last step accepted (a code serves once), the secret of an enrolment
+    // not confirmed yet.
+    totpSecretEncrypted: text("totp_secret_encrypted"),
+    totpEnabledAt: timestamp("totp_enabled_at"),
+    totpLastStep: bigint("totp_last_step", { mode: "number" }),
+    totpPendingSecretEncrypted: text("totp_pending_secret_encrypted"),
 
     // Adresse
     addressStreet: varchar("address_street", { length: 255 }),
@@ -489,13 +501,34 @@ export const passwordResetTokens = pgTable(
 // the two requests apart without exposing the account; both it and the code
 // are kept as digests only (the code keyed with a server secret, since a
 // million values would not resist an offline search of a leaked table).
+/** Story 12.8e — single-use codes that stand in for the app (lost phone); kept hashed. */
+export const recoveryCodes = pgTable(
+  "recovery_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_recovery_codes_user").on(t.userId),
+    uniqueIndex("uq_recovery_codes_hash").on(t.userId, t.codeHash),
+    foreignKey({ columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade"),
+  ],
+)
+
 export const loginChallenges = pgTable(
   "login_challenges",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull(),
+    // Story 12.8e — what opens the session: a mailed code, the app's code, or
+    // the app being enrolled (an admin without it).
+    method: loginChallengeMethodEnum("method").notNull().default("email_code"),
     tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
-    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    // The mailed code's HMAC; none for the app, which computes its own.
+    codeHash: varchar("code_hash", { length: 64 }),
     expiresAt: timestamp("expires_at").notNull(),
     attempts: integer("attempts").notNull().default(0),
     sendCount: integer("send_count").notNull().default(1),

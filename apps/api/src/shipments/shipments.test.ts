@@ -16,6 +16,7 @@ import {
   users,
 } from "../db/schema.js"
 import { sendShipmentShippedEmail } from "../email.js"
+import { signIn } from "../test/sign-in.js"
 
 vi.mock("../email.js", () => ({
   sendShipmentShippedEmail: vi.fn().mockResolvedValue(undefined),
@@ -62,7 +63,7 @@ describe("multi-parcel shipping (story 11.9)", () => {
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
       .returning({ id: users.id })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return { id: row?.id as string, token: login.json().accessToken as string }
   }
 

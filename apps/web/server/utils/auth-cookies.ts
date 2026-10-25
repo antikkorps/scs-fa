@@ -72,31 +72,49 @@ interface ApiSession {
   accessToken: string
   refreshToken: string
   user: AuthUser
+  /** Story 12.8e — the app just enrolled: its recovery codes, shown this once. */
+  recoveryCodes?: string[]
+}
+
+/** Story 12.8e — the authenticator app to enrol: QR code and key (not secret from its owner). */
+interface LoginEnrolment {
+  secret: string
+  otpauthUri: string
+  qrSvg: string
 }
 
 interface ApiLoginChallenge {
   codeRequired: true
   challengeToken: string
   expiresIn: number
+  method: "email_code" | "totp" | "totp_enrollment"
+  enrollment?: LoginEnrolment
 }
+
+export type LoginAnswer =
+  | { user: AuthUser; recoveryCodes?: string[] }
+  | { codeRequired: true; expiresIn: number; method: ApiLoginChallenge["method"]; enrollment?: LoginEnrolment }
 
 /**
  * Turn what the API answered to a login into the BFF's answer: a session goes
  * into the httpOnly cookies and only the user comes back; a challenge (story
  * 12.8a) goes into its own cookie and the page is told to ask for the code.
  */
-export function finishLogin(
-  event: H3Event,
-  res: ApiSession | ApiLoginChallenge,
-): { user: AuthUser } | { codeRequired: true; expiresIn: number } {
+export function finishLogin(event: H3Event, res: ApiSession | ApiLoginChallenge): LoginAnswer {
   if ("codeRequired" in res) {
+    // The challenge token stays in its httpOnly cookie; the page gets what it shows.
     setLoginChallengeCookie(event, res.challengeToken, res.expiresIn)
-    return { codeRequired: true, expiresIn: res.expiresIn }
+    return {
+      codeRequired: true,
+      expiresIn: res.expiresIn,
+      method: res.method,
+      ...(res.enrollment && { enrollment: res.enrollment }),
+    }
   }
   clearLoginChallengeCookie(event)
   setRefreshCookie(event, res.refreshToken)
   setAccessCookie(event, res.accessToken)
-  return { user: res.user }
+  return { user: res.user, ...(res.recoveryCodes && { recoveryCodes: res.recoveryCodes }) }
 }
 
 /**

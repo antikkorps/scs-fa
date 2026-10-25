@@ -108,6 +108,7 @@ async function save() {
         </nav>
 
         <ProAccountPanel v-if="profile.role === 'customer'" />
+        <AccountSecurity />
 
         <form class="card" @submit.prevent="save">
           <h2 class="card__h">Informations personnelles</h2>

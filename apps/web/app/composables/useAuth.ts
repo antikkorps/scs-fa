@@ -7,27 +7,46 @@ import type { AuthUser } from "~/types/admin"
 // state (display name, role); the server enforces all authorization.
 const USER_COOKIE_OPTS = { sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7, secure: !import.meta.dev } as const
 
-export type LoginOutcome = { status: "signed_in"; user: AuthUser } | { status: "code_required"; expiresIn: number }
+/** Story 12.8e — the authenticator app to enrol at login (an admin without it). */
+export interface LoginEnrolment {
+  secret: string
+  otpauthUri: string
+  qrSvg: string
+}
+
+export type LoginMethod = "email_code" | "totp" | "totp_enrollment"
+
+export type LoginOutcome =
+  | { status: "signed_in"; user: AuthUser }
+  | { status: "code_required"; method: LoginMethod; expiresIn: number; enrollment?: LoginEnrolment }
+
+/** The second step's answer: the session's user, and the recovery codes when the app just enrolled. */
+export interface CodeOutcome {
+  user: AuthUser
+  recoveryCodes?: string[]
+}
 
 export function useAuth() {
   const user = useCookie<AuthUser | null>("scs_user", USER_COOKIE_OPTS)
 
   // Story 12.8a: for some accounts the right password is not enough — the BFF
   // keeps the challenge in an httpOnly cookie and the mailed code finishes it.
+  // Story 12.8e: or the authenticator app's code, or its enrolment.
   async function login(email: string, password: string): Promise<LoginOutcome> {
-    const res = await $fetch<{ user: AuthUser } | { codeRequired: true; expiresIn: number }>("/bff/auth/login", {
-      method: "POST",
-      body: { email, password },
-    })
-    if ("codeRequired" in res) return { status: "code_required", expiresIn: res.expiresIn }
+    const res = await $fetch<
+      { user: AuthUser } | { codeRequired: true; method: LoginMethod; expiresIn: number; enrollment?: LoginEnrolment }
+    >("/bff/auth/login", { method: "POST", body: { email, password } })
+    if ("codeRequired" in res) {
+      return { status: "code_required", method: res.method, expiresIn: res.expiresIn, enrollment: res.enrollment }
+    }
     user.value = res.user
     return { status: "signed_in", user: res.user }
   }
 
-  async function verifyLoginCode(code: string): Promise<AuthUser> {
-    const res = await $fetch<{ user: AuthUser }>("/bff/auth/login/verify", { method: "POST", body: { code } })
+  async function verifyLoginCode(code: string): Promise<CodeOutcome> {
+    const res = await $fetch<CodeOutcome>("/bff/auth/login/verify", { method: "POST", body: { code } })
     user.value = res.user
-    return res.user
+    return res
   }
 
   async function resendLoginCode(): Promise<void> {

@@ -123,6 +123,22 @@ async function act(path: string, options: { method: "POST" | "PATCH" | "PUT"; bo
 const approve = () => act("/approve", { method: "POST", body: termsBody() }, "La validation a échoué.")
 const saveTerms = () => act("", { method: "PATCH", body: termsBody() }, "L'enregistrement a échoué.")
 const reinstate = () => act("/reinstate", { method: "POST" }, "Le rétablissement a échoué.")
+// Story 12.8e — the member lost their phone and their recovery codes: they enrol the app again.
+const totpNotice = ref("")
+async function resetTotp() {
+  const member = selected.value?.member
+  if (!member || !confirm(`Réinitialiser la double authentification de ${member.email} ?`)) return
+  actionError.value = ""
+  totpNotice.value = ""
+  try {
+    await api(`/admin/users/${member.id}/totp/reset`, { method: "POST" })
+    totpNotice.value =
+      "Double authentification réinitialisée : le membre la configurera à sa prochaine connexion s'il le souhaite."
+  } catch (err) {
+    actionError.value = errorMessage(err, "La réinitialisation a échoué.")
+  }
+}
+
 const saveBilling = () =>
   act(
     "/billing-address",
@@ -300,6 +316,15 @@ const memberName = (row: AdminOrganisationRow) =>
           <button type="button" class="btn btn-ghost save-billing" :disabled="acting" @click="saveBilling">
             Enregistrer l'adresse
           </button>
+        </section>
+
+        <section v-if="selected.member" class="block">
+          <h3 class="block__h">Double authentification du membre</h3>
+          <p class="hint">Téléphone perdu sans codes de secours : la réinitialiser lui permet d'en configurer une nouvelle.</p>
+          <button type="button" class="btn btn-ghost reset-totp" :disabled="acting" @click="resetTotp">
+            Réinitialiser la double authentification
+          </button>
+          <p v-if="totpNotice" class="hint" role="status">{{ totpNotice }}</p>
         </section>
 
         <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>

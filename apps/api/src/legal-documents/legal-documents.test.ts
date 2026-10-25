@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, legalDocuments, users } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 import { scanDocument } from "./scan.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
@@ -41,7 +42,7 @@ describe("legal documents (/api/legal-documents)", () => {
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
       .returning({ id: users.id })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return { id: u.id, token: login.json().accessToken as string }
   }
 

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { artworkPrints, artworks, auditLogs, products, users } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
 const ADMIN_EMAIL = "testartadmin-admin@testartadmin.local"
@@ -55,7 +56,7 @@ describe("admin artwork CRUD (story 7.5a)", () => {
       rgpdConsentAt: new Date(),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
     })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return login.json().accessToken as string
   }
 

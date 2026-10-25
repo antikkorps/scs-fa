@@ -78,8 +78,23 @@ export const loginSchema = z.object({
 // Story 12.8a — the second step of a login: the code mailed after the password.
 export const loginCodeVerifySchema = z.object({
   challengeToken: z.string().min(20).max(100),
-  code: z.string().regex(/^\d{6}$/, "The code has 6 digits"),
+  // Six digits (mailed, or the authenticator app's), or a recovery code (story 12.8e).
+  code: z
+    .string()
+    .trim()
+    .regex(/^(\d{3}\s?\d{3}|[A-Za-z0-9]{5}-?[A-Za-z0-9]{5})$/, "The code has 6 digits, or is a recovery code"),
 })
+
+// Story 12.8e — the authenticator app from the account: a six-digit code to
+// enable it or regenerate the recovery codes; the password too to turn it off.
+const appCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^(\d{3}\s?\d{3}|[A-Za-z0-9]{5}-?[A-Za-z0-9]{5})$/, "The code has 6 digits, or is a recovery code")
+
+export const totpCodeSchema = z.object({ code: appCodeSchema }).strict()
+
+export const totpDisableSchema = z.object({ password: z.string().min(1).max(200), code: appCodeSchema }).strict()
 
 export const loginCodeResendSchema = z.object({
   challengeToken: z.string().min(20).max(100),

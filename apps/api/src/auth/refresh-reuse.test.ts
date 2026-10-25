@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, refreshTokens, users } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 import { hashRefreshToken, ROTATION_GRACE_MS } from "./tokens.js"
 
 const SUFFIX = "@rtr-test.local"
@@ -52,7 +53,7 @@ describe("auth/refresh — reuse detection (RTR)", () => {
   })
 
   async function login(email: string): Promise<string> {
-    const res = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const res = await signIn(app, { email, password: PASSWORD })
     return (res.json() as { refreshToken: string }).refreshToken
   }
   const refresh = (refreshToken: string) =>

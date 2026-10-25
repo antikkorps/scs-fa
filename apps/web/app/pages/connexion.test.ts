@@ -73,7 +73,7 @@ describe("connexion.vue", () => {
 
   describe("code step (story 12.8a)", () => {
     async function passwordAccepted() {
-      login.mockResolvedValue({ status: "code_required", expiresIn: 600 })
+      login.mockResolvedValue({ status: "code_required", method: "email_code", expiresIn: 600 })
       const wrapper = await mountSuspended(Connexion)
       await wrapper.find('input[type="email"]').setValue("agent@mairie.fr")
       await wrapper.find('input[type="password"]').setValue("longenoughpass")
@@ -98,7 +98,7 @@ describe("connexion.vue", () => {
     })
 
     it("signs in and redirects on the right code", async () => {
-      verifyLoginCode.mockResolvedValue({ role: "customer" })
+      verifyLoginCode.mockResolvedValue({ user: { role: "customer" } })
       const wrapper = await passwordAccepted()
       await typeCode(wrapper, " 042 917 ")
 
@@ -178,6 +178,61 @@ describe("connexion.vue", () => {
       await flushPromises()
 
       expect(wrapper.text()).toContain("Patientez encore 42 secondes")
+    })
+  })
+
+  // Story 12.8e — the authenticator app.
+  describe("with the authenticator app", () => {
+    async function passwordAccepted(outcome: Record<string, unknown>) {
+      login.mockResolvedValue({ status: "code_required", expiresIn: 600, ...outcome })
+      const wrapper = await mountSuspended(Connexion)
+      await wrapper.find('input[type="email"]').setValue("admin@scs.fr")
+      await wrapper.find('input[type="password"]').setValue("longenoughpass")
+      await wrapper.find("form").trigger("submit")
+      await flushPromises()
+      return wrapper
+    }
+
+    async function typeCode(wrapper: Awaited<ReturnType<typeof passwordAccepted>>, code: string) {
+      await wrapper.find('input[autocomplete="one-time-code"]').setValue(code)
+      await wrapper.find("form").trigger("submit")
+      await flushPromises()
+    }
+
+    it("asks for the app's code, offers a recovery code, and sends no mail", async () => {
+      verifyLoginCode.mockResolvedValue({ user: { role: "customer" } })
+      const wrapper = await passwordAccepted({ method: "totp" })
+
+      expect(wrapper.text()).toContain("application d'authentification")
+      expect(wrapper.text()).toContain("code de secours")
+      expect(wrapper.find("button.auth-resend").exists()).toBe(false)
+
+      await typeCode(wrapper, "abcde-23456")
+      expect(verifyLoginCode).toHaveBeenCalledWith("ABCDE-23456")
+      expect(navigateToMock).toHaveBeenCalledWith("/")
+    })
+
+    it("has an admin enrol the app: QR code and key, then the recovery codes before going on", async () => {
+      verifyLoginCode.mockResolvedValue({
+        user: { role: "admin" },
+        recoveryCodes: ["AAAAA-BBBBB", "CCCCC-DDDDD"],
+      })
+      const wrapper = await passwordAccepted({
+        method: "totp_enrollment",
+        enrollment: { secret: "JBSWY3DPEHPK3PXP", otpauthUri: "otpauth://totp/x", qrSvg: "<svg></svg>" },
+      })
+
+      expect(wrapper.find("img.qr").attributes("src")).toMatch(/^data:image\/svg\+xml;base64,/)
+      expect(wrapper.text()).toContain("JBSWY3DPEHPK3PXP")
+
+      await typeCode(wrapper, "123456")
+      expect(navigateToMock).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain("AAAAA-BBBBB")
+      expect(wrapper.text()).toContain("CCCCC-DDDDD")
+
+      await wrapper.find("button.recovery-done").trigger("click")
+      await flushPromises()
+      expect(navigateToMock).toHaveBeenCalledWith("/")
     })
   })
 })

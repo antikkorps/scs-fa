@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { addresses, auditLogs, users } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
 const EMAIL = "addr-test@addr-test.local"
@@ -62,9 +63,7 @@ describe("addresses (/api/addresses)", () => {
       .returning({ id: users.id })
     otherUserId = u2.id
 
-    token = (
-      await app.inject({ method: "POST", url: "/api/auth/login", payload: { email: EMAIL, password: PASSWORD } })
-    ).json().accessToken
+    token = (await signIn(app, { email: EMAIL, password: PASSWORD })).json().accessToken
   })
 
   afterAll(async () => {

@@ -15,6 +15,7 @@ import {
   productVariants,
   users,
 } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 
 const PREFIX = "TEST112-"
 // Slugs must be lowercase (the public slug route validates the shape), so the
@@ -41,7 +42,7 @@ async function makeUser(email: string): Promise<string> {
     rgpdConsentAt: new Date(),
     rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
   })
-  const res = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+  const res = await signIn(app, { email, password: PASSWORD })
   return res.json().accessToken
 }
 

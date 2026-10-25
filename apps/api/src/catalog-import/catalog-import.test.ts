@@ -19,6 +19,7 @@ import {
   users,
 } from "../db/schema.js"
 import { SafeFetchError } from "../net/safe-fetch.js"
+import { signIn } from "../test/sign-in.js"
 import { processCatalogImageBatch } from "./images.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
@@ -82,7 +83,7 @@ describe("admin catalogue import (story 12.2)", () => {
       rgpdConsentAt: new Date(),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
     })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return login.json().accessToken as string
   }
 

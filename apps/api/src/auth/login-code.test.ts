@@ -17,6 +17,7 @@ const { codeAccounts, sentCodes } = vi.hoisted(() => ({
 }))
 vi.mock("./login-code-policy.js", () => ({
   requiresLoginCode: async (user: { id: string }) => codeAccounts.has(user.id),
+  secondFactorFor: async (user: { id: string }) => (codeAccounts.has(user.id) ? "email_code" : null),
 }))
 vi.mock("../email.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../email.js")>()),

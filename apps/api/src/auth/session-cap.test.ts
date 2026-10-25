@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, refreshTokens, users } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 import { hashRefreshToken } from "./tokens.js"
 
 const EMAIL_SUFFIX = "@session-cap.local"
@@ -28,7 +29,7 @@ describe("session cap — 7 days from login for admin accounts (story 12.8a)", (
   }
 
   async function login(email: string): Promise<string> {
-    const res = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const res = await signIn(app, { email, password: PASSWORD })
     expect(res.statusCode).toBe(200)
     return res.json().refreshToken
   }
