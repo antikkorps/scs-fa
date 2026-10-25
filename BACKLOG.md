@@ -1019,7 +1019,22 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
     - _Trouvé en route_ : Henrri répond **200 sans corps** à la validation d'un devis ; le client prenait une réponse vide pour « introuvable » et gelait le devis — corrigé (`command` : seul le statut compte), test à l'appui.
     - _Restes soldés (2026-10-25, migration **0040**, choix de Franck : colonne de suivi)_ : un devis « gelé » après un incident Henrri s'affiche dans l'écran Devis avec son motif et un bouton « Relancer chez Henrri » (`POST /api/admin/quote-requests/:id/henrri/retry`, journalisé) ; l'échéance du jalon Henrri d'une facture « sur facture » est posée sur la date due (`henrri_documents.due_date_recorded_at`, une fois), et la facture impayée ne repasse plus dans la file avant le règlement ; une commande à paiement immédiat **par carte seule** reçoit un rappel à J+4 (nouvel e-mail). Vérifié sur le bac à sable : Henrri refuse le format de date de l'exemple de sa doc (`yyyy-MM-dd HH:mm:ss`), il veut une date ISO avec fuseau.
   - **12.8d-2** : `legal_documents` — `organisation_id` facultatif à côté de `user_id` (exactement un des deux), types pro ajoutés à l'enum ; `orders` — lien vers la demande de devis, mode « sur facture », échéance, rappel envoyé le, code service, numéro d'engagement.
-- [ ] **12.8e — Double authentification par application** : TOTP facultatif pour les particuliers, codes de secours, **obligatoire pour les admins**.
+- [ ] **12.8e — Double authentification par application** : TOTP facultatif pour les particuliers, codes de secours, **obligatoire pour les admins**. — 📝 **CADRÉE** (2026-10-25)
+  _Décisions (Franck, 2026-10-25)_ :
+  - **Secret TOTP chiffré avec une clé dédiée** (`TOTP_ENCRYPTION_KEY`, AES-256-GCM) : le serveur doit pouvoir relire le secret pour vérifier un code, il est donc chiffré et non haché ; une rotation du secret JWT ne casse pas les authentificateurs. Clé refusée en production si absente ou valeur d'exemple (comme les autres secrets, 12.9b).
+  - **Compte pro : l'application remplace le code e-mail** une fois activée (un seul second facteur, lié au téléphone de l'agent) ; l'e-mail reste le défaut tant qu'elle ne l'est pas.
+  - **QR code d'enrôlement avec `uqr` 0.1.3** (unjs, MIT, sans dépendance, SVG, avril 2026), généré par l'API.
+  _Fonctionnement proposé_ :
+  - **Enrôlement** : l'API crée un secret (20 octets, base32), renvoie le QR code (SVG) et la clé à recopier ; l'utilisateur confirme avec un premier code ; on lui remet alors **10 codes de secours** (affichés une seule fois). Algorithme RFC 6238 en `node:crypto` (SHA-1, 6 chiffres, 30 s, tolérance ±1 pas), testé sur les vecteurs officiels ; **un code déjà servi est refusé** (anti-rejeu).
+  - **Connexion** : mot de passe juste → si l'application est activée, défi « code d'application » (même mécanique que le code e-mail : jeton de défi en cookie httpOnly, 5 essais, verrou partagé) ; un **code de secours** est accepté à la place, une seule fois chacun.
+  - **Admins** : obligatoire. Un admin sans application est conduit à l'enrôler à sa prochaine connexion, avant toute session (pas de contournement). Plafond de session de 7 jours inchangé.
+  - **Particuliers** : facultatif, activé / désactivé depuis `/compte` (désactivation : mot de passe + code). Codes de secours régénérables (les anciens tombent).
+  - **Perte du téléphone** : code de secours ; sinon un admin peut **réinitialiser** l'application d'un client depuis le back-office (journalisé) ; pour un admin, un autre admin.
+  - Journal : `user.totp_enabled`, `_disabled`, `_reset`, `user.login` (`method: password+totp` / `+recovery_code`), `user.totp_failed`, `user.recovery_codes_regenerated`.
+  _Schéma proposé (migration 0041, à valider)_ :
+  - `users` : `totp_secret_encrypted` (texte, IV + tag + chiffré), `totp_enabled_at`, `totp_last_step` (dernier pas accepté, anti-rejeu), `totp_pending_secret_encrypted` (secret en cours d'enrôlement, effacé à la confirmation).
+  - `recovery_codes` : `id`, `user_id` (cascade), `code_hash` (HMAC), `used_at`, `created_at`.
+  - `login_challenges` : `method` (`email_code` | `totp` | `totp_enrollment`, défaut `email_code`), `code_hash` devient facultatif (un défi TOTP n'a pas de code envoyé).
 
 **Story 12.9** — Audit de sécurité du 2026-10-21 (delta depuis le pentest 8.6) — 📝 **CADRÉE** (décisions de Franck le 2026-10-22) _(audit fait le 2026-10-21 après la 12.8c)_
 
