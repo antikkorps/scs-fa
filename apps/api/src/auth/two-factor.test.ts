@@ -10,6 +10,7 @@ import {
   RECOVERY_CODE_COUNT,
   regenerateRecoveryCodes,
   resetSecondFactor,
+  resetSecondFactorByEmail,
   verifySecondFactor,
 } from "./two-factor.js"
 
@@ -130,5 +131,13 @@ describe("the app-based second factor (story 12.8e)", () => {
     expect(stored).toMatchObject({ totpSecretEncrypted: null, totpEnabledAt: null, totpLastStep: null })
     expect(await db.select().from(recoveryCodes).where(eq(recoveryCodes.userId, user.id))).toHaveLength(0)
     expect(await verifySecondFactor(user.id, codes[0] ?? "", new Date())).toBeNull()
+  })
+
+  it("resets by e-mail for the command line, journaled, and says when nobody has it", async () => {
+    const { user } = await enrolled()
+
+    expect(await resetSecondFactorByEmail(user.email.toUpperCase())).toBe(true)
+    expect((await reload(user.id))?.totpEnabledAt).toBeNull()
+    expect(await resetSecondFactorByEmail(`nobody${EMAIL_SUFFIX}`)).toBe(false)
   })
 })

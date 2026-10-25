@@ -7,6 +7,7 @@ import { profileRoute } from "./profile.js"
 import { refreshRoute } from "./refresh.js"
 import { registerRoute } from "./register.js"
 import { resetPasswordRoute } from "./reset-password.js"
+import { totpRoutes } from "./totp-routes.js"
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(registerRoute)
@@ -17,4 +18,5 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(profileRoute)
   await fastify.register(forgotPasswordRoute)
   await fastify.register(resetPasswordRoute)
+  await fastify.register(totpRoutes, { prefix: "/totp" })
 }

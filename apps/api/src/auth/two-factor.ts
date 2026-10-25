@@ -7,6 +7,7 @@ import { createHmac, hkdfSync, randomInt } from "node:crypto"
 import { and, eq, isNull, lt, or } from "drizzle-orm"
 import { renderSVG } from "uqr"
 import type { DbExecutor } from "../artworks/reservation.js"
+import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { recoveryCodes, users } from "../db/schema.js"
 import { env } from "../env.js"
@@ -154,4 +155,26 @@ export async function resetSecondFactor(userId: string, executor: DbExecutor = d
     })
     .where(eq(users.id, userId))
   await executor.delete(recoveryCodes).where(eq(recoveryCodes.userId, userId))
+}
+
+/**
+ * The command-line reset (an admin locked out, no other admin at hand): by
+ * e-mail, journaled as done by the system. False when no account has it.
+ */
+export async function resetSecondFactorByEmail(email: string): Promise<boolean> {
+  const [user] = await db
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(eq(users.email, email.trim().toLowerCase()))
+    .limit(1)
+  if (!user) return false
+  await resetSecondFactor(user.id)
+  await recordAuditEvent({
+    userRole: "system",
+    entityType: "user",
+    entityId: user.id,
+    action: "user.totp_reset",
+    newValue: { via: "command line" },
+  })
+  return true
 }
