@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, legalDocuments, orders, refunds, users } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 
 // Test data lives in a historical window (March 2025) so the period filter
 // isolates it from every other suite's `now`-dated rows on the shared database.
@@ -62,7 +63,7 @@ describe("admin metrics API (Story 7.3)", () => {
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
       .returning({ id: users.id })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return { id: u.id, token: login.json().accessToken as string }
   }
 

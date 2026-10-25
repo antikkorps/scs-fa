@@ -8,3 +8,22 @@
 export async function requiresLoginCode(user: { organisationId: string | null }): Promise<boolean> {
   return user.organisationId !== null
 }
+
+export type SecondFactor = "email_code" | "totp" | "totp_enrollment"
+
+/**
+ * Story 12.8e — what a login waits for after the right password: the app's
+ * code once enabled (it replaces the mailed code for a pro, decision
+ * 2026-10-25); its enrolment for an admin without it (mandatory); the mailed
+ * code for an organisation's member; nothing for anyone else.
+ */
+export async function secondFactorFor(user: {
+  role: string
+  organisationId: string | null
+  totpEnabledAt: Date | null
+}): Promise<SecondFactor | null> {
+  if (user.totpEnabledAt) return "totp"
+  if (user.role === "admin") return "totp_enrollment"
+  if (await requiresLoginCode(user)) return "email_code"
+  return null
+}

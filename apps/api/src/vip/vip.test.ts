@@ -21,6 +21,7 @@ import {
   users,
 } from "../db/schema.js"
 import { pinShippingRates } from "../test/shipping-rates.js"
+import { signIn } from "../test/sign-in.js"
 import { recomputeVipStatus } from "./service.js"
 
 // The confirmation e-mail is sent in the background of every order (story 12.1):
@@ -163,9 +164,7 @@ describe("VIP (story 3.4)", () => {
     await tagProduct(`${PREFIX}occ`, "occasion")
     munitionVariantId = await mkProduct("munit", munition, legalNone, "20.00", "30")
 
-    token = (
-      await app.inject({ method: "POST", url: "/api/auth/login", payload: { email: EMAIL, password: PASSWORD } })
-    ).json().accessToken
+    token = (await signIn(app, { email: EMAIL, password: PASSWORD })).json().accessToken
   })
 
   afterAll(async () => {

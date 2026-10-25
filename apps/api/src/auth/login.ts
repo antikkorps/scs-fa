@@ -7,7 +7,7 @@ import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
 import { clearFailedLogins, countFailedLogin, lockoutRemainingSeconds } from "./lockout.js"
 import { startLoginChallenge } from "./login-code.js"
-import { requiresLoginCode } from "./login-code-policy.js"
+import { secondFactorFor } from "./login-code-policy.js"
 import { issueTokens } from "./tokens.js"
 
 // Pre-computed argon2id hash of a random string. Used to keep response time
@@ -70,10 +70,12 @@ export const loginRoute: FastifyPluginAsync = async (fastify) => {
       })
     }
 
-    // Story 12.8a: no session yet for these accounts — the mailed code opens it.
-    // The failure trail stays until then: wrong codes add to it (story 12.9f).
-    if (await requiresLoginCode(user)) {
-      return reply.code(200).send(await startLoginChallenge(user, deviceLabel ?? null))
+    // Story 12.8a / 12.8e: no session yet for these accounts — the mailed
+    // code, the app's code or the app's enrolment opens it. The failure trail
+    // stays until then: wrong codes add to it (story 12.9f).
+    const factor = await secondFactorFor(user)
+    if (factor) {
+      return reply.code(200).send(await startLoginChallenge(user, deviceLabel ?? null, factor))
     }
     await clearFailedLogins(user.id)
 

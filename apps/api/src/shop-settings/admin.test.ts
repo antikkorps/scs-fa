@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, users } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 import { loadShopSettings, type ShopSettings } from "./service.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
@@ -34,7 +35,7 @@ describe("admin shop settings (story 12.9e)", () => {
       rgpdConsentAt: new Date(),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
     })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return login.json().accessToken as string
   }
 

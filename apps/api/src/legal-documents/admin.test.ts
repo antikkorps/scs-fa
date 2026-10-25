@@ -8,6 +8,7 @@ import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, legalDocuments, users } from "../db/schema.js"
 import { sendLegalDocApprovedEmail, sendLegalDocRejectedEmail } from "../email.js"
+import { signIn } from "../test/sign-in.js"
 
 vi.mock("../email.js", () => ({
   sendLegalDocApprovedEmail: vi.fn().mockResolvedValue(undefined),
@@ -51,7 +52,7 @@ describe("admin legal document validation (/api/admin/legal-documents)", () => {
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
       .returning({ id: users.id })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return { id: u.id, token: login.json().accessToken as string }
   }
 

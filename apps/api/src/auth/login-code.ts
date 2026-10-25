@@ -1,6 +1,7 @@
 // Story 12.8a — the second step of a login, for the accounts whose policy asks
 // for it (login-code-policy.ts): after the right password, a 6-digit code is
-// mailed; the session opens only on that code.
+// mailed; the session opens only on that code. Story 12.8e: the same challenge
+// may wait for the authenticator app's code instead, or for its enrolment.
 //
 // A code rather than a magic link: the mail filters of administrations open
 // links on their own, which would spend a link before its recipient does, and
@@ -17,11 +18,13 @@ import { loginChallenges, users } from "../db/schema.js"
 import { sendLoginCodeEmail } from "../email.js"
 import { env } from "../env.js"
 import { clearFailedLogins, countFailedLogin, lockoutRemainingSeconds, MAX_FAILED_ATTEMPTS } from "./lockout.js"
+import type { SecondFactor } from "./login-code-policy.js"
 import {
   generateRefreshToken as generateChallengeToken,
   hashRefreshToken as hashChallengeToken,
   issueTokens,
 } from "./tokens.js"
+import { beginEnrollment, confirmEnrollment, type Enrolment, verifySecondFactor } from "./two-factor.js"
 
 export const LOGIN_CODE_TTL_MINUTES = 10
 export const LOGIN_CODE_MAX_ATTEMPTS = 5
@@ -113,25 +116,61 @@ async function openChallenge(challengeToken: string) {
   return row ?? null
 }
 
+export interface LoginChallengeStart {
+  codeRequired: true
+  method: SecondFactor
+  challengeToken: string
+  expiresIn: number
+  /** The app to enrol (an admin without it): QR code and key to type in. */
+  enrollment?: Enrolment
+}
+
 /**
- * Called by the login route once the password is right: open a challenge, mail
- * its code, and return what the client needs to ask for it.
+ * Called by the login route once the password is right: open a challenge —
+ * mailing its code, or waiting for the app's (or its enrolment) — and return
+ * what the client needs to ask for it.
  */
 export async function startLoginChallenge(
   user: { id: string; email: string },
   deviceLabel: string | null,
-): Promise<{ codeRequired: true; challengeToken: string; expiresIn: number }> {
+  method: SecondFactor = "email_code",
+): Promise<LoginChallengeStart> {
   const challengeToken = generateChallengeToken()
-  const code = newCode()
+  const code = method === "email_code" ? newCode() : null
   await db.insert(loginChallenges).values({
     userId: user.id,
+    method,
     tokenHash: hashChallengeToken(challengeToken),
-    codeHash: digestCode(code),
+    codeHash: code ? digestCode(code) : null,
     expiresAt: new Date(Date.now() + TTL_MS),
     deviceLabel,
   })
-  await sendLoginCodeEmail(user.email, code, LOGIN_CODE_TTL_MINUTES, { userId: user.id })
-  return { codeRequired: true, challengeToken, expiresIn: TTL_MS / 1000 }
+  const start: LoginChallengeStart = { codeRequired: true, method, challengeToken, expiresIn: TTL_MS / 1000 }
+  if (code) await sendLoginCodeEmail(user.email, code, LOGIN_CODE_TTL_MINUTES, { userId: user.id })
+  if (method === "totp_enrollment") start.enrollment = await beginEnrollment(user)
+  return start
+}
+
+type ChallengeRow = typeof loginChallenges.$inferSelect
+
+/**
+ * Whether the code answers the challenge, and how: the mailed code, the app's
+ * code or a recovery code, or the first code of the app being enrolled (which
+ * hands out the recovery codes).
+ */
+async function checkChallengeCode(
+  challenge: ChallengeRow,
+  code: string,
+): Promise<{ method: string; recoveryCodes?: string[] } | null> {
+  if (challenge.method === "email_code") {
+    return challenge.codeHash && sameDigest(digestCode(code), challenge.codeHash) ? { method: "email_code" } : null
+  }
+  if (challenge.method === "totp_enrollment") {
+    const recoveryCodes = await confirmEnrollment(challenge.userId, code, new Date())
+    return recoveryCodes ? { method: "totp_enrollment", recoveryCodes } : null
+  }
+  const factor = await verifySecondFactor(challenge.userId, code, new Date())
+  return factor ? { method: factor } : null
 }
 
 function journal(request: FastifyRequest, user: { id: string; role: string }, action: string, newValue?: unknown) {
@@ -163,12 +202,11 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
       const lockedFor = lockoutRemainingSeconds(user)
       if (lockedFor !== null) return accountLocked(reply, lockedFor)
 
-      // A challenge without a mailed code waits for the app instead (story 12.8e).
-      if (!challenge.codeHash) return invalidChallenge(reply)
       const attempts = await takeAttempt(challenge.id)
       if (attempts === null) return invalidChallenge(reply)
 
-      if (!sameDigest(digestCode(parsed.data.code), challenge.codeHash)) {
+      const answer = await checkChallengeCode(challenge, parsed.data.code)
+      if (!answer) {
         const spent = attempts >= LOGIN_CODE_MAX_ATTEMPTS
         if (spent) {
           await db.update(loginChallenges).set({ consumedAt: new Date() }).where(eq(loginChallenges.id, challenge.id))
@@ -199,11 +237,15 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
 
       await clearFailedLogins(user.id)
       const tokens = await issueTokens(fastify, user, challenge.deviceLabel)
-      await journal(request, user, "user.login", { method: "password+email_code" })
+      if (answer.recoveryCodes) await journal(request, user, "user.totp_enabled", { at: "login" })
+      const method = answer.method === "totp_enrollment" ? "totp" : answer.method
+      await journal(request, user, "user.login", { method: `password+${method}` })
 
       return reply.code(200).send({
         ...tokens,
         user: { id: user.id, email: user.email, firstName: user.firstname, lastName: user.lastname, role: user.role },
+        // The app just enrolled: its recovery codes, shown this once.
+        ...(answer.recoveryCodes && { recoveryCodes: answer.recoveryCodes }),
       })
     },
   )
@@ -222,6 +264,10 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
       if (!user) return invalidChallenge(reply)
       const lockedFor = lockoutRemainingSeconds(user)
       if (lockedFor !== null) return accountLocked(reply, lockedFor)
+      // The app makes its own codes (story 12.8e): nothing to send again.
+      if (challenge.method !== "email_code") {
+        return reply.code(409).send({ error: "NothingToResend", message: "Use the code shown by your app" })
+      }
 
       const now = new Date()
       const code = newCode()

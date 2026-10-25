@@ -8,6 +8,7 @@ import { db } from "../db/client.js"
 import { auditLogs, henrriDocuments, orders, refunds, users } from "../db/schema.js"
 import { HenrriError } from "../henrri/client.js"
 import { createFakeHenrri } from "../test/henrri-fake.js"
+import { signIn } from "../test/sign-in.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
 const EMAIL_PREFIX = "invoices-test"
@@ -48,7 +49,7 @@ describe("customer invoices (story 12.6)", () => {
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
       .returning({ id: users.id })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return { id: user.id, token: login.json().accessToken as string }
   }
 

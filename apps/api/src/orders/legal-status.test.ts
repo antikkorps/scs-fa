@@ -9,6 +9,7 @@ import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, legalDocuments, orders, users } from "../db/schema.js"
 import { scanDocument } from "../legal-documents/scan.js"
+import { signIn } from "../test/sign-in.js"
 import { recomputeOrderLegalStatus } from "./legal-status.js"
 
 vi.mock("../email.js", () => ({
@@ -51,7 +52,7 @@ describe("order legal status (/api/orders/:id/legal)", () => {
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
       .returning({ id: users.id })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return { id: u.id, token: login.json().accessToken as string }
   }
 

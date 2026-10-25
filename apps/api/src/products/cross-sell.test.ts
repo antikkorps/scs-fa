@@ -7,6 +7,7 @@ import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, products, users } from "../db/schema.js"
 import { env } from "../env.js"
+import { signIn } from "../test/sign-in.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
 const ADMIN_EMAIL = "testxsell-admin@testxsell.local"
@@ -56,8 +57,7 @@ describe("cross-sell « fréquemment achetés ensemble » (story 11.8)", () => {
       })
     }
     const login = async (email: string) =>
-      (await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })).json()
-        .accessToken as string
+      (await signIn(app, { email, password: PASSWORD })).json().accessToken as string
     adminToken = await login(ADMIN_EMAIL)
     customerToken = await login(CUSTOMER_EMAIL)
 

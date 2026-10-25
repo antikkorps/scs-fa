@@ -14,6 +14,7 @@ import {
   products,
   users,
 } from "../db/schema.js"
+import { signIn } from "../test/sign-in.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
 const ADMIN_EMAIL = "testartprice-admin@testartprice.local"
@@ -58,7 +59,7 @@ describe("Gun Art price coherence (story 11.7)", () => {
       rgpdConsentAt: new Date(),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
     })
-    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })
+    const login = await signIn(app, { email, password: PASSWORD })
     return login.json().accessToken as string
   }
 

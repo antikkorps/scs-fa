@@ -35,6 +35,7 @@ vi.mock("./stripe.js", () => ({
 }))
 
 import { enqueueInvoice } from "../henrri/queue.js"
+import { signIn } from "../test/sign-in.js"
 import { recomputeVipStatus } from "../vip/service.js"
 import { handleStripeEvent } from "./service.js"
 import {
@@ -295,9 +296,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
       .returning({ id: productVariants.id })
     regulatedVariantId = regVariant.id
 
-    const loginAs = async (email: string) =>
-      (await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: PASSWORD } })).json()
-        .accessToken
+    const loginAs = async (email: string) => (await signIn(app, { email, password: PASSWORD })).json().accessToken
     token = await loginAs(EMAIL)
     otherToken = await loginAs(EMAIL_OTHER)
     adminToken = await loginAs(EMAIL_ADMIN)
