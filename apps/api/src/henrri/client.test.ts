@@ -364,7 +364,8 @@ describe("Henrri client — documents", () => {
 
   // Story 12.8d — the pro's acceptance, recorded on the quote in Henrri.
   it("validates a quote on the signer's behalf", async () => {
-    const fake = fakeHenrri({ "POST /v1/documents/42/validate": () => ({ status: 200, body: { id: 42 } }) })
+    // The sandbox answers 200 with an empty body (2026-10-25).
+    const fake = fakeHenrri({ "POST /v1/documents/42/validate": () => ({ status: 200 }) })
     await clientFor(fake).validateQuotation(42, {
       email: "jeanne@stand.fr",
       firstName: "Jeanne",
@@ -383,8 +384,33 @@ describe("Henrri client — documents", () => {
     })
   })
 
+  it("still reports a quote Henrri does not know, or refuses to validate", async () => {
+    const missing = fakeHenrri({})
+    await expect(
+      clientFor(missing).validateQuotation(42, {
+        email: "a@b.fr",
+        firstName: "A",
+        lastName: "B",
+        at: new Date(),
+        ip: "::1",
+      }),
+    ).rejects.toMatchObject({ code: "NotFound", status: 404 })
+    const refused = fakeHenrri({
+      "POST /v1/documents/42/validate": () => ({ status: 400, body: { errorCode: "DOCUMENT_NOT_QUOTATION" } }),
+    })
+    await expect(
+      clientFor(refused).validateQuotation(42, {
+        email: "a@b.fr",
+        firstName: "A",
+        lastName: "B",
+        at: new Date(),
+        ip: "::1",
+      }),
+    ).rejects.toMatchObject({ code: "DOCUMENT_NOT_QUOTATION" })
+  })
+
   it("writes a custom payment-terms text on a draft", async () => {
-    const fake = fakeHenrri({ "PUT /v1/documents/42/paymenttermsdisplay": () => ({ status: 200, body: {} }) })
+    const fake = fakeHenrri({ "PUT /v1/documents/42/paymenttermsdisplay": () => ({ status: 200 }) })
     await clientFor(fake).setPaymentTermsLabel(42, "Paiement à 30 jours")
     expect(fake.apiCalls()[0].body).toEqual({
       showAmounts: true,

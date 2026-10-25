@@ -347,6 +347,17 @@ export function createHenrriClient(options: HenrriClientOptions) {
     return result
   }
 
+  /**
+   * A call whose answer carries nothing to read: success is its status alone.
+   * Henrri answers some of them 200 with an empty body (quote validation,
+   * sandbox 2026-10-25), which `required` would mistake for "not found".
+   */
+  async function command(method: string, path: string, body?: unknown): Promise<void> {
+    const response = await authorized(method, path, body)
+    if (response.status === 404) throw new HenrriError("NotFound", 404, `Henrri has no ${path}`)
+    if (!response.ok) throw errorFrom(response.status, await readJson(response))
+  }
+
   async function loadDocumentTypes(): Promise<Map<string, number>> {
     const list = await required<ListResponse<{ id: number; documentKind: string }>>("GET", "/v1/documenttypes")
     return new Map((list.elements ?? []).map((type) => [type.documentKind, type.id]))
@@ -489,7 +500,7 @@ export function createHenrriClient(options: HenrriClientOptions) {
 
     /** The quote accepted by its signer: Henrri's "validation" (2 credits). */
     async validateQuotation(documentId: number, signer: HenrriQuoteSigner): Promise<void> {
-      await required("POST", `/v1/documents/${documentId}/validate`, {
+      await command("POST", `/v1/documents/${documentId}/validate`, {
         email: signer.email,
         firstName: signer.firstName,
         lastName: signer.lastName,
@@ -501,7 +512,7 @@ export function createHenrriClient(options: HenrriClientOptions) {
 
     /** A custom payment-terms text on a draft (a finalized document cannot change). */
     async setPaymentTermsLabel(documentId: number, label: string): Promise<void> {
-      await required("PUT", `/v1/documents/${documentId}/paymenttermsdisplay`, {
+      await command("PUT", `/v1/documents/${documentId}/paymenttermsdisplay`, {
         showAmounts: true,
         showPercentages: false,
         showConditions: true,
