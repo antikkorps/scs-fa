@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { CodeOutcome, LoginEnrolment, LoginMethod } from "~/composables/useAuth"
+
 definePageMeta({ layout: false })
 useHead({ title: "Connexion — Administration SCS" })
 
@@ -9,6 +11,9 @@ const email = ref("")
 const password = ref("")
 const error = ref("")
 const loading = ref(false)
+// Story 12.8e — the authenticator app is mandatory for admins: its code, or its enrolment.
+const pending = ref<{ method: LoginMethod; enrollment?: LoginEnrolment } | null>(null)
+const NOT_ADMIN = "Ce compte n'a pas accès à l'administration."
 
 // Already signed in as admin? Skip straight through.
 if (isAdmin.value) {
@@ -20,9 +25,14 @@ async function submit() {
   loading.value = true
   try {
     const outcome = await login(email.value, password.value)
-    // An account that confirms by mailed code is a pro one (12.8b), never an admin.
-    if (outcome.status !== "signed_in" || outcome.user.role !== "admin") {
-      error.value = "Ce compte n'a pas accès à l'administration."
+    if (outcome.status === "code_required") {
+      // A mailed code belongs to a pro account (12.8b), never an admin.
+      if (outcome.method === "email_code") error.value = NOT_ADMIN
+      else pending.value = { method: outcome.method, enrollment: outcome.enrollment }
+      return
+    }
+    if (outcome.user.role !== "admin") {
+      error.value = NOT_ADMIN
       return
     }
     await navigateTo(safeInternalPath(route.query.redirect, "/admin"))
@@ -33,11 +43,36 @@ async function submit() {
     loading.value = false
   }
 }
+
+async function signedIn(outcome: CodeOutcome) {
+  if (outcome.user.role !== "admin") {
+    pending.value = null
+    error.value = NOT_ADMIN
+    return
+  }
+  await navigateTo(safeInternalPath(route.query.redirect, "/admin"))
+}
+
+function restart(message: string) {
+  pending.value = null
+  error.value = message
+}
 </script>
 
 <template>
   <main class="auth">
-    <form class="card" @submit.prevent="submit">
+    <div v-if="pending" class="card">
+      <p class="eyebrow">Administration</p>
+      <h1 class="card__title">SCS Firearms</h1>
+      <LoginCodeStep
+        :email="email"
+        :method="pending.method"
+        :enrollment="pending.enrollment"
+        @signed-in="signedIn"
+        @restart="restart"
+      />
+    </div>
+    <form v-else class="card" @submit.prevent="submit">
       <p class="eyebrow">Administration</p>
       <h1 class="card__title">SCS Firearms</h1>
       <p class="card__lede">Accès réservé à l'équipe.</p>

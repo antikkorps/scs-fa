@@ -180,4 +180,18 @@ describe("admin/organisations.vue (story 12.8b)", () => {
       body: { line1: "1 RUE DU STAND", line2: "Bâtiment B", postal: "69001", city: "LYON", country: "FR" },
     })
   })
+
+  // Story 12.8e — a lost phone without recovery codes.
+  it("resets the member's authenticator app, after a confirmation", async () => {
+    vi.stubGlobal("confirm", () => true)
+    serve({ ...DETAIL, status: "approved" })
+    const wrapper = await openFirst()
+
+    await wrapper.find("button.reset-totp").trigger("click")
+    await flushPromises()
+
+    expect(callsTo("/admin/users/u1/totp/reset")[0]?.[1]).toEqual({ method: "POST" })
+    expect(wrapper.text()).toContain("réinitialisée")
+    vi.unstubAllGlobals()
+  })
 })
