@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto"
 import {
   CURRENT_TERMS_VERSION,
   calculateOrderPaymentSplit,
@@ -10,26 +9,15 @@ import {
   requiresVirement,
   round2,
   uuidParamSchema,
-  virementReferenceFromBytes,
 } from "@armurier/shared"
-import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm"
+import { and, desc, eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { reservePrintForOrder } from "../artworks/reservation.js"
 import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { loadCart, reconcileCart } from "../cart/service.js"
 import { db } from "../db/client.js"
-import {
-  addresses,
-  artworkCartItems,
-  cartItems,
-  type OrderAddressSnapshot,
-  orders,
-  paymentCarte,
-  paymentVirement,
-  productVariants,
-} from "../db/schema.js"
-import { env } from "../env.js"
+import { addresses, artworkCartItems, cartItems, orders, paymentCarte, paymentVirement } from "../db/schema.js"
 import { HenrriError } from "../henrri/client.js"
 import { issuedDocument, issuedDocumentsOfOrder, pdfFileName } from "../henrri/customer.js"
 import { validationError } from "../http.js"
@@ -37,49 +25,7 @@ import { createPayoutsForOrder } from "../payouts/service.js"
 import { customerShipments } from "../shipments/service.js"
 import { sendOrderConfirmation } from "./confirmation.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
-
-class OrderError extends Error {
-  constructor(
-    readonly statusCode: number,
-    readonly errorCode: string,
-    message: string,
-  ) {
-    super(message)
-  }
-}
-
-const ADDRESS_FIELDS = {
-  firstName: addresses.firstName,
-  lastName: addresses.lastName,
-  line1: addresses.line1,
-  line2: addresses.line2,
-  postal: addresses.postal,
-  city: addresses.city,
-  country: addresses.country,
-  phone: addresses.phone,
-} as const
-
-function toSnapshot(a: {
-  firstName: string
-  lastName: string
-  line1: string
-  line2: string | null
-  postal: string
-  city: string
-  country: string
-  phone: string | null
-}): OrderAddressSnapshot {
-  return {
-    firstName: a.firstName,
-    lastName: a.lastName,
-    line1: a.line1,
-    line2: a.line2,
-    postal: a.postal,
-    city: a.city,
-    country: a.country,
-    phone: a.phone,
-  }
-}
+import { ADDRESS_FIELDS, decrementVariantStock, insertPaymentBuckets, OrderError, toSnapshot } from "./placement.js"
 
 export const orderRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
@@ -248,34 +194,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
         await createPayoutsForOrder(order.id, itemsJson, tx)
 
         // Decrement variant stock atomically (guard prevents overselling).
-        // The guard also honours a unique-piece hold (story 11.2): a lapsed hold
-        // that someone else has re-claimed must block this checkout, otherwise
-        // the hold would mean nothing at the one moment it matters.
-        for (const line of cart.items) {
-          const updated = await tx
-            .update(productVariants)
-            .set({
-              stockQty: sql`${productVariants.stockQty} - ${line.qty}`,
-              reservedBy: null,
-              reservedUntil: null,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(productVariants.id, line.variantId),
-                gte(productVariants.stockQty, line.qty),
-                or(
-                  isNull(productVariants.reservedBy),
-                  eq(productVariants.reservedBy, userId),
-                  lt(productVariants.reservedUntil, sql`now()`),
-                ),
-              ),
-            )
-            .returning({ id: productVariants.id })
-          if (updated.length === 0) {
-            throw new OrderError(409, "InsufficientStock", `Insufficient stock for ${line.sku}`)
-          }
-        }
+        await decrementVariantStock(tx, cart.items, userId)
 
         // Promote the cart-held prints to this order (in_cart -> reserved)
         for (const line of cart.artworkItems) {
@@ -285,45 +204,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
-        // Persist the card-payable amount now (split is computed here, and the
-        // immutable itemsJson snapshot does not store VAT per line). Story 6.1
-        // attaches a Stripe PaymentIntent to this row.
-        if (split.carte.amountTtc > 0) {
-          await tx.insert(paymentCarte).values({
-            orderId: order.id,
-            amountTtc: split.carte.amountTtc.toFixed(2),
-            currency: "EUR",
-            paymentStatus: "pending",
-          })
-        }
-
-        // Persist the bank-transfer bucket (Story 6.2). The RIB is snapshotted
-        // from env onto the row so later config changes never rewrite an order's
-        // already-issued instructions, and a unique, typo-resistant reference is
-        // allocated for the customer's transfer label / admin reconciliation.
-        if (split.virement.amountTtc > 0) {
-          let reference = virementReferenceFromBytes(randomBytes(8))
-          for (let attempt = 0; attempt < 5; attempt++) {
-            const [clash] = await tx
-              .select({ id: paymentVirement.id })
-              .from(paymentVirement)
-              .where(eq(paymentVirement.paymentReference, reference))
-              .limit(1)
-            if (!clash) break
-            reference = virementReferenceFromBytes(randomBytes(8))
-          }
-          await tx.insert(paymentVirement).values({
-            orderId: order.id,
-            amountExpectedTtc: split.virement.amountTtc.toFixed(2),
-            currency: "EUR",
-            ibanRecipient: env.VIREMENT_IBAN,
-            bicRecipient: env.VIREMENT_BIC,
-            bankName: env.VIREMENT_BANK_NAME,
-            accountHolderName: env.VIREMENT_ACCOUNT_HOLDER,
-            paymentReference: reference,
-            paymentStatus: "awaiting_transfer",
-          })
-        }
+        await insertPaymentBuckets(tx, order.id, split)
 
         await tx.delete(cartItems).where(eq(cartItems.userId, userId))
         await tx.delete(artworkCartItems).where(eq(artworkCartItems.userId, userId))
