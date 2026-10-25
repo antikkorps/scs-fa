@@ -9,12 +9,55 @@ import { organisations, users } from "../db/schema.js"
 import { sendOrganisationRequestAlertEmail, sendOrganisationRequestReceivedEmail } from "../email.js"
 import type { RegistryLookup } from "./registry.js"
 
+/** The organisation's billing columns (story 12.8d). */
+export const BILLING_ADDRESS_COLUMNS = {
+  billingLine1: organisations.billingLine1,
+  billingLine2: organisations.billingLine2,
+  billingPostal: organisations.billingPostal,
+  billingCity: organisations.billingCity,
+  billingCountry: organisations.billingCountry,
+} as const
+
+type BillingColumns = { [K in keyof typeof BILLING_ADDRESS_COLUMNS]: (typeof organisations.$inferSelect)[K] }
+
+/** The billing columns as one address, every field null-able until SCS has filled it in. */
+export function billingAddressOf(row: BillingColumns) {
+  return {
+    line1: row.billingLine1,
+    line2: row.billingLine2,
+    postal: row.billingPostal,
+    city: row.billingCity,
+    country: row.billingCountry,
+  }
+}
+
+/** The address, or null while a field Henrri needs is still missing. */
+export function completeBillingAddress(row: BillingColumns) {
+  const address = billingAddressOf(row)
+  const { line1, postal, city } = address
+  if (!line1 || !postal || !city) return null
+  return { ...address, line1, postal, city }
+}
+
+/** Replaces the billing columns of a row by its `billingAddress`. */
+export function withBillingAddress<T extends BillingColumns>(row: T) {
+  const { billingLine1, billingLine2, billingPostal, billingCity, billingCountry, ...rest } = row
+  return { ...rest, billingAddress: billingAddressOf(row) }
+}
+
 /** The registry's verdict as stored on the organisation, with its answer when it gave one. */
 export function registryVerdict(lookup: RegistryLookup) {
   if (lookup.status !== "found") return { registryCheck: lookup.status, registrySnapshot: null }
+  const { billingAddress } = lookup.establishment
   return {
     registryCheck: lookup.establishment.active ? ("verified" as const) : ("inactive" as const),
     registrySnapshot: lookup.establishment,
+    // Story 12.8d — a starting point SCS corrects on the organisation's page.
+    ...(billingAddress && {
+      billingLine1: billingAddress.line1,
+      billingPostal: billingAddress.postal,
+      billingCity: billingAddress.city,
+    }),
   }
 }
 

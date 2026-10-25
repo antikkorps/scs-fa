@@ -60,7 +60,10 @@ export async function countDocumentsNeedingAttention(): Promise<number> {
 
 /** The ids of orders with at least one document that needs attention. */
 export function ordersNeedingAttention() {
-  return db.selectDistinct({ orderId: henrriDocuments.orderId }).from(henrriDocuments).where(needsAttention())
+  return db
+    .selectDistinct({ orderId: henrriDocuments.orderId })
+    .from(henrriDocuments)
+    .where(and(isNotNull(henrriDocuments.orderId), needsAttention()))
 }
 
 function needsAttention() {

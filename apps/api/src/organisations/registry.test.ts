@@ -18,6 +18,8 @@ function registryAnswer(establishment: Record<string, unknown> = {}) {
             siret: SIRET,
             etat_administratif: "A",
             adresse: "20 AVENUE DE SEGUR 75007 PARIS",
+            code_postal: "75007",
+            libelle_commune: "PARIS",
             activite_principale: "84.11Z",
             ...establishment,
           },
@@ -55,9 +57,23 @@ describe("lookUpEstablishment", () => {
         legalNature: "7120",
         activityCode: "84.11Z",
         address: "20 AVENUE DE SEGUR 75007 PARIS",
+        billingAddress: { line1: "20 AVENUE DE SEGUR", postal: "75007", city: "PARIS" },
         active: true,
       },
     })
+  })
+
+  it("leaves the billing address out when the registry's parts do not add up to its address", async () => {
+    const cases = [
+      { code_postal: null, libelle_commune: null },
+      { adresse: "BP 12 75007 PARIS CEDEX 07" },
+      { adresse: "75007 PARIS" },
+    ]
+    for (const establishment of cases) {
+      const { fetchImpl } = fakeFetch(() => json(registryAnswer(establishment)))
+      const result = await lookUpEstablishment(SIRET, { fetchImpl })
+      expect(result.status === "found" && result.establishment.billingAddress).toBeNull()
+    }
   })
 
   it("reports a closed establishment as inactive", async () => {

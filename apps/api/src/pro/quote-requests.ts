@@ -5,9 +5,11 @@ import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { products, quoteBasketItems, quoteRequestItems, quoteRequests, users } from "../db/schema.js"
 import { sendQuoteRequestAlertEmail, sendQuoteRequestReceivedEmail } from "../email.js"
+import { HenrriError } from "../henrri/client.js"
 import { validationError } from "../http.js"
 import { proOrganisationOf } from "./access.js"
 import { loadBasket } from "./quote-basket.js"
+import { issuedQuotation, memberQuoteView, validityDay } from "./quotes.js"
 
 const NOT_FOUND = { error: "NotFound", message: "Quote request not found" }
 
@@ -21,7 +23,7 @@ export const QUOTE_REQUESTS_PER_HOUR = 20
 /** DR-<year>-<n>: the sequence never resets, the year only reads better. */
 const NEXT_NUMBER = sql<string>`'DR-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('quote_request_number_seq')::text, 4, '0')`
 
-/** What a pro sees of a request: no public price — the quote's figures come with 12.8d. */
+/** What a pro sees of a request: no public price, and the quote's figures only once it is issued. */
 const MEMBER_REQUEST_COLUMNS = {
   id: quoteRequests.id,
   number: quoteRequests.number,
@@ -61,19 +63,28 @@ class SubmitRefusal extends Error {
   }
 }
 
+/** The validity as a calendar day, as the pro reads it. */
+function withValidityDay<T extends { validUntil: Date | null }>(row: T) {
+  return { ...row, validUntil: validityDay(row.validUntil) }
+}
+
 async function memberRequest(id: string, organisationId: string) {
   const [request] = await db
-    .select(MEMBER_REQUEST_COLUMNS)
+    .select({ ...MEMBER_REQUEST_COLUMNS, shippingPortions: quoteRequests.shippingPortions })
     .from(quoteRequests)
     .where(and(eq(quoteRequests.id, id), eq(quoteRequests.organisationId, organisationId)))
   if (!request) return null
-  const items = await db
-    .select(MEMBER_ITEM_COLUMNS)
-    .from(quoteRequestItems)
-    .leftJoin(products, eq(products.id, quoteRequestItems.productId))
-    .where(eq(quoteRequestItems.quoteRequestId, id))
-    .orderBy(asc(quoteRequestItems.position))
-  return { ...request, items }
+  const [items, quote] = await Promise.all([
+    db
+      .select(MEMBER_ITEM_COLUMNS)
+      .from(quoteRequestItems)
+      .leftJoin(products, eq(products.id, quoteRequestItems.productId))
+      .where(eq(quoteRequestItems.quoteRequestId, id))
+      .orderBy(asc(quoteRequestItems.position)),
+    memberQuoteView(request),
+  ])
+  const { shippingPortions: _shippingPortions, ...visible } = request
+  return { ...withValidityDay(visible), items, quote }
 }
 
 /** Best-effort once committed: the pro's receipt and SCS's alert. */
@@ -206,7 +217,7 @@ export const quoteRequestRoutes: FastifyPluginAsync = async (fastify) => {
       .from(quoteRequests)
       .where(eq(quoteRequests.organisationId, organisation.id))
       .orderBy(desc(quoteRequests.createdAt), desc(quoteRequests.number))
-    return reply.send({ data: rows })
+    return reply.send({ data: rows.map(withValidityDay) })
   })
 
   fastify.get("/:id", async (request, reply) => {
@@ -215,6 +226,33 @@ export const quoteRequestRoutes: FastifyPluginAsync = async (fastify) => {
     const found = await memberRequest(params.data.id, proOrganisationOf(request).id)
     if (!found) return reply.code(404).send(NOT_FOUND)
     return reply.send({ data: found })
+  })
+
+  /** GET /:id/quote.pdf — the issued quote, as Henrri made it (story 12.8d). */
+  fastify.get("/:id/quote.pdf", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) return reply.code(400).send(validationError(params.error.issues))
+    const found = await memberRequest(params.data.id, proOrganisationOf(request).id)
+    const quotation = found?.quote ? await issuedQuotation(found.id) : null
+    if (!quotation) return reply.code(404).send({ error: "NotFound", message: "Quote not found" })
+
+    const unavailable = () =>
+      reply.code(503).send({ error: "QuoteUnavailable", message: "The quote cannot be fetched right now" })
+    if (!fastify.henrri) return unavailable()
+    let pdf: Uint8Array
+    try {
+      pdf = await fastify.henrri.pdf(quotation.henrriDocumentId)
+    } catch (err) {
+      if (!(err instanceof HenrriError)) throw err
+      request.log.warn({ err, quoteRequestId: params.data.id }, "Quote PDF unavailable from Henrri")
+      return unavailable()
+    }
+    return reply
+      .code(200)
+      .header("content-type", "application/pdf")
+      .header("content-disposition", `attachment; filename="Devis-${quotation.number.replace(/[^\w.-]/g, "_")}.pdf"`)
+      .header("cache-control", "private, no-store")
+      .send(Buffer.from(pdf))
   })
 
   /** POST /:id/cancel — only while SCS has not started on it. */

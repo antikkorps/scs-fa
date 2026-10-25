@@ -2,6 +2,7 @@ import {
   adminOrganisationListQuerySchema,
   approveOrganisationSchema,
   type OrganisationStatus,
+  organisationBillingAddressSchema,
   organisationReviewReasonSchema,
   updateOrganisationTermsSchema,
   uuidParamSchema,
@@ -22,7 +23,7 @@ import {
   sendOrganisationSuspendedEmail,
 } from "../email.js"
 import { validationError } from "../http.js"
-import { SIRET_HELD_INDEX } from "./service.js"
+import { BILLING_ADDRESS_COLUMNS, billingAddressOf, SIRET_HELD_INDEX, withBillingAddress } from "./service.js"
 
 const NOT_FOUND = { error: "NotFound", message: "Organisation not found" }
 
@@ -58,6 +59,7 @@ const DETAIL_COLUMNS = {
   discountPct: organisations.discountPct,
   net30Allowed: organisations.net30Allowed,
   showPrices: organisations.showPrices,
+  ...BILLING_ADDRESS_COLUMNS,
   updatedAt: organisations.updatedAt,
 } as const
 
@@ -121,6 +123,11 @@ function termsOf(row: { discountPct: string; net30Allowed: boolean; showPrices: 
 /** The numeric column comes back as a string; the API speaks numbers. */
 function withNumericDiscount<T extends { discountPct: string }>(row: T) {
   return { ...row, discountPct: Number(row.discountPct) }
+}
+
+/** An organisation as the back-office reads it: numeric discount, one billing address. */
+function presented(row: Parameters<typeof withNumericDiscount>[0] & Parameters<typeof withBillingAddress>[0]) {
+  return withBillingAddress(withNumericDiscount(row))
 }
 
 async function memberOf(organisationId: string): Promise<Member | undefined> {
@@ -187,7 +194,7 @@ export const adminOrganisationRoutes: FastifyPluginAsync = async (fastify) => {
       .from(organisations)
       .where(and(eq(organisations.siret, row.siret), ne(organisations.id, row.id)))
       .orderBy(asc(organisations.createdAt))
-    return reply.send({ data: { ...withNumericDiscount(row), sameSiret } })
+    return reply.send({ data: { ...presented(row), sameSiret } })
   })
 
   /**
@@ -263,7 +270,7 @@ export const adminOrganisationRoutes: FastifyPluginAsync = async (fastify) => {
         request.log.error({ err, organisationId: updated.id }, `organisation ${kind} e-mail failed`),
       )
     }
-    return reply.send({ data: withNumericDiscount(updated) })
+    return reply.send({ data: presented(updated) })
   }
 
   /** POST /:id/approve — terms may be set at once; administrations get the 30-day payment by default. */
@@ -343,6 +350,57 @@ export const adminOrganisationRoutes: FastifyPluginAsync = async (fastify) => {
     })
 
     if (!updated) return reply.code(404).send(NOT_FOUND)
-    return reply.send({ data: withNumericDiscount(updated) })
+    return reply.send({ data: presented(updated) })
+  })
+
+  /** PUT /:id/billing-address — where quotes and invoices are made out to (story 12.8d). */
+  fastify.put("/:id/billing-address", async (request, reply) => {
+    const params = uuidParamSchema.safeParse(request.params)
+    if (!params.success) return reply.code(400).send(validationError(params.error.issues))
+    const parsed = organisationBillingAddressSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
+    const address = parsed.data
+
+    const updated = await db.transaction(async (tx) => {
+      const [before] = await tx
+        .select(BILLING_ADDRESS_COLUMNS)
+        .from(organisations)
+        .where(eq(organisations.id, params.data.id))
+        .for("update")
+      if (!before) return null
+
+      const [row] = await tx
+        .update(organisations)
+        .set({
+          billingLine1: address.line1,
+          billingLine2: address.line2,
+          billingPostal: address.postal,
+          billingCity: address.city,
+          billingCountry: address.country,
+          updatedAt: new Date(),
+        })
+        .where(eq(organisations.id, params.data.id))
+        .returning(DETAIL_COLUMNS)
+      if (!row) return null
+
+      await recordAuditEvent(
+        {
+          userId: request.user.sub,
+          userRole: "admin",
+          entityType: "organisation",
+          entityId: row.id,
+          action: "organisation.billing_address_updated",
+          oldValue: billingAddressOf(before),
+          newValue: address,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        },
+        tx,
+      )
+      return row
+    })
+
+    if (!updated) return reply.code(404).send(NOT_FOUND)
+    return reply.send({ data: presented(updated) })
   })
 }

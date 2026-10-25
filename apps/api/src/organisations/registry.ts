@@ -16,6 +16,8 @@ export interface RegistryEstablishment {
   legalNature: string | null
   activityCode: string | null
   address: string | null
+  /** The address split for Henrri (story 12.8d), when the registry's parts allow it. */
+  billingAddress: { line1: string; postal: string; city: string } | null
   active: boolean
 }
 
@@ -38,6 +40,8 @@ const answerSchema = z.object({
             siret: z.string(),
             etat_administratif: z.string(),
             adresse: z.string().nullable().optional(),
+            code_postal: z.string().nullable().optional(),
+            libelle_commune: z.string().nullable().optional(),
             activite_principale: z.string().nullable().optional(),
           }),
         )
@@ -66,6 +70,23 @@ async function fetchAnswer(siret: string, options: RegistryOptions): Promise<unk
   return await Promise.race([response.json(), timedOut])
 }
 
+/**
+ * The street part of the registry's one-line address, which ends with the
+ * postcode and the town. Anything else (a CEDEX, a P.O. box) is left for SCS
+ * to type: a guessed address on an invoice is worse than none.
+ */
+function billingAddressOf(
+  address: string | null | undefined,
+  postal: string | null | undefined,
+  city: string | null | undefined,
+): RegistryEstablishment["billingAddress"] {
+  if (!address || !postal || !city) return null
+  const suffix = ` ${postal} ${city}`
+  if (!address.endsWith(suffix)) return null
+  const line1 = address.slice(0, -suffix.length).trim()
+  return line1 ? { line1, postal, city } : null
+}
+
 /** What the registry knows of one establishment. Never throws: a failure is `unavailable`. */
 export async function lookUpEstablishment(siret: string, options: RegistryOptions = {}): Promise<RegistryLookup> {
   let answer: z.infer<typeof answerSchema>
@@ -86,6 +107,11 @@ export async function lookUpEstablishment(siret: string, options: RegistryOption
         legalNature: company.nature_juridique ?? null,
         activityCode: establishment.activite_principale ?? null,
         address: establishment.adresse ?? null,
+        billingAddress: billingAddressOf(
+          establishment.adresse,
+          establishment.code_postal,
+          establishment.libelle_commune,
+        ),
         active: establishment.etat_administratif === ACTIVE,
       },
     }

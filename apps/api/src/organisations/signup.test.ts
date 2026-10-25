@@ -46,6 +46,7 @@ function found(siret: string, overrides: { active?: boolean; legalNature?: strin
       legalNature: overrides.legalNature ?? "5710",
       activityCode: "47.78C",
       address: "1 RUE DU STAND 69001 LYON",
+      billingAddress: { line1: "1 RUE DU STAND", postal: "69001", city: "LYON" },
       active: overrides.active ?? true,
     },
   }
@@ -173,6 +174,14 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
         showPrices: false,
       })
       expect(organisation?.registrySnapshot).toMatchObject({ legalName: "ARMURERIE DU REGISTRE", active: true })
+      // Story 12.8d — the billing address starts from the registry's.
+      expect(organisation).toMatchObject({
+        billingLine1: "1 RUE DU STAND",
+        billingLine2: null,
+        billingPostal: "69001",
+        billingCity: "LYON",
+        billingCountry: "FR",
+      })
       const [user] = await db.select().from(users).where(eq(users.id, body.id))
       expect(user?.role).toBe("customer")
       expect(user?.passwordHash.startsWith("$argon2id$")).toBe(true)
@@ -201,6 +210,7 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
       const organisation = await organisationOf(res.json().data.id)
       expect(organisation?.registryCheck).toBe("unavailable")
       expect(organisation?.registrySnapshot).toBeNull()
+      expect(organisation?.billingLine1).toBeNull()
     })
 
     it("flags a closed establishment and an unknown number", async () => {

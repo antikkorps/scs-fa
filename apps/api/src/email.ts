@@ -42,6 +42,7 @@ type EmailType =
   | "organisation_suspended"
   | "organisation_reinstated"
   | "quote_request_received"
+  | "quote_available"
   | "transfer_reminder"
   | "unpaid_order_cancelled"
 
@@ -225,6 +226,37 @@ export async function sendQuoteRequestReceivedEmail(
     "Notre équipe l'étudie et vous envoie un devis par e-mail. Vous pouvez suivre son avancement depuis votre espace.",
     `Votre espace : ${PRO_SPACE_URL()}`,
   ])
+}
+
+export interface QuoteAvailableEmail {
+  quoteRequestId: string
+  number: string
+  henrriNumber: string
+  amountTtc: number
+  validUntil: Date | null
+}
+
+/** Story 12.8d — the quote is out: the pro reads it, downloads it and answers it from their space. */
+export async function sendQuoteAvailableEmail(
+  to: string,
+  quote: QuoteAvailableEmail,
+  about: EmailAbout = {},
+): Promise<void> {
+  const quoteUrl = `${env.WEB_BASE_URL}/pro/demandes/${quote.quoteRequestId}`
+  const validity = quote.validUntil
+    ? `Il est valable jusqu'au ${PARIS_DATE.format(quote.validUntil)}.`
+    : "Sa durée de validité figure sur le devis."
+  await deliverParagraphs(
+    "quote_available",
+    about,
+    to,
+    `Votre devis ${quote.henrriNumber} est disponible — demande ${quote.number}`,
+    [
+      `Votre devis ${quote.henrriNumber}, en réponse à votre demande ${quote.number}, est disponible.`,
+      `Montant : ${EUROS.format(quote.amountTtc)} TTC. ${validity}`,
+      `Consultez-le et téléchargez-le depuis votre espace : ${quoteUrl}`,
+    ],
+  )
 }
 
 export interface QuoteRequestAlert {

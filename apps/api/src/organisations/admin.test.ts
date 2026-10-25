@@ -70,7 +70,7 @@ describe("pro accounts in the back-office (/api/admin/organisations, story 12.8b
     return { organisation, member }
   }
 
-  const call = (method: "GET" | "POST" | "PATCH", url: string, payload?: object, token = adminToken) =>
+  const call = (method: "GET" | "POST" | "PATCH" | "PUT", url: string, payload?: object, token = adminToken) =>
     app.inject({
       method,
       url: `/api/admin/organisations${url}`,
@@ -299,6 +299,37 @@ describe("pro accounts in the back-office (/api/admin/organisations, story 12.8b
       for (const payload of [{}, { status: "approved" }, { discountPct: 101 }, { discountPct: 1.234 }]) {
         expect((await call("PATCH", `/${organisation.id}`, payload)).statusCode, JSON.stringify(payload)).toBe(400)
       }
+    })
+  })
+
+  describe("PUT /:id/billing-address (story 12.8d)", () => {
+    const address = { line1: "12 rue de la Paix", line2: "Bâtiment B", postal: "75002", city: "Paris" }
+
+    it("sets the address quotes and invoices are made out to, and journals before and after", async () => {
+      const { organisation } = await proRequest({ status: "approved" })
+
+      const res = await call("PUT", `/${organisation.id}/billing-address`, address)
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().data.billingAddress).toEqual({ ...address, country: "FR" })
+      expect(await stored(organisation.id)).toMatchObject({
+        billingLine1: "12 rue de la Paix",
+        billingLine2: "Bâtiment B",
+        billingPostal: "75002",
+        billingCity: "Paris",
+        billingCountry: "FR",
+      })
+      const events = await db.select().from(auditLogs).where(eq(auditLogs.entityId, organisation.id))
+      expect(events.find((event) => event.action === "organisation.billing_address_updated")).toMatchObject({
+        oldValue: { line1: null, line2: null, postal: null, city: null, country: "FR" },
+        newValue: { ...address, country: "FR" },
+      })
+    })
+
+    it("refuses an incomplete address and an unknown organisation", async () => {
+      const { organisation } = await proRequest({ status: "approved" })
+      expect((await call("PUT", `/${organisation.id}/billing-address`, { line1: "x" })).statusCode).toBe(400)
+      expect((await call("PUT", `/${crypto.randomUUID()}/billing-address`, address)).statusCode).toBe(404)
     })
   })
 })

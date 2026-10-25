@@ -7,14 +7,15 @@ import { organisationTypeLabel, quoteRequestStatus } from "~/utils/organisation"
 import { legalCategoryLabel } from "~/utils/product"
 
 // Story 12.8c — the pros' quote requests: SCS sees what was asked, from the
-// public prices and the organisation's terms, and takes it in hand. Quoting
-// it — prices, Henrri, the PDF — comes with story 12.8d.
+// public prices and the organisation's terms, and takes it in hand; then
+// (story 12.8d) prices the quote and sends it through Henrri.
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Devis — Administration SCS" })
 
 const TABS: { value: QuoteRequestStatus | "all"; label: string }[] = [
   { value: "requested", label: "Nouvelles" },
   { value: "in_review", label: "En cours" },
+  { value: "sent", label: "Envoyés" },
   { value: "all", label: "Toutes" },
 ]
 
@@ -46,18 +47,27 @@ const drawerLoading = ref(false)
 const acting = ref(false)
 const actionError = ref("")
 
+async function load(id: string) {
+  selected.value = (await api<{ data: AdminQuoteRequestDetail }>(`/admin/quote-requests/${id}`)).data
+}
+
 async function open(id: string) {
   drawerOpen.value = true
   drawerLoading.value = true
   selected.value = null
   actionError.value = ""
   try {
-    selected.value = (await api<{ data: AdminQuoteRequestDetail }>(`/admin/quote-requests/${id}`)).data
+    await load(id)
   } catch {
     actionError.value = "Impossible de charger la demande."
   } finally {
     drawerLoading.value = false
   }
+}
+
+async function onQuoteUpdated(quote: AdminQuoteRequestDetail) {
+  selected.value = quote
+  await refresh()
 }
 
 function close() {
@@ -71,10 +81,9 @@ async function takeInHand() {
   acting.value = true
   actionError.value = ""
   try {
-    const answer = await api<{ data: Partial<AdminQuoteRequestDetail> }>(`/admin/quote-requests/${current.id}/review`, {
-      method: "POST",
-    })
-    selected.value = { ...current, ...answer.data }
+    await api(`/admin/quote-requests/${current.id}/review`, { method: "POST" })
+    // Taking it in hand starts the quote: reload it with its prices and delivery.
+    await load(current.id)
     await refresh()
   } catch (err) {
     actionError.value = (err as { data?: { message?: string } })?.data?.message ?? "L'opération a échoué."
@@ -165,7 +174,7 @@ const publicTotal = (detail: AdminQuoteRequestDetail) =>
           </div>
         </dl>
 
-        <section class="block">
+        <section v-if="selected.status === 'requested'" class="block">
           <h3 class="block__h">Articles demandés</h3>
           <ul class="lines" role="list">
             <li v-for="item in selected.items" :key="item.id" class="line">
@@ -194,7 +203,7 @@ const publicTotal = (detail: AdminQuoteRequestDetail) =>
         <div v-if="selected.status === 'requested'" class="actions">
           <button type="button" class="btn btn-primary take" :disabled="acting" @click="takeInHand">Prendre en charge</button>
         </div>
-        <p v-else class="hint">L'établissement du devis arrive avec la prochaine étape (12.8d).</p>
+        <AdminQuoteEditor v-else-if="selected.status !== 'cancelled'" :quote="selected" @updated="onQuoteUpdated" />
       </template>
     </AdminDrawer>
   </div>

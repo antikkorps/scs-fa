@@ -45,6 +45,7 @@ export type DraftRefusal =
   | "ShippingAlreadyRefunded"
   | "NothingToCredit"
   | "NoCreditNote"
+  | "UnpricedLine"
 
 export type DraftResult = { ok: true; draft: DocumentDraft } | { ok: false; reason: DraftRefusal }
 

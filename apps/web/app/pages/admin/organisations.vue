@@ -50,6 +50,7 @@ const actionError = ref("")
 const mode = ref<"view" | "reject" | "suspend">("view")
 const reason = ref("")
 const terms = reactive({ discountPct: 0, net30Allowed: false, showPrices: false })
+const billing = reactive({ line1: "", line2: "", postal: "", city: "", country: "FR" })
 
 function hydrate(detail: AdminOrganisationDetail) {
   selected.value = detail
@@ -57,6 +58,11 @@ function hydrate(detail: AdminOrganisationDetail) {
   // Administrations get the 30-day payment unless SCS unticks it (decision 2026-10-19).
   terms.net30Allowed = detail.status === "pending" ? detail.type === "administration" : detail.net30Allowed
   terms.showPrices = detail.showPrices
+  billing.line1 = detail.billingAddress.line1 ?? ""
+  billing.line2 = detail.billingAddress.line2 ?? ""
+  billing.postal = detail.billingAddress.postal ?? ""
+  billing.city = detail.billingAddress.city ?? ""
+  billing.country = detail.billingAddress.country
 }
 
 async function open(id: string) {
@@ -96,7 +102,7 @@ const termsBody = () => ({
 })
 
 /** One admin action on the open organisation: the answer replaces the fiche, the list follows. */
-async function act(path: string, options: { method: "POST" | "PATCH"; body?: object }, fallback: string) {
+async function act(path: string, options: { method: "POST" | "PATCH" | "PUT"; body?: object }, fallback: string) {
   const current = selected.value
   if (!current) return
   acting.value = true
@@ -117,6 +123,12 @@ async function act(path: string, options: { method: "POST" | "PATCH"; body?: obj
 const approve = () => act("/approve", { method: "POST", body: termsBody() }, "La validation a échoué.")
 const saveTerms = () => act("", { method: "PATCH", body: termsBody() }, "L'enregistrement a échoué.")
 const reinstate = () => act("/reinstate", { method: "POST" }, "Le rétablissement a échoué.")
+const saveBilling = () =>
+  act(
+    "/billing-address",
+    { method: "PUT", body: { ...billing, line2: billing.line2 || null } },
+    "L'adresse n'a pas pu être enregistrée : rue, code postal et ville sont nécessaires.",
+  )
 
 function askReason(next: "reject" | "suspend") {
   mode.value = next
@@ -263,6 +275,30 @@ const memberName = (row: AdminOrganisationRow) =>
           </label>
           <button v-if="selected.status !== 'pending'" type="button" class="btn btn-ghost save-terms" :disabled="acting" @click="saveTerms">
             Enregistrer les conditions
+          </button>
+        </section>
+
+        <section v-if="selected.status !== 'rejected'" class="block">
+          <h3 class="block__h">Adresse de facturation</h3>
+          <p class="hint">Les devis et factures Henrri sont établis à cette adresse ; préremplie depuis le registre quand il l'a donnée.</p>
+          <label class="field">
+            <span>Adresse</span>
+            <input v-model="billing.line1" name="billingLine1" autocomplete="address-line1" class="ctl" />
+          </label>
+          <label class="field">
+            <span>Complément</span>
+            <input v-model="billing.line2" name="billingLine2" autocomplete="address-line2" class="ctl" />
+          </label>
+          <label class="field">
+            <span>Code postal</span>
+            <input v-model="billing.postal" name="billingPostal" autocomplete="postal-code" inputmode="numeric" class="ctl" />
+          </label>
+          <label class="field">
+            <span>Ville</span>
+            <input v-model="billing.city" name="billingCity" autocomplete="address-level2" class="ctl" />
+          </label>
+          <button type="button" class="btn btn-ghost save-billing" :disabled="acting" @click="saveBilling">
+            Enregistrer l'adresse
           </button>
         </section>
 

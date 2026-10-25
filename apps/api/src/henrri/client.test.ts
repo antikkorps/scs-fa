@@ -231,6 +231,7 @@ describe("Henrri client — documents", () => {
     const client = clientFor(fake)
     expect(await client.documentTypeId("invoice")).toBe(3)
     expect(await client.documentTypeId("creditNote")).toBe(4)
+    expect(await client.documentTypeId("quotation")).toBe(7)
     expect(fake.apiCalls()).toHaveLength(1)
   })
 
@@ -385,6 +386,47 @@ describe("Henrri client — customers", () => {
       contacts: [{ firstName: "Jean", lastName: "Tireur", isPrimary: true }],
       address: { address: "1 rue du Tir", postCode: "75001", city: "Paris", country: "France" },
     })
+  })
+
+  // Story 12.8d — a quote is made out to the organisation, not to the person who asked.
+  const company = {
+    companyName: "Armurerie du Stand",
+    siret: "73282932000074",
+    contact: { firstName: "Jeanne", lastName: "Armand" },
+    address: { line1: "12 rue de la Paix", line2: null, postal: "75002", city: "Paris", country: "FR" },
+  }
+
+  it("creates a company as a professional customer with its SIRET, the requester as contact", async () => {
+    const fake = fakeHenrri({ "POST /v1/customers": () => ({ status: 201, body: { id: 11 } }) })
+    expect(await clientFor(fake).createCustomer(company)).toBe(11)
+    expect(fake.apiCalls()[0].body).toEqual({
+      name: "Armurerie du Stand",
+      type: "professional",
+      companyIdentifierType: "siret",
+      siret: "73282932000074",
+      contacts: [{ firstName: "Jeanne", lastName: "Armand", isPrimary: true }],
+      address: { address: "12 rue de la Paix", postCode: "75002", city: "Paris", country: "France" },
+    })
+  })
+
+  it("updates a company's name, SIRET and address the same careful way", async () => {
+    const fake = fakeHenrri({
+      "GET /v1/customers/11": () => ({
+        status: 200,
+        body: { id: 11, name: "ANCIEN NOM", type: "professional", accountingNumber: "411STAND", contacts: [] },
+      }),
+      "PUT /v1/customers/11": () => ({ status: 200, body: { id: 11 } }),
+    })
+    await clientFor(fake).updateCustomer(11, company)
+    const body = fake.apiCalls().find((call) => call.method === "PUT")?.body as Record<string, unknown>
+    expect(body).toMatchObject({
+      id: 11,
+      name: "Armurerie du Stand",
+      type: "professional",
+      siret: "73282932000074",
+      accountingNumber: "411STAND",
+    })
+    expect(body).not.toHaveProperty("contacts")
   })
 
   it("keeps the second address line", async () => {

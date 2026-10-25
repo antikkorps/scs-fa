@@ -31,6 +31,8 @@ const DETAIL: AdminQuoteRequestDetail = {
     discountPct: 12,
     net30Allowed: true,
     showPrices: false,
+    billingAddress: { line1: "1 place de la Comédie", line2: null, postal: "69001", city: "Lyon", country: "FR" },
+    billingAddressComplete: true,
   },
   items: [
     {
@@ -50,6 +52,14 @@ const DETAIL: AdminQuoteRequestDetail = {
       lineDiscountPct: null,
     },
   ],
+  sentAt: null,
+  shippingTtc: 0,
+  totals: null,
+  totalTtc: null,
+  requiresDocuments: false,
+  documentsSufficient: null,
+  henrri: null,
+  sending: false,
 }
 const PAGINATION = { page: 1, limit: 20, total: 1, totalPages: 1, hasMore: false }
 
@@ -97,18 +107,34 @@ describe("admin/devis.vue (story 12.8c)", () => {
     expect(drawer.text()).toContain("Livraison au poste")
   })
 
-  it("takes a request in hand", async () => {
+  it("takes a request in hand, then reloads it to show the quote it starts", async () => {
     serve(DETAIL)
     const wrapper = await openFirst()
     await wrapper.find("button.take").trigger("click")
     await flushPromises()
     const call = apiMock.mock.calls.find(([url]) => String(url).endsWith("/r1/review"))
     expect(call?.[1]).toEqual({ method: "POST" })
+    expect(apiMock.mock.calls.filter(([url]) => url === "/admin/quote-requests/r1")).toHaveLength(2)
   })
 
-  it("offers nothing more once in hand: quoting comes with the next step", async () => {
-    serve({ ...DETAIL, status: "in_review" })
+  // Story 12.8d — once in hand, SCS prices the quote.
+  it("shows the quote editor once in hand", async () => {
+    serve({
+      ...DETAIL,
+      status: "in_review",
+      items: DETAIL.items.map((item) => ({ ...item, quotedPriceHt: 356.4, lineDiscountPct: 12 })),
+    })
     const wrapper = await openFirst()
     expect(wrapper.find("button.take").exists()).toBe(false)
+    expect(wrapper.find("input[name='price-i1']").exists()).toBe(true)
+  })
+
+  it("offers a tab for the sent quotes", async () => {
+    serve(DETAIL)
+    const wrapper = await mountSuspended(Devis, { route: "/admin/devis" })
+    await flushPromises()
+    const sent = wrapper.findAll(".tab").find((tab) => tab.text() === "Envoyés")
+    await sent?.trigger("click")
+    expect(sent?.attributes("aria-pressed")).toBe("true")
   })
 })

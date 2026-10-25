@@ -29,6 +29,7 @@ const DETAIL: AdminOrganisationDetail = {
   net30Allowed: false,
   showPrices: false,
   updatedAt: "2026-10-21T10:00:00Z",
+  billingAddress: { line1: "1 RUE DU STAND", line2: null, postal: "69001", city: "LYON", country: "FR" },
   sameSiret: [],
 }
 const PAGINATION = { page: 1, limit: 20, total: 1, totalPages: 1, hasMore: false }
@@ -162,5 +163,21 @@ describe("admin/organisations.vue (story 12.8b)", () => {
     await wrapper.find("button.reinstate").trigger("click")
     await flushPromises()
     expect(callsTo("/o1/reinstate")[0]?.[1]).toEqual({ method: "POST" })
+  })
+
+  // Story 12.8d — quotes and invoices are made out to this address.
+  it("edits the billing address, prefilled from the registry", async () => {
+    serve({ ...DETAIL, status: "approved" })
+    const wrapper = await openFirst()
+
+    expect((wrapper.find("input[name='billingLine1']").element as HTMLInputElement).value).toBe("1 RUE DU STAND")
+    await wrapper.find("input[name='billingLine2']").setValue("Bâtiment B")
+    await wrapper.find("button.save-billing").trigger("click")
+    await flushPromises()
+
+    expect(callsTo("/o1/billing-address")[0]?.[1]).toEqual({
+      method: "PUT",
+      body: { line1: "1 RUE DU STAND", line2: "Bâtiment B", postal: "69001", city: "LYON", country: "FR" },
+    })
   })
 })

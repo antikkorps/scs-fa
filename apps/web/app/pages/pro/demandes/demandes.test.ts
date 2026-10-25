@@ -95,4 +95,39 @@ describe("pro/demandes (story 12.8c)", () => {
     await flushPromises()
     expect(wrapper.find("button.cancel").exists()).toBe(false)
   })
+
+  // Story 12.8d — the quote, once issued.
+  it("shows the issued quote: number, validity, prices, totals and its PDF", async () => {
+    quotes.getRequest.mockResolvedValue({
+      ...REQUEST,
+      status: "sent",
+      validUntil: "2026-11-24",
+      quote: {
+        number: "D-26-10-3",
+        issuedAt: "2026-10-25T11:00:00Z",
+        validUntil: "2026-11-24",
+        items: [{ id: "i1", qty: 12, unitPriceHt: 356.4, lineHt: 4276.8 }],
+        shippingTtc: 0,
+        totals: { totalHt: 4276.8, vatAmount: 855.36, totalTtc: 5132.16 },
+      },
+    })
+    const wrapper = await mountSuspended(Detail, { route: "/pro/demandes/r1" })
+    await flushPromises()
+
+    const quote = wrapper.find(".quote")
+    expect(quote.text()).toContain("D-26-10-3")
+    expect(quote.text()).toContain("24 nov. 2026")
+    expect(wrapper.find(".line").text()).toMatch(/356,40\s?€/)
+    expect(quote.text()).toMatch(/5\s?132,16\s?€/)
+    expect(quote.text()).toContain("Port offert")
+    expect(quote.find("a.download").attributes("href")).toBe("/bff/api/pro/quote-requests/r1/quote.pdf")
+  })
+
+  it("says the quote is being prepared while SCS works on it", async () => {
+    quotes.getRequest.mockResolvedValue({ ...REQUEST, status: "in_review", quote: null })
+    const wrapper = await mountSuspended(Detail, { route: "/pro/demandes/r1" })
+    await flushPromises()
+    expect(wrapper.find(".quote").exists()).toBe(false)
+    expect(wrapper.text()).toContain("Notre équipe prépare votre devis")
+  })
 })

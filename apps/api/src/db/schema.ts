@@ -140,7 +140,7 @@ export const refundStatusEnum = pgEnum("refund_status", ["pending", "succeeded",
 export const refundKindEnum = pgEnum("refund_kind", ["goods_return", "goodwill", "overpayment"])
 // Story 12.6 — documents comptables poussés dans Henrri. `blocked` attend un humain
 // (commande non facturable, total Henrri différent du nôtre, refus métier).
-export const henrriDocumentKindEnum = pgEnum("henrri_document_kind", ["invoice", "credit_note"])
+export const henrriDocumentKindEnum = pgEnum("henrri_document_kind", ["invoice", "credit_note", "quotation"])
 export const henrriDocumentStatusEnum = pgEnum("henrri_document_status", ["pending", "draft", "finalized", "blocked"])
 export const printStatusEnum = pgEnum("print_status", [
   "available",
@@ -287,6 +287,19 @@ export const organisations = pgTable(
     net30Allowed: boolean("net30_allowed").notNull().default(false),
     showPrices: boolean("show_prices").notNull().default(false),
 
+    // Billing address (story 12.8d): prefilled from the registry, set by SCS;
+    // a quote cannot be sent without it.
+    billingLine1: varchar("billing_line1", { length: 255 }),
+    billingLine2: varchar("billing_line2", { length: 255 }),
+    billingPostal: varchar("billing_postal", { length: 10 }),
+    billingCity: varchar("billing_city", { length: 100 }),
+    billingCountry: varchar("billing_country", { length: 2 }).notNull().default("FR"),
+
+    // The organisation's Henrri customer (a company), created with its first quote.
+    henrriCustomerId: integer("henrri_customer_id").unique(),
+    // Name, SIRET and address sent to Henrri: the record is rewritten only when they change.
+    henrriCustomerFingerprint: text("henrri_customer_fingerprint"),
+
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -339,8 +352,14 @@ export const quoteRequests = pgTable(
     requestedBy: uuid("requested_by").notNull(),
     message: text("message"),
     status: quoteRequestStatusEnum("status").notNull().default("requested"),
-    // Set with the quote (12.8d).
+    // The quote (12.8d): delivery split by VAT rate as on an order, the TTC
+    // total frozen when it is sent, and SCS's call on the organisation's documents.
     validUntil: timestamp("valid_until"),
+    shippingPortions: jsonb("shipping_portions").$type<OrderShippingPortion[]>(),
+    totalTtc: decimal("total_ttc", { precision: 10, scale: 2 }),
+    documentsSufficientAt: timestamp("documents_sufficient_at"),
+    documentsSufficientBy: uuid("documents_sufficient_by"),
+    sentAt: timestamp("sent_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     // Last activity: a request never converted is purged 3 years after it.
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2089,8 +2108,10 @@ export const henrriDocuments = pgTable(
   "henrri_documents",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    orderId: uuid("order_id").notNull(),
-    // Null pour la facture, renseigné pour l'avoir du remboursement.
+    // Une facture ou un avoir vient d'une commande, un devis d'une demande de devis (12.8d).
+    orderId: uuid("order_id"),
+    quoteRequestId: uuid("quote_request_id"),
+    // Renseigné pour l'avoir du remboursement seulement.
     refundId: uuid("refund_id").unique(),
     kind: henrriDocumentKindEnum("kind").notNull(),
     status: henrriDocumentStatusEnum("status").notNull().default("pending"),
@@ -2127,11 +2148,24 @@ export const henrriDocuments = pgTable(
     uniqueIndex("uq_henrri_documents_order_invoice")
       .on(t.orderId)
       .where(sql`${t.kind} = 'invoice'`),
-    check("henrri_documents_refund_matches_kind", sql`(${t.kind} = 'invoice') = (${t.refundId} IS NULL)`),
+    check("henrri_documents_refund_matches_kind", sql`(${t.kind} = 'credit_note') = (${t.refundId} IS NOT NULL)`),
+    // Facture et avoir viennent d'une commande, le devis d'une demande. Écrit sans
+    // la valeur 'quotation' : une valeur d'enum neuve ne sert pas dans la migration qui l'ajoute.
+    check(
+      "henrri_documents_source_matches_kind",
+      sql`(${t.kind} IN ('invoice', 'credit_note')) = (${t.orderId} IS NOT NULL)
+        AND (${t.orderId} IS NULL) <> (${t.quoteRequestId} IS NULL)`,
+    ),
+    // Un seul devis en cours d'émission par demande ; une révision en émet un nouveau.
+    uniqueIndex("uq_henrri_documents_quote_in_flight")
+      .on(t.quoteRequestId)
+      .where(sql`${t.status} IN ('pending', 'draft')`),
     // Pièces comptables conservées 10 ans : leur commande ou leur remboursement ne
     // peut pas être supprimé tant qu'elles existent.
     foreignKey({ columns: [t.orderId], foreignColumns: [orders.id] }).onDelete("restrict"),
     foreignKey({ columns: [t.refundId], foreignColumns: [refunds.id] }).onDelete("restrict"),
+    // Un devis n'est pas une pièce comptable : il suit la conservation de sa demande.
+    foreignKey({ columns: [t.quoteRequestId], foreignColumns: [quoteRequests.id] }).onDelete("cascade"),
   ],
 )
 
