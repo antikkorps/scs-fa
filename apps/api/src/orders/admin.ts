@@ -171,10 +171,17 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
       .where(eq(refunds.orderId, order.id))
       .orderBy(sql`${refunds.createdAt} DESC`)
     const shipping = await adminShippingView(order)
+    // Story 12.8d — an order on invoice past its due date, still unpaid: SCS follows it up.
+    const paymentLate =
+      order.paymentTerms === "net30" &&
+      order.paymentStatus === "pending" &&
+      order.paymentDueAt !== null &&
+      order.paymentDueAt.getTime() < Date.now()
 
     return reply.code(200).send({
       data: {
         ...order,
+        paymentLate,
         subtotalHt: Number(order.subtotalHt),
         vatAmount: Number(order.vatAmount),
         totalTtc: Number(order.totalTtc),
