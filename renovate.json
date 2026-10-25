@@ -40,6 +40,12 @@
       "description": "exceljs is CommonJS and requires uuid; uuid 12+ is ESM-only, so the override stays on 11.x",
       "matchDepNames": ["exceljs>uuid"],
       "allowedVersions": "<12"
+    },
+    {
+      "description": "Security overrides scoped to a vulnerable range (\"pkg@<x.y.z\") pin the fixed release of the same major; a major bump would hand the parent an incompatible dependency",
+      "matchDepNames": ["/@[<>=]/"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ]
 }
