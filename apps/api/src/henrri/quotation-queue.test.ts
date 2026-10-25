@@ -113,7 +113,10 @@ describe("Henrri quotes (story 12.8d)", () => {
     expect(document).toMatchObject({ kind: "quotation", status: "finalized", expectedTotalTtc: "3941.21" })
     expect(document.henrriNumber).toMatch(/^26-10-/)
     const issued = henrri.documents.get(document.henrriDocumentId as number)
-    expect(issued).toMatchObject({ documentTypeId: FAKE_TYPES.quotation, title: `Devis ${request.number}` })
+    expect(issued).toMatchObject({
+      documentTypeId: FAKE_TYPES.quotation,
+      title: `Devis ${request.number} — valable jusqu'au 30/11/2026`,
+    })
     expect(issued?.lines.map((line) => line.article.reference)).toEqual([`${TAG}-CAR`, `${TAG}-BRE`, "PORT"])
     expect(henrri.customers.get(issued?.customerId as number)).toEqual({
       companyName: `Armurerie ${TAG}`,

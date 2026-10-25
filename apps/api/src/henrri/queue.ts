@@ -597,8 +597,17 @@ function quotationIssuance(context: QuotationContext): Issuance {
           save: (customerId, fingerprint) => saveOrganisationCustomer(context.organisationId, customerId, fingerprint),
         }
       : null,
-    title: `Devis ${context.number}`,
+    title: quotationTitle(context),
   }
+}
+
+// The validity day is stored at midnight UTC: read it in UTC, it is a calendar day.
+const VALIDITY_DAY = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeZone: "UTC" })
+
+/** Henrri has no validity field on a quote: the title, printed as its heading, carries it. */
+function quotationTitle(context: QuotationContext): string {
+  const title = `Devis ${context.number}`
+  return context.validUntil ? `${title} — valable jusqu'au ${VALIDITY_DAY.format(context.validUntil)}` : title
 }
 
 async function runSteps(
