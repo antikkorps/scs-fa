@@ -50,6 +50,7 @@ import { paymentRoutes, stripeWebhookRoutes } from "./payments/index.js"
 import { adminPayoutRoutes } from "./payouts/index.js"
 import { adminQuoteRequestRoutes } from "./pro/admin-quotes.js"
 import { proRoutes } from "./pro/index.js"
+import { startQuoteExpiryScheduler } from "./pro/quote-expiry.js"
 import { startQuoteRequestPurgeScheduler } from "./pro/retention.js"
 import { productCategoryRoutes } from "./product-categories/index.js"
 import { adminProductRoutes } from "./products/admin.js"
@@ -191,6 +192,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   startNewsletterPurgeScheduler(fastify)
   startLoginChallengePurgeScheduler(fastify)
   startQuoteRequestPurgeScheduler(fastify)
+  startQuoteExpiryScheduler(fastify)
   startOrderConfirmationScheduler(fastify)
   startUnpaidOrderSweep(fastify)
   startHenrriScheduler(fastify)

@@ -65,7 +65,7 @@ describe("quoteTotals", () => {
         { qty: 3, unitPriceHt: 1084.5, vatPct: 20 },
         { qty: 1, unitPriceHt: 10.01, vatPct: 20 },
       ],
-      [{ amountTtc: 25, priceHt: 20.83, vatAmount: 4.17, vatPct: 20, requiresPaymentVirement: true }],
+      [{ priceHt: 20.83, vatPct: 20 }],
     )
 
     expect(totals.totalHt).toBe(3284.34)

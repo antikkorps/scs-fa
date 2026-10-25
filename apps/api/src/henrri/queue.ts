@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto"
 import { orderReference } from "@armurier/shared"
 import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
+import type { DbExecutor } from "../artworks/reservation.js"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { henrriDocuments, orders, paymentCarte, paymentVirement, quoteRequests, refunds, users } from "../db/schema.js"
@@ -103,18 +104,19 @@ export async function enqueueCreditNote(refundId: string): Promise<void> {
 }
 
 /**
- * Queue the quote SCS has just sent (story 12.8d). Idempotent while one is on
- * its way; a quote Henrri refused goes back to the queue with the request's
- * current total, and a revision of an issued quote queues a new one.
+ * Queue the quote SCS has just sent (story 12.8d), returning its document id.
+ * Idempotent while one is on its way; a quote Henrri refused goes back to the
+ * queue with the request's current total, and a revision of an issued quote
+ * queues a new one.
  */
-export async function enqueueQuotation(quoteRequestId: string): Promise<void> {
-  const [request] = await db
+export async function enqueueQuotation(quoteRequestId: string, executor: DbExecutor = db): Promise<string | null> {
+  const [request] = await executor
     .select({ totalTtc: quoteRequests.totalTtc })
     .from(quoteRequests)
     .where(eq(quoteRequests.id, quoteRequestId))
     .limit(1)
-  if (!request?.totalTtc) return
-  const retried = await db
+  if (!request?.totalTtc) return null
+  const [retried] = await executor
     .update(henrriDocuments)
     .set({
       status: "pending",
@@ -126,11 +128,13 @@ export async function enqueueQuotation(quoteRequestId: string): Promise<void> {
     })
     .where(and(eq(henrriDocuments.quoteRequestId, quoteRequestId), eq(henrriDocuments.status, "blocked")))
     .returning({ id: henrriDocuments.id })
-  if (retried.length > 0) return
-  await db
+  if (retried) return retried.id
+  const [queued] = await executor
     .insert(henrriDocuments)
     .values({ quoteRequestId, kind: "quotation", expectedTotalTtc: request.totalTtc })
     .onConflictDoNothing()
+    .returning({ id: henrriDocuments.id })
+  return queued?.id ?? null
 }
 
 /**

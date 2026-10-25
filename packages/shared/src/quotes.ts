@@ -28,7 +28,10 @@ export interface QuotedLine {
 }
 
 /** The quote's totals: each line rounded to the cent, then VAT by rate over lines and delivery. */
-export function quoteTotals(lines: readonly QuotedLine[], shipping: readonly ShippingPortion[]): VatTotals {
+export function quoteTotals(
+  lines: readonly QuotedLine[],
+  shipping: readonly Pick<ShippingPortion, "priceHt" | "vatPct">[],
+): VatTotals {
   return computeVatTotals([
     ...lines.map((line) => ({ priceHt: round2(line.unitPriceHt * line.qty), vatPct: line.vatPct })),
     ...shipping,
