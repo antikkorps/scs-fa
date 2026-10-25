@@ -254,8 +254,14 @@ below is the recommended path.
       keys, SMTP creds, the real `VIREMENT_*` account. No placeholder left — the
       API refuses to start otherwise (story 12.9b): any secret still holding a
       `CHANGE-ME` / `replace-me` / `your-…` sample (Postgres, Umami and the admin
-      seed included), the sample IBAN, or the same value for both JWT secrets.
-      `just logs api` then names the variables to fix, never their values.
+      seed included), the sample IBAN, the same value for both JWT secrets, or
+      `TOTP_ENCRYPTION_KEY` (story 12.8e, `openssl rand -base64 48`) equal to the
+      JWT secret. `just logs api` then names the variables to fix, never their values.
+- [ ] **Admins enrol their authenticator app** at their first login (mandatory,
+      story 12.8e) and keep their recovery codes. One who loses both is reset by
+      another admin (*Comptes pro* for a pro member, or the API), or on the server:
+      `docker compose exec api pnpm auth:totp-reset <email>`. Never rotate
+      `TOTP_ENCRYPTION_KEY` casually: every enrolled app would have to enrol again.
 - [ ] Stack builds & boots on the VM; `migrate` ran; seed ran; `ps` all healthy.
 - [ ] **Stripe live webhook** registered at `https://www.<DOMAIN>/api/webhooks/stripe`,
       subscribed to exactly these five events: `payment_intent.succeeded`,
