@@ -31,9 +31,13 @@ export function sampleValueProblems(environment: Record<string, string | undefin
 
   if (environment.VIREMENT_IBAN?.replace(/\s/g, "").toUpperCase() === SAMPLE_IBAN) problems.push("VIREMENT_IBAN")
 
-  const { JWT_SECRET, JWT_REFRESH_SECRET } = environment
+  const { JWT_SECRET, JWT_REFRESH_SECRET, TOTP_ENCRYPTION_KEY } = environment
   if (JWT_SECRET && JWT_SECRET === JWT_REFRESH_SECRET && !problems.includes("JWT_SECRET")) {
     problems.push("JWT_REFRESH_SECRET (same as JWT_SECRET)")
+  }
+  // Story 12.8e — a leaked token key must not also open the authenticator secrets.
+  if (JWT_SECRET && JWT_SECRET === TOTP_ENCRYPTION_KEY && !problems.includes("JWT_SECRET")) {
+    problems.push("TOTP_ENCRYPTION_KEY (same as JWT_SECRET)")
   }
   return problems
 }

@@ -75,6 +75,16 @@ describe("sampleValueProblems (story 12.9b)", () => {
     ])
   })
 
+  // Story 12.8e — the key of the authenticator secrets must not be the token key.
+  it("refuses the JWT secret as the TOTP encryption key", () => {
+    expect(sampleValueProblems({ ...REAL, TOTP_ENCRYPTION_KEY: REAL.JWT_SECRET })).toEqual([
+      "TOTP_ENCRYPTION_KEY (same as JWT_SECRET)",
+    ])
+    expect(sampleValueProblems({ ...REAL, TOTP_ENCRYPTION_KEY: "CHANGE-ME-openssl-rand-base64-48" })).toEqual([
+      "TOTP_ENCRYPTION_KEY",
+    ])
+  })
+
   it("ignores non-secret variables and empty optional secrets", () => {
     expect(sampleValueProblems({ ...REAL, ARTWORK_WATERMARK_TEXT: "your-brand", HENRRI_CLIENT_SECRET: "" })).toEqual([])
   })

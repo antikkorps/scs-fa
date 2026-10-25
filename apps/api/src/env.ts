@@ -15,6 +15,8 @@ const envSchema = z.object({
   // JWT
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
+  // Story 12.8e — encrypts the authenticator-app secrets at rest (AES-256-GCM).
+  TOTP_ENCRYPTION_KEY: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("1h"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
 

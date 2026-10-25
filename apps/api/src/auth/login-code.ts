@@ -163,6 +163,8 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
       const lockedFor = lockoutRemainingSeconds(user)
       if (lockedFor !== null) return accountLocked(reply, lockedFor)
 
+      // A challenge without a mailed code waits for the app instead (story 12.8e).
+      if (!challenge.codeHash) return invalidChallenge(reply)
       const attempts = await takeAttempt(challenge.id)
       if (attempts === null) return invalidChallenge(reply)
 

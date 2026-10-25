@@ -63,6 +63,7 @@ jobs:
       # external calls (Stripe is mocked, storage is in-memory, no mail is sent).
       JWT_SECRET: ci_jwt_secret_at_least_32_characters_long
       JWT_REFRESH_SECRET: ci_jwt_refresh_secret_at_least_32_characters
+      TOTP_ENCRYPTION_KEY: ci_totp_encryption_key_at_least_32_characters
       S3_ENDPOINT: http://localhost:9000
       S3_ACCESS_KEY: ci
       S3_SECRET_KEY: ci
