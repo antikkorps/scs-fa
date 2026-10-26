@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import type { AdminBeneficiary, AdminPayout } from "~/types/admin-finance"
+import { parisToday } from "@armurier/shared"
+import type { AdminBeneficiary, AdminPayout, AdminPayoutSummary } from "~/types/admin-finance"
 import { formatDate, formatEuros, formatPercent } from "~/utils/format"
+import { previousMonth } from "~/utils/period"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Reversements — Administration SCS" })
@@ -48,6 +50,65 @@ async function setStatus(row: AdminPayout, status: "due" | "paid") {
   }
 }
 
+// Accounting export: the payouts settled in a period (Paris days), last month by default.
+const exportPeriod = reactive(previousMonth(parisToday()))
+const exportBeneficiary = ref("")
+const summary = ref<AdminPayoutSummary[]>([])
+const exportError = ref("")
+const downloading = ref(false)
+
+function exportQuery() {
+  return {
+    from: exportPeriod.from,
+    to: exportPeriod.to,
+    ...(exportBeneficiary.value ? { beneficiaryId: exportBeneficiary.value } : {}),
+  }
+}
+
+/** Both days set, in order — checked here so a slip never reaches the API. */
+function periodIsValid(): boolean {
+  exportError.value = ""
+  if (!exportPeriod.from || !exportPeriod.to) {
+    exportError.value = "Choisissez les deux dates de la période."
+    return false
+  }
+  if (exportPeriod.to < exportPeriod.from) {
+    exportError.value = "La fin de la période tombe avant son début."
+    return false
+  }
+  return true
+}
+
+async function loadSummary() {
+  if (!periodIsValid()) return
+  try {
+    const result = await api<{ data: AdminPayoutSummary[] }>("/admin/finance/payouts/summary", { query: exportQuery() })
+    summary.value = result.data
+  } catch {
+    exportError.value = "Impossible de charger le récapitulatif."
+  }
+}
+
+async function downloadCsv() {
+  if (!periodIsValid()) return
+  downloading.value = true
+  try {
+    const blob = await api<Blob>("/admin/finance/payouts/export", { responseType: "blob", query: exportQuery() })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `reversements-${exportPeriod.from}-${exportPeriod.to}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    exportError.value = "L'export a échoué."
+  } finally {
+    downloading.value = false
+  }
+}
+
+onMounted(loadSummary)
+
 const totalDue = computed(() => payouts.value.filter((p) => p.status === "due").reduce((sum, p) => sum + p.amountHt, 0))
 </script>
 
@@ -90,7 +151,7 @@ const totalDue = computed(() => payouts.value.filter((p) => p.status === "due").
     <p v-else-if="error" class="state state--error">Impossible de charger les reversements.</p>
     <p v-else-if="payouts.length === 0" class="state">Aucun reversement pour ce filtre.</p>
 
-    <section v-else class="panel">
+    <section v-else class="panel payouts">
       <div class="tablewrap">
         <table class="grid">
           <thead>
@@ -125,6 +186,59 @@ const totalDue = computed(() => payouts.value.filter((p) => p.status === "due").
                   Annuler le versement
                 </button>
               </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel export" aria-labelledby="export-title">
+      <h2 id="export-title" class="export__title">Export comptable</h2>
+      <p class="export__intro">
+        Les reversements <strong>versés</strong> sur la période (date du versement, heure de Paris), en CSV pour le
+        comptable : une ligne par reversement, avec la commande et sa facture Henrri.
+      </p>
+      <div class="filters">
+        <label class="field">
+          <span class="field__label">Du</span>
+          <input v-model="exportPeriod.from" class="ctl" type="date" @change="loadSummary" />
+        </label>
+        <label class="field">
+          <span class="field__label">Au</span>
+          <input v-model="exportPeriod.to" class="ctl" type="date" @change="loadSummary" />
+        </label>
+        <label class="field">
+          <span class="field__label">Bénéficiaire</span>
+          <select v-model="exportBeneficiary" class="ctl" @change="loadSummary">
+            <option value="">Tous</option>
+            <option v-for="b in beneficiaries" :key="b.id" :value="b.id">{{ b.name }}</option>
+          </select>
+        </label>
+        <button type="button" class="btn-add download" :disabled="downloading" @click="downloadCsv">
+          Télécharger le CSV
+        </button>
+      </div>
+      <p v-if="exportError" class="alert" role="alert">{{ exportError }}</p>
+
+      <p v-if="summary.length === 0" class="state">Rien de versé, dû ni à venir pour ce choix.</p>
+      <div v-else class="tablewrap">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th scope="col">Bénéficiaire</th>
+              <th scope="col">Versements sur la période</th>
+              <th scope="col">Versé sur la période HT</th>
+              <th scope="col">Reste dû à ce jour HT</th>
+              <th scope="col">À venir HT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in summary" :key="row.beneficiaryId">
+              <td>{{ row.name }}</td>
+              <td class="cell--num">{{ row.paidCount }}</td>
+              <td class="cell--num cell--strong">{{ formatEuros(row.paidHt) }}</td>
+              <td class="cell--num">{{ formatEuros(row.dueHt) }}</td>
+              <td class="cell--num cell--dim">{{ formatEuros(row.pendingHt) }}</td>
             </tr>
           </tbody>
         </table>
@@ -211,6 +325,32 @@ h1 {
 .total strong {
   color: var(--brass);
   font-variant-numeric: tabular-nums;
+}
+.export {
+  margin-top: 2rem;
+}
+.export__title {
+  margin: 0 0 0.5rem;
+  font-size: var(--fs-lg);
+}
+.export__intro {
+  max-width: 78ch;
+  margin: 0 0 1.2rem;
+  color: var(--paper-dim);
+  font-size: var(--fs-sm);
+}
+.export__intro strong {
+  color: var(--paper);
+}
+.download {
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.download:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 .panel {
   background: var(--ink-soft);

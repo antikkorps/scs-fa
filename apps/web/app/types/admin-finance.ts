@@ -33,6 +33,18 @@ export interface AdminPayout {
   paidNotes: string | null
 }
 
+/** GET /admin/finance/payouts/summary — one beneficiary over the export period. */
+export interface AdminPayoutSummary {
+  beneficiaryId: string
+  name: string
+  /** Settled within the period (Paris days). */
+  paidCount: number
+  paidHt: number
+  /** Today's figures, whatever the period. */
+  dueHt: number
+  pendingHt: number
+}
+
 /** What an article earns once cost, charges and the third-party share are off. */
 export interface AdminProfitability {
   priceHt: number

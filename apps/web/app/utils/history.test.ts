@@ -66,6 +66,16 @@ describe("historyEventLabel (story 12.7b)", () => {
     expect(historyEventLabel(event("henrri.retry"))).toBe("Facturation relancée")
   })
 
+  it("names a payout settled or put back, with its beneficiary and amount", () => {
+    const values = { newValue: { status: "paid", amountHt: "100.00", beneficiary: "Florian" } }
+    expect(historyEventLabel(event("payout.paid", values)).replace(/\s/g, " ")).toBe(
+      "Reversement à Florian marqué versé — 100,00 € HT",
+    )
+    expect(historyEventLabel(event("payout.unpaid", values)).replace(/\s/g, " ")).toBe(
+      "Reversement à Florian remis à verser — 100,00 € HT",
+    )
+  })
+
   it("names e-mails with their recipient, and what became of them (story 12.7c)", () => {
     const recipient = { recipient: "jean@example.fr" }
     expect(historyEventLabel(event("email.order_confirmation.sent", { newValue: recipient }))).toBe(
