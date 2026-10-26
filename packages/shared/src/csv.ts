@@ -1,4 +1,5 @@
-// CSV reading shared by every import (bank statements, supplier catalogues).
+// CSV reading shared by every import (bank statements, supplier catalogues),
+// and writing for the accounting exports.
 //
 // Written by hand rather than pulled from a dependency: the need is narrow and
 // well defined — RFC 4180 quoting, the three delimiters French and English
@@ -103,4 +104,25 @@ const CP1252_C1 =
  */
 export function fixC1(text: string): string {
   return text.replace(/[\u0080-\u009f]/g, (c) => CP1252_C1[c.charCodeAt(0) - 0x80] ?? c)
+}
+
+// A cell a spreadsheet would run as a formula (CSV injection), unless it is a
+// plain negative amount such as `-12,50`.
+const FORMULA_START = /^[=+\-@\t\r]/
+const PLAIN_NUMBER = /^-?\d+(?:[.,]\d+)?$/
+const NEEDS_QUOTES = /["\r\n]/
+
+function csvCell(value: string, delimiter: CsvDelimiter): string {
+  const safe = FORMULA_START.test(value) && !PLAIN_NUMBER.test(value) ? `'${value}` : value
+  const quoted = NEEDS_QUOTES.test(safe) || safe.includes(delimiter)
+  return quoted ? `"${safe.replaceAll('"', '""')}"` : safe
+}
+
+/**
+ * Write records as CSV for a French Excel (accounting exports): `;` by default,
+ * CRLF line ends, RFC 4180 quoting. Cells are text the caller has already
+ * formatted (decimal comma, dates), so nothing is coerced here either.
+ */
+export function toCsv(rows: readonly (readonly string[])[], delimiter: CsvDelimiter = ";"): string {
+  return rows.map((row) => `${row.map((cell) => csvCell(cell, delimiter)).join(delimiter)}\r\n`).join("")
 }

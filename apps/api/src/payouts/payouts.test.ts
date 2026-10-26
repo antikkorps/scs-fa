@@ -1,4 +1,4 @@
-import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, orderReference } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
@@ -9,6 +9,7 @@ import {
   auditLogs,
   beneficiaries,
   beneficiaryPayouts,
+  henrriDocuments,
   legalCategories,
   orders,
   productCategories,
@@ -25,6 +26,7 @@ const ADMIN_EMAIL = "testpayout-admin@testpayout.local"
 const CUSTOMER_EMAIL = "testpayout-cust@testpayout.local"
 const PREFIX = "TESTPAYOUT-"
 const BASE = "/api/admin/finance"
+const PARIS_DAY = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris" })
 
 const ADDRESS = {
   firstName: "Test",
@@ -51,6 +53,7 @@ describe("beneficiary payouts (story 11.10)", () => {
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
     const orderIds = db.select({ id: orders.id }).from(orders).where(inArray(orders.userId, userIds))
     await db.delete(refunds).where(inArray(refunds.orderId, orderIds))
+    await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, orderIds))
     await db.delete(beneficiaryPayouts).where(inArray(beneficiaryPayouts.orderId, orderIds))
     await db.delete(orders).where(inArray(orders.userId, userIds))
     await db.delete(users).where(like(users.email, "testpayout-%"))
@@ -170,6 +173,7 @@ describe("beneficiary payouts (story 11.10)", () => {
   beforeEach(async () => {
     const userOrders = db.select({ id: orders.id }).from(orders).where(eq(orders.userId, customerId))
     await db.delete(refunds).where(inArray(refunds.orderId, userOrders))
+    await db.delete(henrriDocuments).where(inArray(henrriDocuments.orderId, userOrders))
     await db.delete(beneficiaryPayouts).where(inArray(beneficiaryPayouts.orderId, userOrders))
     await db.delete(orders).where(eq(orders.userId, customerId))
     orderId = await placeOrder(1000)
@@ -329,5 +333,115 @@ describe("beneficiary payouts (story 11.10)", () => {
       .update(products)
       .set({ beneficiaryId })
       .where(like(products.sku, `${PREFIX}%`))
+  })
+
+  it("journals settling a payout and putting it back, in the order's history", async () => {
+    await db.update(orders).set({ paymentStatus: "received" }).where(eq(orders.id, orderId))
+    await settlePayoutsForOrder(orderId)
+    const [row] = await payoutsOf(orderId)
+
+    await asAdmin("PATCH", `${BASE}/payouts/${row?.id}`, { status: "paid", paidNotes: "Virement du 10/09" })
+    await asAdmin("PATCH", `${BASE}/payouts/${row?.id}`, { status: "due" })
+
+    const events = await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.entityId, row?.id as string))
+      .orderBy(auditLogs.createdAt)
+    expect(events.map((event) => event.action)).toEqual(["payout.paid", "payout.unpaid"])
+    expect(events[0]).toMatchObject({
+      entityType: "payout",
+      orderId,
+      userRole: "admin",
+      oldValue: { status: "due" },
+      newValue: { status: "paid", amountHt: "100.00", beneficiary: "Florian de test", paidNotes: "Virement du 10/09" },
+    })
+  })
+
+  describe("accounting export, by the day the money went out", () => {
+    /** A paid sale whose payout was settled at `paidAt`, with its Henrri invoice when numbered. */
+    async function settledAt(paidAt: string, invoiceNumber?: string) {
+      const id = await placeOrder(1000)
+      await db.update(orders).set({ paymentStatus: "received" }).where(eq(orders.id, id))
+      await settlePayoutsForOrder(id)
+      await db
+        .update(beneficiaryPayouts)
+        .set({ status: "paid", paidAt: new Date(paidAt), paidNotes: "Virement ; septembre" })
+        .where(eq(beneficiaryPayouts.orderId, id))
+      if (invoiceNumber) {
+        await db.insert(henrriDocuments).values({
+          orderId: id,
+          kind: "invoice",
+          status: "finalized",
+          henrriNumber: invoiceNumber,
+          expectedTotalTtc: "1200.00",
+        })
+      }
+      return id
+    }
+
+    const exportOf = (query: string) => asAdmin("GET", `${BASE}/payouts/export?${query}`)
+
+    it("lists the payouts settled in the period, Paris days, as a French Excel CSV", async () => {
+      const invoiceNumber = `T-${Date.now() % 1e9}`
+      const inSeptember = await settledAt("2026-09-15T10:00:00Z", invoiceNumber)
+      // 00:30 on 1 October in Paris: October's books, not September's.
+      const firstOfOctober = await settledAt("2026-09-30T22:30:00Z")
+
+      const res = await exportOf(`from=2026-09-01&to=2026-09-30&beneficiaryId=${beneficiaryId}`)
+
+      expect(res.statusCode).toBe(200)
+      expect(res.headers["content-type"]).toBe("text/csv; charset=utf-8")
+      expect(res.headers["content-disposition"]).toBe('attachment; filename="reversements-2026-09-01-2026-09-30.csv"')
+      expect(res.headers["cache-control"]).toBe("no-store")
+      expect(res.body.startsWith("\uFEFF")).toBe(true)
+      const lines = res.body.slice(1).trimEnd().split("\r\n")
+      expect(lines[0]).toBe(
+        "Versé le;Bénéficiaire;Commande;Date de commande;Facture;Article;Base HT;Taux (%);Montant HT;Note",
+      )
+      expect(lines).toHaveLength(2)
+      expect(lines[1]).toBe(
+        `15/09/2026;Florian de test;${orderReference(inSeptember)};${PARIS_DAY.format(new Date())};${invoiceNumber};Article de test;1000,00;10,00;100,00;"Virement ; septembre"`,
+      )
+
+      const october = (await exportOf(`from=2026-10-01&to=2026-10-31&beneficiaryId=${beneficiaryId}`)).body
+      expect(october).toContain(orderReference(firstOfOctober))
+      expect(october).not.toContain(orderReference(inSeptember))
+    })
+
+    it("leaves out what is still owed, and keeps the header when nothing was paid", async () => {
+      await db.update(orders).set({ paymentStatus: "received" }).where(eq(orders.id, orderId))
+      await settlePayoutsForOrder(orderId)
+
+      const res = await exportOf(`from=2000-01-01&to=2099-12-31&beneficiaryId=${beneficiaryId}`)
+      expect(res.statusCode).toBe(200)
+      expect(res.body.slice(1).trimEnd().split("\r\n")).toHaveLength(1)
+    })
+
+    it("sums the period per beneficiary next to what is still owed and to come", async () => {
+      await settledAt("2026-08-10T10:00:00Z")
+      await settledAt("2026-08-20T10:00:00Z")
+      await db.update(orders).set({ paymentStatus: "received" }).where(eq(orders.id, orderId))
+      await settlePayoutsForOrder(orderId)
+      await placeOrder(500)
+
+      const res = await asAdmin("GET", `${BASE}/payouts/summary?from=2026-08-01&to=2026-08-31`)
+
+      expect(res.statusCode).toBe(200)
+      const mine = res.json().data.find((row: { beneficiaryId: string }) => row.beneficiaryId === beneficiaryId)
+      expect(mine).toEqual({
+        beneficiaryId,
+        name: "Florian de test",
+        paidCount: 2,
+        paidHt: 200,
+        dueHt: 100,
+        pendingHt: 50,
+      })
+    })
+
+    it("refuses a reversed or incomplete period", async () => {
+      expect((await exportOf("from=2026-09-30&to=2026-09-01")).statusCode).toBe(400)
+      expect((await asAdmin("GET", `${BASE}/payouts/summary?from=2026-09-01`)).statusCode).toBe(400)
+    })
   })
 })

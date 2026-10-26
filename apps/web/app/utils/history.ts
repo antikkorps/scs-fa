@@ -103,6 +103,19 @@ function emailLabel(type: string, outcome: string, recipient: unknown): string |
   return `E-mail ${name} ${said.said}${to}`
 }
 
+// A beneficiary's share marked paid, or the record of it withdrawn (admin-only history).
+const PAYOUT_STEPS: Record<string, string> = { paid: "marqué versé", unpaid: "remis à verser" }
+
+function payoutLabel(kind: string, values: unknown): string | null {
+  const step = PAYOUT_STEPS[kind]
+  if (!step) return null
+  const beneficiary = fieldOf(values, "beneficiary")
+  const to = typeof beneficiary === "string" && beneficiary ? ` à ${beneficiary}` : ""
+  const amount = fieldOf(values, "amountHt")
+  const worth = amount == null ? "" : ` — ${formatEuros(Number(amount))} HT`
+  return `Reversement${to} ${step}${worth}`
+}
+
 export function historyEventLabel(event: OrderHistoryEvent): string {
   const [scope = "", kind = "", step = ""] = event.action.split(".")
   if (scope === "email") {
@@ -116,6 +129,10 @@ export function historyEventLabel(event: OrderHistoryEvent): string {
   if (scope === "henrri") {
     const henrri = henrriLabel(kind, step, fieldOf(event.newValue, "number"))
     if (henrri) return henrri
+  }
+  if (scope === "payout") {
+    const payout = payoutLabel(kind, event.newValue)
+    if (payout) return payout
   }
   const label = LABELS[event.action]
   if (!label) return event.action

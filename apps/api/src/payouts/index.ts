@@ -1,5 +1,6 @@
 import {
   createBeneficiarySchema,
+  payoutPeriodQuerySchema,
   payoutQuerySchema,
   updateBeneficiarySchema,
   updatePayoutSchema,
@@ -7,11 +8,13 @@ import {
 } from "@armurier/shared"
 import { and, asc, desc, eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
+import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import { artists, beneficiaries, beneficiaryPayouts, orders, products } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { paidInPeriod, payoutsExportCsv } from "./export.js"
 
 // What each beneficiary is owed and has been paid — counted through joins, not a
 // correlated sub-query (a bare column in a raw `sql` fragment binds to the wrong
@@ -177,6 +180,51 @@ export const adminPayoutRoutes: FastifyPluginAsync = async (fastify) => {
     })
   })
 
+  /** GET /payouts/export?from&to — the payouts settled in the period, as a CSV for the accountant. */
+  fastify.get("/payouts/export", async (request, reply) => {
+    const parsed = payoutPeriodQuerySchema.safeParse(request.query)
+    if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
+    const { from, to } = parsed.data
+    return reply
+      .header("content-type", "text/csv; charset=utf-8")
+      .header("content-disposition", `attachment; filename="reversements-${from}-${to}.csv"`)
+      .header("cache-control", "no-store")
+      .send(await payoutsExportCsv(parsed.data))
+  })
+
+  /** GET /payouts/summary?from&to — per beneficiary: paid in the period, still owed and to come today. */
+  fastify.get("/payouts/summary", async (request, reply) => {
+    const parsed = payoutPeriodQuerySchema.safeParse(request.query)
+    if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
+    const inPeriod = paidInPeriod(parsed.data)
+
+    const rows = await db
+      .select({
+        beneficiaryId: beneficiaries.id,
+        name: beneficiaries.name,
+        paidCount: sql<number>`count(*) filter (where ${inPeriod})::int`,
+        paidHt: sql<string>`coalesce(sum(${beneficiaryPayouts.amountHt}) filter (where ${inPeriod}), 0)`,
+        dueHt: DUE_HT,
+        pendingHt: PENDING_HT,
+      })
+      .from(beneficiaries)
+      .innerJoin(beneficiaryPayouts, eq(beneficiaryPayouts.beneficiaryId, beneficiaries.id))
+      .where(parsed.data.beneficiaryId ? eq(beneficiaries.id, parsed.data.beneficiaryId) : undefined)
+      .groupBy(beneficiaries.id)
+      .orderBy(asc(beneficiaries.name))
+
+    return reply.send({
+      data: rows
+        .map((row) => ({
+          ...row,
+          paidHt: Number(row.paidHt),
+          dueHt: Number(row.dueHt),
+          pendingHt: Number(row.pendingHt),
+        }))
+        .filter((row) => row.paidCount > 0 || row.dueHt > 0 || row.pendingHt > 0),
+    })
+  })
+
   /**
    * PATCH /payouts/:id — mark a payout settled (or put it back to due).
    *
@@ -190,8 +238,14 @@ export const adminPayoutRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
 
     const [existing] = await db
-      .select({ status: beneficiaryPayouts.status })
+      .select({
+        status: beneficiaryPayouts.status,
+        orderId: beneficiaryPayouts.orderId,
+        amountHt: beneficiaryPayouts.amountHt,
+        beneficiary: beneficiaries.name,
+      })
       .from(beneficiaryPayouts)
+      .innerJoin(beneficiaries, eq(beneficiaryPayouts.beneficiaryId, beneficiaries.id))
       .where(eq(beneficiaryPayouts.id, params.data.id))
       .limit(1)
     if (!existing) return reply.code(404).send({ error: "NotFound", message: "Payout not found" })
@@ -204,16 +258,39 @@ export const adminPayoutRoutes: FastifyPluginAsync = async (fastify) => {
       })
     }
 
-    const [row] = await db
-      .update(beneficiaryPayouts)
-      .set({
-        status: parsed.data.status,
-        paidNotes: parsed.data.paidNotes,
-        paidAt: parsed.data.status === "paid" ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(beneficiaryPayouts.id, params.data.id))
-      .returning()
+    // Money going out, or the record of it withdrawn: journaled with the change,
+    // in the order's history (admin-only), so the accountant can trace each line.
+    const row = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(beneficiaryPayouts)
+        .set({
+          status: parsed.data.status,
+          paidNotes: parsed.data.paidNotes,
+          paidAt: parsed.data.status === "paid" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(beneficiaryPayouts.id, params.data.id))
+        .returning()
+      await recordAuditEvent(
+        {
+          userId: request.user.sub,
+          userRole: "admin",
+          entityType: "payout",
+          entityId: params.data.id,
+          orderId: existing.orderId,
+          action: parsed.data.status === "paid" ? "payout.paid" : "payout.unpaid",
+          oldValue: { status: existing.status },
+          newValue: {
+            status: parsed.data.status,
+            amountHt: existing.amountHt,
+            beneficiary: existing.beneficiary,
+            paidNotes: parsed.data.paidNotes ?? null,
+          },
+        },
+        tx,
+      )
+      return updated
+    })
     return reply.send({ data: row })
   })
 
