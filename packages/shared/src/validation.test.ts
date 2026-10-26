@@ -12,6 +12,7 @@ import {
   loginSchema,
   newsletterSubscribeSchema,
   newsletterUnsubscribeSchema,
+  payoutPeriodQuerySchema,
   productSlugSchema,
   refreshSchema,
   registerSchema,
@@ -327,5 +328,27 @@ describe("adminUserSearchQuerySchema (back-office customer search)", () => {
 
   it("refuses an overlong search", () => {
     expect(adminUserSearchQuerySchema.safeParse({ q: "a".repeat(256) }).success).toBe(false)
+  })
+})
+
+describe("payoutPeriodQuerySchema (accounting export of the payouts)", () => {
+  const beneficiaryId = "8f14e45f-ceea-4e7a-9f6b-1c2d3e4f5a6b"
+
+  it("takes a period of ISO days, and an optional beneficiary", () => {
+    expect(payoutPeriodQuerySchema.parse({ from: "2026-09-01", to: "2026-09-30" })).toEqual({
+      from: "2026-09-01",
+      to: "2026-09-30",
+    })
+    expect(payoutPeriodQuerySchema.parse({ from: "2026-09-01", to: "2026-09-01", beneficiaryId }).beneficiaryId).toBe(
+      beneficiaryId,
+    )
+  })
+
+  it("refuses a missing bound, a reversed period or an unknown field", () => {
+    expect(payoutPeriodQuerySchema.safeParse({ from: "2026-09-01" }).success).toBe(false)
+    expect(payoutPeriodQuerySchema.safeParse({ from: "2026-09-30", to: "2026-09-01" }).success).toBe(false)
+    expect(payoutPeriodQuerySchema.safeParse({ from: "2026-09-01", to: "2026-09-30", status: "paid" }).success).toBe(
+      false,
+    )
   })
 })

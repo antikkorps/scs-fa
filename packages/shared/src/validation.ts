@@ -1143,6 +1143,19 @@ export const payoutQuerySchema = z
   })
   .strict()
 
+// The accounting export and its summary: the payouts settled between two Paris
+// days, both included — money out is what the books record.
+export const payoutPeriodQuerySchema = z
+  .object({
+    from: isoDateSchema,
+    to: isoDateSchema,
+    beneficiaryId: z.string().uuid().optional(),
+  })
+  .strict()
+  .refine((period) => period.from <= period.to, { message: "from must be on or before to", path: ["from"] })
+
+export type PayoutPeriodQuery = z.infer<typeof payoutPeriodQuerySchema>
+
 // --- Expédition multi-colis (story 11.9) -----------------------------------
 
 const trackingNumberField = z
