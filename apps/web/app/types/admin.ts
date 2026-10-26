@@ -1,6 +1,6 @@
 // Shapes consumed by the admin dashboard (mirror the API responses).
 
-import type { ShipGate, SuggestedParcel } from "@armurier/shared"
+import type { ShipGate, SuggestedParcel, UserRole } from "@armurier/shared"
 
 export interface AuthUser {
   id: string
@@ -413,4 +413,16 @@ export interface CatalogFailedImage {
   productId: string
   productName: string
   productSku: string
+}
+
+/** GET /admin/users?q= — an account found from the back-office, with its second factor. */
+export interface AdminUserRow {
+  id: string
+  email: string
+  firstname: string | null
+  lastname: string | null
+  role: UserRole
+  isPro: boolean
+  totpEnabled: boolean
+  createdAt: string
 }

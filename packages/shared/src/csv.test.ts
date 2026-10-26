@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { fixC1, normaliseHeader, parseCsv } from "./csv.js"
+import { fixC1, normaliseHeader, parseCsv, toCsv } from "./csv.js"
 
 describe("parseCsv", () => {
   it("detects a semicolon delimiter (French Excel export)", () => {
@@ -89,5 +89,36 @@ describe("normaliseHeader", () => {
 describe("fixC1", () => {
   it("repairs curly quotes stored as C1 control characters", () => {
     expect(fixC1("d\u0092autonomie \u0093ok\u0094 \u0080")).toBe("d’autonomie “ok” €")
+  })
+})
+
+describe("toCsv (accounting exports)", () => {
+  it("writes a French Excel file: semicolons, CRLF line ends", () => {
+    expect(
+      toCsv([
+        ["Bénéficiaire", "Montant HT"],
+        ["Sylvain", "120,50"],
+      ]),
+    ).toBe("Bénéficiaire;Montant HT\r\nSylvain;120,50\r\n")
+  })
+
+  it("quotes a cell holding the delimiter, a quote or a line break", () => {
+    expect(toCsv([["Prix; HT", 'Le "grand" modèle', "ligne 1\nligne 2"]])).toBe(
+      '"Prix; HT";"Le ""grand"" modèle";"ligne 1\nligne 2"\r\n',
+    )
+  })
+
+  it("neutralises a cell a spreadsheet would run as a formula, but keeps negative amounts", () => {
+    expect(toCsv([["=HYPERLINK(1)", "+33 6", "@SUM(A1)", "-12,50", "-x"]])).toBe(
+      "'=HYPERLINK(1);'+33 6;'@SUM(A1);-12,50;'-x\r\n",
+    )
+  })
+
+  it("reads back what it wrote", () => {
+    const rows = [
+      ["a;b", 'c"d'],
+      ["e", "f"],
+    ]
+    expect(parseCsv(toCsv(rows))).toEqual(rows)
   })
 })
