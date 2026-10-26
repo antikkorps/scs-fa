@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  adminUserSearchQuerySchema,
   blogArticleCreateSchema,
   blogArticleUpdateSchema,
   blogQuerySchema,
@@ -314,5 +315,17 @@ describe("createRefundSchema (story 12.6, decisions 2026-10-14)", () => {
     { kind: "goodwill", channel: "carte" },
   ])("refuses %o", (input) => {
     expect(createRefundSchema.safeParse(input).success).toBe(false)
+  })
+})
+
+describe("adminUserSearchQuerySchema (back-office customer search)", () => {
+  it("trims the search and needs three characters", () => {
+    expect(adminUserSearchQuerySchema.parse({ q: "  jea  " })).toEqual({ q: "jea" })
+    expect(adminUserSearchQuerySchema.safeParse({ q: " je " }).success).toBe(false)
+    expect(adminUserSearchQuerySchema.safeParse({}).success).toBe(false)
+  })
+
+  it("refuses an overlong search", () => {
+    expect(adminUserSearchQuerySchema.safeParse({ q: "a".repeat(256) }).success).toBe(false)
   })
 })
