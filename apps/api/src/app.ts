@@ -65,6 +65,7 @@ import { adminShopSettingsRoutes } from "./shop-settings/admin.js"
 import { adminSupplierRoutes } from "./suppliers/admin.js"
 import { adminTagRoutes } from "./tags/admin.js"
 import { tagRoutes } from "./tags/index.js"
+import { adminUserRoutes } from "./users/admin.js"
 
 export interface BuildAppOptions {
   /**
@@ -168,6 +169,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(adminOrderRoutes, { prefix: "/api/admin/orders" })
   await fastify.register(adminOrganisationRoutes, { prefix: "/api/admin/organisations" })
   await fastify.register(adminTwoFactorRoutes, { prefix: "/api/admin/users" })
+  await fastify.register(adminUserRoutes, { prefix: "/api/admin/users" })
   await fastify.register(adminQuoteRequestRoutes, { prefix: "/api/admin/quote-requests" })
   await fastify.register(adminShipmentRoutes, { prefix: "/api/admin/shipments" })
   await fastify.register(adminShippingRateRoutes, { prefix: "/api/admin/shipping-rates" })

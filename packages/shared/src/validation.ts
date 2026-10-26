@@ -1240,3 +1240,13 @@ export const shippingRatesSchema = z
     printTtc: shippingRateSchema,
   })
   .strict()
+
+// Back-office account search (TOTP reset of a customer): a few accounts matching
+// a name or an e-mail, never the whole customer list — hence three characters.
+export const ADMIN_USER_SEARCH_LIMIT = 20
+
+export const adminUserSearchQuerySchema = z.object({
+  q: z.string().trim().min(3).max(255),
+})
+
+export type AdminUserSearchQuery = z.infer<typeof adminUserSearchQuerySchema>
