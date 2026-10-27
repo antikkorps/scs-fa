@@ -38,6 +38,7 @@ import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/inde
 import { adminMediaRoutes, mediaRoutes } from "./media/index.js"
 import { adminMetricsRoutes } from "./metrics/admin.js"
 import { isInternalCall, rateLimitKey, trustDirectPrivatePeer } from "./net/client-ip.js"
+import { adminNewsletterRoutes } from "./newsletter/admin.js"
 import { newsletterRoutes } from "./newsletter/index.js"
 import { startNewsletterPurgeScheduler } from "./newsletter/retention.js"
 import { adminOrderRoutes } from "./orders/admin.js"
@@ -170,6 +171,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(adminOrganisationRoutes, { prefix: "/api/admin/organisations" })
   await fastify.register(adminTwoFactorRoutes, { prefix: "/api/admin/users" })
   await fastify.register(adminUserRoutes, { prefix: "/api/admin/users" })
+  await fastify.register(adminNewsletterRoutes, { prefix: "/api/admin/newsletter" })
   await fastify.register(adminQuoteRequestRoutes, { prefix: "/api/admin/quote-requests" })
   await fastify.register(adminShipmentRoutes, { prefix: "/api/admin/shipments" })
   await fastify.register(adminShippingRateRoutes, { prefix: "/api/admin/shipping-rates" })

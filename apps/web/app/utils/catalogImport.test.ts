@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { CatalogImportPreviewRow } from "~/types/admin"
-import { exportSupplierLabel, filterPreviewRows, plural, previewFilterCounts } from "./catalogImport"
+import { exportSupplierLabel, filterPreviewRows, previewFilterCounts } from "./catalogImport"
 
 const row = (over: Partial<CatalogImportPreviewRow>): CatalogImportPreviewRow => ({
   line: 2,
@@ -32,15 +32,6 @@ describe("filterPreviewRows", () => {
 
   it("counts every filter at once", () => {
     expect(previewFilterCounts(rows)).toEqual({ all: 4, invalid: 1, warnings: 1, create: 1, update: 2 })
-  })
-})
-
-describe("plural", () => {
-  it("agrees with the number, French style", () => {
-    expect(plural(1, "produit")).toBe("1 produit")
-    expect(plural(0, "produit")).toBe("0 produit")
-    expect(plural(1200, "produit")).toMatch(/^1\s200 produits$/)
-    expect(plural(2, "nouveau fournisseur", "nouveaux fournisseurs")).toBe("2 nouveaux fournisseurs")
   })
 })
 

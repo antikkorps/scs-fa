@@ -8,13 +8,9 @@ import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
+import { containsPattern } from "../db/like.js"
 import { users } from "../db/schema.js"
 import { validationError } from "../http.js"
-
-/** `%` and `_` typed by the admin are plain characters, not LIKE wildcards. */
-function containsPattern(search: string): string {
-  return `%${search.replace(/[\\%_]/g, (character) => `\\${character}`)}%`
-}
 
 export const adminUserRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)

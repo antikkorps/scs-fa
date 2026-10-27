@@ -10,6 +10,7 @@ import {
   formatEuros,
   formatNumber,
   formatPercent,
+  plural,
 } from "./format.js"
 
 describe("formatEuros", () => {
@@ -128,5 +129,14 @@ describe("formatCountdown (story 12.9a)", () => {
     expect(formatCountdown(500)).toBe("0:01")
     expect(formatCountdown(0)).toBe("0:00")
     expect(formatCountdown(-3_000)).toBe("0:00")
+  })
+})
+
+describe("plural", () => {
+  it("agrees with the number, French style", () => {
+    expect(plural(1, "produit")).toBe("1 produit")
+    expect(plural(0, "produit")).toBe("0 produit")
+    expect(plural(1200, "produit")).toMatch(/^1\s200 produits$/)
+    expect(plural(2, "nouveau fournisseur", "nouveaux fournisseurs")).toBe("2 nouveaux fournisseurs")
   })
 })

@@ -58,6 +58,12 @@ const SHIPMENT: Record<string, StatusMeta> = {
   delivered: { label: "Livré", severity: "ok" },
 }
 
+const NEWSLETTER: Record<string, StatusMeta> = {
+  pending: { label: "À confirmer", severity: "warn" },
+  confirmed: { label: "Abonné", severity: "ok" },
+  unsubscribed: { label: "Désabonné", severity: "muted" },
+}
+
 const FALLBACK = (value: string): StatusMeta => ({ label: value, severity: "muted" })
 
 export function paymentStatus(value: string): StatusMeta {
@@ -78,11 +84,15 @@ export function shippingStatus(value: string): StatusMeta {
 export function shipmentStatus(value: string): StatusMeta {
   return SHIPMENT[value] ?? FALLBACK(value)
 }
+export function newsletterStatus(value: string): StatusMeta {
+  return NEWSLETTER[value] ?? FALLBACK(value)
+}
 
 // Filter dropdown options (value/label) for the order list screens.
 export const PAYMENT_STATUS_OPTIONS = Object.entries(PAYMENT).map(([value, m]) => ({ value, label: m.label }))
 export const LEGAL_STATUS_OPTIONS = Object.entries(LEGAL).map(([value, m]) => ({ value, label: m.label }))
 export const SHIPPING_STATUS_OPTIONS = Object.entries(SHIPPING).map(([value, m]) => ({ value, label: m.label }))
+export const NEWSLETTER_STATUS_OPTIONS = Object.entries(NEWSLETTER).map(([value, m]) => ({ value, label: m.label }))
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   cni: "CNI",

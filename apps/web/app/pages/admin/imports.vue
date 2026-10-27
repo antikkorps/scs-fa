@@ -13,10 +13,9 @@ import {
   IMPORT_ACTION_META,
   PREVIEW_FILTERS,
   type PreviewFilter,
-  plural,
   previewFilterCounts,
 } from "~/utils/catalogImport"
-import { formatDateTime } from "~/utils/format"
+import { formatDateTime, plural } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Import de catalogues — Administration SCS" })

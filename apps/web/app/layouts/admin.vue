@@ -47,7 +47,13 @@ const groups = [
       { to: "/admin/metrics", label: "Métriques", icon: "▥" },
     ],
   },
-  { label: "Contenu", items: [{ to: "/admin/blog", label: "Journal", icon: "✎" }] },
+  {
+    label: "Contenu",
+    items: [
+      { to: "/admin/blog", label: "Journal", icon: "✎" },
+      { to: "/admin/newsletter", label: "Newsletter", icon: "◎" },
+    ],
+  },
 ]
 
 const isActive = (item: { to: string; exact?: boolean }) =>

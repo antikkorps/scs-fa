@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  adminNewsletterQuerySchema,
   adminUserSearchQuerySchema,
   blogArticleCreateSchema,
   blogArticleUpdateSchema,
@@ -328,6 +329,25 @@ describe("adminUserSearchQuerySchema (back-office customer search)", () => {
 
   it("refuses an overlong search", () => {
     expect(adminUserSearchQuerySchema.safeParse({ q: "a".repeat(256) }).success).toBe(false)
+  })
+})
+
+describe("adminNewsletterQuerySchema (back-office subscriber list)", () => {
+  it("defaults to the first page with no filter", () => {
+    expect(adminNewsletterQuerySchema.parse({})).toEqual({ page: 1, limit: 20 })
+  })
+
+  it("keeps a known segment, status and a trimmed search", () => {
+    expect(
+      adminNewsletterQuerySchema.parse({ segment: "gun_art", status: "confirmed", search: "  jeanne ", page: "2" }),
+    ).toEqual({ segment: "gun_art", status: "confirmed", search: "jeanne", page: 2, limit: 20 })
+  })
+
+  it("refuses an unknown segment or status, and an overlong search", () => {
+    expect(adminNewsletterQuerySchema.safeParse({ segment: "tout" }).success).toBe(false)
+    expect(adminNewsletterQuerySchema.safeParse({ status: "bounced" }).success).toBe(false)
+    expect(adminNewsletterQuerySchema.safeParse({ search: "a".repeat(256) }).success).toBe(false)
+    expect(adminNewsletterQuerySchema.safeParse({ limit: "101" }).success).toBe(false)
   })
 })
 

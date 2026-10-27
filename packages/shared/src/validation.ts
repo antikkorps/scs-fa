@@ -11,7 +11,7 @@ import {
   TAG_FACETS,
 } from "./constants.js"
 import { MAX_CROSS_SELLS_PER_PRODUCT } from "./cross-sell.js"
-import { NEWSLETTER_SEGMENTS } from "./newsletter.js"
+import { NEWSLETTER_SEGMENTS, NEWSLETTER_SUBSCRIPTION_STATUS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
 import {
   MAX_PARCELS_PER_ARTICLE,
@@ -694,6 +694,18 @@ export const newsletterUnsubscribeSchema = z
     segments: newsletterSegmentsSchema.optional(),
   })
   .strict()
+
+// Back-office subscriber list: filter by segment and status, find an address.
+// A contact matches when one of its subscriptions has the segment and status.
+export const adminNewsletterQuerySchema = z.object({
+  segment: z.enum(NEWSLETTER_SEGMENTS).optional(),
+  status: z.enum(NEWSLETTER_SUBSCRIPTION_STATUS).optional(),
+  search: z.string().trim().min(1).max(255).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+})
+
+export type AdminNewsletterQuery = z.infer<typeof adminNewsletterQuerySchema>
 
 export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>
 export type NewsletterUnsubscribeInput = z.infer<typeof newsletterUnsubscribeSchema>

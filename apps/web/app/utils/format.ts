@@ -18,6 +18,11 @@ export function formatEuros(amount: number | null | undefined): string {
 const PERCENT = new Intl.NumberFormat("fr-FR", { style: "percent", maximumFractionDigits: 2 })
 const NUMBER = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 })
 
+/** "12 produits" / "1 produit" / "0 produit": the noun agrees with the count, French style. */
+export function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${n.toLocaleString("fr-FR")} ${n > 1 ? pluralForm : singular}`
+}
+
 /** Format a percentage expressed as 0–100 (the API's `…Pct` fields), e.g. "66,67 %". */
 export function formatPercent(pct: number | null | undefined): string {
   if (isMissing(pct)) return "—"
