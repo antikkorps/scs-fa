@@ -40,11 +40,6 @@ export function previewFilterCounts(rows: CatalogImportPreviewRow[]): Record<Pre
   >
 }
 
-/** "12 produits" / "1 produit" — the commit button states exactly what it will do. */
-export function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
-  return `${n.toLocaleString("fr-FR")} ${n > 1 ? pluralForm : singular}`
-}
-
 /** The per-supplier export choice: a supplier with no product yet gets a blank file to fill in. */
 export function exportSupplierLabel(supplier: CatalogExportSupplier): string {
   if (supplier.products === 0) return `${supplier.name} (fichier vierge)`
