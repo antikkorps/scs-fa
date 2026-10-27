@@ -1,6 +1,12 @@
 // Shapes consumed by the admin dashboard (mirror the API responses).
 
-import type { ShipGate, SuggestedParcel, UserRole } from "@armurier/shared"
+import type {
+  NewsletterSegment,
+  NewsletterSubscriptionStatus,
+  ShipGate,
+  SuggestedParcel,
+  UserRole,
+} from "@armurier/shared"
 
 export interface AuthUser {
   id: string
@@ -425,4 +431,32 @@ export interface AdminUserRow {
   isPro: boolean
   totpEnabled: boolean
   createdAt: string
+}
+
+// Back-office newsletter subscribers (read-only: letters are sent from Brevo).
+export interface AdminNewsletterSubscription {
+  segment: NewsletterSegment
+  status: NewsletterSubscriptionStatus
+  requestedAt: string
+  confirmedAt: string | null
+  unsubscribedAt: string | null
+  consentSource: string | null
+  consentIp: string | null
+  /** Mirrored to Brevo; a confirmed subscription that is not will not receive letters yet. */
+  synced: boolean
+}
+
+export interface AdminNewsletterContact {
+  id: string
+  email: string
+  createdAt: string
+  subscriptions: AdminNewsletterSubscription[]
+}
+
+export interface AdminNewsletterSummary {
+  segments: Record<NewsletterSegment, Record<NewsletterSubscriptionStatus, number>>
+  /** Contacts that still hold an address (anonymised traces excluded). */
+  contacts: number
+  /** Confirmed subscriptions not mirrored to Brevo yet. */
+  awaitingSync: number
 }
