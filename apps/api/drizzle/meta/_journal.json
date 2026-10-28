@@ -295,6 +295,13 @@
       "when": 1792953942867,
       "tag": "0041_story_12_8e_totp",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793218681720,
+      "tag": "0042_story_12_10_launch_stage",
+      "breakpoints": true
     }
   ]
 }

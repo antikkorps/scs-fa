@@ -63,6 +63,7 @@ import { adminShipmentRoutes } from "./shipments/admin.js"
 import { startShipmentTrackingScheduler } from "./shipments/tracking/sync.js"
 import { adminShippingRateRoutes } from "./shipping-rates/admin.js"
 import { adminShopSettingsRoutes } from "./shop-settings/admin.js"
+import { shopStatusRoutes } from "./shop-settings/public.js"
 import { adminSupplierRoutes } from "./suppliers/admin.js"
 import { adminTagRoutes } from "./tags/admin.js"
 import { tagRoutes } from "./tags/index.js"
@@ -156,6 +157,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(newsletterRoutes, { prefix: "/api/newsletter" })
   await fastify.register(searchRoutes, { prefix: "/api/search" })
   await fastify.register(seoRoutes, { prefix: "/api/seo" })
+  await fastify.register(shopStatusRoutes, { prefix: "/api/shop-status" })
   await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
   await fastify.register(addressRoutes, { prefix: "/api/addresses" })

@@ -1,16 +1,29 @@
 <script setup lang="ts">
-import { calculateVipDiscount } from "@armurier/shared"
+import { calculateVipDiscount, type LaunchStage, type ShopSettingsInput } from "@armurier/shared"
 import { formatEuros } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Réglages — Administration SCS" })
 
-// Story 12.9e — the shop settings: today, the share of the margin a VIP gets
-// back. Each change is journaled server-side; orders already placed keep the
-// discount they were sold with.
-interface ShopSettings {
-  vipMarginSharePct: number
-}
+// Story 12.9e — the shop settings: the share of the margin a VIP gets back
+// (orders already placed keep the discount they were sold with); story 12.10 —
+// how far the shop is open, and whether robots may index it. Each change is
+// journaled server-side.
+type ShopSettings = ShopSettingsInput
+
+const LAUNCH_STAGE_OPTIONS: { value: LaunchStage; label: string; help: string }[] = [
+  {
+    value: "coming_soon",
+    label: "Page d'attente",
+    help: "Le public ne voit qu'une page « Ouverture prochaine » avec l'inscription à la newsletter. Vous naviguez normalement, une fois connecté.",
+  },
+  {
+    value: "showcase",
+    label: "Vitrine",
+    help: "Le site est visible, mais ni compte, ni panier, ni commande, ni devis : « Disponible à l'ouverture ».",
+  },
+  { value: "open", label: "Ouvert", help: "Tout est ouvert, ventes comprises." },
+]
 
 const api = useApi()
 
@@ -20,12 +33,12 @@ const { data, pending, error } = await useAsyncData(
   { server: false },
 )
 
-const form = reactive({ vipMarginSharePct: 50 })
+const form = reactive<ShopSettings>({ vipMarginSharePct: 50, launchStage: "coming_soon", indexingEnabled: false })
 
 watch(
   () => data.value?.data,
   (settings) => {
-    if (settings) form.vipMarginSharePct = settings.vipMarginSharePct
+    if (settings) Object.assign(form, settings)
   },
   { immediate: true },
 )
@@ -46,14 +59,14 @@ async function save() {
   saveError.value = null
   saved.value = false
   try {
-    const body: ShopSettings = { vipMarginSharePct: Number(form.vipMarginSharePct) }
+    const body: ShopSettings = { ...form, vipMarginSharePct: Number(form.vipMarginSharePct) }
     data.value = await api<{ data: ShopSettings }>("/admin/shop-settings", { method: "PUT", body })
     saved.value = true
   } catch (err) {
     const status = (err as { response?: { status?: number } }).response?.status
     saveError.value =
       status === 400
-        ? "Part invalide : un pourcentage entre 0 et 100, au centième près."
+        ? "Réglage invalide : une part entre 0 et 100 %, au centième près, et une étape d'ouverture."
         : "L'enregistrement a échoué. Réessayez."
   } finally {
     saving.value = false
@@ -67,8 +80,7 @@ async function save() {
       <p class="eyebrow">Boutique</p>
       <h1>Réglages</h1>
       <p class="intro">
-        Une modification vaut pour les paniers à venir : les commandes déjà passées gardent la remise avec laquelle
-        elles ont été vendues. Chaque changement est tracé.
+        Chaque changement est tracé et prend effet tout de suite, sans redéploiement.
       </p>
     </header>
 
@@ -76,11 +88,33 @@ async function save() {
     <p v-else-if="error" class="state">Impossible de charger les réglages.</p>
 
     <form v-else class="grid" @submit.prevent="save">
+      <fieldset class="field">
+        <legend class="field__label">Ouverture du site</legend>
+        <label v-for="option in LAUNCH_STAGE_OPTIONS" :key="option.value" class="choice">
+          <input v-model="form.launchStage" type="radio" name="launchStage" :value="option.value" class="check" >
+          <span>
+            <span class="choice__label">{{ option.label }}</span>
+            <span class="field__help">{{ option.help }}</span>
+          </span>
+        </label>
+      </fieldset>
+
+      <label class="field--check">
+        <input v-model="form.indexingEnabled" type="checkbox" name="indexingEnabled" class="check" >
+        <span>
+          <span class="choice__label">Autoriser l'indexation par les moteurs de recherche</span>
+          <span class="field__help">
+            À cocher une fois le vrai catalogue en ligne. Décoché, chaque page porte « noindex » et le plan du site est
+            vide.
+          </span>
+        </span>
+      </label>
+
       <label class="field">
         <span class="field__label">Remise VIP — part de la marge rendue (%)</span>
         <input v-model.number="form.vipMarginSharePct" type="number" min="0" max="100" step="0.01" class="ctl" required >
         <span class="field__help">
-          Le client VIP récupère cette part de la marge de chaque article, hors munitions et hors frais de port. Il
+          Vaut pour les paniers à venir : les commandes déjà passées gardent leur remise. Le client VIP récupère cette part de la marge de chaque article, hors munitions et hors frais de port. Il
           devient VIP à sa première arme neuve payée et dont les documents sont validés, et le reste tant qu'il ne la
           retourne pas.
         </span>
@@ -133,13 +167,35 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  /* Also a fieldset: no browser frame. */
+  border: 0;
+  padding: 0;
+  margin: 0;
 }
 .field--check {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.6rem;
   color: var(--paper-dim);
   cursor: pointer;
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+.choice + .choice {
+  margin-top: 0.6rem;
+}
+.choice .check,
+.field--check .check {
+  flex: none;
+  margin-top: 0.2rem;
+}
+.choice__label {
+  display: block;
+  color: var(--paper);
 }
 .field__label {
   font-size: var(--fs-xs);
@@ -149,6 +205,7 @@ h1 {
   font-weight: var(--fw-semibold);
 }
 .field__help {
+  display: block;
   font-size: var(--fs-sm);
   color: var(--paper-faint);
   line-height: var(--lh-normal);

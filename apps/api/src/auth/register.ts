@@ -4,12 +4,14 @@ import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { isUniqueViolation } from "../db/errors.js"
 import { users } from "../db/schema.js"
+import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import { hashPassword } from "./password.js"
 
 export const registerRoute: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/register",
     {
+      preHandler: requireShopOpen,
       config: {
         rateLimit: { max: 5, timeWindow: "1 minute" },
       },

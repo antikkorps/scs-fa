@@ -19,6 +19,7 @@ import {
   products,
   productTags,
   productVariants,
+  shopSettings,
   tags,
   users,
 } from "./schema.js"
@@ -200,8 +201,17 @@ export async function seedDemoData() {
   await seedGunArt()
   await seedArmurerie()
   await seedBlog()
+  await openDemoShop()
 
   console.log("🎭 Demo data complete!")
+}
+
+// Story 12.10 — a fresh database starts closed (waiting page, sales refused). A
+// demo catalogue is there to be browsed and bought from: its shop opens, still
+// unindexed — no robot should ever list demo products.
+async function openDemoShop() {
+  await db.update(shopSettings).set({ launchStage: "open", updatedAt: new Date() }).where(eq(shopSettings.id, 1))
+  console.log("✅ Demo shop open")
 }
 
 // ==========================================================================

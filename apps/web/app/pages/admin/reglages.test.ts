@@ -7,11 +7,13 @@ import Reglages from "./reglages.vue"
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }))
 mockNuxtImport("useApi", () => () => apiMock)
 
+const SETTINGS = { vipMarginSharePct: 50, launchStage: "coming_soon", indexingEnabled: false }
+
 beforeEach(() => {
   clearNuxtData("admin-shop-settings")
   apiMock.mockReset()
   apiMock.mockImplementation((_url: string, options?: { method?: string; body?: unknown }) =>
-    Promise.resolve({ data: options?.method === "PUT" ? options.body : { vipMarginSharePct: 50 } }),
+    Promise.resolve({ data: options?.method === "PUT" ? options.body : SETTINGS }),
   )
 })
 
@@ -21,7 +23,7 @@ async function mountPage() {
   return wrapper
 }
 
-describe("admin/reglages.vue (story 12.9e)", () => {
+describe("admin/reglages.vue (stories 12.9e, 12.10)", () => {
   it("loads the VIP share in force, with a worked example", async () => {
     const wrapper = await mountPage()
     expect((wrapper.find('input[type="number"]').element as HTMLInputElement).value).toBe("50")
@@ -36,10 +38,30 @@ describe("admin/reglages.vue (story 12.9e)", () => {
     await flushPromises()
     expect(apiMock).toHaveBeenLastCalledWith("/admin/shop-settings", {
       method: "PUT",
-      body: { vipMarginSharePct: 40 },
+      body: { ...SETTINGS, vipMarginSharePct: 40 },
     })
     expect(wrapper.find('[role="status"]').text()).toBe("Réglages enregistrés.")
     expect(wrapper.find(".example").text()).toMatch(/120,00/)
+  })
+
+  it("shows the launch stage and the indexing switch in force", async () => {
+    const wrapper = await mountPage()
+    const checked = wrapper.find('input[name="launchStage"]:checked').element as HTMLInputElement
+    expect(checked.value).toBe("coming_soon")
+    expect(wrapper.findAll('input[name="launchStage"]')).toHaveLength(3)
+    expect((wrapper.find('input[name="indexingEnabled"]').element as HTMLInputElement).checked).toBe(false)
+  })
+
+  it("opens the showcase and lets robots index, saved with the rest", async () => {
+    const wrapper = await mountPage()
+    await wrapper.find('input[name="launchStage"][value="showcase"]').setValue(true)
+    await wrapper.find('input[name="indexingEnabled"]').setValue(true)
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+    expect(apiMock).toHaveBeenLastCalledWith("/admin/shop-settings", {
+      method: "PUT",
+      body: { vipMarginSharePct: 50, launchStage: "showcase", indexingEnabled: true },
+    })
   })
 
   it("explains a refused value", async () => {

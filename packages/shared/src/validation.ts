@@ -11,6 +11,7 @@ import {
   TAG_FACETS,
 } from "./constants.js"
 import { MAX_CROSS_SELLS_PER_PRODUCT } from "./cross-sell.js"
+import { LAUNCH_STAGES } from "./launch.js"
 import { NEWSLETTER_SEGMENTS, NEWSLETTER_SUBSCRIPTION_STATUS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
 import {
@@ -1247,6 +1248,9 @@ export const shopSettingsSchema = z
   .object({
     // Share of the product margin a VIP gets back, in percent.
     vipMarginSharePct: z.coerce.number().min(0).max(100).multipleOf(0.01),
+    // Story 12.10 — how far the shop is open, and whether search engines may index it.
+    launchStage: z.enum(LAUNCH_STAGES),
+    indexingEnabled: z.boolean(),
   })
   .strict()
 

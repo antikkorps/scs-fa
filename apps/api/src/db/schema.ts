@@ -1629,11 +1629,17 @@ export const shippingRates = pgTable(
  * `audit_logs`. Aujourd'hui : la part de la marge rendue au client VIP (50 %
  * par défaut, `DEFAULT_VIP_MARGIN_SHARE_PCT`). Une commande garde le taux figé.
  */
+// Story 12.10 — LAUNCH_STAGES in @armurier/shared.
+export const shopLaunchStageEnum = pgEnum("shop_launch_stage", ["coming_soon", "showcase", "open"])
+
 export const shopSettings = pgTable(
   "shop_settings",
   {
     id: integer("id").primaryKey().default(1),
     vipMarginSharePct: decimal("vip_margin_share_pct", { precision: 5, scale: 2 }).notNull().default("50"),
+    // Story 12.10 — a fresh database starts closed and unindexed: opening is a decision.
+    launchStage: shopLaunchStageEnum("launch_stage").notNull().default("coming_soon"),
+    indexingEnabled: boolean("indexing_enabled").notNull().default(false),
     updatedAt: timestamp("updated_at").defaultNow(),
   },
   () => [
