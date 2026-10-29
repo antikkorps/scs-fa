@@ -17,6 +17,7 @@ import { db } from "../db/client.js"
 import { isUniqueViolation } from "../db/errors.js"
 import { organisations, refreshTokens, users } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import { lookUpEstablishment } from "./registry.js"
 import {
   announceOrganisationRequest,
@@ -61,56 +62,60 @@ export const organisationRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   /** POST /signup — a new account and its organisation, together or not at all. */
-  fastify.post("/signup", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
-    const parsed = proSignupSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
-    const { email, password, firstName, lastName, phone, ...organisationInput } = parsed.data
+  fastify.post(
+    "/signup",
+    { preHandler: requireShopOpen, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = proSignupSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
+      const { email, password, firstName, lastName, phone, ...organisationInput } = parsed.data
 
-    const lookup = await lookUpEstablishment(organisationInput.siret)
-    const passwordHash = await hashPassword(password)
+      const lookup = await lookUpEstablishment(organisationInput.siret)
+      const passwordHash = await hashPassword(password)
 
-    try {
-      const { user, organisation, registryVerified } = await db.transaction(async (tx) => {
-        const [created] = await tx
-          .insert(users)
-          .values({
-            email: email.trim().toLowerCase(),
-            passwordHash,
-            firstname: firstName,
-            lastname: lastName,
-            phone: phone ?? null,
-            role: "customer",
-            rgpdConsentAt: new Date(),
-            rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
-          })
-          .returning({ id: users.id, email: users.email, firstName: users.firstname, lastName: users.lastname })
-        if (!created) throw new Error("user insert returned no row")
+      try {
+        const { user, organisation, registryVerified } = await db.transaction(async (tx) => {
+          const [created] = await tx
+            .insert(users)
+            .values({
+              email: email.trim().toLowerCase(),
+              passwordHash,
+              firstname: firstName,
+              lastname: lastName,
+              phone: phone ?? null,
+              role: "customer",
+              rgpdConsentAt: new Date(),
+              rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
+            })
+            .returning({ id: users.id, email: users.email, firstName: users.firstname, lastName: users.lastname })
+          if (!created) throw new Error("user insert returned no row")
 
-        const opened = await openOrganisation(tx, organisationInput, lookup, requestContext(request, created.id))
-        await tx.update(users).set({ organisationId: opened.organisation.id }).where(eq(users.id, created.id))
-        await recordAuditEvent(
-          {
-            userId: created.id,
-            userRole: "customer",
-            entityType: "user",
-            entityId: created.id,
-            action: "user.registered",
-            ipAddress: request.ip,
-            userAgent: request.headers["user-agent"] ?? null,
-          },
-          tx,
-        )
-        return { user: created, ...opened }
-      })
+          const opened = await openOrganisation(tx, organisationInput, lookup, requestContext(request, created.id))
+          await tx.update(users).set({ organisationId: opened.organisation.id }).where(eq(users.id, created.id))
+          await recordAuditEvent(
+            {
+              userId: created.id,
+              userRole: "customer",
+              entityType: "user",
+              entityId: created.id,
+              action: "user.registered",
+              ipAddress: request.ip,
+              userAgent: request.headers["user-agent"] ?? null,
+            },
+            tx,
+          )
+          return { user: created, ...opened }
+        })
 
-      await announceOrganisationRequest(user, organisation, registryVerified, request.log)
-      return reply.code(201).send({ data: { ...user, organisation } })
-    } catch (err) {
-      if (isUniqueViolation(err, "users_email_unique")) return reply.code(409).send(EMAIL_TAKEN)
-      if (err instanceof SiretHeldError) return reply.code(409).send(SIRET_TAKEN)
-      throw err
-    }
-  })
+        await announceOrganisationRequest(user, organisation, registryVerified, request.log)
+        return reply.code(201).send({ data: { ...user, organisation } })
+      } catch (err) {
+        if (isUniqueViolation(err, "users_email_unique")) return reply.code(409).send(EMAIL_TAKEN)
+        if (err instanceof SiretHeldError) return reply.code(409).send(SIRET_TAKEN)
+        throw err
+      }
+    },
+  )
 
   /**
    * POST /request — a registered customer turns pro. Their history stays; the
@@ -119,7 +124,7 @@ export const organisationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/request",
     {
-      preHandler: [authenticate, requireRole("customer")],
+      preHandler: [authenticate, requireRole("customer"), requireShopOpen],
       config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
     },
     async (request, reply) => {

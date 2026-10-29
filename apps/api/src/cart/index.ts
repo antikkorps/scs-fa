@@ -17,6 +17,7 @@ import {
 import { validationError } from "../http.js"
 import { releaseAllUniquePieces, releaseUniquePiece, reserveUniquePiece } from "../products/reservation.js"
 import { publiclyVisible } from "../products/visibility.js"
+import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import { loadCart } from "./service.js"
 
 export const cartRoutes: FastifyPluginAsync = async (fastify) => {
@@ -29,7 +30,7 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   // POST /api/cart/items — add a product variant or an artwork print
-  fastify.post("/items", async (request, reply) => {
+  fastify.post("/items", { preHandler: requireShopOpen }, async (request, reply) => {
     const parsed = cartItemSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.code(400).send(validationError(parsed.error.issues))
@@ -153,7 +154,7 @@ export const cartRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   // PATCH /api/cart/items/:id — change the quantity of a product variant line
-  fastify.patch("/items/:id", async (request, reply) => {
+  fastify.patch("/items/:id", { preHandler: requireShopOpen }, async (request, reply) => {
     const params = uuidParamSchema.safeParse(request.params)
     if (!params.success) {
       return reply.code(400).send(validationError(params.error.issues))

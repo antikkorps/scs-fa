@@ -12,7 +12,7 @@ import { loadShopSettings, type ShopSettings } from "./service.js"
 const PASSWORD = "MotDePasseTresLong123!"
 const BASE = "/api/admin/shop-settings"
 
-describe("admin shop settings (story 12.9e)", () => {
+describe("admin shop settings (stories 12.9e, 12.10)", () => {
   let app: FastifyInstance
   let adminToken: string
   let customerToken: string
@@ -57,24 +57,25 @@ describe("admin shop settings (story 12.9e)", () => {
     await app.close()
   })
 
-  it("serves the seeded settings: half the margin back to a VIP", async () => {
+  it("serves the seeded settings: half the margin back to a VIP, a demo shop open but unindexed", async () => {
     const res = await app.inject({ method: "GET", url: BASE, headers: { authorization: `Bearer ${adminToken}` } })
     expect(res.statusCode).toBe(200)
-    expect(res.json().data).toEqual({ vipMarginSharePct: 50 })
+    expect(res.json().data).toEqual({ vipMarginSharePct: 50, launchStage: "open", indexingEnabled: false })
   })
 
   it("is admin-only, read and write", async () => {
     const read = await app.inject({ method: "GET", url: BASE, headers: { authorization: `Bearer ${customerToken}` } })
     expect(read.statusCode).toBe(403)
-    expect((await put(customerToken, { vipMarginSharePct: 40 })).statusCode).toBe(403)
+    expect((await put(customerToken, { ...original, vipMarginSharePct: 40 })).statusCode).toBe(403)
     expect((await app.inject({ method: "GET", url: BASE })).statusCode).toBe(401)
   })
 
-  it("changes the VIP share and journals who changed it from what", async () => {
-    const res = await put(adminToken, { vipMarginSharePct: 40 })
+  it("changes the settings and journals who changed them from what", async () => {
+    const changed = { vipMarginSharePct: 40, launchStage: "showcase", indexingEnabled: true }
+    const res = await put(adminToken, changed)
     expect(res.statusCode).toBe(200)
-    expect(res.json().data).toEqual({ vipMarginSharePct: 40 })
-    expect(await loadShopSettings()).toEqual({ vipMarginSharePct: 40 })
+    expect(res.json().data).toEqual(changed)
+    expect(await loadShopSettings()).toEqual(changed)
 
     const [log] = await db
       .select()
@@ -83,14 +84,16 @@ describe("admin shop settings (story 12.9e)", () => {
       .orderBy(auditLogs.createdAt)
       .limit(1)
     expect(log?.oldValue).toEqual(original)
-    expect(log?.newValue).toEqual({ vipMarginSharePct: 40 })
+    expect(log?.newValue).toEqual(changed)
   })
 
-  it("refuses a share outside 0–100 % or an unknown field, and leaves the settings alone", async () => {
+  it("refuses a share outside 0–100 %, an unknown stage, a partial body or an unknown field", async () => {
     const before = await loadShopSettings()
-    expect((await put(adminToken, { vipMarginSharePct: 120 })).statusCode).toBe(400)
-    expect((await put(adminToken, { vipMarginSharePct: -5 })).statusCode).toBe(400)
-    expect((await put(adminToken, { vipMarginSharePct: 40, extra: true })).statusCode).toBe(400)
+    expect((await put(adminToken, { ...before, vipMarginSharePct: 120 })).statusCode).toBe(400)
+    expect((await put(adminToken, { ...before, vipMarginSharePct: -5 })).statusCode).toBe(400)
+    expect((await put(adminToken, { ...before, launchStage: "closed" })).statusCode).toBe(400)
+    expect((await put(adminToken, { vipMarginSharePct: 40 })).statusCode).toBe(400)
+    expect((await put(adminToken, { ...before, extra: true })).statusCode).toBe(400)
     expect(await loadShopSettings()).toEqual(before)
   })
 })

@@ -263,6 +263,11 @@ below is the recommended path.
       `docker compose exec api pnpm auth:totp-reset <email>`. Never rotate
       `TOTP_ENCRYPTION_KEY` casually: every enrolled app would have to enrol again.
 - [ ] Stack builds & boots on the VM; `migrate` ran; seed ran; `ps` all healthy.
+- [ ] **Launch stage** (story 12.10): a fresh database starts at the *waiting
+      page*, sales closed (`ShopNotOpen`), robots told not to index. Open it from
+      *Réglages* in the back-office — *Vitrine* (site visible, no sales) then
+      *Ouvert* — and allow indexing only once the real catalogue is online. No
+      Stripe live key before sales open.
 - [ ] **Stripe live webhook** registered at `https://www.<DOMAIN>/api/webhooks/stripe`,
       subscribed to exactly these five events: `payment_intent.succeeded`,
       `payment_intent.payment_failed`, `payment_intent.canceled`,

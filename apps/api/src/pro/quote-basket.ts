@@ -12,6 +12,7 @@ import { db } from "../db/client.js"
 import { legalCategories, productCategories, products, productVariants, quoteBasketItems, users } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { proCatalogueVisible } from "../products/visibility.js"
+import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import { type ProOrganisation, proOrganisationOf } from "./access.js"
 import { netPrices } from "./prices.js"
 
@@ -108,7 +109,7 @@ export const quoteBasketRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send({ data: await basketOf(request.user.sub, proOrganisationOf(request)) })
   })
 
-  fastify.post("/items", async (request, reply) => {
+  fastify.post("/items", { preHandler: requireShopOpen }, async (request, reply) => {
     const parsed = quoteBasketItemSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
     const { variantId, qty } = parsed.data
@@ -164,7 +165,7 @@ export const quoteBasketRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.code(201).send({ data: await basketOf(userId, proOrganisationOf(request)) })
   })
 
-  fastify.patch("/items/:id", async (request, reply) => {
+  fastify.patch("/items/:id", { preHandler: requireShopOpen }, async (request, reply) => {
     const params = uuidParamSchema.safeParse(request.params)
     if (!params.success) return reply.code(400).send(validationError(params.error.issues))
     const parsed = quoteBasketQtySchema.safeParse(request.body)
