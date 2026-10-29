@@ -32,11 +32,11 @@
     "@nuxt/test-utils": "4.1.0",
     "@types/node": "24.13.3",
     "@vitest/coverage-v8": "^4.1.0",
-    "@vue/language-core": "3.3.8",
+    "@vue/language-core": "3.3.9",
     "@vue/test-utils": "2.4.11",
     "happy-dom": "21.0.4",
     "typescript": "5.9.3",
     "vitest": "^4.1.0",
-    "vue-tsc": "3.3.8"
+    "vue-tsc": "3.3.9"
   }
 }
