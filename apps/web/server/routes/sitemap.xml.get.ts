@@ -11,6 +11,7 @@ interface Entry {
 interface SitemapPayload {
   products: (Entry & { isAncientWeapon: boolean })[]
   productCategories: Entry[]
+  tags: Entry[]
   artworks: Entry[]
   series: Entry[]
   themes: Entry[]
@@ -21,6 +22,7 @@ interface SitemapPayload {
 const EMPTY: SitemapPayload = {
   products: [],
   productCategories: [],
+  tags: [],
   artworks: [],
   series: [],
   themes: [],
@@ -32,6 +34,14 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const api = apiUpstream(event)
   const siteUrl = config.public.siteUrl as string
+  setHeader(event, "content-type", "application/xml; charset=utf-8")
+
+  // Story 12.10: until robots may index the site there is nothing to submit.
+  // Not cached for long, so switching indexing on is picked up quickly.
+  if (!(await shopStatus()).indexingEnabled) {
+    setHeader(event, "cache-control", "public, max-age=300")
+    return buildSitemap([])
+  }
 
   // An unreachable API degrades to the static pages rather than failing the
   // whole sitemap — but it is not cached as if it were the real one.
@@ -84,6 +94,13 @@ export default defineEventHandler(async (event) => {
       changefreq: "weekly" as const,
       priority: 0.8,
     })),
+    // Tag pages: only tags on at least one published product reach this list.
+    ...d.tags.map((t) => ({
+      loc: `${siteUrl}/boutique/tag/${encodeURIComponent(t.slug)}`,
+      lastmod: t.updatedAt,
+      changefreq: "weekly" as const,
+      priority: 0.6,
+    })),
     ...d.products.map((p) => ({
       loc: `${siteUrl}/boutique/${p.slug}`,
       lastmod: p.updatedAt,
@@ -131,7 +148,6 @@ export default defineEventHandler(async (event) => {
     })),
   ]
 
-  setHeader(event, "content-type", "application/xml; charset=utf-8")
   setHeader(event, "cache-control", payload ? "public, max-age=3600" : "no-store")
   return buildSitemap(urls)
 })

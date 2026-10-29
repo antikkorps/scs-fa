@@ -67,6 +67,8 @@ async function send() {
       sendError.value = `Ces articles ne sont plus proposés, retirez-les puis renvoyez : ${names.join(", ")}.`
     } else if (code === "EmptyBasket") {
       sendError.value = "Votre demande est vide."
+    } else if (code === "ShopNotOpen") {
+      sendError.value = SHOP_NOT_OPEN_MESSAGE
     } else if (code === "TooManyQuoteRequests") {
       sendError.value =
         "Vous avez envoyé beaucoup de demandes en peu de temps. Votre sélection est conservée : renvoyez-la dans une heure."

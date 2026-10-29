@@ -32,7 +32,7 @@ const { reopen } = useConsent()
         <NuxtLink to="/panier">Panier</NuxtLink>
       </nav>
 
-      <div class="ft__news">
+      <div id="newsletter" class="ft__news">
         <NewsletterSignup
           variant="bare"
           source="/"

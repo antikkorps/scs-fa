@@ -14,6 +14,7 @@ import { HenrriError } from "../henrri/client.js"
 import { validationError } from "../http.js"
 import { sendOrderConfirmation } from "../orders/confirmation.js"
 import { OrderError } from "../orders/placement.js"
+import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import { proOrganisationOf } from "./access.js"
 import { acceptQuote } from "./quote-acceptance.js"
 import { loadBasket } from "./quote-basket.js"
@@ -127,105 +128,109 @@ async function announce(
 /** A pro's quote requests (story 12.8c): sent from the basket, followed, cancelled while untouched. */
 export const quoteRequestRoutes: FastifyPluginAsync = async (fastify) => {
   /** POST / — the basket becomes a numbered request, all at once or not at all. */
-  fastify.post("/", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
-    const parsed = quoteRequestSubmitSchema.safeParse(request.body ?? {})
-    if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
-    const organisation = proOrganisationOf(request)
-    const userId = request.user.sub
+  fastify.post(
+    "/",
+    { preHandler: requireShopOpen, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = quoteRequestSubmitSchema.safeParse(request.body ?? {})
+      if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
+      const organisation = proOrganisationOf(request)
+      const userId = request.user.sub
 
-    let submitted: { id: string; number: string; lineCount: number; email: string }
-    try {
-      submitted = await db.transaction(async (tx) => {
-        // Serialised with the basket's own changes: what is frozen is what was there.
-        const [applicant] = await tx
-          .select({ email: users.email })
-          .from(users)
-          .where(eq(users.id, userId))
-          .for("update")
-        const [recent] = await tx
-          .select({ total: count() })
-          .from(quoteRequests)
-          .where(
-            and(
-              eq(quoteRequests.organisationId, organisation.id),
-              gt(quoteRequests.createdAt, sql`now() - interval '1 hour'`),
-            ),
+      let submitted: { id: string; number: string; lineCount: number; email: string }
+      try {
+        submitted = await db.transaction(async (tx) => {
+          // Serialised with the basket's own changes: what is frozen is what was there.
+          const [applicant] = await tx
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, userId))
+            .for("update")
+          const [recent] = await tx
+            .select({ total: count() })
+            .from(quoteRequests)
+            .where(
+              and(
+                eq(quoteRequests.organisationId, organisation.id),
+                gt(quoteRequests.createdAt, sql`now() - interval '1 hour'`),
+              ),
+            )
+          if ((recent?.total ?? 0) >= QUOTE_REQUESTS_PER_HOUR) {
+            throw new SubmitRefusal(429, {
+              error: "TooManyQuoteRequests",
+              message: "Too many quote requests in the last hour; the basket is kept",
+            })
+          }
+          const lines = await loadBasket(userId, tx)
+          if (lines.length === 0) {
+            throw new SubmitRefusal(400, { error: "EmptyBasket", message: "The quote basket is empty" })
+          }
+          const unavailable = lines.filter((line) => !line.available)
+          if (unavailable.length > 0) {
+            throw new SubmitRefusal(409, {
+              error: "UnavailableItems",
+              message: "Some items can no longer be asked for a quote",
+              items: unavailable.map((line) => line.name),
+            })
+          }
+
+          const [created] = await tx
+            .insert(quoteRequests)
+            .values({
+              number: NEXT_NUMBER,
+              organisationId: organisation.id,
+              requestedBy: userId,
+              message: parsed.data.message || null,
+            })
+            .returning({ id: quoteRequests.id, number: quoteRequests.number })
+          if (!created) throw new Error("quote request insert returned no row")
+
+          await tx.insert(quoteRequestItems).values(
+            lines.map((line, index) => ({
+              quoteRequestId: created.id,
+              position: index + 1,
+              productId: line.productId,
+              variantId: line.variantId,
+              productName: line.name,
+              productSku: line.sku,
+              variantSku: line.skuVariant,
+              variantLabel: line.variantLabel,
+              legalCategory: line.legalCategory,
+              qty: line.qty,
+              publicPriceHt: line.publicPriceHt.toFixed(2),
+              vatPct: line.vatPct.toFixed(2),
+            })),
           )
-        if ((recent?.total ?? 0) >= QUOTE_REQUESTS_PER_HOUR) {
-          throw new SubmitRefusal(429, {
-            error: "TooManyQuoteRequests",
-            message: "Too many quote requests in the last hour; the basket is kept",
-          })
-        }
-        const lines = await loadBasket(userId, tx)
-        if (lines.length === 0) {
-          throw new SubmitRefusal(400, { error: "EmptyBasket", message: "The quote basket is empty" })
-        }
-        const unavailable = lines.filter((line) => !line.available)
-        if (unavailable.length > 0) {
-          throw new SubmitRefusal(409, {
-            error: "UnavailableItems",
-            message: "Some items can no longer be asked for a quote",
-            items: unavailable.map((line) => line.name),
-          })
-        }
+          await tx.delete(quoteBasketItems).where(eq(quoteBasketItems.userId, userId))
+          await recordAuditEvent(
+            {
+              userId,
+              userRole: "customer",
+              entityType: "quote_request",
+              entityId: created.id,
+              action: "quote_request.submitted",
+              newValue: { number: created.number, organisationId: organisation.id, lineCount: lines.length },
+              ipAddress: request.ip,
+              userAgent: request.headers["user-agent"] ?? null,
+            },
+            tx,
+          )
+          return { ...created, lineCount: lines.length, email: applicant?.email ?? "" }
+        })
+      } catch (err) {
+        if (err instanceof SubmitRefusal) return reply.code(err.status).send(err.body)
+        throw err
+      }
 
-        const [created] = await tx
-          .insert(quoteRequests)
-          .values({
-            number: NEXT_NUMBER,
-            organisationId: organisation.id,
-            requestedBy: userId,
-            message: parsed.data.message || null,
-          })
-          .returning({ id: quoteRequests.id, number: quoteRequests.number })
-        if (!created) throw new Error("quote request insert returned no row")
-
-        await tx.insert(quoteRequestItems).values(
-          lines.map((line, index) => ({
-            quoteRequestId: created.id,
-            position: index + 1,
-            productId: line.productId,
-            variantId: line.variantId,
-            productName: line.name,
-            productSku: line.sku,
-            variantSku: line.skuVariant,
-            variantLabel: line.variantLabel,
-            legalCategory: line.legalCategory,
-            qty: line.qty,
-            publicPriceHt: line.publicPriceHt.toFixed(2),
-            vatPct: line.vatPct.toFixed(2),
-          })),
-        )
-        await tx.delete(quoteBasketItems).where(eq(quoteBasketItems.userId, userId))
-        await recordAuditEvent(
-          {
-            userId,
-            userRole: "customer",
-            entityType: "quote_request",
-            entityId: created.id,
-            action: "quote_request.submitted",
-            newValue: { number: created.number, organisationId: organisation.id, lineCount: lines.length },
-            ipAddress: request.ip,
-            userAgent: request.headers["user-agent"] ?? null,
-          },
-          tx,
-        )
-        return { ...created, lineCount: lines.length, email: applicant?.email ?? "" }
-      })
-    } catch (err) {
-      if (err instanceof SubmitRefusal) return reply.code(err.status).send(err.body)
-      throw err
-    }
-
-    await announce(
-      request,
-      { number: submitted.number, lineCount: submitted.lineCount },
-      { id: userId, email: submitted.email },
-      organisation.legalName,
-    )
-    return reply.code(201).send({ data: await memberRequest(submitted.id, organisation.id) })
-  })
+      await announce(
+        request,
+        { number: submitted.number, lineCount: submitted.lineCount },
+        { id: userId, email: submitted.email },
+        organisation.legalName,
+      )
+      return reply.code(201).send({ data: await memberRequest(submitted.id, organisation.id) })
+    },
+  )
 
   /** GET / — the organisation's requests, newest first. */
   fastify.get("/", async (request, reply) => {
@@ -279,7 +284,7 @@ export const quoteRequestRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post(
     "/:id/accept",
-    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    { preHandler: requireShopOpen, config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const params = uuidParamSchema.safeParse(request.params)
       if (!params.success) return reply.code(400).send(validationError(params.error.issues))

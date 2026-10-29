@@ -1,10 +1,12 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { ref } from "vue"
+import { ref, toValue } from "vue"
 import ShopCatalogue from "./ShopCatalogue.vue"
 
-mockNuxtImport("useFetch", () => (url: string) => {
+const { productQueries } = vi.hoisted(() => ({ productQueries: [] as unknown[] }))
+
+mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
   if (typeof url === "string" && url.includes("/product-categories")) {
     return {
       data: ref({
@@ -16,8 +18,18 @@ mockNuxtImport("useFetch", () => (url: string) => {
     }
   }
   if (typeof url === "string" && url.includes("/tags")) {
-    return { data: ref({ data: [] }) }
+    return {
+      data: ref({
+        data: [
+          {
+            facet: "etat",
+            tags: [{ slug: "occasion", name: "Occasion", facet: "etat", description: null, productCount: 3 }],
+          },
+        ],
+      }),
+    }
   }
+  productQueries.push(toValue(opts?.query))
   return {
     data: ref({ data: [], pagination: { page: 1, limit: 24, total: 0, totalPages: 0, hasMore: false } }),
     error: ref(null),
@@ -61,5 +73,34 @@ describe("ShopCatalogue (story 9.6)", () => {
     const push = spyPush()
     await wrapper.find("#shop-category").setValue("")
     expect(push).toHaveBeenCalledWith({ path: "/boutique", query: {} })
+  })
+
+  describe("on a tag page", () => {
+    const tagPage = { category: "", tag: "occasion", basePath: "/boutique/tag/occasion", listName: "x" }
+
+    it("lists the products carrying the page's tag", async () => {
+      productQueries.length = 0
+      await mountSuspended(ShopCatalogue, { props: tagPage, route: "/boutique/tag/occasion" })
+      expect(productQueries.at(-1)).toMatchObject({ tags: "occasion" })
+    })
+
+    it("shows the page's tag as ticked, and unticking it goes back to the whole catalogue", async () => {
+      const wrapper = await mountSuspended(ShopCatalogue, {
+        props: tagPage,
+        route: "/boutique/tag/occasion?legalCategory=B",
+      })
+      const box = wrapper.find(".tagf__box")
+      expect((box.element as HTMLInputElement).checked).toBe(true)
+      const push = spyPush()
+      await box.trigger("change")
+      expect(push).toHaveBeenCalledWith({ path: "/boutique", query: { legalCategory: "B" } })
+    })
+
+    it("keeps the tag when moving to a category", async () => {
+      const wrapper = await mountSuspended(ShopCatalogue, { props: tagPage, route: "/boutique/tag/occasion" })
+      const push = spyPush()
+      await wrapper.find("#shop-category").setValue("munition")
+      expect(push).toHaveBeenCalledWith({ path: "/boutique/categorie/munition", query: { tags: "occasion" } })
+    })
   })
 })

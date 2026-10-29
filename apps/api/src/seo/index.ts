@@ -10,6 +10,8 @@ import {
   blogPosts,
   productCategories,
   products,
+  productTags,
+  tags,
 } from "../db/schema.js"
 import { publiclyVisible } from "../products/visibility.js"
 
@@ -24,88 +26,114 @@ import { publiclyVisible } from "../products/visibility.js"
  */
 export const seoRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/sitemap", async (_request, reply) => {
-    const [productRows, categoryRows, artworkRows, seriesRows, themeRows, artistRows, postRows] = await Promise.all([
-      // Gun Art products only back the artworks, which live under /collection.
-      db
-        .select({
-          slug: products.slug,
-          name: products.name,
-          updatedAt: products.updatedAt,
-          imageUrl: products.featuredImageUrl,
-          isAncientWeapon: ancientWeapons.id,
-        })
-        .from(products)
-        .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
-        .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
-        .where(and(publiclyVisible(), ne(productCategories.category, "gun_art")))
-        .orderBy(asc(products.slug)),
-      // A category page with nothing in it would be thin content: only
-      // categories holding at least one published product are listed, dated by
-      // their most recently touched product.
-      db
-        .select({
-          slug: productCategories.slug,
-          name: productCategories.name,
-          updatedAt: max(products.updatedAt),
-        })
-        .from(productCategories)
-        .innerJoin(products, and(eq(products.categoryId, productCategories.id), publiclyVisible()))
-        .where(ne(productCategories.category, "gun_art"))
-        .groupBy(productCategories.id)
-        .orderBy(asc(productCategories.displayOrder), asc(productCategories.name)),
-      db
-        .select({
-          slug: artworks.slug,
-          title: artworks.title,
-          updatedAt: artworks.updatedAt,
-          imageUrl: artworks.featuredImageUrl,
-        })
-        .from(artworks)
-        .where(eq(artworks.published, true))
-        .orderBy(asc(artworks.slug)),
-      db
-        .select({
-          slug: artworkSeries.slug,
-          title: artworkSeries.title,
-          updatedAt: artworkSeries.updatedAt,
-          imageUrl: artworkSeries.coverImageUrl,
-        })
-        .from(artworkSeries)
-        .where(eq(artworkSeries.published, true))
-        .orderBy(asc(artworkSeries.slug)),
-      // Same rule as the collection page: a theme without a published series is
-      // an empty page. Its date is that of its latest series.
-      db
-        .select({
-          slug: artworkThemes.slug,
-          updatedAt: max(artworkSeries.updatedAt),
-        })
-        .from(artworkThemes)
-        .innerJoin(artworkSeries, and(eq(artworkSeries.themeId, artworkThemes.id), eq(artworkSeries.published, true)))
-        .groupBy(artworkThemes.id)
-        .orderBy(asc(artworkThemes.slug)),
-      db
-        .select({ slug: artists.slug, name: artists.name, updatedAt: artists.updatedAt, imageUrl: artists.portraitUrl })
-        .from(artists)
-        .where(eq(artists.published, true))
-        .orderBy(asc(artists.slug)),
-      db
-        .select({
-          slug: blogPosts.slug,
-          title: blogPosts.title,
-          updatedAt: blogPosts.updatedAt,
-          publishedAt: blogPosts.publishedAt,
-          imageUrl: blogPosts.featuredImageUrl,
-        })
-        .from(blogPosts)
-        .where(eq(blogPosts.published, true))
-        .orderBy(asc(blogPosts.slug)),
-    ])
+    const [productRows, categoryRows, tagRows, artworkRows, seriesRows, themeRows, artistRows, postRows] =
+      await Promise.all([
+        // Gun Art products only back the artworks, which live under /collection.
+        db
+          .select({
+            slug: products.slug,
+            name: products.name,
+            updatedAt: products.updatedAt,
+            imageUrl: products.featuredImageUrl,
+            isAncientWeapon: ancientWeapons.id,
+          })
+          .from(products)
+          .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
+          .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
+          .where(and(publiclyVisible(), ne(productCategories.category, "gun_art")))
+          .orderBy(asc(products.slug)),
+        // A category page with nothing in it would be thin content: only
+        // categories holding at least one published product are listed, dated by
+        // their most recently touched product.
+        db
+          .select({
+            slug: productCategories.slug,
+            name: productCategories.name,
+            updatedAt: max(products.updatedAt),
+          })
+          .from(productCategories)
+          .innerJoin(products, and(eq(products.categoryId, productCategories.id), publiclyVisible()))
+          .where(ne(productCategories.category, "gun_art"))
+          .groupBy(productCategories.id)
+          .orderBy(asc(productCategories.displayOrder), asc(productCategories.name)),
+        // Tag pages (/boutique/tag/:slug) follow the same rule as categories: only
+        // a tag on at least one published armurerie product is a page worth listing.
+        db
+          .select({
+            slug: tags.slug,
+            tagUpdatedAt: tags.updatedAt,
+            productUpdatedAt: max(products.updatedAt),
+          })
+          .from(tags)
+          .innerJoin(productTags, eq(productTags.tagId, tags.id))
+          .innerJoin(products, and(eq(products.id, productTags.productId), publiclyVisible()))
+          .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
+          .where(ne(productCategories.category, "gun_art"))
+          .groupBy(tags.id)
+          .orderBy(asc(tags.displayOrder), asc(tags.name)),
+        db
+          .select({
+            slug: artworks.slug,
+            title: artworks.title,
+            updatedAt: artworks.updatedAt,
+            imageUrl: artworks.featuredImageUrl,
+          })
+          .from(artworks)
+          .where(eq(artworks.published, true))
+          .orderBy(asc(artworks.slug)),
+        db
+          .select({
+            slug: artworkSeries.slug,
+            title: artworkSeries.title,
+            updatedAt: artworkSeries.updatedAt,
+            imageUrl: artworkSeries.coverImageUrl,
+          })
+          .from(artworkSeries)
+          .where(eq(artworkSeries.published, true))
+          .orderBy(asc(artworkSeries.slug)),
+        // Same rule as the collection page: a theme without a published series is
+        // an empty page. Its date is that of its latest series.
+        db
+          .select({
+            slug: artworkThemes.slug,
+            updatedAt: max(artworkSeries.updatedAt),
+          })
+          .from(artworkThemes)
+          .innerJoin(artworkSeries, and(eq(artworkSeries.themeId, artworkThemes.id), eq(artworkSeries.published, true)))
+          .groupBy(artworkThemes.id)
+          .orderBy(asc(artworkThemes.slug)),
+        db
+          .select({
+            slug: artists.slug,
+            name: artists.name,
+            updatedAt: artists.updatedAt,
+            imageUrl: artists.portraitUrl,
+          })
+          .from(artists)
+          .where(eq(artists.published, true))
+          .orderBy(asc(artists.slug)),
+        db
+          .select({
+            slug: blogPosts.slug,
+            title: blogPosts.title,
+            updatedAt: blogPosts.updatedAt,
+            publishedAt: blogPosts.publishedAt,
+            imageUrl: blogPosts.featuredImageUrl,
+          })
+          .from(blogPosts)
+          .where(eq(blogPosts.published, true))
+          .orderBy(asc(blogPosts.slug)),
+      ])
 
     return reply.code(200).send({
       data: {
         products: productRows.map(({ isAncientWeapon, ...p }) => ({ ...p, isAncientWeapon: isAncientWeapon !== null })),
         productCategories: categoryRows,
+        // A tag page changes with its own wording or with its newest product.
+        tags: tagRows.map(({ slug, tagUpdatedAt, productUpdatedAt }) => ({
+          slug,
+          updatedAt: latestOf(tagUpdatedAt, productUpdatedAt),
+        })),
         artworks: artworkRows,
         series: seriesRows,
         themes: themeRows,
@@ -115,4 +143,9 @@ export const seoRoutes: FastifyPluginAsync = async (fastify) => {
       },
     })
   })
+}
+
+function latestOf(...dates: (Date | string | null)[]): Date | null {
+  const times = dates.filter((d) => d !== null).map((d) => new Date(d).getTime())
+  return times.length > 0 ? new Date(Math.max(...times)) : null
 }

@@ -13,6 +13,7 @@ const ERRORS: Record<string, string> = {
   NotAvailableForQuote: "Cet article n'est pas proposé sur devis.",
   QuantityTooLarge: "Cette ligne de votre demande est déjà au maximum.",
   BasketFull: "Votre demande est complète : envoyez-la, puis commencez-en une autre.",
+  ShopNotOpen: SHOP_NOT_OPEN_MESSAGE,
 }
 
 async function add() {

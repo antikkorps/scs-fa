@@ -5,11 +5,13 @@ import {
   QUOTE_REQUEST_STATUSES,
 } from "@armurier/shared"
 import { describe, expect, it } from "vitest"
+import { SHOP_NOT_OPEN_MESSAGE } from "./launch"
 import {
   legalDocOwner,
   ORGANISATION_TYPE_OPTIONS,
   organisationStatus,
   organisationTypeLabel,
+  quoteAcceptanceMessage,
   quoteRequestStatus,
   registryCheckLabel,
 } from "./organisation"
@@ -60,5 +62,11 @@ describe("an organisation's documents (story 12.8d)", () => {
       name: "Armurerie du Stand",
       contact: "Compte pro",
     })
+  })
+})
+
+describe("quoteAcceptanceMessage", () => {
+  it("says the shop is not open yet (story 12.10)", () => {
+    expect(quoteAcceptanceMessage("ShopNotOpen")).toBe(SHOP_NOT_OPEN_MESSAGE)
   })
 })

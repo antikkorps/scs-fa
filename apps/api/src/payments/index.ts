@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from "fastify"
 import type Stripe from "stripe"
 import { authenticate } from "../auth/authenticate.js"
 import { validationError } from "../http.js"
+import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import {
   claimVirementTransfer,
   getVirementInstructions,
@@ -17,7 +18,7 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
 
   // POST /api/payments/stripe/intent — create/reuse a PaymentIntent for an order
-  fastify.post("/stripe/intent", async (request, reply) => {
+  fastify.post("/stripe/intent", { preHandler: requireShopOpen }, async (request, reply) => {
     const parsed = createStripePaymentSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.code(400).send(validationError(parsed.error.issues))

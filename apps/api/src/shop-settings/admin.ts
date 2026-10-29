@@ -8,7 +8,7 @@ import { shopSettings } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { loadShopSettings } from "./service.js"
 
-/** The shop settings (story 12.9e): read and replaced whole by an admin. */
+/** The shop settings (stories 12.9e, 12.10): read and replaced whole by an admin. */
 export const adminShopSettingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
   fastify.addHook("preHandler", requireRole("admin"))
@@ -22,12 +22,18 @@ export const adminShopSettingsRoutes: FastifyPluginAsync = async (fastify) => {
 
     await db.transaction(async (tx) => {
       const before = await loadShopSettings(tx)
-      const values = { vipMarginSharePct: settings.vipMarginSharePct.toFixed(2), updatedAt: new Date() }
+      const values = {
+        vipMarginSharePct: settings.vipMarginSharePct.toFixed(2),
+        launchStage: settings.launchStage,
+        indexingEnabled: settings.indexingEnabled,
+        updatedAt: new Date(),
+      }
       await tx
         .insert(shopSettings)
         .values({ id: 1, ...values })
         .onConflictDoUpdate({ target: shopSettings.id, set: values })
-      // The VIP share moves every future VIP cart: who changed it, and from what, must be traceable.
+      // The VIP share moves every future VIP cart and the stage opens or closes the
+      // shop: who changed them, and from what, must be traceable.
       await recordAuditEvent(
         {
           userId: request.user.sub,

@@ -65,6 +65,7 @@ const isSold = computed(() => state.value === "sold")
 const available = computed(() => isPurchasable(state.value) && !heldByOther.value)
 
 const { isAuthenticated } = useAuth()
+const { salesOpen } = useLaunch()
 const cart = useCart()
 // Story 12.8c: an approved pro asks for a quote on the armurerie instead of
 // buying; a collection piece stays an ordinary purchase, for them too.
@@ -198,6 +199,10 @@ useHead({
 
           <p class="detail__price">{{ formatEuros(displayPriceTtc) }} <span>TTC</span></p>
 
+          <div v-if="product.tags.length > 0" class="detail__taglinks">
+            <ProductTagLinks :tags="product.tags" />
+          </div>
+
           <p v-if="isSold" class="detail__avail-note">
             Cette pièce a trouvé preneur. Elle reste présentée ici pour mémoire.
           </p>
@@ -300,7 +305,13 @@ useHead({
             </p>
           </section>
 
-          <div v-if="asksForQuote && selectedVariant" class="detail__cta">
+          <!-- Story 12.10: before the opening, neither a purchase nor a quote. -->
+          <SalesClosedNotice
+            v-if="!salesOpen"
+            class="detail__cta"
+            :segments="[ancient ? 'collection' : 'armurerie']"
+          />
+          <div v-else-if="asksForQuote && selectedVariant" class="detail__cta">
             <ProQuoteButton :variant-id="selectedVariant.id" />
           </div>
           <div v-else class="detail__cta">
@@ -407,6 +418,9 @@ useHead({
 .detail__title {
   font-size: var(--fs-2xl);
   margin: 0.5rem 0 1rem;
+}
+.detail__taglinks {
+  margin-bottom: 1.5rem;
 }
 .detail__tags {
   display: flex;

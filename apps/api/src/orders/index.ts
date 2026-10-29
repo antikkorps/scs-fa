@@ -23,6 +23,7 @@ import { issuedDocument, issuedDocumentsOfOrder, pdfFileName } from "../henrri/c
 import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
 import { customerShipments } from "../shipments/service.js"
+import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import { sendOrderConfirmation } from "./confirmation.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 import { ADDRESS_FIELDS, decrementVariantStock, insertPaymentBuckets, OrderError, toSnapshot } from "./placement.js"
@@ -53,7 +54,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
 
   // POST /api/orders — turn the user's cart into an order with an automatic payment split
-  fastify.post("/", async (request, reply) => {
+  fastify.post("/", { preHandler: requireShopOpen }, async (request, reply) => {
     const userId = request.user.sub
     const role = request.user.role
 

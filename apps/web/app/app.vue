@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { setResponseHeader } from "h3"
+
+// A day: the opening is weeks away, robots need not come back sooner.
+const WAITING_PAGE_RETRY_AFTER_SECONDS = 86_400
+
 const config = useRuntimeConfig()
 const siteUrl = config.public.siteUrl as string
 
@@ -79,10 +84,25 @@ useHead({
     },
   ],
 })
+
+// Story 12.10 — before the opening, the waiting page stands in for every public
+// page. A 503 with Retry-After tells robots the absence is temporary, so the
+// waiting page is never taken for the content of the URL.
+const route = useRoute()
+const launch = useLaunch()
+const waiting = computed(() => launch.waitingPageFor(route.path))
+if (import.meta.server && waiting.value) {
+  const event = useRequestEvent()
+  if (event) {
+    setResponseStatus(event, 503, "Opening soon")
+    setResponseHeader(event, "retry-after", WAITING_PAGE_RETRY_AFTER_SECONDS)
+  }
+}
 </script>
 
 <template>
-  <NuxtLayout>
+  <ComingSoonPage v-if="waiting" />
+  <NuxtLayout v-else>
     <NuxtPage />
   </NuxtLayout>
 </template>

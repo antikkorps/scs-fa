@@ -7,7 +7,7 @@ import { legalCategoryLabel } from "~/utils/product"
  * and the category pages (story 9.6).
  *
  * The category is a PATH, not a filter: choosing one navigates to its own
- * indexable page, and the remaining filters (search, legal category, price,
+ * indexable page (and so does a tag, on its own page — /boutique/tag/:slug), and the remaining filters (search, legal category, price,
  * tags) travel along in the query. Every filtered view canonicalises to the
  * bare page it filters; a later page of results canonicalises to itself, as a
  * distinct page of the listing.
@@ -15,6 +15,8 @@ import { legalCategoryLabel } from "~/utils/product"
 const props = defineProps<{
   /** Category slug locked by the page, or "" for the whole catalogue. */
   category: string
+  /** Tag slug locked by a tag page: always applied, unticking it leaves the page. */
+  tag?: string
   /** Absolute path of the page hosting the catalogue, e.g. "/boutique". */
   basePath: string
   /** Name of the list in its ItemList structured data. */
@@ -60,7 +62,14 @@ const selectedTags = computed(() =>
     .filter(Boolean),
 )
 
+// What the API is asked for: the page's own tag, then the visitor's.
+const appliedTags = computed(() => (props.tag ? [props.tag, ...selectedTags.value] : selectedTags.value))
+
 function toggleTag(slug: string) {
+  if (slug === props.tag) {
+    router.push({ path: categoryPath(""), query: filterQuery({}) })
+    return
+  }
   const next = selectedTags.value.includes(slug)
     ? selectedTags.value.filter((s) => s !== slug)
     : [...selectedTags.value, slug]
@@ -71,7 +80,7 @@ function toggleTag(slug: string) {
 const apiQuery = computed(() => {
   const query: Record<string, string | number> = { limit: PAGE_SIZE, page: page.value }
   if (props.category) query.category = props.category
-  if (selectedTags.value.length > 0) query.tags = selectedTags.value.join(",")
+  if (appliedTags.value.length > 0) query.tags = appliedTags.value.join(",")
   if (legalCategory.value) query.legalCategory = legalCategory.value
   if (term.value.trim()) query.search = term.value.trim()
   if (minPrice.value) query.minPrice = minPrice.value
@@ -80,7 +89,7 @@ const apiQuery = computed(() => {
 })
 
 const { data, error, pending } = await useApiFetch<ProductListResponse>(`/products`, {
-  key: `boutique-products-${props.category || "all"}`,
+  key: `boutique-products-${props.category || "all"}-${props.tag ?? ""}`,
   query: apiQuery,
 })
 
@@ -110,9 +119,9 @@ function navigate(overrides: Record<string, string | undefined>, resetPage = tru
   router.push({ query: filterQuery(overrides, resetPage) })
 }
 
-/** Switching category changes page, keeping the other filters. */
+/** Switching category changes page, keeping the other filters (a tag page's own tag included). */
 function selectCategory(slug: string) {
-  router.push({ path: categoryPath(slug), query: filterQuery({}) })
+  router.push({ path: categoryPath(slug), query: filterQuery({ tags: appliedTags.value.join(",") || undefined }) })
 }
 
 // Debounce the free-text search; selects/prices commit immediately.
@@ -136,10 +145,13 @@ function resetFilters() {
   router.push({ query: {} })
 }
 
-const hasFilters = computed(() =>
-  Boolean(
-    legalCategory.value || minPrice.value || maxPrice.value || term.value.trim() || selectedTags.value.length > 0,
-  ),
+const hasFiltersBesidesTags = computed(() =>
+  Boolean(legalCategory.value || minPrice.value || maxPrice.value || term.value.trim()),
+)
+const hasFilters = computed(() => hasFiltersBesidesTags.value || selectedTags.value.length > 0)
+
+const canonicalPath = computed(() =>
+  catalogueCanonicalPath(props.basePath, selectedTags.value, hasFiltersBesidesTags.value),
 )
 
 useHead({
@@ -147,7 +159,7 @@ useHead({
     {
       key: "canonical",
       rel: "canonical",
-      href: computed(() => catalogueCanonical(siteUrl, props.basePath, page.value)),
+      href: computed(() => catalogueCanonical(siteUrl, canonicalPath.value, page.value)),
     },
   ],
   script: [
@@ -246,7 +258,7 @@ useHead({
 
       <ProductTagFilters
         :facets="facets"
-        :selected="selectedTags"
+        :selected="appliedTags"
         @toggle="toggleTag"
         @clear="navigate({ tags: undefined })"
       />

@@ -17,6 +17,7 @@ mockNuxtImport("useAuth", () => () => ({ isAuthenticated }))
 mockNuxtImport("navigateTo", () => navigateToMock)
 
 beforeEach(() => {
+  useState("launch").value = { launchStage: "open", indexingEnabled: true, adminPreview: false }
   signup.mockReset()
   lookup.mockReset().mockResolvedValue({ status: "unavailable" })
   navigateToMock.mockReset()
@@ -87,5 +88,14 @@ describe("pro/inscription.vue (story 12.8b)", () => {
     isAuthenticated.value = true
     await mountSuspended(ProInscription)
     expect(navigateToMock).toHaveBeenCalledWith("/compte#compte-pro")
+  })
+})
+
+describe("pro/inscription.test.ts before the opening (story 12.10)", () => {
+  it("replaces the form with the opening notice in the showcase stage", async () => {
+    useState("launch").value = { launchStage: "showcase", indexingEnabled: false, adminPreview: false }
+    const wrapper = await mountSuspended(ProInscription)
+    expect(wrapper.find('input[type="password"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain("La demande de compte professionnel ouvre avec la boutique")
   })
 })

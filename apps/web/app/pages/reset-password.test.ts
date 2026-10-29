@@ -7,7 +7,8 @@ import ResetPassword from "./reset-password.vue"
 
 const { resetPassword } = vi.hoisted(() => ({ resetPassword: vi.fn() }))
 
-mockNuxtImport("useAuth", () => () => ({ resetPassword }))
+// The global launch middleware (story 12.10) reads `isAdmin` on every navigation.
+mockNuxtImport("useAuth", () => () => ({ resetPassword, isAdmin: { value: false } }))
 
 const TOKEN = "a".repeat(32)
 // Story 12.9g — the mailed link carries its token in the fragment.

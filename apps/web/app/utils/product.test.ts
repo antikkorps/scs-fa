@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest"
 import {
   catalogueCanonical,
+  catalogueCanonicalPath,
   categoryMetaDescription,
   categoryPath,
   inStock,
   isRegulated,
   legalCategoryLabel,
   stockLabel,
+  tagMetaDescription,
+  tagPath,
 } from "./product.js"
 
 describe("legalCategoryLabel", () => {
@@ -72,5 +75,35 @@ describe("categoryMetaDescription", () => {
     expect(categoryMetaDescription("Munitions", null)).toBe(
       "Munitions. Catégorie légale, prix TTC et stock en temps réel — boutique armurerie SCS Firearms.",
     )
+  })
+})
+
+describe("tag pages", () => {
+  it("gives a tag its own page in the armurerie", () => {
+    expect(tagPath("occasion")).toBe("/boutique/tag/occasion")
+    expect(tagPath("état neuf")).toBe("/boutique/tag/%C3%A9tat%20neuf")
+  })
+
+  it("describes a tag page in its own words, or plainly", () => {
+    expect(tagMetaDescription("Occasion", "Armes révisées par notre atelier.")).toBe(
+      "Occasion : Armes révisées par notre atelier. Catégorie légale, prix TTC et stock en temps réel — boutique armurerie SCS Firearms.",
+    )
+    expect(tagMetaDescription("Occasion", null)).toBe(
+      "Occasion. Catégorie légale, prix TTC et stock en temps réel — boutique armurerie SCS Firearms.",
+    )
+  })
+})
+
+describe("catalogueCanonicalPath", () => {
+  it("sends the whole catalogue filtered on a single tag to that tag's page", () => {
+    expect(catalogueCanonicalPath("/boutique", ["occasion"], false)).toBe("/boutique/tag/occasion")
+  })
+
+  it("keeps the page it filters otherwise", () => {
+    expect(catalogueCanonicalPath("/boutique", [], false)).toBe("/boutique")
+    expect(catalogueCanonicalPath("/boutique", ["occasion", "xixe"], false)).toBe("/boutique")
+    expect(catalogueCanonicalPath("/boutique", ["occasion"], true)).toBe("/boutique")
+    expect(catalogueCanonicalPath("/boutique/categorie/fusils", ["occasion"], false)).toBe("/boutique/categorie/fusils")
+    expect(catalogueCanonicalPath("/boutique/tag/occasion", ["xixe"], false)).toBe("/boutique/tag/occasion")
   })
 })
