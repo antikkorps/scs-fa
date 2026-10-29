@@ -4,6 +4,7 @@ import { registerSchema } from "@armurier/shared"
 useHead({ title: "Créer un compte — SCS Firearms" })
 
 const { register, isAuthenticated } = useAuth()
+const { salesOpen } = useLaunch()
 const route = useRoute()
 
 const form = reactive({
@@ -57,7 +58,13 @@ async function submit() {
 
 <template>
   <div class="auth-wrap">
-    <form class="auth-card" novalidate @submit.prevent="submit">
+    <!-- Story 12.10: the API refuses a sign-up until the shop opens. -->
+    <section v-if="!salesOpen" class="auth-card">
+      <p class="eyebrow">Espace client</p>
+      <h1 class="auth-card__title">Créer un compte</h1>
+      <SalesClosedNotice what="La création de compte" />
+    </section>
+    <form v-else class="auth-card" novalidate @submit.prevent="submit">
       <p class="eyebrow">Espace client</p>
       <h1 class="auth-card__title">Créer un compte</h1>
       <p class="auth-card__lede">Quelques informations pour démarrer.</p>
