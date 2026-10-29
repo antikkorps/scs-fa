@@ -3,6 +3,7 @@ import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { flushPromises } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { computed, ref } from "vue"
+import { SHOP_NOT_OPEN_MESSAGE } from "~/utils/launch"
 import Demande from "./demande.vue"
 
 const { quotes, navigateToMock } = vi.hoisted(() => ({
@@ -104,5 +105,14 @@ describe("pro/demande (story 12.8c)", () => {
     await wrapper.find("form.quote-send").trigger("submit")
     await flushPromises()
     expect(wrapper.find('[role="alert"]').text()).toContain("dans une heure")
+  })
+
+  it("says the shop is not open yet (story 12.10)", async () => {
+    quotes.submit.mockRejectedValue({ response: { status: 403 }, data: { error: "ShopNotOpen" } })
+    const wrapper = await mountPage()
+
+    await wrapper.find("form.quote-send").trigger("submit")
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').text()).toBe(SHOP_NOT_OPEN_MESSAGE)
   })
 })

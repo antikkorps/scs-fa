@@ -13,6 +13,7 @@ usePageSeo({
 
 const { signup } = useOrganisation()
 const { isAuthenticated } = useAuth()
+const { salesOpen } = useLaunch()
 
 // A signed-in customer turns pro from their account instead.
 if (isAuthenticated.value) await navigateTo("/compte#compte-pro")
@@ -75,6 +76,12 @@ async function submit() {
       <NuxtLink to="/connexion" class="btn btn-primary auth-submit">Se connecter</NuxtLink>
     </section>
 
+    <!-- Story 12.10: the API refuses a pro sign-up until the shop opens. -->
+    <section v-else-if="!salesOpen" class="auth-card">
+      <p class="eyebrow">Espace professionnel</p>
+      <h1 class="auth-card__title">Ouvrir un compte professionnel</h1>
+      <SalesClosedNotice what="La demande de compte professionnel" />
+    </section>
     <form v-else class="auth-card" novalidate @submit.prevent="submit">
       <p class="eyebrow">Espace professionnel</p>
       <h1 class="auth-card__title">Ouvrir un compte professionnel</h1>

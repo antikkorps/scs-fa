@@ -2,6 +2,7 @@
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { flushPromises } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { SHOP_NOT_OPEN_MESSAGE } from "~/utils/launch"
 import ProQuoteButton from "./ProQuoteButton.vue"
 
 const { addToBasket } = vi.hoisted(() => ({ addToBasket: vi.fn() }))
@@ -30,5 +31,13 @@ describe("ProQuoteButton (story 12.8c)", () => {
     await wrapper.find("button").trigger("click")
     await flushPromises()
     expect(wrapper.find('[role="alert"]').text()).toContain("n'est pas proposé sur devis")
+  })
+
+  it("says the shop is not open yet (story 12.10)", async () => {
+    addToBasket.mockRejectedValue({ response: { status: 403 }, data: { error: "ShopNotOpen" } })
+    const wrapper = await mountSuspended(ProQuoteButton, { props: { variantId: "v1" } })
+    await wrapper.find("button").trigger("click")
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').text()).toBe(SHOP_NOT_OPEN_MESSAGE)
   })
 })

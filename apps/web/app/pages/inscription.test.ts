@@ -15,6 +15,7 @@ mockNuxtImport("useAuth", () => () => ({ register, isAuthenticated }))
 mockNuxtImport("navigateTo", () => navigateToMock)
 
 beforeEach(() => {
+  useState("launch").value = { launchStage: "open", indexingEnabled: true, adminPreview: false }
   register.mockReset()
   navigateToMock.mockReset()
   isAuthenticated.value = false
@@ -66,5 +67,14 @@ describe("inscription.vue", () => {
   it("points professionals to their own signup", async () => {
     const wrapper = await mountSuspended(Inscription)
     expect(wrapper.find('a[href="/pro/inscription"]').exists()).toBe(true)
+  })
+})
+
+describe("inscription.test.ts before the opening (story 12.10)", () => {
+  it("replaces the form with the opening notice in the showcase stage", async () => {
+    useState("launch").value = { launchStage: "showcase", indexingEnabled: false, adminPreview: false }
+    const wrapper = await mountSuspended(Inscription)
+    expect(wrapper.find('input[type="password"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain("La création de compte ouvre avec la boutique")
   })
 })

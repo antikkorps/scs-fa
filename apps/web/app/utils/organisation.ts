@@ -1,4 +1,5 @@
 import type { OrganisationStatus, OrganisationType, QuoteRequestStatus } from "@armurier/shared"
+import { SHOP_NOT_OPEN_MESSAGE } from "~/utils/launch"
 import type { Severity } from "~/utils/status"
 
 // Story 12.8b — French labels for pro accounts, shared by the signup form, the
@@ -99,6 +100,7 @@ const ACCEPTANCE_MESSAGES: Record<string, string> = {
     "Nos conditions générales de vente ont changé depuis l'ouverture de cette page. Rechargez la page pour lire la nouvelle version.",
   UndeliverableAddress: "Nous livrons uniquement en France métropolitaine, Corse comprise.",
   InvalidStatusTransition: "Ce devis a déjà été accepté ou n'est plus ouvert.",
+  ShopNotOpen: SHOP_NOT_OPEN_MESSAGE,
 }
 
 export function quoteAcceptanceMessage(code: string | null | undefined): string {

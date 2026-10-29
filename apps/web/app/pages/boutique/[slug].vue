@@ -65,6 +65,7 @@ const isSold = computed(() => state.value === "sold")
 const available = computed(() => isPurchasable(state.value) && !heldByOther.value)
 
 const { isAuthenticated } = useAuth()
+const { salesOpen } = useLaunch()
 const cart = useCart()
 // Story 12.8c: an approved pro asks for a quote on the armurerie instead of
 // buying; a collection piece stays an ordinary purchase, for them too.
@@ -300,7 +301,13 @@ useHead({
             </p>
           </section>
 
-          <div v-if="asksForQuote && selectedVariant" class="detail__cta">
+          <!-- Story 12.10: before the opening, neither a purchase nor a quote. -->
+          <SalesClosedNotice
+            v-if="!salesOpen"
+            class="detail__cta"
+            :segments="[ancient ? 'collection' : 'armurerie']"
+          />
+          <div v-else-if="asksForQuote && selectedVariant" class="detail__cta">
             <ProQuoteButton :variant-id="selectedVariant.id" />
           </div>
           <div v-else class="detail__cta">

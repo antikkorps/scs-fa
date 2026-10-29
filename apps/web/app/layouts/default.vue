@@ -1,5 +1,6 @@
 <template>
   <div class="site">
+    <LaunchBanner />
     <AppHeader />
     <main id="main">
       <slot />
