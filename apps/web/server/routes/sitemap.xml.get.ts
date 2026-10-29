@@ -11,6 +11,7 @@ interface Entry {
 interface SitemapPayload {
   products: (Entry & { isAncientWeapon: boolean })[]
   productCategories: Entry[]
+  tags: Entry[]
   artworks: Entry[]
   series: Entry[]
   themes: Entry[]
@@ -21,6 +22,7 @@ interface SitemapPayload {
 const EMPTY: SitemapPayload = {
   products: [],
   productCategories: [],
+  tags: [],
   artworks: [],
   series: [],
   themes: [],
@@ -91,6 +93,13 @@ export default defineEventHandler(async (event) => {
       lastmod: c.updatedAt,
       changefreq: "weekly" as const,
       priority: 0.8,
+    })),
+    // Tag pages: only tags on at least one published product reach this list.
+    ...d.tags.map((t) => ({
+      loc: `${siteUrl}/boutique/tag/${encodeURIComponent(t.slug)}`,
+      lastmod: t.updatedAt,
+      changefreq: "weekly" as const,
+      priority: 0.6,
     })),
     ...d.products.map((p) => ({
       loc: `${siteUrl}/boutique/${p.slug}`,

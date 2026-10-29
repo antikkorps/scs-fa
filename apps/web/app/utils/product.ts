@@ -62,6 +62,24 @@ export function categoryPath(slug: string): string {
   return slug ? `/boutique/categorie/${encodeURIComponent(slug)}` : "/boutique"
 }
 
+/** The page of an armurerie tag: every published product carrying it. */
+export function tagPath(slug: string): string {
+  return `/boutique/tag/${encodeURIComponent(slug)}`
+}
+
+const WHOLE_CATALOGUE_PATH = "/boutique"
+
+/**
+ * The page a catalogue view canonicalises to. A filtered view is not a page of
+ * its own, except one: the whole catalogue filtered on a single tag and nothing
+ * else is exactly that tag's page, which gets the credit.
+ */
+export function catalogueCanonicalPath(basePath: string, tags: string[], hasOtherFilters: boolean): string {
+  const [onlyTag] = tags
+  if (basePath === WHOLE_CATALOGUE_PATH && tags.length === 1 && onlyTag && !hasOtherFilters) return tagPath(onlyTag)
+  return basePath
+}
+
 /**
  * Canonical URL of a catalogue view. Filters never make a distinct page — a
  * filtered view canonicalises to the page it filters — but a later page of
@@ -76,6 +94,15 @@ export function catalogueCanonical(siteUrl: string, basePath: string, page: numb
  * catalogue has some, framed so every category page reads distinctly.
  */
 export function categoryMetaDescription(name: string, description: string | null | undefined): string {
+  return listingMetaDescription(name, description)
+}
+
+/** Meta description of a tag page, on the same pattern as a category page. */
+export function tagMetaDescription(name: string, description: string | null | undefined): string {
+  return listingMetaDescription(name, description)
+}
+
+function listingMetaDescription(name: string, description: string | null | undefined): string {
   const own = description?.trim().replace(/\.$/, "")
   return `${name}${own ? ` : ${own}` : ""}. Catégorie légale, prix TTC et stock en temps réel — boutique armurerie SCS Firearms.`
 }

@@ -22,11 +22,13 @@ export function tagFacetLabel(facet: TagFacet): string {
  * nothing under it.
  */
 export function useTags() {
-  const { data } = useApiFetch<{ data: TagFacetGroup[] }>(`/tags`, {
+  const request = useApiFetch<{ data: TagFacetGroup[] }>(`/tags`, {
     key: "tags",
   })
 
-  const facets = computed(() => (data.value?.data ?? []).filter((group) => group.tags.length > 0))
+  const facets = computed(() => (request.data.value?.data ?? []).filter((group) => group.tags.length > 0))
+  // A tag page deciding between itself and a 404 awaits this; the filters do not.
+  const ready = Promise.resolve(request).then(() => undefined)
 
-  return { facets, tagFacetLabel }
+  return { facets, ready, error: request.error, tagFacetLabel }
 }

@@ -199,6 +199,10 @@ useHead({
 
           <p class="detail__price">{{ formatEuros(displayPriceTtc) }} <span>TTC</span></p>
 
+          <div v-if="product.tags.length > 0" class="detail__taglinks">
+            <ProductTagLinks :tags="product.tags" />
+          </div>
+
           <p v-if="isSold" class="detail__avail-note">
             Cette pièce a trouvé preneur. Elle reste présentée ici pour mémoire.
           </p>
@@ -414,6 +418,9 @@ useHead({
 .detail__title {
   font-size: var(--fs-2xl);
   margin: 0.5rem 0 1rem;
+}
+.detail__taglinks {
+  margin-bottom: 1.5rem;
 }
 .detail__tags {
   display: flex;

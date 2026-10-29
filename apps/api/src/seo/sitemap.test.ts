@@ -3,7 +3,16 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { ancientWeapons, artworkSeries, artworkThemes, blogPosts, productCategories, products } from "../db/schema.js"
+import {
+  ancientWeapons,
+  artworkSeries,
+  artworkThemes,
+  blogPosts,
+  productCategories,
+  products,
+  productTags,
+  tags,
+} from "../db/schema.js"
 
 const PREFIX = "TESTSEO96-"
 const SLUG = PREFIX.toLowerCase()
@@ -21,6 +30,7 @@ async function categoryId(slug: string): Promise<string> {
 interface SitemapPayload {
   products: { slug: string; updatedAt: string; imageUrl: string | null; isAncientWeapon: boolean }[]
   productCategories: { slug: string; updatedAt: string }[]
+  tags: { slug: string; updatedAt: string }[]
   series: { slug: string }[]
   themes: { slug: string; updatedAt: string }[]
   blogPosts: { slug: string; updatedAt: string }[]
@@ -40,6 +50,7 @@ describe("GET /api/seo/sitemap (story 9.6)", () => {
     await db.delete(artworkSeries).where(like(artworkSeries.slug, `${SLUG}%`))
     await db.delete(artworkThemes).where(like(artworkThemes.slug, `${SLUG}%`))
     await db.delete(blogPosts).where(like(blogPosts.slug, `${SLUG}%`))
+    await db.delete(tags).where(like(tags.slug, `${SLUG}%`))
   }
 
   function product(suffix: string, categoryId: string, published: boolean, updatedAt = new Date()) {
@@ -76,6 +87,30 @@ describe("GET /api/seo/sitemap (story 9.6)", () => {
     const antique = inserted.find((p) => p.slug === `${SLUG}antique`)
     if (!antique) throw new Error("Test product insert returned no row")
     await db.insert(ancientWeapons).values({ productId: antique.id, condition: "bon" })
+
+    // Story 9.6 follow-up: tag pages. One tag on a published product, one only on
+    // a draft, one only on a Gun Art backing product.
+    const productId = (slug: string) => {
+      const row = inserted.find((p) => p.slug === `${SLUG}${slug}`)
+      if (!row) throw new Error(`Test product ${slug} missing`)
+      return row.id
+    }
+    const [shown, onDraft, onGunArt] = await db
+      .insert(tags)
+      .values([
+        { slug: `${SLUG}tag`, name: "Tag", facet: "etat", updatedAt: new Date("2026-03-01T00:00:00Z") },
+        { slug: `${SLUG}tag-brouillon`, name: "Tag brouillon", facet: "etat" },
+        { slug: `${SLUG}tag-gunart`, name: "Tag Gun Art", facet: "etat" },
+      ])
+      .returning({ id: tags.id })
+    if (!shown || !onDraft || !onGunArt) throw new Error("Test tag insert returned no row")
+    await db.insert(productTags).values([
+      { productId: productId("old"), tagId: shown.id },
+      { productId: productId("recent"), tagId: shown.id },
+      { productId: productId("draft"), tagId: shown.id },
+      { productId: productId("draft"), tagId: onDraft.id },
+      { productId: productId("gunart"), tagId: onGunArt.id },
+    ])
 
     const [theme, emptyTheme] = await db
       .insert(artworkThemes)
@@ -134,6 +169,13 @@ describe("GET /api/seo/sitemap (story 9.6)", () => {
       new Date("2026-08-01T00:00:00Z").getTime(),
     )
     expect(data.productCategories.map((c) => c.slug)).not.toContain("gun-art")
+  })
+
+  it("lists only the tags of a published armurerie product, dated by the latest change", () => {
+    const listed = mine(data.tags)
+    expect(listed.map((t) => t.slug)).toEqual([`${SLUG}tag`])
+    // The tag itself was edited in March, its newest product in August.
+    expect(listed[0]?.updatedAt).toBe("2026-08-01T00:00:00.000Z")
   })
 
   it("lists published series, and only the themes that hold one", () => {
