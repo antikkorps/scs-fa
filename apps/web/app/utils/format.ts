@@ -1,6 +1,6 @@
 // Pure presentation helpers — unit-tested in format.test.ts.
 
-import { type ArtworkOrientation, mediaSrcset } from "@armurier/shared"
+import { type ArtworkOrientation, isMediaOgUrl, MEDIA_OG_SIZE, mediaOgImage, mediaSrcset } from "@armurier/shared"
 
 /** NaN counts as absent: a failed computation must not print "NaN". */
 function isMissing(value: number | null | undefined): value is null | undefined {
@@ -113,10 +113,19 @@ export function fallbackImage(seed: string, w = 800, h = 1000): string {
  * the page ships a share card that looks configured and renders as nothing.
  * Omitting the tag is the honest state. Open Graph also requires an absolute
  * URL, which `featuredImageUrl` (site-relative) is not on its own.
+ *
+ * An uploaded visual is shared through its 1200×630 JPEG card rather than its
+ * raw WebP: the size networks crop to, in the format all of them read.
  */
 export function ogImageUrl(featuredImageUrl: string | null | undefined, siteUrl: string): string | undefined {
   if (!featuredImageUrl) return undefined
-  return featuredImageUrl.startsWith("http") ? featuredImageUrl : `${siteUrl}${featuredImageUrl}`
+  const image = mediaOgImage(featuredImageUrl) ?? featuredImageUrl
+  return image.startsWith("http") ? image : `${siteUrl}${image}`
+}
+
+/** The `og:image` size when it is known — a share card's; stating a wrong one is worse than none. */
+export function ogImageSize(url: string | undefined): { width: number; height: number } | undefined {
+  return isMediaOgUrl(url) ? { ...MEDIA_OG_SIZE } : undefined
 }
 
 /**
