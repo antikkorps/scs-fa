@@ -27,9 +27,17 @@ import {
 } from "./service.js"
 
 const ALLOWED_INPUT = new Set(["image/jpeg", "image/png", "image/webp", "image/tiff"])
-// `<uuid>/<width>.<avif|webp>` and nothing else — no slashes or dots to traverse with.
+// `<uuid>/<width>.<avif|webp>` or `<uuid>/og.jpg` and nothing else — no slashes or dots to traverse with.
 const ID_RE = /^[0-9a-f-]{36}$/
 const RENDITION_RE = /^(\d{2,5})\.(avif|webp)$/
+const OG_RENDITION = "og.jpg"
+
+/** The Content-Type a public rendition name maps to, or null for anything else. */
+function renditionContentType(rendition: string): string | null {
+  if (rendition === OG_RENDITION) return "image/jpeg"
+  const format = RENDITION_RE.exec(rendition)?.[2]
+  return format ? `image/${format}` : null
+}
 
 function toDto(row: typeof media.$inferSelect) {
   return {
@@ -248,8 +256,8 @@ export const adminMediaRoutes: FastifyPluginAsync = async (fastify) => {
 export const mediaRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/:id/:rendition", async (request, reply) => {
     const { id, rendition } = request.params as { id: string; rendition: string }
-    const format = RENDITION_RE.exec(rendition)?.[2]
-    if (!ID_RE.test(id) || !format) {
+    const contentType = renditionContentType(rendition)
+    if (!ID_RE.test(id) || !contentType) {
       return reply.code(404).send({ error: "NotFound", message: "Image not found" })
     }
 
@@ -260,7 +268,7 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify) => {
       return replyForStorageReadFailure(error, request, reply, `media/${id}/${rendition}`, "Image not found")
     }
 
-    reply.header("content-type", `image/${format}`)
+    reply.header("content-type", contentType)
     reply.header("cache-control", "public, max-age=31536000, immutable")
     return reply.send(bytes)
   })
