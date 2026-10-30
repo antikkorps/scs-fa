@@ -30,12 +30,12 @@
   "devDependencies": {
     "@nuxt/devtools": "3.4.3",
     "@nuxt/test-utils": "4.1.0",
-    "@types/node": "24.13.3",
+    "@types/node": "26.1.2",
     "@vitest/coverage-v8": "^4.1.0",
     "@vue/language-core": "3.3.9",
     "@vue/test-utils": "2.4.11",
     "happy-dom": "21.0.4",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vitest": "^4.1.0",
     "vue-tsc": "3.3.9"
   }
