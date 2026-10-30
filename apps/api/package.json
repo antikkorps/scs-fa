@@ -30,8 +30,8 @@
   },
   "dependencies": {
     "@armurier/shared": "workspace:*",
-    "@aws-sdk/client-s3": "3.1100.0",
-    "@aws-sdk/s3-request-presigner": "3.1100.0",
+    "@aws-sdk/client-s3": "3.1101.0",
+    "@aws-sdk/s3-request-presigner": "3.1101.0",
     "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.0",
     "@fastify/jwt": "10.2.1",
@@ -54,7 +54,7 @@
   "devDependencies": {
     "@types/node": "24.13.3",
     "@types/nodemailer": "^8.0.0",
-    "@types/pg": "8.20.0",
+    "@types/pg": "8.20.3",
     "@types/sanitize-html": "2.16.1",
     "@vitest/coverage-v8": "^4.1.0",
     "drizzle-kit": "0.31.10",
