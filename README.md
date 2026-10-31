@@ -48,6 +48,7 @@ pnpm dev:web
 | `pnpm dev:api`        | Fastify API in watch mode                                  |
 | `pnpm dev:web`        | Nuxt dev server                                            |
 | `pnpm test`           | Vitest across all packages                                 |
+| `pnpm test:layout`    | Playwright layout checks on every public page (builds the site first) |
 | `pnpm lint`           | Biome lint                                                 |
 | `pnpm format`         | Biome format (auto-fix)                                    |
 | `pnpm check`          | Biome lint + format combined                               |
@@ -73,6 +74,24 @@ Locally, tests auto-provision a throwaway `armurier_test` database — see
 `apps/api/src/test/global-setup.ts` — so they never touch dev data. Both paths
 build the schema by **applying the migrations**, so CI, dev and prod are created
 the same way and cannot drift. Run the same gate locally with `pnpm verify`.
+
+### Layout checks (Playwright)
+
+A second job, `layout`, runs after `verify` in the official Playwright image.
+It loads every public page at 375, 768 and 1280 px against the production build
+of the site and fails on: a horizontal overflow, visible text under 12 px, a
+missing `header`/`main`/`footer` or anything but one `h1`, a console error or
+exception, or a broken image. Rules, not screenshot comparisons. The list of
+pages is `apps/web/e2e/pages.spec.ts`; the rules are `apps/web/e2e/layout-rules.ts`.
+
+Playwright starts two servers itself (`apps/web/playwright.config.ts`): the e2e
+API (`apps/api/src/e2e/server.ts`), which seeds the reference data, the demo
+catalogue and the e2e fixtures (fixed slugs, long names, real visuals through
+the upload pipeline) and serves them **in the same process**, since images live
+in memory; and the built site. Both use dedicated ports (8091, 3091). Locally
+they run against the throwaway `armurier_test` database (run `pnpm test` once
+to create it, or set `E2E_DATABASE_URL`), after `pnpm --filter @armurier/web
+exec playwright install chromium`.
 
 ### Test isolation: checking the suite does not depend on file order
 

@@ -21,6 +21,7 @@
     "db:seed:demo": "tsx src/db/seed-cli.ts --demo",
     "media:backfill-avif": "tsx src/media/backfill-avif-cli.ts",
     "media:backfill-og": "tsx src/media/backfill-og-cli.ts",
+    "e2e:server": "tsx src/e2e/server.ts",
     "sla:check": "tsx src/legal-documents/sla-cli.ts",
     "orders:confirmations": "tsx src/orders/confirmations-cli.ts",
     "tracking:sync": "tsx src/shipments/tracking/tracking-cli.ts",
