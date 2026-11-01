@@ -109,6 +109,7 @@ async function save() {
 
         <ProAccountPanel v-if="profile.role === 'customer'" />
         <AccountSecurity />
+        <AccountDataRights :deletable="profile.role === 'customer' && !profile.organisationId" />
 
         <form class="card" @submit.prevent="save">
           <h2 class="card__h">Informations personnelles</h2>

@@ -1086,18 +1086,27 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **Indexation coupée** : `X-Robots-Tag: noindex` sur tout le site et sitemap vide ; `robots.txt` ne bloque **rien** (sinon Google ne lit jamais le `noindex`) ✅ _(12.10b : en-tête sur toutes les réponses, sitemap vide mis en cache 5 min ; `robots.txt` garde seulement `/admin` et `/bff/`, jamais indexables)_
 - Prérequis de mise en ligne, hors code : identité du vendeur dans les mentions légales (obligatoire dès la mise en ligne, LCEN) ; pas de clé Stripe live avant l'ouverture des ventes. Accès testeurs en prod : pas pour l'instant
 
-**Story 12.11** — Droits RGPD en libre-service : export, suppression du compte, purge des comptes inactifs — 🚧 **EN COURS** _(créée le 2026-11-01, demande de Franck)_
+**Story 12.11** — Droits RGPD en libre-service : export, suppression du compte, purge des comptes inactifs — ✅ **CODÉE** (le 2026-11-01, migration 0043) _(créée le 2026-11-01, demande de Franck)_
 
 > Constat : la politique de confidentialité renvoie vers un e-mail pour l'accès et l'effacement ; `users.deleted_at` existe mais ne sert jamais ; aucun compte n'est jamais purgé. Un compte ne peut pas être effacé physiquement : commandes, devis et journal d'audit y pointent et se gardent 10 ans. Il est donc **anonymisé**.
 
 **Décisions validées avec Franck (2026-11-01) :**
 
-- [ ] **Export** (accès + portabilité) : un fichier **JSON** depuis « Mon compte » — profil, adresses, commandes et lignes, devis, liste des pièces justificatives (type, statut, dates ; les fichiers restent téléchargeables un par un), abonnement newsletter, consentements. Mot de passe (+ code de l'application si activée) redemandé, débit limité
-- [ ] **Suppression immédiate** (pas de délai de grâce), mot de passe (+ code) redemandé. **Refusée** tant qu'une commande est en cours (non payée, non expédiée, ou livrée depuis moins de 14 jours) ou qu'un devis est ouvert ; **non proposée** aux administrateurs ni au compte d'une organisation (passe par SCS). Effet : sessions fermées, compte anonymisé (`deleted_at`, e-mail remplacé par une adresse inexistante, nom, téléphone, adresse, mot de passe et application vidés), adresses, paniers, jetons et codes supprimés, abonnement newsletter effacé (trace de consentement conservée comme pour un désabonnement), e-mail de confirmation
-- [ ] **Pièces justificatives** : celles qui ont servi à une commande (commande dont les pièces ont été vérifiées, `legal_verified_at`) sont **gardées dans le même délai légal que la commande, 10 ans** à compter de cette vérification, puis purgées ; les autres sont effacées tout de suite (base + fichier)
-- [ ] **Commandes, factures (Henrri) et journal d'audit** : conservés selon leurs durées actuelles (10 ans / 1 an) ; les commandes gardent leurs propres copies d'adresses
-- [ ] **Comptes inactifs : 3 ans** sans connexion ni commande → e-mail d'avertissement, puis anonymisation 30 jours plus tard par la même fonction (migration : date de l'avertissement)
-- [ ] `/confidentialite` et le registre des traitements mis à jour (durée du compte : 3 ans d'inactivité ; pièces : 10 ans si utilisées pour une commande)
+- [x] **Export** (accès + portabilité) : un fichier **JSON** depuis « Mon compte » — profil, adresses, commandes et lignes, devis, liste des pièces justificatives (type, statut, dates ; les fichiers restent téléchargeables un par un), abonnement newsletter, consentements. Mot de passe (+ code de l'application si activée) redemandé, débit limité
+- [x] **Suppression immédiate** (pas de délai de grâce), mot de passe (+ code) redemandé. **Refusée** tant qu'une commande est en cours (non payée, non expédiée, ou livrée depuis moins de 14 jours) ou qu'un devis est ouvert ; **non proposée** aux administrateurs ni au compte d'une organisation (passe par SCS). Effet : sessions fermées, compte anonymisé (`deleted_at`, e-mail remplacé par une adresse inexistante, nom, téléphone, adresse, mot de passe et application vidés), adresses, paniers, jetons et codes supprimés, abonnement newsletter effacé (trace de consentement conservée comme pour un désabonnement), e-mail de confirmation
+- [x] **Pièces justificatives** : celles qui ont servi à une commande (commande dont les pièces ont été vérifiées, `legal_verified_at`) sont **gardées dans le même délai légal que la commande, 10 ans** à compter de cette vérification, puis purgées ; les autres sont effacées tout de suite (base + fichier)
+- [x] **Commandes, factures (Henrri) et journal d'audit** : conservés selon leurs durées actuelles (10 ans / 1 an) ; les commandes gardent leurs propres copies d'adresses
+- [x] **Comptes inactifs : 3 ans** sans connexion ni commande → e-mail d'avertissement, puis anonymisation 30 jours plus tard par la même fonction (migration : date de l'avertissement)
+- [x] `/confidentialite` et le registre des traitements mis à jour (durée du compte : 3 ans d'inactivité ; pièces : 10 ans si utilisées pour une commande)
+
+**Livré :**
+
+- [x] API : `POST /api/auth/me/export` (fichier JSON daté, `no-store`) et `POST /api/auth/me/delete` ; re-saisie du mot de passe (+ code de l'application) ; mauvais mot de passe = **403** (un 401 renverrait le site à la page de connexion) ; journal `user.data_exported` / `user.deleted` (sans e-mail ni IP)
+- [x] **Une session ouverte avant la suppression est refusée aussitôt** (`authenticate` vérifie `deleted_at`), sans attendre l'expiration du jeton (1 h)
+- [x] Suppression : réservations de pièces uniques et tirages Gun Art remises en vente ; adresse newsletter effacée aussi chez Brevo ; fichiers des pièces effacées supprimés du stockage ; e-mail de confirmation à l'ancienne adresse
+- [x] Tâche quotidienne `inactive account` : avertissement (posé avant l'envoi, relâché si l'envoi échoue), anonymisation 30 jours après sauf connexion entre-temps ou commande en cours, purge des pièces conservées après 10 ans ; jamais les admins ni les comptes d'organisation
+- [x] Site : bloc « Vos données » dans `/compte` (téléchargement, suppression avec case de confirmation et explication de ce que la loi conserve), page `/compte-supprime` (noindex, contrôlée par Playwright)
+- ⚠️ Mise en ligne : `db:migrate` (0043)
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
