@@ -13,7 +13,9 @@ type ReauthenticatedUser = typeof users.$inferSelect
 
 const REFUSALS = {
   NotFound: { status: 404, message: "Account not found" },
-  InvalidCredentials: { status: 401, message: "Invalid password" },
+  // 403, not 401: the session is valid, the confirmation is not — a 401 would
+  // send the site to its login page instead of saying the password is wrong.
+  InvalidCredentials: { status: 403, message: "Invalid password" },
   TotpCodeRequired: { status: 400, message: "The authenticator app's code is required" },
   InvalidTotpCode: { status: 400, message: "Invalid code" },
 } as const

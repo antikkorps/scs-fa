@@ -40,7 +40,7 @@ describe("the export of an account's data (story 12.11)", () => {
   it("asks for the password again, and refuses a wrong one", async () => {
     const account = await createAccount(app, EMAIL_SUFFIX)
     const res = await exportFor(account.token, { password: "not-the-password" })
-    expect(res.statusCode).toBe(401)
+    expect(res.statusCode).toBe(403)
     expect(res.json().error).toBe("InvalidCredentials")
   })
 

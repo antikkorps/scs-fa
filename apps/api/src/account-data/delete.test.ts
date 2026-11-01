@@ -106,7 +106,7 @@ describe("the deletion of an account by its holder (story 12.11)", () => {
       expect((await deleteFor(null, { password: ACCOUNT_PASSWORD })).statusCode).toBe(401)
       const account = await createAccount(app, EMAIL_SUFFIX)
       const res = await deleteFor(account.token, { password: "not-the-password" })
-      expect(res.statusCode).toBe(401)
+      expect(res.statusCode).toBe(403)
       expect(res.json().error).toBe("InvalidCredentials")
     })
 
