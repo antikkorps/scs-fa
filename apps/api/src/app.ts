@@ -5,6 +5,7 @@ import fastifyJwt from "@fastify/jwt"
 import fastifyMultipart from "@fastify/multipart"
 import fastifyRateLimit from "@fastify/rate-limit"
 import Fastify, { type FastifyInstance } from "fastify"
+import { startInactiveAccountPurge } from "./account-data/inactivity.js"
 import { addressRoutes } from "./addresses/index.js"
 import { adminAncientWeaponRoutes } from "./ancient-weapons/admin.js"
 import { ancientWeaponRoutes } from "./ancient-weapons/index.js"
@@ -198,6 +199,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   startLegalDocExpiryScheduler(fastify)
   startAuditPurgeScheduler(fastify)
   startNewsletterPurgeScheduler(fastify)
+  startInactiveAccountPurge(fastify)
   startLoginChallengePurgeScheduler(fastify)
   startQuoteRequestPurgeScheduler(fastify)
   startQuoteExpiryScheduler(fastify)

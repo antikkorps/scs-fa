@@ -5,17 +5,12 @@
 import { and, inArray, isNull, lt } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { startDailyPurge } from "../daily-purge.js"
+import { yearsBefore } from "../dates.js"
 import { db } from "../db/client.js"
 import { auditLogs, orders } from "../db/schema.js"
 
 const ORDER_HISTORY_YEARS = 10
 const OTHER_EVENTS_YEARS = 1
-
-function yearsBefore(now: Date, years: number): Date {
-  const cutoff = new Date(now)
-  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - years)
-  return cutoff
-}
 
 /** Delete what is past its retention. Idempotent: run it as often as you like. */
 export async function purgeAuditLogs(now: Date = new Date()): Promise<{ orderEvents: number; otherEvents: number }> {

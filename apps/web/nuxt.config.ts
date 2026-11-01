@@ -87,6 +87,7 @@ export default defineNuxtConfig({
         "/panier",
         "/compte",
         "/compte/**",
+        "/compte-supprime",
         "/commande",
         "/commande/**",
         "/newsletter/**",
