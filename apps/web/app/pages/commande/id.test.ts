@@ -105,3 +105,14 @@ describe("commande/[id].vue — a regulated order's next steps (UX audit 2026-11
     expect(wrapper.find("ol.steps").exists()).toBe(false)
   })
 })
+
+describe("commande/[id].vue — transfer details (UX audit 2026-11-01, I1)", () => {
+  it("prints the IBAN grouped by four, with a copy button for the IBAN, the BIC and the reference", async () => {
+    getOrder.mockResolvedValue(order())
+    const wrapper = await mounted()
+    const rib = wrapper.find(".rib")
+    expect(rib.text()).toContain("FR76 3000 6000 0112 3456 7890 189")
+    const labels = rib.findAll("button").map((button) => button.attributes("aria-label"))
+    expect(labels).toEqual(["Copier l'IBAN", "Copier le BIC", "Copier la référence"])
+  })
+})
