@@ -15,6 +15,14 @@
       "matchStrings": ["https://biomejs\\.dev/schemas/(?<currentValue>[^/\"]+)/schema\\.json"],
       "depNameTemplate": "@biomejs/biome",
       "datasourceTemplate": "npm"
+    },
+    {
+      "description": "Keep the corepack the Dockerfiles install (Node 25+ no longer ships it) up to date",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": ["npm install -g corepack@(?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "corepack",
+      "datasourceTemplate": "npm"
     }
   ],
   "packageRules": [
@@ -46,6 +54,12 @@
       "matchDepNames": ["/@[<>=]/"],
       "matchUpdateTypes": ["major"],
       "enabled": false
+    },
+    {
+      "description": "One Node.js runtime everywhere (CI, Docker images, .nvmrc, engines), moved together and only to an even (LTS-track) major: CI must test what production runs",
+      "matchDepNames": ["node"],
+      "groupName": "node runtime",
+      "allowedVersions": "/^v?\\d*[02468](\\.|-|$)/"
     }
   ]
 }
