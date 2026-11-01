@@ -5,7 +5,7 @@ import {
   UNPAID_CARD_ORDER_MINUTES,
   UNPAID_TRANSFER_ORDER_DAYS,
 } from "./constants.js"
-import { LEGAL_IDENTITY, type LegalIdentity } from "./legal-identity.js"
+import type { LegalIdentity } from "./legal-identity.js"
 
 /**
  * The text of the terms of sale (story 12.1), as data: the `/cgv` page and the
@@ -322,14 +322,15 @@ export function escapeHtml(value: string): string {
 export interface TermsRenderOptions {
   /** Absolute origin used for links, without trailing slash. */
   siteUrl: string
-  identity?: LegalIdentity
+  /** The shop's identity record (shop_identity): its facts fill the text. */
+  identity: LegalIdentity
 }
 
 function inlineText(i: TermsInline, o: TermsRenderOptions): string {
   if (typeof i === "string") return i
   if ("strong" in i) return i.strong
   if ("link" in i) return `${i.link} (${o.siteUrl}${i.path})`
-  if ("fact" in i) return (o.identity ?? LEGAL_IDENTITY)[i.fact] || `[${i.label}]`
+  if ("fact" in i) return o.identity[i.fact] || `[${i.label}]`
   return `[${i.todo}]`
 }
 
@@ -338,7 +339,7 @@ function inlineHtml(i: TermsInline, o: TermsRenderOptions): string {
   if ("strong" in i) return `<strong>${escapeHtml(i.strong)}</strong>`
   if ("link" in i) return `<a href="${escapeHtml(o.siteUrl + i.path)}">${escapeHtml(i.link)}</a>`
   if ("fact" in i) {
-    const value = (o.identity ?? LEGAL_IDENTITY)[i.fact]
+    const value = o.identity[i.fact]
     return value ? escapeHtml(value) : `<mark>[${escapeHtml(i.label)}]</mark>`
   }
   return `<mark>[${escapeHtml(i.todo)}]</mark>`

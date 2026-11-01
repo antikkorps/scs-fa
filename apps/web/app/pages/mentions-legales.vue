@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { LEGAL_IDENTITY, SITE_HOST } from "@armurier/shared"
-import { EDITORIAL_PAGES } from "#shared/utils/editorialPages"
+import { SITE_HOST } from "@armurier/shared"
+import { EDITORIAL_PAGES, isEditorialPagePublishable } from "#shared/utils/editorialPages"
 
 /**
  * Legal notice (story 12.1) — what the LCEN (loi n° 2004-575, art. 6 III)
- * requires a commercial site to state. The seller's identity comes from
- * shared/utils/legalIdentity.ts; what is still missing shows highlighted.
+ * requires a commercial site to state. The seller's identity is the
+ * shop_identity record the admins fill in the back-office; what is still
+ * missing shows highlighted.
  *
  * ⚠️ Drafted in the codebase, to be read by the client and a lawyer: until the
  * flag is flipped in shared/utils/editorialPages.ts the page shows a draft
  * notice, is noindex and is not in the sitemap.
  */
 const REVIEWED = EDITORIAL_PAGES.mentionsLegales.reviewed
+// The seller's facts, entered by the admins (shop_identity): the page stays out
+// of the index until it is validated AND every fact is supplied.
+const identity = await loadShopIdentity()
+const PUBLISHABLE = isEditorialPagePublishable("mentionsLegales", identity.value)
 const UPDATED_ON = "29 septembre 2026"
 
 usePageSeo({
@@ -19,10 +24,10 @@ usePageSeo({
   description:
     "Éditeur, directeur de la publication, hébergeur et propriété intellectuelle du site SCS Firearms, armurerie et galerie Gun Art.",
   path: "/mentions-legales",
-  noindex: !REVIEWED,
+  noindex: !PUBLISHABLE,
 })
 
-const id = LEGAL_IDENTITY
+const id = identity
 </script>
 
 <template>

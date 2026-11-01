@@ -63,6 +63,7 @@ import { seoRoutes } from "./seo/index.js"
 import { adminShipmentRoutes } from "./shipments/admin.js"
 import { startShipmentTrackingScheduler } from "./shipments/tracking/sync.js"
 import { adminShippingRateRoutes } from "./shipping-rates/admin.js"
+import { adminShopIdentityRoutes, shopIdentityRoutes } from "./shop-identity/routes.js"
 import { adminShopSettingsRoutes } from "./shop-settings/admin.js"
 import { shopStatusRoutes } from "./shop-settings/public.js"
 import { adminSupplierRoutes } from "./suppliers/admin.js"
@@ -159,6 +160,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(searchRoutes, { prefix: "/api/search" })
   await fastify.register(seoRoutes, { prefix: "/api/seo" })
   await fastify.register(shopStatusRoutes, { prefix: "/api/shop-status" })
+  await fastify.register(shopIdentityRoutes, { prefix: "/api/shop-identity" })
   await fastify.register(legalCategoryRoutes, { prefix: "/api/legal-categories" })
   await fastify.register(cartRoutes, { prefix: "/api/cart" })
   await fastify.register(addressRoutes, { prefix: "/api/addresses" })
@@ -179,6 +181,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(adminShipmentRoutes, { prefix: "/api/admin/shipments" })
   await fastify.register(adminShippingRateRoutes, { prefix: "/api/admin/shipping-rates" })
   await fastify.register(adminShopSettingsRoutes, { prefix: "/api/admin/shop-settings" })
+  await fastify.register(adminShopIdentityRoutes, { prefix: "/api/admin/shop-identity" })
   await fastify.register(adminBlogRoutes, { prefix: "/api/admin/blog" })
   await fastify.register(adminBlogImageRoutes, { prefix: "/api/admin/blog/images" })
   await fastify.register(adminMetricsRoutes, { prefix: "/api/admin/metrics" })

@@ -1,32 +1,36 @@
 import { describe, expect, it } from "vitest"
 import { CART_HOLD_MINUTES, UNPAID_CARD_ORDER_MINUTES, UNPAID_TRANSFER_ORDER_DAYS } from "./constants.js"
-import { LEGAL_IDENTITY } from "./legal-identity.js"
+import { EMPTY_SHOP_IDENTITY } from "./legal-identity.js"
 import { escapeHtml, renderTermsHtml, renderTermsText, TERMS_SECTIONS } from "./terms-content.js"
 
 const siteUrl = "https://scs.example"
 
 describe("terms content (story 12.1)", () => {
   it("renders every section and the withdrawal form as text", () => {
-    const text = renderTermsText({ siteUrl })
+    const text = renderTermsText({ siteUrl, identity: EMPTY_SHOP_IDENTITY })
     for (const s of TERMS_SECTIONS) expect(text).toContain(s.title)
     expect(text).toContain("Je vous notifie par la présente ma rétractation")
   })
 
   it("turns site links into absolute URLs", () => {
-    expect(renderTermsText({ siteUrl })).toContain("politique de confidentialité (https://scs.example/confidentialite)")
-    expect(renderTermsHtml({ siteUrl })).toContain('<a href="https://scs.example/confidentialite">')
+    expect(renderTermsText({ siteUrl, identity: EMPTY_SHOP_IDENTITY })).toContain(
+      "politique de confidentialité (https://scs.example/confidentialite)",
+    )
+    expect(renderTermsHtml({ siteUrl, identity: EMPTY_SHOP_IDENTITY })).toContain(
+      '<a href="https://scs.example/confidentialite">',
+    )
   })
 
   it("shows a missing legal fact as a placeholder, and the fact once supplied", () => {
-    expect(renderTermsText({ siteUrl })).toContain("[raison sociale]")
-    const identity = { ...LEGAL_IDENTITY, companyName: "SCS <Firearm> SAS" }
+    expect(renderTermsText({ siteUrl, identity: EMPTY_SHOP_IDENTITY })).toContain("[raison sociale]")
+    const identity = { ...EMPTY_SHOP_IDENTITY, companyName: "SCS <Firearm> SAS" }
     expect(renderTermsText({ siteUrl, identity })).toContain("SCS <Firearm> SAS")
     expect(renderTermsHtml({ siteUrl, identity })).toContain("SCS &lt;Firearm&gt; SAS")
-    expect(renderTermsHtml({ siteUrl })).toContain("<mark>[raison sociale]</mark>")
+    expect(renderTermsHtml({ siteUrl, identity: EMPTY_SHOP_IDENTITY })).toContain("<mark>[raison sociale]</mark>")
   })
 
   it("never leaves raw markup from the text in the HTML", () => {
-    const html = renderTermsHtml({ siteUrl })
+    const html = renderTermsHtml({ siteUrl, identity: EMPTY_SHOP_IDENTITY })
     expect(html).not.toMatch(/<(?!\/?(h3|p|ul|li|strong|em|a|mark)\b)[a-z]/i)
   })
 
@@ -35,7 +39,7 @@ describe("terms content (story 12.1)", () => {
   })
 
   it("states the payment deadlines and cart holds the shop enforces (story 12.9a)", () => {
-    const text = renderTermsText({ siteUrl })
+    const text = renderTermsText({ siteUrl, identity: EMPTY_SHOP_IDENTITY })
     expect(text).toContain(`dans les ${UNPAID_CARD_ORDER_MINUTES} minutes qui suivent la commande`)
     expect(text).toContain(`sous ${UNPAID_TRANSFER_ORDER_DAYS} jours`)
     expect(text).toContain(

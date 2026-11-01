@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CURRENT_TERMS_VERSION, TERMS_SECTIONS, WITHDRAWAL_FORM } from "@armurier/shared"
-import { EDITORIAL_PAGES } from "#shared/utils/editorialPages"
+import { EDITORIAL_PAGES, isEditorialPagePublishable } from "#shared/utils/editorialPages"
 import { formatDate } from "~/utils/format"
 
 /**
@@ -14,6 +14,10 @@ import { formatDate } from "~/utils/format"
  * under. Validation is tracked in shared/utils/editorialPages.ts.
  */
 const REVIEWED = EDITORIAL_PAGES.cgv.reviewed
+// The seller's facts, entered by the admins (shop_identity): the page stays out
+// of the index until it is validated AND every fact is supplied.
+const identity = await loadShopIdentity()
+const PUBLISHABLE = isEditorialPagePublishable("cgv", identity.value)
 const VERSION_LABEL = formatDate(CURRENT_TERMS_VERSION)
 
 usePageSeo({
@@ -21,7 +25,7 @@ usePageSeo({
   description:
     "Commande, paiement, livraison, droit de rétractation, garanties et conditions propres aux armes réglementées et aux tirages Gun Art vendus sur SCS Firearms.",
   path: "/cgv",
-  noindex: !REVIEWED,
+  noindex: !PUBLISHABLE,
 })
 </script>
 

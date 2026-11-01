@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { LEGAL_IDENTITY } from "@armurier/shared"
-import { EDITORIAL_PAGES } from "#shared/utils/editorialPages"
+import { EDITORIAL_PAGES, isEditorialPagePublishable } from "#shared/utils/editorialPages"
 
 /**
  * Privacy policy (story 9.6). Written from what the code actually does
@@ -12,6 +11,10 @@ import { EDITORIAL_PAGES } from "#shared/utils/editorialPages"
  * flipped there, the page shows a draft notice, is noindex and is not in the sitemap.
  */
 const REVIEWED = EDITORIAL_PAGES.confidentialite.reviewed
+// The seller's facts, entered by the admins (shop_identity): the page stays out
+// of the index until it is validated AND every fact is supplied.
+const identity = await loadShopIdentity()
+const PUBLISHABLE = isEditorialPagePublishable("confidentialite", identity.value)
 const UPDATED_ON = "19 octobre 2026"
 
 usePageSeo({
@@ -19,7 +22,7 @@ usePageSeo({
   description:
     "Quelles données SCS Firearms collecte, pourquoi, combien de temps elles sont conservées, avec qui elles sont partagées et comment exercer vos droits.",
   path: "/confidentialite",
-  noindex: !REVIEWED,
+  noindex: !PUBLISHABLE,
 })
 </script>
 
@@ -40,12 +43,12 @@ usePageSeo({
 
     <h2>Responsable du traitement</h2>
     <p>
-      <LegalFact :value="LEGAL_IDENTITY.companyName" label="Raison sociale" />,
-      <LegalFact :value="LEGAL_IDENTITY.legalForm" label="forme juridique" /> au capital de
-      <LegalFact :value="LEGAL_IDENTITY.shareCapital" label="capital" />, immatriculée sous le numéro SIRET
-      <LegalFact :value="LEGAL_IDENTITY.siret" label="SIRET" />, dont le siège est situé
-      <LegalFact :value="LEGAL_IDENTITY.address" label="adresse postale" />. Pour toute question relative à vos données :
-      <LegalFact :value="LEGAL_IDENTITY.privacyEmail" label="adresse e-mail dédiée" />.
+      <LegalFact :value="identity.companyName" label="Raison sociale" />,
+      <LegalFact :value="identity.legalForm" label="forme juridique" /> au capital de
+      <LegalFact :value="identity.shareCapital" label="capital" />, immatriculée sous le numéro SIRET
+      <LegalFact :value="identity.siret" label="SIRET" />, dont le siège est situé
+      <LegalFact :value="identity.address" label="adresse postale" />. Pour toute question relative à vos données :
+      <LegalFact :value="identity.privacyEmail" label="adresse e-mail dédiée" />.
     </p>
 
     <h2>Données traitées et finalités</h2>
@@ -295,7 +298,7 @@ usePageSeo({
       </li>
       <li>
         pour tout le reste, écrivez-nous à
-        <LegalFact :value="LEGAL_IDENTITY.privacyEmail" label="adresse e-mail dédiée" />. Nous répondons dans un délai d'un mois.
+        <LegalFact :value="identity.privacyEmail" label="adresse e-mail dédiée" />. Nous répondons dans un délai d'un mois.
       </li>
     </ul>
     <p>

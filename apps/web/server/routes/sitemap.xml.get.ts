@@ -1,4 +1,5 @@
-import { reviewedEditorialPaths } from "#shared/utils/editorialPages"
+import { EMPTY_SHOP_IDENTITY, type ShopIdentity } from "@armurier/shared"
+import { publishableEditorialPaths } from "#shared/utils/editorialPages"
 import { absoluteImageUrl, buildSitemap, latest, type SitemapUrl } from "../utils/seo"
 
 interface Entry {
@@ -49,6 +50,10 @@ export default defineEventHandler(async (event) => {
     .then((r) => r.data)
     .catch(() => null)
   const d = payload ?? EMPTY
+  // A legal page waits for every fact about the seller (shop_identity) too.
+  const identity = await $fetch<{ data: ShopIdentity }>(`${api.base}/shop-identity`, { headers: api.headers })
+    .then((r) => r.data)
+    .catch(() => EMPTY_SHOP_IDENTITY)
 
   const images = (e: Entry) => {
     const img = absoluteImageUrl(e.imageUrl, siteUrl)
@@ -80,8 +85,9 @@ export default defineEventHandler(async (event) => {
       : []),
     // (/collection/artiste is deliberately absent: a noindex router page.)
     { loc: `${siteUrl}/blog`, lastmod: latest(d.blogPosts.map(dated)), changefreq: "weekly", priority: 0.7 },
-    // Reference pages, once the client has validated them (shared/utils/editorialPages.ts).
-    ...reviewedEditorialPaths().map((path) => ({
+    { loc: `${siteUrl}/contact`, changefreq: "yearly", priority: 0.4 },
+    // Reference pages, once validated and complete (shared/utils/editorialPages.ts).
+    ...publishableEditorialPaths(identity).map((path) => ({
       loc: `${siteUrl}${path}`,
       changefreq: "yearly" as const,
       priority: 0.3,

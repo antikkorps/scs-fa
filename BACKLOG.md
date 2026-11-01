@@ -1110,6 +1110,37 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **Lot sécurité de l'audit 2026-11-01** : les mauvais mots de passe ou codes d'une re-saisie (export, suppression, application d'authentification) comptent dans le **même blocage que la connexion** (5 essais, 15 min, `423 AccountLocked`) (B1) ; **activer l'application d'authentification demande le mot de passe** (B4) ; la désactivation passe par la même re-saisie : un mauvais mot de passe répond 403 et s'affiche au lieu de renvoyer à la page de connexion
 - ⚠️ Mise en ligne : `db:migrate` (0043)
 
+**Story 12.12** — Audits sécurité et UX/UI avant mise en ligne (2026-11-01) — 🚧 **EN COURS** _(demande de Franck : « s'assurer que le projet tient la route »)_
+
+> Deux audits menés le 2026-11-01 sur `main` + la PR RGPD. **Sécurité : GO avec corrections**, aucune faille critique ni haute. **UX/UI : pas prêt en l'état**, base saine (thème cohérent, aucun débordement à 375/768/1280 px, focus visible).
+
+**Sécurité :**
+
+- [x] M1 pièce approuvée puis expirée supprimable → gardée (PR #210)
+- [x] M2, B2, B3 effacement RGPD (dans la #207, avant merge) ; B1 re-saisie comptée dans le blocage, B4 mot de passe pour activer l'application, désactivation en 403 (PR #211)
+- [ ] B5 **avant ouverture** : vérifier que chaque admin a enrôlé son application d'authentification (sans elle, le mot de passe seul ouvre la session)
+- [ ] B6 avis moyens/bas de `pnpm audit --prod` (surtout outils de build) : suivis par Renovate ; B7 formulation « pseudonymisée » de l'empreinte newsletter dans la politique
+
+**UX/UI — bloquants (PR #209) :**
+
+- [x] Tirage Gun Art impossible à acheter (et `addPrint` sans quantité, refusé par l'API)
+- [x] Aide « carte de test 4242 » affichée en prod → seulement avec une clé `pk_test_`
+- [x] Arme réglementée : la page après commande met en avant le RIB → étapes numérotées, pièces d'abord
+
+**UX/UI — importants :**
+
+- [ ] I1 IBAN et référence de virement coupés à 375 px, pas de bouton copier
+- [ ] I2 libellés des pièces (« cni », « SIA » sans explication, passeport ?, « En attente » quand c'est au client d'agir)
+- [ ] I3 ajout au panier sans compte : article perdu, l'inscription perd la page d'origine
+- [ ] I4 **prix TTC seulement pour les particuliers** (décision Franck 2026-11-01 ; le HT reste pour les pros)
+- [ ] I5 récapitulatif sans les articles ; formulaire d'adresse sans libellés
+- [ ] I6 boutique à 375 px : ~900 px de filtres avant le premier produit, pas de tri
+- [ ] I7 fiche produit à 375 px : bouton d'achat loin ; encadré titré « Mentions légales » ; catégorie C sans la licence de tir (attend Fred et Steph)
+- [x] I8 aucun contact → **fiche « Identité de la boutique » au back-office** (décision Franck 2026-11-01) : remplace la constante du code, lue par les mentions légales, les CGV, la confidentialité, l'e-mail de commande et la nouvelle page `/contact` (migration 0044) ; une page légale reste non indexée tant qu'un fait manque
+- [ ] I8b **formulaire de contact** (décision Franck 2026-11-01) : nom, e-mail, téléphone facultatif, sujet (Commande, Arme ou produit, Gun Art, Compte professionnel, Autre), référence de commande facultative, message ; enregistré en base + écran admin « Messages » (à traiter / traité) + e-mail de notification avec « Répondre à » ; anti-spam champ piège + limite par IP et e-mail + temps minimal, pas de captcha tiers ; conservation 1 an après traitement (purge quotidienne), registre et politique mis à jour
+- [ ] I9 back-office : tiroir de vérification d'une pièce sans la commande ni l'arme, ni aperçu ; codes bruts (« clean ») ; recherche de commande par référence
+- [x] Retours de Franck sur l'admin (PR #209) : dates sur une ligne et e-mails coupés dans les listes, actions en icônes avec infobulle, champs du simulateur alignés
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).

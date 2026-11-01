@@ -13,6 +13,7 @@ import {
 import { createTransport, type SendMailOptions } from "nodemailer"
 import { type AuditEvent, recordAuditEvent } from "./audit/record.js"
 import { env } from "./env.js"
+import { loadShopIdentity } from "./shop-identity/service.js"
 
 const transporter = createTransport({
   host: env.SMTP_HOST,
@@ -744,7 +745,8 @@ export async function sendUnpaidOrderCancelledEmail(to: string, c: UnpaidOrderCa
  * Idempotence and retries are the caller's job (orders/confirmation.ts).
  */
 export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmationEmail): Promise<void> {
-  const site = { siteUrl: env.WEB_BASE_URL }
+  // The CGV in the e-mail state the seller's facts as the admins entered them.
+  const site = { siteUrl: env.WEB_BASE_URL, identity: await loadShopIdentity() }
   const orderUrl = `${env.WEB_BASE_URL}/commande/${o.orderId}`
   const hello = o.firstName ? `Bonjour ${o.firstName},` : "Bonjour,"
   const placed = PARIS_DATETIME.format(o.placedAt)
