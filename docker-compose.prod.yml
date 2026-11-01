@@ -134,7 +134,7 @@ services:
   # usability on the verdict. Ships freshclam, which keeps the virus DB current.
   clamav:
     logging: *logging
-    image: clamav/clamav:1.5.2-35
+    image: clamav/clamav:1.5.3
     restart: unless-stopped
     volumes:
       - clamav_data:/var/lib/clamav # virus DB — persist so restarts don't re-download
