@@ -7,6 +7,7 @@ import { db } from "../db/client.js"
 import {
   addresses,
   auditLogs,
+  contactMessages,
   legalDocuments,
   newsletterContacts,
   newsletterSubscriptions,
@@ -293,6 +294,17 @@ describe("the deletion of an account by its holder (story 12.11)", () => {
         .from(newsletterSubscriptions)
         .where(eq(newsletterSubscriptions.contactId, contact.id))
       expect(subscriptions.map((row) => row.status)).toEqual(["unsubscribed"])
+    })
+
+    it("erases the messages sent from the account's address through the contact form", async () => {
+      const account = await createAccount(app, EMAIL_SUFFIX)
+      await db
+        .insert(contactMessages)
+        .values({ name: "Jeanne", email: account.email, subject: "other", message: "Bonjour" })
+
+      await deleteOk(account)
+
+      expect(await db.select().from(contactMessages).where(eq(contactMessages.email, account.email))).toEqual([])
     })
 
     it("confirms by e-mail to the address it had, and journals the deletion", async () => {
