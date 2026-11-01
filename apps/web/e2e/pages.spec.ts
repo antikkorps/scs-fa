@@ -29,6 +29,7 @@ const PAGES: { path: string; status?: number }[] = [
   { path: "/pro/inscription" },
   { path: "/cgv" },
   { path: "/mentions-legales" },
+  { path: "/contact" },
   { path: "/confidentialite" },
   { path: "/reglementation" },
   { path: "/cette-page-n-existe-pas", status: 404 },

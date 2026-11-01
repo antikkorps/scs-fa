@@ -186,8 +186,7 @@ async function deleteAccount() {
         </form>
       </template>
       <p v-else class="muted">
-        Ce compte est fermé par SCS Firearms : contactez-nous (coordonnées dans les
-        <NuxtLink to="/mentions-legales">mentions légales</NuxtLink>).
+        Ce compte est fermé par SCS Firearms : <NuxtLink to="/contact">contactez-nous</NuxtLink>.
       </p>
     </div>
   </section>

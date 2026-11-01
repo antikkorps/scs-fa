@@ -17,6 +17,7 @@ const groups = [
       { to: "/admin/devis", label: "Devis", icon: "✉" },
       { to: "/admin/livraison", label: "Frais de port", icon: "⇶" },
       { to: "/admin/reglages", label: "Réglages", icon: "⚙" },
+      { to: "/admin/identite", label: "Identité de la boutique", icon: "◈" },
     ],
   },
   {
