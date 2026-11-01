@@ -160,7 +160,7 @@ function consentProof(subscription: AdminNewsletterSubscription): string {
         <tbody>
           <tr v-for="contact in contacts" :key="contact.id">
             <td>
-              <span class="strong">{{ contact.email }}</span>
+              <span class="strong cell-break">{{ contact.email }}</span>
               <span class="sub">Inscription le {{ formatDate(contact.createdAt) }}</span>
             </td>
             <td>

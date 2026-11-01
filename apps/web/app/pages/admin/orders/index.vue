@@ -151,9 +151,9 @@ watch(
         </thead>
         <tbody>
           <tr v-for="o in orders" :key="o.id" class="row" @click="navigateTo(`/admin/orders/${o.id}`)">
-            <td>{{ formatDateTime(o.createdAt) }}</td>
+            <td class="cell-date">{{ formatDateTime(o.createdAt) }}</td>
             <td>
-              <span class="email">{{ o.user.email }}</span>
+              <span class="email cell-break">{{ o.user.email }}</span>
               <span v-if="o.user.firstname || o.user.lastname" class="name">
                 {{ o.user.firstname }} {{ o.user.lastname }}
               </span>
