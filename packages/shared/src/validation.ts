@@ -97,6 +97,9 @@ export const totpCodeSchema = z.object({ code: appCodeSchema }).strict()
 
 export const totpDisableSchema = z.object({ password: z.string().min(1).max(200), code: appCodeSchema }).strict()
 
+/** Starting the app's setup asks for the password: a stolen session alone must not enrol a phone (audit 2026-11-01). */
+export const totpSetupSchema = z.object({ password: z.string().min(1).max(200) }).strict()
+
 export const loginCodeResendSchema = z.object({
   challengeToken: z.string().min(20).max(100),
 })

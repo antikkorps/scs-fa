@@ -78,7 +78,10 @@ describe("TOTP (story 12.8e)", () => {
     it("refuses another key or a tampered value", () => {
       const sealed = encryptSecret(RFC_SECRET, KEY)
       expect(() => decryptSecret(sealed, "another-key-entirely-different-from-the-first")).toThrow()
-      const tampered = `${sealed.slice(0, -2)}${sealed.endsWith("A") ? "B" : "A"}${sealed.slice(-1)}`
+      // Always a different character: picking it from the neighbour left the
+      // value untouched whenever it already held that letter (a 1-in-64 flake).
+      const target = sealed.at(-2)
+      const tampered = `${sealed.slice(0, -2)}${target === "A" ? "B" : "A"}${sealed.slice(-1)}`
       expect(() => decryptSecret(tampered, KEY)).toThrow()
     })
   })
