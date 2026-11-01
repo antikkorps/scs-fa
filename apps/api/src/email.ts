@@ -143,6 +143,26 @@ export async function sendAccountDeletedEmail(to: string, about: EmailAbout = {}
   ])
 }
 
+/** Story 12.11 — unused for 3 years: the account is anonymised on `deletionDate` unless its holder logs in. */
+export async function sendInactiveAccountWarningEmail(
+  to: string,
+  warning: { deletionDate: Date },
+  about: EmailAbout = {},
+): Promise<void> {
+  const deletionDay = warning.deletionDate.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Paris",
+  })
+  await deliverParagraphs("inactive_account_warning", about, to, "Votre compte SCS Firearms va être supprimé", [
+    "Bonjour,",
+    `Vous ne vous êtes pas connecté à votre compte SCS Firearms depuis plus de 3 ans. Pour ne pas garder vos données plus longtemps que nécessaire, il sera supprimé le ${deletionDay}.`,
+    `Pour le garder, il suffit de vous connecter avant cette date : ${env.WEB_BASE_URL}/connexion`,
+    "Sinon, rien à faire : vos coordonnées, votre carnet d'adresses et votre inscription à la lettre d'information seront effacés. La loi nous oblige à conserver vos commandes et leurs factures pendant 10 ans.",
+  ])
+}
+
 // Story 12.8b — the pro account's follow-up e-mails, in French like the site.
 const ORGANISATION_TYPE_LABELS: Record<OrganisationType, string> = {
   armurier: "Armurier",
