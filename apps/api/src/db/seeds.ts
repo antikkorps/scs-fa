@@ -263,10 +263,10 @@ async function seedTags() {
 
 // A4 print format (priceFactor 1.0) used to price every seeded numbered print;
 // rarity drives the increment (print 1 dearest, print N = base).
-const A4_FORMAT = { id: "A4", name: "A4 (21 × 29,7 cm)", widthCm: 21, heightCm: 29.7, priceFactor: 1.0 }
+export const A4_FORMAT = { id: "A4", name: "A4 (21 × 29,7 cm)", widthCm: 21, heightCm: 29.7, priceFactor: 1.0 }
 const A3_FORMAT = { id: "A3", name: "A3 (29,7 × 42 cm)", widthCm: 29.7, heightCm: 42, priceFactor: 1.5 }
 const A2_FORMAT = { id: "A2", name: "A2 (42 × 59,4 cm)", widthCm: 42, heightCm: 59.4, priceFactor: 2.0 }
-const FORMATS = [A4_FORMAT, A3_FORMAT, A2_FORMAT]
+export const FORMATS = [A4_FORMAT, A3_FORMAT, A2_FORMAT]
 
 // --- Éditorial Gun Art (story 11.6) -----------------------------------------
 // L'artiste, le thème et la série sont désormais des entités à part entière :

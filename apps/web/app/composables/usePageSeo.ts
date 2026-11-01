@@ -41,9 +41,11 @@ export function usePageSeo(seo: PageSeo) {
   const ownImage = () => ogImageUrl(toValue(seo.image), siteUrl)
   const image = () => ownImage() ?? `${siteUrl}${DEFAULT_IMAGE.path}`
   const imageAlt = () => (ownImage() ? toValue(seo.imageAlt) || title() || DEFAULT_IMAGE.alt : DEFAULT_IMAGE.alt)
-  // Dimensions are known for the brand card only; stating wrong ones is worse than none.
-  const imageWidth = () => (ownImage() ? undefined : DEFAULT_IMAGE.width)
-  const imageHeight = () => (ownImage() ? undefined : DEFAULT_IMAGE.height)
+  // Dimensions are known for the brand card and a visual's share card only;
+  // stating wrong ones is worse than none.
+  const imageSize = () => (ownImage() ? ogImageSize(ownImage()) : DEFAULT_IMAGE)
+  const imageWidth = () => imageSize()?.width
+  const imageHeight = () => imageSize()?.height
 
   useSeoMeta({
     title,

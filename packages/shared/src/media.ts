@@ -42,3 +42,23 @@ export function mediaSrcset(url: string | null | undefined, format: MediaFormat)
   if (!set) return null
   return set.widths.map((w) => `${mediaRenditionUrl(set.id, w, format)} ${w}w`).join(", ")
 }
+
+/**
+ * The share card (og:image) rendered at upload next to the renditions: the main
+ * visual letterboxed on the brand background, never cropped. JPEG because it is
+ * the one format every social network's crawler reads.
+ */
+export const MEDIA_OG_SIZE = { width: 1200, height: 630 } as const
+
+const MEDIA_OG_URL_RE = /\/api\/media\/[0-9a-f-]{36}\/og\.jpg$/
+
+/** The share card behind a stored image URL, or null when it is not a media rendition. */
+export function mediaOgImage(url: string | null | undefined): string | null {
+  const set = mediaRenditions(url)
+  return set ? `/api/media/${set.id}/og.jpg` : null
+}
+
+/** Is this — relative or absolute — a share card, whose size is therefore known? */
+export function isMediaOgUrl(url: string | null | undefined): boolean {
+  return url ? MEDIA_OG_URL_RE.test(url) : false
+}

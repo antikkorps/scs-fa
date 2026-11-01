@@ -20,7 +20,7 @@ import {
 } from "../db/schema.js"
 import { storage } from "../storage/index.js"
 import { signIn } from "../test/sign-in.js"
-import { backfillAvifRenditions } from "./service.js"
+import { backfillAvifRenditions, backfillOgImages } from "./service.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
 const ADMIN_EMAIL = "testmedia-admin@testmedia.local"
@@ -209,6 +209,38 @@ describe("catalogue media gallery (story 7.5b)", () => {
     }
   })
 
+  /** Mean colour of a region of an image — a flat area reads as one colour. */
+  async function meanColour(bytes: Buffer, region: { left: number; top: number; width: number; height: number }) {
+    // `stats()` reads the input, not the pipeline: the crop has to be materialised first.
+    const crop = await sharp(bytes).extract(region).toBuffer()
+    const stats = await sharp(crop).stats()
+    return {
+      rgb: stats.channels.slice(0, 3).map((c) => Math.round(c.mean)),
+      spread: Math.max(...stats.channels.map((c) => c.stdev)),
+    }
+  }
+
+  it("renders the share card: 1200×630 JPEG, letterboxed on the brand background, never cropped", async () => {
+    const data = (await upload({ ownerType: "product", ownerId: productId })).json().data
+
+    const card = await app.inject({ method: "GET", url: `/api/media/${data.id}/og.jpg` })
+    expect(card.statusCode).toBe(200)
+    expect(card.headers["content-type"]).toBe("image/jpeg")
+    expect(card.headers["cache-control"]).toContain("immutable")
+    const meta = await sharp(card.rawPayload).metadata()
+    expect(meta).toMatchObject({ format: "jpeg", width: 1200, height: 630 })
+
+    // 2400×1600 (3:2) fits by height: 945px of photo, brand ink on both sides.
+    const side = await meanColour(card.rawPayload, { left: 0, top: 0, width: 100, height: 630 })
+    const photo = await meanColour(card.rawPayload, { left: 300, top: 100, width: 600, height: 430 })
+    for (const [got, want] of side.rgb.map((c, i) => [c, [14, 14, 16][i] as number])) {
+      expect(Math.abs(got - want)).toBeLessThanOrEqual(3)
+    }
+    for (const [got, want] of photo.rgb.map((c, i) => [c, [30, 30, 40][i] as number])) {
+      expect(Math.abs(got - want)).toBeLessThanOrEqual(3)
+    }
+  })
+
   it("never upscales a small image", async () => {
     const res = await upload({ ownerType: "product", ownerId: productId, buffer: tiny })
     expect(res.statusCode).toBe(201)
@@ -236,6 +268,10 @@ describe("catalogue media gallery (story 7.5b)", () => {
       const stats = await sharp(bytes).stats()
       expect(Math.max(...stats.channels.map((c) => c.stdev))).toBeGreaterThan(1)
     }
+
+    // The share card is cut from the watermarked pixels, never from the original.
+    const card = (await app.inject({ method: "GET", url: `/api/media/${data.id}/og.jpg` })).rawPayload
+    expect((await meanColour(card, { left: 300, top: 0, width: 600, height: 630 })).spread).toBeGreaterThan(1)
 
     // The print-grade original never travels over a public route.
     expect((await app.inject({ method: "GET", url: `/api/media/${data.id}/original` })).statusCode).toBe(404)
@@ -329,6 +365,7 @@ describe("catalogue media gallery (story 7.5b)", () => {
     // The bytes are gone too, not just the row — every format.
     expect((await app.inject({ method: "GET", url: `/api/media/${removed.id}/400.webp` })).statusCode).toBe(404)
     expect((await app.inject({ method: "GET", url: `/api/media/${removed.id}/400.avif` })).statusCode).toBe(404)
+    expect((await app.inject({ method: "GET", url: `/api/media/${removed.id}/og.jpg` })).statusCode).toBe(404)
 
     const after = (await asAdmin("GET", `${BASE}?ownerType=artist&ownerId=${artistId}`)).json().data
     expect(after).toHaveLength(1)
@@ -388,9 +425,26 @@ describe("catalogue media gallery (story 7.5b)", () => {
     expect(again.created).toBe(0)
   })
 
+  it("backfills the share card of an upload made before cards existed — once", async () => {
+    const data = (await upload({ ownerType: "artist", ownerId: artistId })).json().data
+    await storage.delete(`media/${data.id}/og.jpg`)
+    expect((await app.inject({ method: "GET", url: `/api/media/${data.id}/og.jpg` })).statusCode).toBe(404)
+
+    const first = await backfillOgImages()
+    expect(first.created).toBeGreaterThanOrEqual(1)
+    expect(first.failed).toBe(0)
+    const card = await app.inject({ method: "GET", url: `/api/media/${data.id}/og.jpg` })
+    expect(card.statusCode).toBe(200)
+    expect(await sharp(card.rawPayload).metadata()).toMatchObject({ format: "jpeg", width: 1200, height: 630 })
+
+    const again = await backfillOgImages()
+    expect(again.created).toBe(0)
+  })
+
   it("rejects a traversal attempt on the public route", async () => {
     const res = await app.inject({ method: "GET", url: "/api/media/..%2f..%2fetc/800.webp" })
     expect(res.statusCode).toBe(404)
     expect((await app.inject({ method: "GET", url: `/api/media/${artworkId}/abc.webp` })).statusCode).toBe(404)
+    expect((await app.inject({ method: "GET", url: `/api/media/${artworkId}/og.png` })).statusCode).toBe(404)
   })
 })

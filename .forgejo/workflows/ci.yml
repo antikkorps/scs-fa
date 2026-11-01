@@ -23,6 +23,37 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Shared by both jobs. The suite runs against the CI Postgres directly.
+  # TEST_DB_SKIP_PROVISION skips the docker drop/create (the service container
+  # already provides the database); the vitest global setup then applies the
+  # Drizzle migrations and seeds it — the same code path as a local run, so CI
+  # and dev build the schema identically.
+  DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
+  TEST_DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
+  TEST_DB_SKIP_PROVISION: "true"
+  STORAGE_DRIVER: memory
+  # All other vars are required by env.ts; safe dummies — tests make no
+  # external calls (Stripe is mocked, storage is in-memory, no mail is sent).
+  JWT_SECRET: ci_jwt_secret_at_least_32_characters_long
+  JWT_REFRESH_SECRET: ci_jwt_refresh_secret_at_least_32_characters
+  TOTP_ENCRYPTION_KEY: ci_totp_encryption_key_at_least_32_characters
+  S3_ENDPOINT: http://localhost:9000
+  S3_ACCESS_KEY: ci
+  S3_SECRET_KEY: ci
+  S3_BUCKET: ci
+  S3_REGION: eu-west-1
+  SMTP_HOST: localhost
+  SMTP_USER: ci
+  SMTP_PASS: ci
+  SMTP_FROM: ci@example.com
+  STRIPE_SECRET_KEY: sk_test_dummy
+  STRIPE_WEBHOOK_SECRET: whsec_test_dummy
+  VIREMENT_IBAN: FR7630006000011234567890189
+  VIREMENT_BIC: AGRIFRPP
+  VIREMENT_BANK_NAME: Banque CI
+  VIREMENT_ACCOUNT_HOLDER: SCS Firearm SAS
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -48,37 +79,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 15
-
-    env:
-      # The suite runs against the CI Postgres directly. TEST_DB_SKIP_PROVISION
-      # skips the docker drop/create (the service container already provides the
-      # database); the vitest global setup then applies the Drizzle migrations
-      # and seeds it — the same code path as a local run, so CI and dev build the
-      # schema identically.
-      DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
-      TEST_DATABASE_URL: postgresql://armurier@testdb:5432/armurier_test
-      TEST_DB_SKIP_PROVISION: "true"
-      STORAGE_DRIVER: memory
-      # All other vars are required by env.ts; safe dummies — tests make no
-      # external calls (Stripe is mocked, storage is in-memory, no mail is sent).
-      JWT_SECRET: ci_jwt_secret_at_least_32_characters_long
-      JWT_REFRESH_SECRET: ci_jwt_refresh_secret_at_least_32_characters
-      TOTP_ENCRYPTION_KEY: ci_totp_encryption_key_at_least_32_characters
-      S3_ENDPOINT: http://localhost:9000
-      S3_ACCESS_KEY: ci
-      S3_SECRET_KEY: ci
-      S3_BUCKET: ci
-      S3_REGION: eu-west-1
-      SMTP_HOST: localhost
-      SMTP_USER: ci
-      SMTP_PASS: ci
-      SMTP_FROM: ci@example.com
-      STRIPE_SECRET_KEY: sk_test_dummy
-      STRIPE_WEBHOOK_SECRET: whsec_test_dummy
-      VIREMENT_IBAN: FR7630006000011234567890189
-      VIREMENT_BIC: AGRIFRPP
-      VIREMENT_BANK_NAME: Banque CI
-      VIREMENT_ACCOUNT_HOLDER: SCS Firearm SAS
 
     steps:
       - uses: actions/checkout@v7
@@ -106,3 +106,53 @@ jobs:
 
       - name: Test
         run: pnpm -r test
+
+  # Layout checks (Playwright): every public page at 375, 768 and 1280 px must
+  # not overflow sideways, show text under 12px, miss a landmark or its single
+  # h1, log an error or show a broken image. Rules, not screenshots: they hold
+  # through a redesign. Runs after `verify` — a red suite needs no browser run.
+  layout:
+    needs: verify
+    runs-on: ubuntu-latest
+    # The official image, pinned to the @playwright/test version of apps/web:
+    # Chromium and its system libraries come installed, nothing is downloaded.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+
+    services:
+      # Same throwaway Postgres as `verify` (see there).
+      testdb:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: armurier
+          POSTGRES_DB: armurier_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U armurier -d armurier_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Migrate the database
+        run: pnpm --filter @armurier/api db:migrate
+
+      - name: Build the site
+        run: pnpm --filter @armurier/web build
+
+      # Starts the e2e API (reference + demo + e2e fixtures, seeded in-process)
+      # and the built site itself: see apps/web/playwright.config.ts.
+      - name: Layout checks
+        run: pnpm --filter @armurier/web exec playwright test

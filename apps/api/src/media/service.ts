@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { MEDIA_FORMATS, MEDIA_WIDTHS, type MediaFormat, mediaRenditionUrl } from "@armurier/shared"
+import { MEDIA_FORMATS, MEDIA_OG_SIZE, MEDIA_WIDTHS, type MediaFormat, mediaRenditionUrl } from "@armurier/shared"
 import { and, asc, eq, sql } from "drizzle-orm"
 import sharp, { type Sharp } from "sharp"
 import { protectedPipeline } from "../artworks/watermark.js"
@@ -44,9 +44,34 @@ function encode(image: Sharp, format: MediaFormat): Promise<Buffer> {
     : image.webp({ quality: WEBP_QUALITY }).toBuffer()
 }
 
+/** The brand ink (`--ink`, the manifest's background) the share card is laid on. */
+const OG_BACKGROUND = { r: 14, g: 14, b: 16 }
+const OG_JPEG_QUALITY = 85
+
 /** Storage key of one rendition. */
 export function renditionKey(id: string, width: number, format: MediaFormat): string {
   return `${KEY_PREFIX}/${id}/${width}.${format}`
+}
+
+/** Storage key of the share card. */
+export function ogKey(id: string): string {
+  return `${KEY_PREFIX}/${id}/og.jpg`
+}
+
+/**
+ * The share card: the visual fitted inside 1200×630 and centred on the brand
+ * ink — letterboxed, never cropped (a cropped rifle loses its muzzle), never
+ * enlarged. No price or text on it: social networks cache a card for weeks,
+ * and a price baked in would outlive the price itself.
+ */
+export async function renderOgImage(source: Buffer): Promise<Buffer> {
+  const fitted = await sharp(source)
+    .resize({ ...MEDIA_OG_SIZE, fit: "inside", withoutEnlargement: true })
+    .toBuffer()
+  return sharp({ create: { ...MEDIA_OG_SIZE, channels: 3, background: OG_BACKGROUND } })
+    .composite([{ input: fitted, gravity: "centre" }])
+    .jpeg({ quality: OG_JPEG_QUALITY, mozjpeg: true })
+    .toBuffer()
 }
 
 /**
@@ -113,6 +138,7 @@ export async function renderRenditions(id: string, input: Buffer, ownerType: Med
 
   let sizeBytes = 0
   let largestHeight = sourceHeight
+  let largestPixels: Buffer | undefined
   for (const width of widths) {
     // One set of pixels per width — watermarked for a protected visual — then
     // each format encoded from it.
@@ -135,13 +161,23 @@ export async function renderRenditions(id: string, input: Buffer, ownerType: Med
       image = sharp(resized.data)
       height = resized.info.height
     }
-    if (width === widths[widths.length - 1]) largestHeight = height
+    if (width === widths[widths.length - 1]) {
+      largestHeight = height
+      // The card is cut from these pixels — watermarked for a protected visual.
+      largestPixels = await image.clone().png().toBuffer()
+    }
 
     for (const format of MEDIA_FORMATS) {
       const buffer = await encode(image.clone(), format)
       sizeBytes += buffer.length
       await storage.put({ key: renditionKey(id, width, format), body: buffer, contentType: `image/${format}` })
     }
+  }
+
+  if (largestPixels) {
+    const card = await renderOgImage(largestPixels)
+    sizeBytes += card.length
+    await storage.put({ key: ogKey(id), body: card, contentType: "image/jpeg" })
   }
 
   const largest = widths[widths.length - 1] as number
@@ -157,6 +193,7 @@ export async function deleteRenditions(id: string, widths: number[], watermarked
       await storage.delete(renditionKey(id, width, format)).catch(() => {})
     }
   }
+  await storage.delete(ogKey(id)).catch(() => {})
   if (watermarked) await storage.delete(`${ORIGINAL_PREFIX}/${id}`).catch(() => {})
 }
 
@@ -302,6 +339,37 @@ export async function backfillAvifRenditions(): Promise<{ created: number; skipp
         // A row whose WebP is itself missing cannot be helped here: reported, not fatal.
         tally.failed++
       }
+    }
+  }
+  return tally
+}
+
+/**
+ * Give every existing media row its share card — the uploads made before cards
+ * were rendered. Idempotent like the AVIF backfill: a stored card is left alone.
+ *
+ * Cut from the widest WebP: an ordinary product keeps no original, and a
+ * protected visual's card must carry the watermark that WebP already has.
+ */
+export async function backfillOgImages(): Promise<{ created: number; skipped: number; failed: number }> {
+  const rows = await db.select({ id: media.id, widths: media.widths }).from(media)
+  const tally = { created: 0, skipped: 0, failed: 0 }
+
+  for (const row of rows) {
+    try {
+      await storage.getBytes(ogKey(row.id))
+      tally.skipped++
+      continue
+    } catch (error) {
+      if (!(error instanceof ObjectNotFoundError)) throw error
+    }
+    try {
+      const widest = row.widths.at(-1) as number
+      const webp = await storage.getBytes(renditionKey(row.id, widest, "webp"))
+      await storage.put({ key: ogKey(row.id), body: await renderOgImage(webp), contentType: "image/jpeg" })
+      tally.created++
+    } catch {
+      tally.failed++
     }
   }
   return tally

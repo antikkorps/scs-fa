@@ -10,6 +10,8 @@ import {
   formatEuros,
   formatNumber,
   formatPercent,
+  ogImageSize,
+  ogImageUrl,
   plural,
 } from "./format.js"
 
@@ -138,5 +140,33 @@ describe("plural", () => {
     expect(plural(0, "produit")).toBe("0 produit")
     expect(plural(1200, "produit")).toMatch(/^1\s200 produits$/)
     expect(plural(2, "nouveau fournisseur", "nouveaux fournisseurs")).toBe("2 nouveaux fournisseurs")
+  })
+})
+
+describe("share-card image", () => {
+  const SITE = "https://scs-firearms.fr"
+  const ID = "0b8f6a3e-5a8c-4d59-9f6e-2d8a7c1b3e41"
+
+  it("shares the 1200×630 card of an uploaded visual, not its raw WebP", () => {
+    expect(ogImageUrl(`/api/media/${ID}/1400.webp`, SITE)).toBe(`${SITE}/api/media/${ID}/og.jpg`)
+  })
+
+  it("keeps a legacy or external visual as it is, made absolute", () => {
+    expect(ogImageUrl("/api/artworks/images/x.webp", SITE)).toBe(`${SITE}/api/artworks/images/x.webp`)
+    expect(ogImageUrl("https://cdn.example/a.jpg", SITE)).toBe("https://cdn.example/a.jpg")
+  })
+
+  it("passes an already resolved card through untouched", () => {
+    expect(ogImageUrl(`${SITE}/api/media/${ID}/og.jpg`, SITE)).toBe(`${SITE}/api/media/${ID}/og.jpg`)
+  })
+
+  it("has no image rather than a placeholder", () => {
+    expect(ogImageUrl(null, SITE)).toBeUndefined()
+    expect(ogImageUrl("", SITE)).toBeUndefined()
+  })
+
+  it("states a size only for a card, whose size is known", () => {
+    expect(ogImageSize(`${SITE}/api/media/${ID}/og.jpg`)).toEqual({ width: 1200, height: 630 })
+    expect(ogImageSize("https://cdn.example/a.jpg")).toBeUndefined()
   })
 })
