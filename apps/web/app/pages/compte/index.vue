@@ -109,6 +109,7 @@ async function save() {
 
         <ProAccountPanel v-if="profile.role === 'customer'" />
         <AccountSecurity />
+        <AccountDataRights :deletable="profile.role === 'customer' && !profile.organisationId" />
 
         <form class="card" @submit.prevent="save">
           <h2 class="card__h">Informations personnelles</h2>
@@ -229,6 +230,10 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+/* The account's components (security, data rights) are cards too: keep them apart. */
+.card + .card {
+  margin-top: 1.75rem;
 }
 .card__h {
   font-size: var(--fs-md);
