@@ -285,6 +285,32 @@ describe("legal documents (/api/legal-documents)", () => {
     expect(kept).toBeDefined()
   })
 
+  it("keeps a document approved then expired: it still backs the purchase (audit 2026-11-01, M1)", async () => {
+    const created = (await upload({ fields: { docType: "cni" }, file: validPdf })).json().data
+    await db
+      .update(legalDocuments)
+      .set({ verificationStatus: "expired", verifiedAt: new Date("2025-01-10T10:00:00Z") })
+      .where(eq(legalDocuments.id, created.id))
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/api/legal-documents/${created.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(del.statusCode).toBe(409)
+    expect(del.json().error).toBe("DocumentApproved")
+  })
+
+  it("lets go a document that expired before anyone reviewed it", async () => {
+    const created = (await upload({ fields: { docType: "cni" }, file: validPdf })).json().data
+    await db.update(legalDocuments).set({ verificationStatus: "expired" }).where(eq(legalDocuments.id, created.id))
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/api/legal-documents/${created.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(del.statusCode).toBe(204)
+  })
+
   it("returns 404 when deleting an unknown document", async () => {
     const res = await app.inject({
       method: "DELETE",

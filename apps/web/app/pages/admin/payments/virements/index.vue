@@ -183,13 +183,13 @@ function setStatus(s: typeof status.value) {
           <tr v-for="r in rows" :key="r.id" class="row" @click="open(r)">
             <td class="mono">{{ r.paymentReference }}</td>
             <td>
-              <span class="email">{{ r.user.email }}</span>
+              <span class="email cell-break">{{ r.user.email }}</span>
               <span v-if="r.clientReportedDate" class="claim">déclaré le {{ r.clientReportedDate }}</span>
             </td>
             <td class="num strong">{{ formatEuros(Number(r.amountExpectedTtc)) }}</td>
             <td class="num">{{ r.amountReceivedTtc ? formatEuros(Number(r.amountReceivedTtc)) : "—" }}</td>
             <td><AdminStatusTag v-bind="paymentStatus(r.paymentStatus)" /></td>
-            <td>{{ formatDateTime(r.createdAt) }}</td>
+            <td class="cell-date">{{ formatDateTime(r.createdAt) }}</td>
           </tr>
         </tbody>
       </table>

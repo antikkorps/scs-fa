@@ -107,8 +107,8 @@ function go(delta: number) {
               </span>
               <span v-if="p.featured" class="tag tag--star">En avant</span>
             </td>
-            <td>{{ p.publishedAt ? formatDate(p.publishedAt) : "—" }}</td>
-            <td>{{ formatDateTime(p.updatedAt) }}</td>
+            <td class="cell-date">{{ p.publishedAt ? formatDate(p.publishedAt) : "—" }}</td>
+            <td class="cell-date">{{ formatDateTime(p.updatedAt) }}</td>
           </tr>
         </tbody>
       </table>

@@ -44,6 +44,25 @@ describe("the export of an account's data (story 12.11)", () => {
     expect(res.json().error).toBe("InvalidCredentials")
   })
 
+  it("counts wrong passwords towards the account lockout, like the login (audit 2026-11-01, B1)", async () => {
+    const account = await createAccount(app, EMAIL_SUFFIX)
+    for (let attempt = 1; attempt < 5; attempt++) {
+      expect((await exportFor(account.token, { password: "not-the-password" })).statusCode).toBe(403)
+    }
+    const fifth = await exportFor(account.token, { password: "not-the-password" })
+    expect(fifth.statusCode).toBe(423)
+    expect(fifth.json().error).toBe("AccountLocked")
+
+    // Locked: even the right password waits, and the login is locked too.
+    expect((await exportFor(account.token, { password: ACCOUNT_PASSWORD })).statusCode).toBe(423)
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: account.email, password: ACCOUNT_PASSWORD },
+    })
+    expect(login.statusCode).toBe(423)
+  })
+
   it("asks for the app's code too when the account has the app on", async () => {
     const account = await createAccount(app, EMAIL_SUFFIX, { withApp: true })
 

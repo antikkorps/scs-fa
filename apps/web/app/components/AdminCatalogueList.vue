@@ -107,11 +107,14 @@ async function remove(row: CatalogueRow) {
               </td>
               <td class="cell--actions">
                 <div class="actions">
-                  <NuxtLink :to="`${editBase}/${row.id}`" class="link">Modifier</NuxtLink>
-                  <button v-if="archivable" class="link" type="button" @click="toggleArchive(row)">
-                    {{ isArchived(row) ? "Réactiver" : "Archiver" }}
-                  </button>
-                  <button class="link link--danger" type="button" @click="remove(row)">Supprimer</button>
+                  <AdminRowAction icon="edit" label="Modifier" :to="`${editBase}/${row.id}`" />
+                  <AdminRowAction
+                    v-if="archivable"
+                    :icon="isArchived(row) ? 'restore' : 'archive'"
+                    :label="isArchived(row) ? 'Réactiver' : 'Archiver'"
+                    @click="toggleArchive(row)"
+                  />
+                  <AdminRowAction icon="delete" label="Supprimer" danger @click="remove(row)" />
                 </div>
               </td>
             </tr>
@@ -178,28 +181,11 @@ async function remove(row: CatalogueRow) {
 .cell--actions {
   white-space: nowrap;
 }
-/* Stacked, so a third action does not push the table past its frame. */
+/* Icons side by side: three actions fit where one word used to. */
 .actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.2rem;
-}
-.link {
-  background: none;
-  border: 0;
-  color: var(--paper-dim);
-  font: inherit;
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  padding: 0 0 0 0.8rem;
-  text-decoration: none;
-}
-.link:hover {
-  color: var(--brass);
-}
-.link--danger:hover {
-  color: var(--danger);
+  justify-content: flex-end;
+  gap: 0.15rem;
 }
 .alert {
   background: rgba(217, 138, 106, 0.12);

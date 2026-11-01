@@ -94,6 +94,22 @@ describe("AccountDataRights (story 12.11)", () => {
     })
   })
 
+  it("says the account is locked after too many wrong passwords (audit 2026-11-01)", async () => {
+    serve(false, {
+      "/me/delete": () => {
+        throw apiError(423, "AccountLocked")
+      },
+    })
+    const wrapper = await mountSuspended(AccountDataRights, { props: { deletable: true } })
+    await flushPromises()
+    await wrapper.find("button.delete-open").trigger("click")
+    await wrapper.find("form.delete input[name='delete-password']").setValue("faux")
+    await wrapper.find("form.delete input[name='delete-confirm']").setValue(true)
+    await wrapper.find("form.delete").trigger("submit")
+    await flushPromises()
+    expect(wrapper.find("form.delete [role='alert']").text()).toMatch(/Trop d'essais/)
+  })
+
   describe("the deletion", () => {
     async function openDeletion(appEnabled = false, answers: Record<string, () => unknown> = {}) {
       serve(appEnabled, answers)

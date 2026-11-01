@@ -2,12 +2,15 @@
 import { loadStripe, type Stripe, type StripeElements } from "@stripe/stripe-js"
 import { isNetworkFailure, isReportableStripeError, reportClientError } from "~/utils/clientErrors"
 import { formatEuros } from "~/utils/format"
+import { isStripeTestKey } from "~/utils/stripe"
 
 const props = defineProps<{ orderId: string; amount: number }>()
 const emit = defineEmits<{ paid: [] }>()
 
 const { createStripeIntent } = useOrders()
 const pk = useRuntimeConfig().public.stripePublishableKey as string
+// The test-card hint is for the sandbox only: never in front of a real customer.
+const testMode = isStripeTestKey(pk)
 
 const elRef = ref<HTMLElement | null>(null)
 const ready = ref(false)
@@ -97,7 +100,7 @@ async function pay() {
         {{ paying ? "Paiement…" : `Payer ${formatEuros(amount)}` }}
       </button>
       <p v-if="payError" class="card-pay__err" role="alert">{{ payError }}</p>
-      <p class="card-pay__test">Test : carte 4242 4242 4242 4242, date future, CVC libre.</p>
+      <p v-if="testMode" class="card-pay__test">Test : carte 4242 4242 4242 4242, date future, CVC libre.</p>
     </template>
   </div>
 </template>

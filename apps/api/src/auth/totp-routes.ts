@@ -2,8 +2,7 @@
 // setup (QR code, then a first code), the recovery codes regenerated, and
 // turning it off (password and code; never for an admin, for whom it is mandatory).
 
-import { totpCodeSchema, totpDisableSchema } from "@armurier/shared"
-import { verify } from "@node-rs/argon2"
+import { totpCodeSchema, totpDisableSchema, totpSetupSchema } from "@armurier/shared"
 import { eq } from "drizzle-orm"
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
@@ -11,6 +10,7 @@ import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { authenticate } from "./authenticate.js"
+import { reauthenticate, sendReauthRefusal } from "./reauth.js"
 import {
   beginEnrollment,
   confirmEnrollment,
@@ -60,13 +60,17 @@ export const totpRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   /** POST /setup — a new secret to scan; the app is enabled by the first code (POST /enable). */
-  fastify.post("/setup", async (request, reply) => {
-    const user = await currentUser(request)
-    if (!user) return notFound(reply)
-    if (user.totpEnabledAt) {
+  fastify.post("/setup", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const parsed = totpSetupSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
+    const current = await currentUser(request)
+    if (!current) return notFound(reply)
+    if (current.totpEnabledAt) {
       return reply.code(409).send({ error: "TotpAlreadyEnabled", message: "The app is already set up" })
     }
-    return reply.send({ data: await beginEnrollment(user) })
+    const reauth = await reauthenticate(current.id, { password: parsed.data.password }, new Date())
+    if ("refusal" in reauth) return sendReauthRefusal(reply, reauth.refusal)
+    return reply.send({ data: await beginEnrollment(reauth.user) })
   })
 
   fastify.post("/enable", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
@@ -105,12 +109,10 @@ export const totpRoutes: FastifyPluginAsync = async (fastify) => {
     if (user.role === "admin") {
       return reply.code(403).send({ error: "TotpRequired", message: "The app is mandatory for admin accounts" })
     }
-    if (!(await verify(user.passwordHash, parsed.data.password))) {
-      return reply.code(401).send({ error: "InvalidCredentials", message: "Invalid password" })
-    }
-    if (!(await verifySecondFactor(user.id, parsed.data.code, new Date()))) {
-      return reply.code(400).send(INVALID_CODE)
-    }
+    // Password and code, counted towards the lockout; a wrong password answers
+    // 403 so the site shows it instead of going to its login page.
+    const reauth = await reauthenticate(user.id, parsed.data, new Date())
+    if ("refusal" in reauth) return sendReauthRefusal(reply, reauth.refusal)
     await resetSecondFactor(user.id)
     await journal(request, user, "user.totp_disabled")
     return reply.send({ data: { enabled: false } })

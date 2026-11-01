@@ -20,6 +20,9 @@ const recoveryCodes = ref<string[] | null>(null)
 const setupCode = ref("")
 const regenCode = ref("")
 const disablePassword = ref("")
+// Security audit 2026-11-01 (B4): the setup starts with the password.
+const settingUp = ref(false)
+const setupPassword = ref("")
 const disableCode = ref("")
 const busy = ref(false)
 const error = ref("")
@@ -35,6 +38,7 @@ function messageOf(err: unknown, fallback: string): string {
   const code = apiErrorCode(err)
   if (code === "InvalidTotpCode") return "Code incorrect."
   if (code === "InvalidCredentials") return "Mot de passe incorrect."
+  if (code === "AccountLocked") return "Trop d'essais : votre compte est bloqué pour 15 minutes."
   return fallback
 }
 
@@ -53,7 +57,14 @@ async function act(run: () => Promise<void>, fallback: string) {
 const startSetup = () =>
   act(async () => {
     recoveryCodes.value = null
-    enrolment.value = (await api<{ data: LoginEnrolment }>("/auth/totp/setup", { method: "POST" })).data
+    enrolment.value = (
+      await api<{ data: LoginEnrolment }>("/auth/totp/setup", {
+        method: "POST",
+        body: { password: setupPassword.value },
+      })
+    ).data
+    setupPassword.value = ""
+    settingUp.value = false
   }, "La mise en place a échoué.")
 
 const enable = () =>
@@ -117,9 +128,29 @@ const disable = () =>
       </div>
 
       <template v-if="!state.enabled">
-        <button v-if="!enrolment" type="button" class="btn btn-primary setup" :disabled="busy" @click="startSetup">
+        <button
+          v-if="!enrolment && !settingUp"
+          type="button"
+          class="btn btn-primary setup"
+          :disabled="busy"
+          @click="settingUp = true"
+        >
           Activer la double authentification
         </button>
+        <form v-else-if="!enrolment" class="start" @submit.prevent="startSetup">
+          <label class="field">
+            <span>Votre mot de passe, pour commencer</span>
+            <input
+              v-model="setupPassword"
+              name="setup-password"
+              type="password"
+              class="input"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <button type="submit" class="btn btn-primary" :disabled="busy">Continuer</button>
+        </form>
         <form v-else class="enable" @submit.prevent="enable">
           <p class="muted">Scannez ce QR code avec l'application, puis saisissez le code qu'elle affiche.</p>
           <img v-if="qrSource" :src="qrSource" alt="QR code à scanner avec l'application d'authentification" class="qr" />
