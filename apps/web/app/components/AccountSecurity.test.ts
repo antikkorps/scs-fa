@@ -39,8 +39,12 @@ describe("AccountSecurity (story 12.8e)", () => {
     await flushPromises()
     expect(wrapper.text()).toMatch(/désactivée/i)
 
+    // The password first (security audit 2026-11-01, B4).
     await wrapper.find("button.setup").trigger("click")
+    await wrapper.find("input[name='setup-password']").setValue("MotDePasse123!")
+    await wrapper.find("form.start").trigger("submit")
     await flushPromises()
+    expect(callTo("/totp/setup")?.[1]).toEqual({ method: "POST", body: { password: "MotDePasse123!" } })
     expect(wrapper.find("img.qr").exists()).toBe(true)
     expect(wrapper.text()).toContain("JBSWY3DPEHPK3PXP")
 
@@ -89,5 +93,23 @@ describe("AccountSecurity (story 12.8e)", () => {
     await flushPromises()
     expect(wrapper.text()).toContain("obligatoire")
     expect(wrapper.find("form.disable").exists()).toBe(false)
+  })
+
+  it("says the account is locked after too many wrong passwords", async () => {
+    serve(status())
+    apiMock.mockImplementation(async (url: string) => {
+      if (url === "/auth/totp") return { data: status() }
+      throw Object.assign(new Error("Locked"), {
+        response: { status: 423, _data: { error: "AccountLocked" } },
+        data: { error: "AccountLocked" },
+      })
+    })
+    const wrapper = await mountSuspended(AccountSecurity)
+    await flushPromises()
+    await wrapper.find("button.setup").trigger("click")
+    await wrapper.find("input[name='setup-password']").setValue("faux")
+    await wrapper.find("form.start").trigger("submit")
+    await flushPromises()
+    expect(wrapper.find("[role='alert']").text()).toMatch(/Trop d'essais/)
   })
 })

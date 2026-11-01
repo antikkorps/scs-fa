@@ -39,7 +39,7 @@ describe("the authenticator app from the account (story 12.8e)", () => {
 
   /** Sets the app up through the routes; returns its secret and recovery codes. */
   async function enable(user: { token: string }) {
-    const setup = (await call("POST", "/api/auth/totp/setup", user.token)).json().data
+    const setup = (await call("POST", "/api/auth/totp/setup", user.token, { password: PASSWORD })).json().data
     const enabled = await call("POST", "/api/auth/totp/enable", user.token, { code: codeAt(setup.secret, -1) })
     return { secret: setup.secret as string, recoveryCodes: enabled.json().data.recoveryCodes as string[] }
   }
@@ -83,7 +83,15 @@ describe("the authenticator app from the account (story 12.8e)", () => {
   it("sets the app up: QR code, then a first code enables it and hands out the recovery codes", async () => {
     const user = await account()
 
-    const setup = await call("POST", "/api/auth/totp/setup", user.token)
+    // A stolen session alone must not tie the account to someone else's phone
+    // (security audit 2026-11-01, B4): the password comes first.
+    const noPassword = await call("POST", "/api/auth/totp/setup", user.token, {})
+    expect(noPassword.statusCode).toBe(400)
+    const badPassword = await call("POST", "/api/auth/totp/setup", user.token, { password: "wrong-password-entirely" })
+    expect(badPassword.statusCode).toBe(403)
+    expect(badPassword.json().error).toBe("InvalidCredentials")
+
+    const setup = await call("POST", "/api/auth/totp/setup", user.token, { password: PASSWORD })
     expect(setup.statusCode).toBe(200)
     expect(setup.json().data.qrSvg).toMatch(/^<svg/)
 
@@ -103,7 +111,7 @@ describe("the authenticator app from the account (story 12.8e)", () => {
     expect(await actions(user.id)).toContain("user.totp_enabled")
 
     // Already on: no second setup over it.
-    expect((await call("POST", "/api/auth/totp/setup", user.token)).statusCode).toBe(409)
+    expect((await call("POST", "/api/auth/totp/setup", user.token, { password: PASSWORD })).statusCode).toBe(409)
   })
 
   it("regenerates the recovery codes against the app's code", async () => {
@@ -126,7 +134,9 @@ describe("the authenticator app from the account (story 12.8e)", () => {
       password: "wrong-password-entirely",
       code: codeAt(secret, 1),
     })
-    expect(badPassword.statusCode).toBe(401)
+    // 403, not 401: a 401 sends the site to its login page (audit 2026-11-01).
+    expect(badPassword.statusCode).toBe(403)
+    expect(badPassword.json().error).toBe("InvalidCredentials")
 
     const off = await call("POST", "/api/auth/totp/disable", user.token, {
       password: PASSWORD,

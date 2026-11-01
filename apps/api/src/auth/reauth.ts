@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm"
 import type { FastifyReply } from "fastify"
 import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
+import { countFailedLogin, lockoutRemainingSeconds } from "./lockout.js"
 import { verifySecondFactor } from "./two-factor.js"
 
 type ReauthenticatedUser = typeof users.$inferSelect
@@ -18,6 +19,9 @@ const REFUSALS = {
   InvalidCredentials: { status: 403, message: "Invalid password" },
   TotpCodeRequired: { status: 400, message: "The authenticator app's code is required" },
   InvalidTotpCode: { status: 400, message: "Invalid code" },
+  // Same counter and answer as the login (audit 2026-11-01, B1): a stolen
+  // session must not buy an endless supply of password guesses.
+  AccountLocked: { status: 423, message: "Too many failed attempts. Try again later." },
 } as const
 
 export type ReauthRefusal = keyof typeof REFUSALS
@@ -29,12 +33,19 @@ export async function reauthenticate(
 ): Promise<{ user: ReauthenticatedUser } | { refusal: ReauthRefusal }> {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
   if (!user || user.deletedAt) return { refusal: "NotFound" }
-  if (!(await verify(user.passwordHash, input.password))) return { refusal: "InvalidCredentials" }
+  if (lockoutRemainingSeconds(user) !== null) return { refusal: "AccountLocked" }
+  if (!(await verify(user.passwordHash, input.password))) return failed(user.id, "InvalidCredentials")
   if (user.totpEnabledAt) {
     if (!input.code) return { refusal: "TotpCodeRequired" }
-    if (!(await verifySecondFactor(user.id, input.code, now))) return { refusal: "InvalidTotpCode" }
+    if (!(await verifySecondFactor(user.id, input.code, now))) return failed(user.id, "InvalidTotpCode")
   }
   return { user }
+}
+
+/** A wrong password or code counts towards the lockout; the last one allowed locks. */
+async function failed(userId: string, refusal: ReauthRefusal): Promise<{ refusal: ReauthRefusal }> {
+  const { locked } = await countFailedLogin(userId)
+  return { refusal: locked ? "AccountLocked" : refusal }
 }
 
 export function sendReauthRefusal(reply: FastifyReply, refusal: ReauthRefusal) {
