@@ -231,6 +231,10 @@ async function save() {
   flex-direction: column;
   gap: 1rem;
 }
+/* The account's components (security, data rights) are cards too: keep them apart. */
+.card + .card {
+  margin-top: 1.75rem;
+}
 .card__h {
   font-size: var(--fs-md);
   margin: 0;

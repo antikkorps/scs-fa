@@ -75,10 +75,12 @@ describe("AccountDataRights (story 12.11)", () => {
       expect(callTo("/auth/me/export")?.[1]?.body).toEqual({ password: "MotDePasse123!", code: "123456" })
     })
 
-    it("says so when the password is wrong", async () => {
+    it("says so when the password is wrong, though the refusal comes back as a file", async () => {
+      // The export asks for a blob: its error body is a blob too, not parsed JSON.
+      const refusal = new Blob([JSON.stringify({ error: "InvalidCredentials" })], { type: "application/json" })
       serve(false, {
         "/me/export": () => {
-          throw apiError(403, "InvalidCredentials")
+          throw Object.assign(new Error("Forbidden"), { response: { status: 403, _data: refusal }, data: refusal })
         },
       })
       const wrapper = await mountSuspended(AccountDataRights, { props: { deletable: true } })

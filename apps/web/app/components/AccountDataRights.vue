@@ -32,8 +32,20 @@ const REFUSALS: Record<string, string> = {
   OrganisationAccount: "Le compte d'une organisation est fermé par SCS Firearms : contactez-nous.",
 }
 
-function refusalOf(err: unknown, fallback: string): string {
-  const code = apiErrorCode(err)
+/** The API's error code; a download's refusal arrives as a blob, read before it can be parsed. */
+async function errorCodeOf(err: unknown): Promise<string | undefined> {
+  const body = (err as { data?: unknown }).data
+  if (!(body instanceof Blob)) return apiErrorCode(err)
+  try {
+    const parsed = JSON.parse(await body.text()) as { error?: unknown }
+    return typeof parsed.error === "string" ? parsed.error : undefined
+  } catch {
+    return undefined
+  }
+}
+
+async function refusalOf(err: unknown, fallback: string): Promise<string> {
+  const code = await errorCodeOf(err)
   return (code && REFUSALS[code]) || fallback
 }
 
@@ -64,7 +76,7 @@ async function downloadExport() {
     exportForm.password = ""
     exportForm.code = ""
   } catch (err) {
-    exportForm.error = refusalOf(err, "Le téléchargement a échoué. Veuillez réessayer.")
+    exportForm.error = await refusalOf(err, "Le téléchargement a échoué. Veuillez réessayer.")
   } finally {
     exportForm.busy = false
   }
@@ -80,7 +92,7 @@ async function deleteAccount() {
   try {
     await api("/auth/me/delete", { method: "POST", body: credentials(deleteForm.password, deleteForm.code) })
   } catch (err) {
-    deleteForm.error = refusalOf(err, "La suppression a échoué. Veuillez réessayer.")
+    deleteForm.error = await refusalOf(err, "La suppression a échoué. Veuillez réessayer.")
     deleteForm.busy = false
     return
   }
@@ -235,8 +247,8 @@ form {
   margin-top: 0.2rem;
 }
 .btn-danger {
-  color: #fff;
-  background: var(--danger);
+  color: var(--danger);
+  background: transparent;
   border: 1px solid var(--danger);
 }
 .btn-danger:disabled {
