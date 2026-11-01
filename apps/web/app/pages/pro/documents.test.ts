@@ -31,6 +31,7 @@ const doc = (overrides: Record<string, unknown> = {}) => ({
   issuedAt: null,
   expiresAt: "2030-12-31",
   uploadedAt: "2026-10-25T10:00:00Z",
+  removable: false,
   ...overrides,
 })
 
@@ -38,7 +39,9 @@ beforeEach(() => {
   for (const fn of Object.values(documents)) fn.mockReset()
   documents.list.mockResolvedValue([
     doc(),
-    doc({ id: "d2", docType: "bon_de_commande", verificationStatus: "pending" }),
+    doc({ id: "d2", docType: "bon_de_commande", verificationStatus: "pending", removable: true }),
+    // Approved once, since expired: still the proof behind accepted quotes (audit 2026-11-01).
+    doc({ id: "d3", docType: "autorisation_commerce", verificationStatus: "expired", removable: false }),
   ])
 })
 
@@ -49,7 +52,7 @@ describe("pro/documents (story 12.8d)", () => {
 
     expect(documentsBase.value).toBe("/pro/documents")
     const rows = wrapper.findAll(".doc")
-    expect(rows).toHaveLength(2)
+    expect(rows).toHaveLength(3)
     expect(rows[0]?.text()).toContain("Agrément d'armurier")
     expect(rows[0]?.text()).toContain("Approuvé")
     expect(rows[1]?.text()).toContain("Bon de commande signé")
@@ -78,6 +81,7 @@ describe("pro/documents (story 12.8d)", () => {
 
     const rows = wrapper.findAll(".doc")
     expect(rows[0]?.find("button.remove").exists()).toBe(false)
+    expect(rows[2]?.find("button.remove").exists()).toBe(false)
     await rows[1]?.find("button.remove").trigger("click")
     await flushPromises()
     expect(documents.remove).toHaveBeenCalledWith("d2")

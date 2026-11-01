@@ -309,6 +309,9 @@ h1 {
 .field {
   display: flex;
   flex-direction: column;
+  /* Label on top, input at the bottom: the inputs of a row line up even when
+     one label runs on two lines. */
+  justify-content: space-between;
   gap: 0.4rem;
   font-size: var(--fs-xs);
   letter-spacing: var(--ls-wide);

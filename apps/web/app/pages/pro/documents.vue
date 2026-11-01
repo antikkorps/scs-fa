@@ -76,7 +76,7 @@ async function withdraw(doc: LegalDocument) {
             <span class="doc__side">
               <AdminStatusTag v-bind="docVerificationStatus(doc.verificationStatus)" />
               <button
-                v-if="doc.verificationStatus !== 'approved'"
+                v-if="doc.removable"
                 type="button"
                 class="btn btn-ghost remove"
                 @click="withdraw(doc)"

@@ -2,9 +2,11 @@
 # Build context is the repo root: docker build -f apps/api/Dockerfile -t scs-api .
 
 # ---- build: install the workspace, then extract a self-contained API bundle ----
-FROM node:22-slim AS build
+FROM node:26-slim AS build
 ENV CI=1
-RUN corepack enable
+# Node 25+ no longer ships corepack: install it (pinned), then let it provide
+# the pnpm named by `packageManager` in the root package.json.
+RUN npm install -g corepack@0.35.0 && corepack enable
 WORKDIR /repo
 COPY . .
 RUN pnpm install --frozen-lockfile
@@ -13,7 +15,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @armurier/api deploy --legacy --prod /app
 
 # ---- runtime ----
-FROM node:22-slim AS runtime
+FROM node:26-slim AS runtime
 ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=8080

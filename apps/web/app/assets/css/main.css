@@ -381,3 +381,12 @@ mark.todo {
   white-space: nowrap;
   border: 0;
 }
+
+/* Table cells (admin lists): a date reads on one line, and a long e-mail breaks
+   rather than widening its column until the table overflows its frame. */
+.cell-date {
+  white-space: nowrap;
+}
+.cell-break {
+  overflow-wrap: anywhere;
+}

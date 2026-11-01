@@ -204,14 +204,14 @@ const memberName = (row: AdminOrganisationRow) =>
         </thead>
         <tbody>
           <tr v-for="row in rows" :key="row.id" class="row" tabindex="0" @click="open(row.id)" @keydown.enter="open(row.id)">
-            <td>{{ formatDateTime(row.createdAt) }}</td>
+            <td class="cell-date">{{ formatDateTime(row.createdAt) }}</td>
             <td>
               <span class="strong">{{ row.legalName }}</span>
               <span class="sub">{{ organisationTypeLabel(row.type) }} · {{ row.siret }}</span>
             </td>
             <td>
               <span>{{ memberName(row) }}</span>
-              <span class="sub">{{ row.member?.email }}</span>
+              <span class="sub cell-break">{{ row.member?.email }}</span>
             </td>
             <td><AdminStatusTag v-bind="registryCheckLabel(row.registryCheck)" /></td>
             <td><AdminStatusTag v-bind="organisationStatus(row.status)" /></td>

@@ -101,6 +101,8 @@ describe("an organisation's documents (story 12.8d)", () => {
 
     it("withdraws a document not yet approved, keeps an approved one", async () => {
       const pending = await uploaded()
+      const beforeList = (await call("GET", "/api/pro/documents", pro.token)).json().data
+      expect(beforeList.find((doc: { id: string }) => doc.id === pending)?.removable).toBe(true)
       expect((await call("DELETE", `/api/pro/documents/${pending}`, pro.token)).statusCode).toBe(204)
 
       const approved = await uploaded("autorisation_commerce")
@@ -108,6 +110,15 @@ describe("an organisation's documents (story 12.8d)", () => {
       const refused = await call("DELETE", `/api/pro/documents/${approved}`, pro.token)
       expect(refused.statusCode).toBe(409)
       expect(refused.json().error).toBe("DocumentApproved")
+
+      // The list tells the site which documents it may offer to withdraw.
+      const listed = (await call("GET", "/api/pro/documents", pro.token)).json().data
+      expect(listed.find((doc: { id: string }) => doc.id === approved)?.removable).toBe(false)
+      // Still kept once its validity has run out (audit 2026-11-01, M1).
+      await db.update(legalDocuments).set({ verificationStatus: "expired" }).where(eq(legalDocuments.id, approved))
+      const stillRefused = await call("DELETE", `/api/pro/documents/${approved}`, pro.token)
+      expect(stillRefused.statusCode).toBe(409)
+      expect(stillRefused.json().error).toBe("DocumentApproved")
     })
   })
 

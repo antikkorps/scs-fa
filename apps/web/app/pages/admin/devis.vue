@@ -136,7 +136,7 @@ const publicTotal = (detail: AdminQuoteRequestDetail) =>
         </thead>
         <tbody>
           <tr v-for="row in rows" :key="row.id" class="row" tabindex="0" @click="open(row.id)" @keydown.enter="open(row.id)">
-            <td>{{ formatDateTime(row.createdAt) }}</td>
+            <td class="cell-date">{{ formatDateTime(row.createdAt) }}</td>
             <td class="strong">{{ row.number }}</td>
             <td>
               <span class="strong">{{ row.organisation.legalName }}</span>
