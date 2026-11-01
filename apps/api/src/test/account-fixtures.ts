@@ -3,7 +3,7 @@
 // and a session token minted directly (the login itself is tested elsewhere).
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
-import { inArray, like } from "drizzle-orm"
+import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { encryptSecret, generateTotpSecret, totpCode } from "../auth/totp.js"
 import { db } from "../db/client.js"
@@ -19,6 +19,14 @@ let passwordHash: string | undefined
 async function knownPasswordHash(): Promise<string> {
   passwordHash ??= await hash(ACCOUNT_PASSWORD, { memoryCost: 19_456, timeCost: 2, parallelism: 1 })
   return passwordHash
+}
+
+/** Give an account made elsewhere (e.g. a pro fixture) the suite's known password. */
+export async function setKnownPassword(userId: string): Promise<void> {
+  await db
+    .update(users)
+    .set({ passwordHash: await knownPasswordHash() })
+    .where(eq(users.id, userId))
 }
 
 export interface TestAccount {

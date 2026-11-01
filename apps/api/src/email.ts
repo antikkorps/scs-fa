@@ -47,6 +47,8 @@ type EmailType =
   | "card_payment_reminder"
   | "transfer_reminder"
   | "unpaid_order_cancelled"
+  | "account_deleted"
+  | "inactive_account_warning"
 
 /** The order first (its history), else the account, else the newsletter contact. */
 function journalEntity(about: EmailAbout): { entityType: string; entityId: string | null } {
@@ -129,6 +131,16 @@ export async function sendLoginCodeEmail(
       `<p>Il est valable ${validMinutes} minutes et ne sert qu'une fois.</p>` +
       `<p>Si vous n'êtes pas à l'origine de cette connexion, quelqu'un connaît votre mot de passe : changez-le sans attendre.</p>`,
   })
+}
+
+/** Story 12.11 — the account is gone: what was erased, and what the law keeps. */
+export async function sendAccountDeletedEmail(to: string, about: EmailAbout = {}): Promise<void> {
+  await deliverParagraphs("account_deleted", about, to, "Votre compte SCS Firearms a été supprimé", [
+    "Bonjour,",
+    "Votre compte SCS Firearms a été supprimé : vos coordonnées, votre carnet d'adresses, votre panier et votre inscription à la lettre d'information sont effacés, et vous ne pouvez plus vous connecter.",
+    "La loi nous oblige à conserver vos commandes et leurs factures pendant 10 ans, ainsi que les pièces justificatives qui ont servi à une commande d'arme, pour la même durée. Elles seront alors supprimées.",
+    "Si vous n'êtes pas à l'origine de cette suppression, répondez à ce message.",
+  ])
 }
 
 // Story 12.8b — the pro account's follow-up e-mails, in French like the site.
