@@ -137,6 +137,8 @@ form {
   color: var(--paper-dim);
 }
 .field small {
+  /* The browser's `smaller` would drop the label's size under 12 px. */
+  font-size: inherit;
   color: var(--paper-faint);
 }
 .input {
