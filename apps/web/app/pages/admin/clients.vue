@@ -120,10 +120,10 @@ async function resetTotp(row: AdminUserRow) {
           <tr v-for="row in rows" :key="row.id">
             <td>
               <span class="strong">{{ fullName(row) }}</span>
-              <span class="sub">{{ row.email }}</span>
+              <span class="sub cell-break">{{ row.email }}</span>
             </td>
             <td>{{ accountKind(row) }}</td>
-            <td>{{ formatDate(row.createdAt) }}</td>
+            <td class="cell-date">{{ formatDate(row.createdAt) }}</td>
             <td>
               <AdminStatusTag v-if="row.totpEnabled" label="Activée" severity="ok" />
               <AdminStatusTag v-else label="Désactivée" severity="muted" />

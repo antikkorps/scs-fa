@@ -135,9 +135,9 @@ function setStatus(s: typeof status.value) {
         </thead>
         <tbody>
           <tr v-for="d in docs" :key="d.id" class="row" @click="open(d.id)">
-            <td>{{ formatDateTime(d.uploadedAt) }}</td>
+            <td class="cell-date">{{ formatDateTime(d.uploadedAt) }}</td>
             <td>{{ docTypeLabel(d.docType) }}</td>
-            <td class="email">{{ legalDocOwner(d).name }}<span v-if="d.organisation" class="muted"> · {{ legalDocOwner(d).contact }}</span></td>
+            <td class="email cell-break">{{ legalDocOwner(d).name }}<span v-if="d.organisation" class="muted"> · {{ legalDocOwner(d).contact }}</span></td>
             <td>
               <span class="scan" :class="`scan--${d.scanStatus}`">{{ d.scanStatus }}</span>
             </td>

@@ -430,7 +430,7 @@ async function retry(id: string) {
           <tbody>
             <template v-for="i in imports" :key="i.id">
               <tr>
-                <td>{{ formatDateTime(i.createdAt) }}</td>
+                <td class="cell-date">{{ formatDateTime(i.createdAt) }}</td>
                 <td>
                   {{ i.fileName }}
                   <span v-if="i.overwrite" class="sub">écrasement</span>
