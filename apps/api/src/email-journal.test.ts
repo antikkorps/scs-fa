@@ -7,8 +7,13 @@ import { auditLogs, orders, users } from "./db/schema.js"
 const { sendMail } = vi.hoisted(() => ({ sendMail: vi.fn() }))
 vi.mock("nodemailer", () => ({ createTransport: () => ({ sendMail }) }))
 
-const { sendErrorAlertEmail, sendNewsletterConfirmationEmail, sendOrderConfirmationEmail, sendPasswordResetEmail } =
-  await import("./email.js")
+const {
+  sendAccountDeletedEmail,
+  sendErrorAlertEmail,
+  sendNewsletterConfirmationEmail,
+  sendOrderConfirmationEmail,
+  sendPasswordResetEmail,
+} = await import("./email.js")
 
 const EMAIL_PREFIX = "email-journal-"
 const RECIPIENT = `${EMAIL_PREFIX}jean@example.fr`
@@ -142,6 +147,14 @@ describe("e-mail journal (story 12.7c)", () => {
     ).resolves.toBeUndefined()
     expect(warning).toHaveBeenCalledTimes(1)
     warning.mockRestore()
+  })
+
+  it("journals an account's deletion e-mail without the address it went to (story 12.11)", async () => {
+    sendMail.mockResolvedValueOnce({ messageId: "<deleted@test>" })
+    await sendAccountDeletedEmail(RECIPIENT, { userId })
+    const [event] = await journal()
+    expect(event).toMatchObject({ action: "email.account_deleted.sent", entityId: userId, newValue: null })
+    expect(JSON.stringify(event)).not.toContain(RECIPIENT)
   })
 
   it("keeps internal alerts out of the journal: they concern no customer", async () => {

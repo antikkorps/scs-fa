@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto"
 import {
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
   NEWSLETTER_SEGMENT_LABELS,
@@ -17,14 +16,10 @@ import { generateRefreshToken as generateLinkToken, hashRefreshToken as hashLink
 import { db } from "../db/client.js"
 import { newsletterContacts, newsletterSubscriptions, newsletterTokens } from "../db/schema.js"
 import { sendNewsletterConfirmationEmail } from "../email.js"
+import { newsletterEmailHash } from "./contact.js"
 import { newsletterProvider } from "./service.js"
 
 const CONFIRM_TOKEN_TTL_MS = NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS * 60 * 60 * 1000
-
-/** Stable identity key that survives the purge of the address itself. */
-function hashEmail(email: string): string {
-  return createHash("sha256").update(email).digest("hex")
-}
 
 function validationError(reply: FastifyReply, issues: { path: PropertyKey[]; message: string }[]) {
   return reply.code(400).send({
@@ -109,7 +104,7 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
       if (!parsed.success) return validationError(reply, parsed.error.issues)
 
       const email = parsed.data.email.trim().toLowerCase()
-      const emailHash = hashEmail(email)
+      const emailHash = newsletterEmailHash(email)
       const now = new Date()
 
       // Re-subscribing after a purge finds the anonymised trace by its hash and

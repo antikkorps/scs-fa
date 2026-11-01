@@ -25,6 +25,7 @@ const PAGES: { path: string; status?: number }[] = [
   { path: "/connexion" },
   { path: "/inscription" },
   { path: "/mot-de-passe-oublie" },
+  { path: "/compte-supprime" },
   { path: "/pro/inscription" },
   { path: "/cgv" },
   { path: "/mentions-legales" },

@@ -46,7 +46,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Personnes concernées | Clients, administrateurs |
 | Données | Nom, prénom, e-mail, téléphone, mot de passe haché (Argon2id, jamais en clair), adresses, rôle, date et version du consentement à la politique de confidentialité |
 | Destinataires | Personnel habilité de SCS Firearms ; Hetzner |
-| Durée | [À compléter : par exemple 3 ans après la dernière activité du client] |
+| Durée | Client : tant qu'il utilise son compte ; sans connexion ni commande pendant 3 ans, avertissement par e-mail puis anonymisation 30 jours plus tard (tâche quotidienne). Suppression immédiate à sa demande, depuis son compte (sauf commande ou devis en cours) : le compte est anonymisé, ses commandes restent (10 ans). Personnel et comptes d'organisation : fermés par SCS |
 
 ### 2. Commandes, livraison et facturation
 
@@ -79,7 +79,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Personnes concernées | Clients achetant une arme réglementée |
 | Données | Pièces justificatives déposées (pièce d'identité, permis de chasser, licence de tir, autorisation préfectorale, numéro SIA, certificat d'expertise), numéros et dates de validité, résultat et motif de la vérification, administrateur qui a vérifié |
 | Destinataires | Personnel chargé de la vérification ; Scaleway (stockage chiffré) ; autorités administratives et judiciaires dans les cas prévus par la loi |
-| Durée | [À compléter selon les obligations de l'armurier] |
+| Durée | Pièces ayant servi à une commande : 10 ans à compter de la dernière vérification d'une commande du client, comme la commande, puis suppression automatique (fichiers compris). Autres pièces : jusqu'à la suppression du compte |
 | Mesures particulières | Analyse antivirus au dépôt ; stockage chiffré au repos ; accès par liens signés valables quelques minutes, réservés aux administrateurs |
 
 ### 5. Lettre d'information
@@ -186,3 +186,4 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 |---|---|
 | 2026-10-19 | Création, à partir du site et de la politique de confidentialité (story 12.7e) |
 | 2026-10-19 | Mesure d'audience : conservation fixée à 25 mois, purge automatique ; cookie `__cf_bm` de Cloudflare déclaré |
+| 2026-11-01 | Droits d'accès, de portabilité et d'effacement en libre-service (story 12.11) ; durées fixées : compte (3 ans d'inactivité, puis anonymisation), pièces justificatives (10 ans si elles ont servi à une commande) |

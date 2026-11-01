@@ -225,11 +225,17 @@ usePageSeo({
         <tbody>
           <tr>
             <td>Compte client</td>
-            <td><mark class="todo">[À compléter : par exemple 3 ans après votre dernière activité]</mark></td>
+            <td>
+              Tant que vous l'utilisez. Sans connexion ni commande pendant 3 ans, nous vous prévenons par e-mail, puis
+              le compte est supprimé 30 jours plus tard si vous ne vous êtes pas reconnecté
+            </td>
           </tr>
           <tr>
             <td>Pièces justificatives réglementaires</td>
-            <td><mark class="todo">[À compléter selon les obligations de l'armurier]</mark></td>
+            <td>
+              Celles qui ont servi à une commande : 10 ans à compter de leur vérification pour cette commande, comme la
+              commande elle-même. Les autres : jusqu'à la suppression de votre compte
+            </td>
           </tr>
           <tr>
             <td>Commandes et factures</td>
@@ -281,7 +287,14 @@ usePageSeo({
       <li>Vos informations de profil et vos adresses se modifient directement depuis <NuxtLink to="/compte">votre compte</NuxtLink> ;</li>
       <li>la lettre d'information se quitte en un clic, depuis le lien présent dans chaque envoi ;</li>
       <li>
-        pour tout le reste — obtenir une copie de vos données, supprimer votre compte — écrivez-nous à
+        « Télécharger mes données », dans <NuxtLink to="/compte">votre compte</NuxtLink>, vous remet une copie de
+        tout ce qu'il contient, dans un fichier JSON réutilisable ;
+      </li>
+      <li>
+        « Supprimer mon compte », au même endroit, l'efface immédiatement, une fois vos commandes en cours terminées ;
+      </li>
+      <li>
+        pour tout le reste, écrivez-nous à
         <LegalFact :value="LEGAL_IDENTITY.privacyEmail" label="adresse e-mail dédiée" />. Nous répondons dans un délai d'un mois.
       </li>
     </ul>
