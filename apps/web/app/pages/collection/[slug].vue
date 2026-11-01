@@ -30,6 +30,42 @@ const formatName = (id: string) => art.value.availableFormats?.find((f) => f.id 
 const availablePrints = computed(() => art.value.prints.filter((p) => p.status === "available"))
 const soldOut = computed(() => availablePrints.value.length === 0)
 
+// Buying a print (UX audit 2026-11-01: the button only led back to /collection).
+// The visitor picks a numbered print; the first one available is the default.
+const { isAuthenticated } = useAuth()
+const { salesOpen } = useLaunch()
+const cart = useCart()
+const chosenPrintId = ref<string | null>(availablePrints.value[0]?.id ?? null)
+const chosenPrint = computed(
+  () => availablePrints.value.find((p) => p.id === chosenPrintId.value) ?? availablePrints.value[0] ?? null,
+)
+const adding = ref(false)
+const addedDesignation = ref("")
+const addError = ref("")
+
+async function addChosenPrint() {
+  const print = chosenPrint.value
+  if (!print || adding.value) return
+  if (!isAuthenticated.value) {
+    await navigateTo(`/connexion?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
+  adding.value = true
+  addError.value = ""
+  addedDesignation.value = ""
+  try {
+    await cart.addPrint(print.id)
+    addedDesignation.value = print.printDesignation
+  } catch (err) {
+    addError.value =
+      authErrorStatus(err) === 409
+        ? "Cet exemplaire vient d'être réservé par un autre collectionneur, ou il est déjà dans votre panier. Choisissez-en un autre."
+        : "Impossible d'ajouter cet exemplaire au panier. Veuillez réessayer."
+  } finally {
+    adding.value = false
+  }
+}
+
 const pageUrl = `${siteUrl}/collection/${slug}`
 
 // Collection › series (when published) › artwork.
@@ -142,17 +178,37 @@ useHead({
               Cette édition est entièrement attribuée. Contactez la maison pour la liste d'attente.
             </p>
 
-            <ul v-else class="prints__list" role="list">
-              <li v-for="p in availablePrints" :key="p.id" class="prints__row">
-                <span class="prints__num">{{ p.printDesignation }}</span>
-                <span class="prints__fmt">{{ formatName(p.formatId) }}</span>
-                <span class="prints__price">{{ formatEuros(p.priceTtc) }}</span>
-              </li>
-            </ul>
+            <fieldset v-else class="prints__choice">
+              <legend class="sr-only">Choisissez votre exemplaire</legend>
+              <ul class="prints__list" role="list">
+                <li v-for="p in availablePrints" :key="p.id">
+                  <label class="prints__row" :class="{ 'prints__row--on': chosenPrint?.id === p.id }">
+                    <input
+                      v-model="chosenPrintId"
+                      type="radio"
+                      name="print"
+                      class="prints__radio"
+                      :value="p.id"
+                    />
+                    <span class="prints__num">{{ p.printDesignation }}</span>
+                    <span class="prints__fmt">{{ formatName(p.formatId) }}</span>
+                    <span class="prints__price">{{ formatEuros(p.priceTtc) }}</span>
+                  </label>
+                </li>
+              </ul>
+            </fieldset>
 
-            <NuxtLink v-if="!soldOut" to="/collection" class="btn btn-primary prints__cta">
-              Acquérir un exemplaire
-            </NuxtLink>
+            <!-- Story 12.10: before the opening, nothing is sold. -->
+            <SalesClosedNotice v-if="!soldOut && !salesOpen" :segments="['gun_art']" />
+            <template v-else-if="!soldOut">
+              <button type="button" class="btn btn-primary prints__cta" :disabled="adding" @click="addChosenPrint">
+                {{ adding ? "Ajout…" : `Ajouter l'exemplaire ${chosenPrint?.printDesignation ?? ""} au panier` }}
+              </button>
+              <p v-if="addedDesignation" class="prints__added" role="status">
+                Exemplaire {{ addedDesignation }} ajouté à votre panier. <NuxtLink to="/panier">Voir le panier</NuxtLink>
+              </p>
+              <p v-if="addError" class="prints__error" role="alert">{{ addError }}</p>
+            </template>
           </section>
         </div>
       </div>
@@ -294,13 +350,37 @@ useHead({
   max-height: 340px;
   overflow-y: auto;
 }
+.prints__choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
 .prints__row {
   display: grid;
-  grid-template-columns: 4.5rem 1fr auto;
+  grid-template-columns: auto 4.5rem 1fr auto;
   gap: 1rem;
   align-items: center;
-  padding: 0.85rem 0;
+  min-height: 48px;
+  padding: 0.85rem 0.5rem;
   border-bottom: 1px solid var(--ink-line);
+  cursor: pointer;
+}
+.prints__row--on {
+  background: var(--ink-soft);
+}
+.prints__radio {
+  accent-color: var(--brass);
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.prints__added {
+  margin-top: 0.75rem;
+  color: var(--paper);
+}
+.prints__error {
+  margin-top: 0.75rem;
+  color: var(--danger);
 }
 .prints__num {
   /* An amount, an edition number or a transfer reference is read, compared

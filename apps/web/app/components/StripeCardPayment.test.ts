@@ -112,4 +112,3 @@ describe("StripeCardPayment — the test-card hint (UX audit 2026-11-01)", () =>
     expect(wrapper.find(".card-pay__test").exists()).toBe(true)
   })
 })
-
