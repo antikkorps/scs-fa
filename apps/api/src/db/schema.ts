@@ -1651,6 +1651,34 @@ export const shopSettings = pgTable(
   ],
 )
 
+// Audit 2026-11-01 (I8) — who the shop is (the legal facts every legal page,
+// the CGV and the order e-mail state) and how to reach it (/contact): ONE row,
+// filled by the admins in the back-office. Null = not supplied yet.
+export const shopIdentity = pgTable(
+  "shop_identity",
+  {
+    id: integer("id").primaryKey().default(1),
+    companyName: varchar("company_name", { length: 200 }),
+    legalForm: varchar("legal_form", { length: 100 }),
+    shareCapital: varchar("share_capital", { length: 100 }),
+    registration: varchar("registration", { length: 200 }),
+    siret: varchar("siret", { length: 14 }),
+    vatNumber: varchar("vat_number", { length: 50 }),
+    address: varchar("address", { length: 300 }),
+    email: varchar("email", { length: 255 }),
+    privacyEmail: varchar("privacy_email", { length: 255 }),
+    phone: varchar("phone", { length: 20 }),
+    publicationDirector: varchar("publication_director", { length: 200 }),
+    firearmsTradeAuthorisation: varchar("firearms_trade_authorisation", { length: 300 }),
+    mediatorName: varchar("mediator_name", { length: 200 }),
+    mediatorUrl: varchar("mediator_url", { length: 500 }),
+    contactHours: varchar("contact_hours", { length: 300 }),
+    contactNote: varchar("contact_note", { length: 500 }),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  () => [check("chk_shop_identity_singleton", sql`id = 1`)],
+)
+
 export const orders = pgTable(
   "orders",
   {
