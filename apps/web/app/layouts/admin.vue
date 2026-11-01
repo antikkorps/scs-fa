@@ -15,6 +15,7 @@ const groups = [
       { to: "/admin/clients", label: "Clients", icon: "◉" },
       { to: "/admin/organisations", label: "Comptes pro", icon: "◫" },
       { to: "/admin/devis", label: "Devis", icon: "✉" },
+      { to: "/admin/messages", label: "Messages", icon: "✎" },
       { to: "/admin/livraison", label: "Frais de port", icon: "⇶" },
       { to: "/admin/reglages", label: "Réglages", icon: "⚙" },
       { to: "/admin/identite", label: "Identité de la boutique", icon: "◈" },
@@ -109,6 +110,7 @@ async function signOut() {
         <div class="spacer" />
         <div class="account">
           <span class="account__name">{{ user?.firstName }} {{ user?.lastName }}</span>
+          <NuxtLink to="/" class="account__site">Retour au site</NuxtLink>
           <button class="account__out" type="button" @click="signOut">Déconnexion</button>
         </div>
       </header>
@@ -247,6 +249,7 @@ async function signOut() {
   font-size: var(--fs-sm);
   color: var(--paper-dim);
 }
+.account__site,
 .account__out {
   background: transparent;
   border: 1px solid var(--ink-line);
@@ -259,6 +262,16 @@ async function signOut() {
     color 0.2s,
     border-color 0.2s;
 }
+.account__site {
+  text-decoration: none;
+}
+/* A phone keeps the two buttons; the name gives way. */
+@media (max-width: 560px) {
+  .account__name {
+    display: none;
+  }
+}
+.account__site:hover,
 .account__out:hover {
   color: var(--brass);
   border-color: var(--brass);
