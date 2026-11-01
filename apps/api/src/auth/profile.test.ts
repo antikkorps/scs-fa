@@ -87,6 +87,8 @@ describe("auth/profile (GET & PATCH /api/auth/me)", () => {
       expect(body.firstName).toBe("Jean")
       expect(body.lastName).toBe("Dupont")
       expect(body.role).toBe("customer")
+      // Story 12.11 — tells the page whether the holder may delete the account.
+      expect(body.organisationId).toBeNull()
       expect(body).not.toHaveProperty("passwordHash")
       expect(body).not.toHaveProperty("failedLoginAttempts")
       expect(body).not.toHaveProperty("lockedUntil")

@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify"
+import { accountDataRoutes } from "../account-data/routes.js"
 import { forgotPasswordRoute } from "./forgot-password.js"
 import { loginRoute } from "./login.js"
 import { loginCodeRoutes } from "./login-code.js"
@@ -16,6 +17,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(refreshRoute)
   await fastify.register(logoutRoute)
   await fastify.register(profileRoute)
+  await fastify.register(accountDataRoutes)
   await fastify.register(forgotPasswordRoute)
   await fastify.register(resetPasswordRoute)
   await fastify.register(totpRoutes, { prefix: "/totp" })

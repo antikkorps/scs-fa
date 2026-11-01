@@ -13,6 +13,8 @@ const PUBLIC_FIELDS = {
   lastName: users.lastname,
   phone: users.phone,
   role: users.role,
+  // Story 12.11 — an organisation's account is closed by SCS, not by its holder.
+  organisationId: users.organisationId,
   addressStreet: users.addressStreet,
   addressPostal: users.addressPostal,
   addressCity: users.addressCity,

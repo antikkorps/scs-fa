@@ -49,6 +49,29 @@ const legalShown = computed(() =>
   ["docs_verifying", "docs_verified", "docs_rejected"].includes(order.value?.legalVerificationStatus ?? ""),
 )
 
+// A regulated order (UX audit 2026-11-01): documents first, then payment, then
+// verification and dispatch — told as numbered steps, before the bank details.
+const legalStatus = computed(() => order.value?.legalVerificationStatus ?? "")
+const regulated = computed(
+  () =>
+    !cancelled.value &&
+    !fromQuote.value &&
+    ["pending", "docs_rejected", "docs_verifying", "docs_verified"].includes(legalStatus.value),
+)
+const documentsToSend = computed(() => ["pending", "docs_rejected"].includes(legalStatus.value))
+const paymentSettled = computed(
+  () =>
+    cardSettled.value ||
+    ["received", "reconciled"].includes(order.value?.paymentStatus ?? "") ||
+    virement.value?.status === "transfer_claimed",
+)
+const stepsLeft = computed(() => Number(documentsToSend.value) + Number(!paymentSettled.value))
+const headTitle = computed(() => {
+  if (cancelled.value) return "Cette commande n'a pas été réglée"
+  if (!regulated.value || stepsLeft.value === 0) return "Merci pour votre commande"
+  return stepsLeft.value === 2 ? "Plus que deux étapes" : "Plus qu'une étape"
+})
+
 async function onCardPaid() {
   cardPaidLocal.value = true
   // The webhook settles the card bucket asynchronously; poll a few times so the
@@ -84,15 +107,47 @@ async function declareTransfer() {
 
       <template v-else-if="order">
         <header class="order__head">
-          <p class="eyebrow">{{ cancelled ? "Commande annulée" : "Commande confirmée" }}</p>
-          <h1 class="order__title">{{ cancelled ? "Cette commande n'a pas été réglée" : "Merci pour votre commande" }}</h1>
+          <p class="eyebrow">{{ cancelled ? "Commande annulée" : "Commande enregistrée" }}</p>
+          <h1 class="order__title">{{ headTitle }}</h1>
           <p class="order__ref">Référence&nbsp;: {{ orderReference(order.id) }} · Total {{ formatEuros(order.totalTtc) }} TTC</p>
           <p v-if="cancelled" class="order__deadline" role="status">
             Faute de paiement dans le délai prévu, elle a été annulée et ses articles remis en vente. Aucune somme ne vous a
             été prélevée.
           </p>
-          <p v-else-if="deadlineNote" class="order__deadline">{{ deadlineNote }}</p>
+          <p v-else-if="deadlineNote && !regulated" class="order__deadline">{{ deadlineNote }}</p>
         </header>
+
+        <ol v-if="regulated" class="steps">
+          <li class="steps__item" :class="{ 'steps__item--done': !documentsToSend }">
+            <h2 class="steps__h">Envoyez vos pièces justificatives</h2>
+            <p v-if="legalStatus === 'pending'" class="steps__p">
+              La loi les exige pour cette arme. Vous les déposez depuis le détail de votre commande, en quelques minutes.
+            </p>
+            <p v-else-if="legalStatus === 'docs_rejected'" class="steps__p">
+              Une pièce a été refusée : consultez le motif dans le détail de la commande et envoyez-en une nouvelle.
+            </p>
+            <p v-else-if="legalStatus === 'docs_verifying'" class="steps__p">Pièces reçues, en cours de vérification.</p>
+            <p v-else class="steps__p">Pièces validées.</p>
+            <NuxtLink v-if="documentsToSend" :to="`/compte/commandes/${order.id}`" class="btn btn-primary steps__cta">
+              Envoyer mes documents
+            </NuxtLink>
+          </li>
+          <li class="steps__item" :class="{ 'steps__item--done': paymentSettled }">
+            <h2 class="steps__h">Réglez votre commande</h2>
+            <p v-if="paymentSettled" class="steps__p">Paiement reçu ou déclaré.</p>
+            <p v-else class="steps__p">
+              {{ deadlineNote }} Vous pouvez régler dès maintenant : rien n'est expédié avant la validation de vos
+              pièces.
+            </p>
+          </li>
+          <li class="steps__item">
+            <h2 class="steps__h">Vérification et expédition</h2>
+            <p class="steps__p">
+              Nous vérifions vos pièces sous 48 heures. Votre commande part dès qu'elles sont validées et le paiement
+              reçu ; vous êtes prévenu par e-mail à chaque étape.
+            </p>
+          </li>
+        </ol>
 
         <!-- Virement bucket -->
         <section v-if="virement && !cancelled" class="pay" aria-labelledby="vir-h">
@@ -149,8 +204,8 @@ async function declareTransfer() {
           <NuxtLink :to="`/compte/commandes/${order.id}`" class="link">son détail</NuxtLink>.
         </p>
         <p v-else class="order__next">
-          Pour les articles réglementés, envoyez vos documents légaux depuis
-          <NuxtLink :to="`/compte/commandes/${order.id}`" class="link">le détail de votre commande</NuxtLink>.
+          Suivez votre commande depuis
+          <NuxtLink :to="`/compte/commandes/${order.id}`" class="link">son détail</NuxtLink>.
           <NuxtLink to="/boutique" class="link">Retour à la boutique</NuxtLink>
         </p>
       </template>
@@ -176,6 +231,55 @@ async function declareTransfer() {
 }
 .order__head {
   margin-bottom: 2rem;
+}
+.steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 0 0 2rem;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+.steps__item {
+  counter-increment: step;
+  position: relative;
+  padding: 1.1rem 1.25rem 1.1rem 3.6rem;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  background: var(--ink-soft);
+}
+.steps__item::before {
+  content: counter(step);
+  position: absolute;
+  left: 1.1rem;
+  top: 1.05rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--brass);
+  color: var(--brass);
+  font-family: var(--font-body);
+  font-variant-numeric: var(--nums);
+  font-weight: var(--fw-semibold);
+}
+.steps__item--done::before {
+  content: "✓";
+  background: var(--brass);
+  color: var(--ink);
+}
+.steps__h {
+  margin: 0 0 0.35rem;
+  font-size: var(--fs-md);
+}
+.steps__p {
+  margin: 0;
+  color: var(--paper-dim);
+  font-size: var(--fs-sm);
+}
+.steps__cta {
+  margin-top: 0.9rem;
 }
 .order__title {
   font-size: var(--fs-2xl);

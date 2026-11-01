@@ -71,4 +71,22 @@ describe("legal pages (story 12.1)", () => {
     expect(row?.text()).toContain("1 an")
     expect(row?.text()).toContain("14 jours")
   })
+
+  it("states how long an account and its documents are kept (story 12.11)", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const rows = wrapper.findAll("tr")
+    const account = rows.find((line) => line.text().startsWith("Compte client"))
+    expect(account?.find("mark.todo").exists()).toBe(false)
+    expect(account?.text()).toContain("3 ans")
+    const documents = rows.find((line) => line.text().startsWith("Pièces justificatives"))
+    expect(documents?.find("mark.todo").exists()).toBe(false)
+    expect(documents?.text()).toContain("10 ans")
+  })
+
+  it("lets the holder export their data and delete their account from the account page (story 12.11)", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const rights = wrapper.findAll("li").map((item) => item.text())
+    expect(rights).toContainEqual(expect.stringMatching(/Télécharger mes données/))
+    expect(rights).toContainEqual(expect.stringMatching(/Supprimer mon compte/))
+  })
 })

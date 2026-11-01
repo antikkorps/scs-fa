@@ -23,7 +23,8 @@ export function useCart() {
   }
 
   async function addPrint(printId: string): Promise<CartView> {
-    const res = await api<{ data: CartView }>("/cart/items", { method: "POST", body: { printId } })
+    // A print is one numbered copy; the API still asks for the quantity.
+    const res = await api<{ data: CartView }>("/cart/items", { method: "POST", body: { printId, qty: 1 } })
     return syncCount(res.data)
   }
 

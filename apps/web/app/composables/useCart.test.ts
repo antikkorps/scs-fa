@@ -30,6 +30,14 @@ describe("useCart", () => {
     expect(cart.count.value).toBe(4)
   })
 
+  it("adds a print as a single copy: the API requires a quantity (UX audit 2026-11-01)", async () => {
+    apiMock.mockResolvedValue(cartWith(1))
+    const cart = useCart()
+    await cart.addPrint("print-1")
+    expect(apiMock).toHaveBeenCalledWith("/cart/items", { method: "POST", body: { printId: "print-1", qty: 1 } })
+    expect(cart.count.value).toBe(1)
+  })
+
   it("removes a line via DELETE", async () => {
     apiMock.mockResolvedValue(cartWith(0))
     const cart = useCart()

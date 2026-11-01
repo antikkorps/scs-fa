@@ -8,6 +8,7 @@ export interface Profile {
   lastName: string | null
   phone: string | null
   role: string
+  organisationId: string | null
   addressStreet: string | null
   addressPostal: string | null
   addressCity: string | null

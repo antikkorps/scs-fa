@@ -104,3 +104,11 @@ describe("StripeCardPayment — refused initialisation", () => {
     expect(wrapper.text()).toContain("Cette commande a été annulée")
   })
 })
+
+describe("StripeCardPayment — the test-card hint (UX audit 2026-11-01)", () => {
+  it("shows with a test key (the suite's), and only through isStripeTestKey", async () => {
+    loadStripeMock.mockResolvedValue(fakeStripe())
+    const wrapper = await mounted()
+    expect(wrapper.find(".card-pay__test").exists()).toBe(true)
+  })
+})

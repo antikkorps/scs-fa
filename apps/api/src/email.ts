@@ -47,6 +47,14 @@ type EmailType =
   | "card_payment_reminder"
   | "transfer_reminder"
   | "unpaid_order_cancelled"
+  | "account_deleted"
+  | "inactive_account_warning"
+
+/**
+ * Story 12.11 — e-mails whose journal line must not name the recipient: the
+ * account they concern has just been erased, and its address with it.
+ */
+const ANONYMOUS_JOURNAL: ReadonlySet<EmailType> = new Set(["account_deleted"])
 
 /** The order first (its history), else the account, else the newsletter contact. */
 function journalEntity(about: EmailAbout): { entityType: string; entityId: string | null } {
@@ -75,7 +83,7 @@ async function deliver(type: EmailType, about: EmailAbout, mail: SendMailOptions
       userRole: "system",
       orderId: about.orderId ?? null,
       action: `email.${type}.${event.result === "failure" ? "failed" : "sent"}`,
-      newValue: { recipient: mail.to },
+      newValue: ANONYMOUS_JOURNAL.has(type) ? null : { recipient: mail.to },
       ...event,
     }).catch((error: unknown) => {
       process.emitWarning(`E-mail journal line not written (${type}): ${String(error)}`)
@@ -129,6 +137,36 @@ export async function sendLoginCodeEmail(
       `<p>Il est valable ${validMinutes} minutes et ne sert qu'une fois.</p>` +
       `<p>Si vous n'êtes pas à l'origine de cette connexion, quelqu'un connaît votre mot de passe : changez-le sans attendre.</p>`,
   })
+}
+
+/** Story 12.11 — the account is gone: what was erased, and what the law keeps. */
+export async function sendAccountDeletedEmail(to: string, about: EmailAbout = {}): Promise<void> {
+  await deliverParagraphs("account_deleted", about, to, "Votre compte SCS Firearms a été supprimé", [
+    "Bonjour,",
+    "Votre compte SCS Firearms a été supprimé : vos coordonnées, votre carnet d'adresses, votre panier et votre inscription à la lettre d'information sont effacés, et vous ne pouvez plus vous connecter.",
+    "La loi nous oblige à conserver vos commandes et leurs factures pendant 10 ans, ainsi que les pièces justificatives qui ont servi à une commande d'arme, pour la même durée. Elles seront alors supprimées.",
+    "Si vous n'êtes pas à l'origine de cette suppression, répondez à ce message.",
+  ])
+}
+
+/** Story 12.11 — unused for 3 years: the account is anonymised on `deletionDate` unless its holder logs in. */
+export async function sendInactiveAccountWarningEmail(
+  to: string,
+  warning: { deletionDate: Date },
+  about: EmailAbout = {},
+): Promise<void> {
+  const deletionDay = warning.deletionDate.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Paris",
+  })
+  await deliverParagraphs("inactive_account_warning", about, to, "Votre compte SCS Firearms va être supprimé", [
+    "Bonjour,",
+    `Vous ne vous êtes pas connecté à votre compte SCS Firearms depuis plus de 3 ans. Pour ne pas garder vos données plus longtemps que nécessaire, il sera supprimé le ${deletionDay}.`,
+    `Pour le garder, il suffit de vous connecter avant cette date : ${env.WEB_BASE_URL}/connexion`,
+    "Sinon, rien à faire : vos coordonnées, votre carnet d'adresses et votre inscription à la lettre d'information seront effacés. La loi nous oblige à conserver vos commandes et leurs factures pendant 10 ans.",
+  ])
 }
 
 // Story 12.8b — the pro account's follow-up e-mails, in French like the site.

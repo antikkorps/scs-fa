@@ -219,8 +219,10 @@ const editableFields = computed(() => props.fields.filter((f) => editing.value =
                 <template v-else>{{ row[c.key] ?? "—" }}</template>
               </td>
               <td class="cell--actions">
-                <button class="link" type="button" @click="startEdit(row)">Modifier</button>
-                <button class="link link--danger" type="button" @click="remove(row)">Supprimer</button>
+                <div class="row-actions">
+                  <AdminRowAction icon="edit" label="Modifier" @click="startEdit(row)" />
+                  <AdminRowAction icon="delete" label="Supprimer" danger @click="remove(row)" />
+                </div>
               </td>
             </tr>
           </tbody>
@@ -362,20 +364,9 @@ h1 {
 .row--on {
   background: rgba(200, 163, 91, 0.07);
 }
-.link {
-  background: none;
-  border: 0;
-  color: var(--paper-dim);
-  font: inherit;
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  padding: 0 0 0 0.8rem;
-}
-.link:hover {
-  color: var(--brass);
-}
-.link--danger:hover {
-  color: var(--danger);
+.row-actions {
+  display: inline-flex;
+  gap: 0.15rem;
 }
 .alert {
   background: rgba(217, 138, 106, 0.12);

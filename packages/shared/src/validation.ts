@@ -88,7 +88,7 @@ export const loginCodeVerifySchema = z.object({
 
 // Story 12.8e — the authenticator app from the account: a six-digit code to
 // enable it or regenerate the recovery codes; the password too to turn it off.
-const appCodeSchema = z
+export const appCodeSchema = z
   .string()
   .trim()
   .regex(/^(\d{3}\s?\d{3}|[A-Za-z0-9]{5}-?[A-Za-z0-9]{5})$/, "The code has 6 digits, or is a recovery code")

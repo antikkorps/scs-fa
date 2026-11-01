@@ -236,6 +236,9 @@ export const users = pgTable(
     updatedAt: timestamp("updated_at").defaultNow(),
     lastLoginAt: timestamp("last_login_at"),
     deletedAt: timestamp("deleted_at"), // Soft delete RGPD
+    // Story 12.11 — when the "unused for 3 years" warning left; anonymised 30 days
+    // later unless a login came in between.
+    inactivityWarnedAt: timestamp("inactivity_warned_at"),
 
     // Brute-force protection
     failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
