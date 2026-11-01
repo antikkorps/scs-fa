@@ -89,6 +89,8 @@ export interface LegalDocument {
   issuedAt: string | null
   expiresAt: string | null
   uploadedAt: string
+  /** Its holder may still withdraw it: never once SCS approved it, even since expired. */
+  removable: boolean
   // Only present on GET /:id, and only once the antivirus scan is clean.
   downloadUrl?: string | null
 }

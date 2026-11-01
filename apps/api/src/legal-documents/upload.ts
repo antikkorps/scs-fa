@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm"
 // The upload of a supporting document, whoever it belongs to: a person
 // (story 4.x) or, since story 12.8d, an organisation. Multipart parsing, the
 // per-feature size cap, the real file type checked against the declared one,
@@ -19,6 +20,7 @@ import { db } from "../db/client.js"
 import { legalDocuments } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { storage } from "../storage/index.js"
+import { approvedOnce } from "./approved-once.js"
 import { scanDocument } from "./scan.js"
 
 // Fields returned to the owner — never the raw storage URL (read access is
@@ -35,6 +37,8 @@ export const OWNER_DOC_FIELDS = {
   issuedAt: legalDocuments.issuedAt,
   expiresAt: legalDocuments.expiresAt,
   uploadedAt: legalDocuments.uploadedAt,
+  // Whether its holder may still delete it: never once SCS approved it.
+  removable: sql<boolean>`not (${approvedOnce})`,
 } as const
 
 const MIME_EXTENSION: Record<AllowedLegalDocMimeType, string> = {
