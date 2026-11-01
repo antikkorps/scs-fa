@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { auditLogs, legalDocuments, orders, users } from "../db/schema.js"
+import { auditLogs, legalDocuments, orders, refreshTokens, users } from "../db/schema.js"
 import { sendAccountDeletedEmail, sendInactiveAccountWarningEmail } from "../email.js"
 import { storage } from "../storage/index.js"
 import { createAccount, createOrder, deleteAccounts } from "../test/account-fixtures.js"
@@ -111,6 +111,55 @@ describe("the purge of inactive accounts (story 12.11)", () => {
 
       expect((await userRow(admin.id)).inactivityWarnedAt).toBeNull()
       expect((await userRow(organisation.id)).inactivityWarnedAt).toBeNull()
+    })
+  })
+
+  describe("what counts as activity", () => {
+    async function sessionUsed(userId: string, at: Date) {
+      await db.insert(refreshTokens).values({
+        userId,
+        tokenHash: `inactivity-${userId}-${Math.random()}`.slice(0, 64),
+        expiresAt: new Date(now.getTime() + 7 * DAY_MS),
+        lastUsedAt: at,
+      })
+    }
+
+    it("a session kept alive without a fresh login: the holder is still here", async () => {
+      const account = await createAccount(app, EMAIL_SUFFIX, {
+        lastLoginAt: ago(4 * YEAR_MS),
+        createdAt: ago(5 * YEAR_MS),
+      })
+      await sessionUsed(account.id, ago(10 * DAY_MS))
+
+      await purgeInactiveAccounts(now)
+
+      expect((await userRow(account.id)).inactivityWarnedAt).toBeNull()
+    })
+
+    it("a session used after the warning keeps the account", async () => {
+      const account = await createAccount(app, EMAIL_SUFFIX, {
+        lastLoginAt: ago(4 * YEAR_MS),
+        createdAt: ago(5 * YEAR_MS),
+      })
+      await warned(account.id, ago(31 * DAY_MS))
+      await sessionUsed(account.id, ago(5 * DAY_MS))
+
+      await purgeInactiveAccounts(now)
+
+      expect((await userRow(account.id)).deletedAt).toBeNull()
+    })
+
+    it("an order placed after the warning keeps the account", async () => {
+      const account = await createAccount(app, EMAIL_SUFFIX, {
+        lastLoginAt: ago(4 * YEAR_MS),
+        createdAt: ago(5 * YEAR_MS),
+      })
+      await warned(account.id, ago(31 * DAY_MS))
+      await createOrder(account.id, { paymentStatus: "cancelled", createdAt: ago(20 * DAY_MS) })
+
+      await purgeInactiveAccounts(now)
+
+      expect((await userRow(account.id)).deletedAt).toBeNull()
     })
   })
 

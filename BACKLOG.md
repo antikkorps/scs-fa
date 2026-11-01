@@ -1106,6 +1106,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] Suppression : réservations de pièces uniques et tirages Gun Art remises en vente ; adresse newsletter effacée aussi chez Brevo ; fichiers des pièces effacées supprimés du stockage ; e-mail de confirmation à l'ancienne adresse
 - [x] Tâche quotidienne `inactive account` : avertissement (posé avant l'envoi, relâché si l'envoi échoue), anonymisation 30 jours après sauf connexion entre-temps ou commande en cours, purge des pièces conservées après 10 ans ; jamais les admins ni les comptes d'organisation
 - [x] Site : bloc « Vos données » dans `/compte` (téléchargement, suppression avec case de confirmation et explication de ce que la loi conserve), page `/compte-supprime` (noindex, contrôlée par Playwright)
+- [x] **Corrigé après l'audit sécurité du 2026-11-01** (avant merge) : l'effacement vide aussi le contenu des lignes du journal propres au compte (hors commande ; dates et actions gardées 1 an), et l'e-mail de suppression est journalisé sans destinataire (M2) ; la purge d'inactivité compte aussi une session encore utilisée et une commande passée depuis l'avertissement (B2) ; le contrôle « commande en cours » se fait dans la transaction d'effacement, sous verrou du compte (B3)
 - ⚠️ Mise en ligne : `db:migrate` (0043)
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)

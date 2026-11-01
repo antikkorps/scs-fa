@@ -12,6 +12,7 @@ import { db } from "../db/client.js"
 import {
   addresses,
   artworkCartItems,
+  auditLogs,
   cartItems,
   legalDocuments,
   loginChallenges,
@@ -43,21 +44,25 @@ export function anonymisedEmail(userId: string): string {
   return `deleted-${userId}@deleted.invalid`
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+type Executor = typeof db | Tx
+
 /** Why this account cannot be deleted by its holder now, or null when it can. */
 export async function deletionBlocker(
   user: { id: string; role: string; organisationId: string | null },
   now: Date,
+  executor: Executor = db,
 ): Promise<AccountDeletionBlocker | null> {
   if (user.role !== "customer") return "AdminAccount"
   if (user.organisationId) return "OrganisationAccount"
 
   // An order is over once cancelled or refunded, or delivered with its withdrawal
   // period past (dated by its last delivery, else by its last change).
-  const lastDelivery = db
+  const lastDelivery = executor
     .select({ at: sql`max(${shipments.deliveredAt})` })
     .from(shipments)
     .where(eq(shipments.orderId, orders.id))
-  const [running] = await db
+  const [running] = await executor
     .select({ id: orders.id })
     .from(orders)
     .where(
@@ -73,7 +78,7 @@ export async function deletionBlocker(
     .limit(1)
   if (running) return "OrderInProgress"
 
-  const [openQuote] = await db
+  const [openQuote] = await executor
     .select({ id: quoteRequests.id })
     .from(quoteRequests)
     .where(and(eq(quoteRequests.requestedBy, user.id), inArray(quoteRequests.status, [...OPEN_QUOTE_STATUSES])))
@@ -95,16 +100,23 @@ export interface ErasedAccount {
 
 /**
  * Anonymise an account and delete what only served it. Returns null when the
- * account does not exist or is already deleted (idempotent).
+ * account does not exist or is already deleted (idempotent), and the blocker
+ * when it may not go now — checked here, under the account's row lock, so the
+ * check and the erasure see the same orders.
  */
-export async function eraseAccount(userId: string, now: Date): Promise<ErasedAccount | null> {
+export async function eraseAccount(
+  userId: string,
+  now: Date,
+): Promise<ErasedAccount | { blocker: AccountDeletionBlocker } | null> {
   return db.transaction(async (tx) => {
     const [user] = await tx
-      .select({ id: users.id, email: users.email })
+      .select({ id: users.id, email: users.email, role: users.role, organisationId: users.organisationId })
       .from(users)
       .where(and(eq(users.id, userId), isNull(users.deletedAt)))
       .for("update")
     if (!user) return null
+    const blocker = await deletionBlocker(user, now, tx)
+    if (blocker) return { blocker }
 
     // Documents an order relied on: approved (or since expired), and uploaded no
     // later than the last verification of this account's orders.
@@ -143,6 +155,19 @@ export async function eraseAccount(userId: string, now: Date): Promise<ErasedAcc
 
     const newsletterErased = await eraseNewsletterAddress(tx, user.email, now)
 
+    // The account's own journal lines keep their dates and actions (security
+    // history, 1 year) but no longer what they said: names, phone, addresses.
+    // An order's lines stay whole, with the order, for 10 years.
+    await tx
+      .update(auditLogs)
+      .set({ oldValue: null, newValue: null })
+      .where(
+        and(
+          isNull(auditLogs.orderId),
+          or(eq(auditLogs.userId, userId), and(eq(auditLogs.entityType, "user"), eq(auditLogs.entityId, userId))),
+        ),
+      )
+
     await tx
       .update(users)
       .set({
@@ -179,8 +204,6 @@ export async function eraseAccount(userId: string, now: Date): Promise<ErasedAcc
     }
   })
 }
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /** Same end state as a full unsubscribe: the address goes, the anonymous consent trace stays. */
 async function eraseNewsletterAddress(tx: Tx, email: string, now: Date): Promise<boolean> {

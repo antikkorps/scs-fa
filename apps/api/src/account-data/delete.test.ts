@@ -25,6 +25,7 @@ import {
   setKnownPassword,
 } from "../test/account-fixtures.js"
 import { proFixtures } from "../test/pro-fixtures.js"
+import { eraseAccount } from "./erase.js"
 
 vi.mock("../email.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../email.js")>()),
@@ -305,6 +306,56 @@ describe("the deletion of an account by its holder (story 12.11)", () => {
       expect(deletion?.newValue).toEqual({ reason: "holder_request", documentsKept: 0 })
       // The journal line names no one.
       expect(JSON.stringify(deletion)).not.toContain(account.email)
+    })
+
+    it("scrubs what the account's own journal lines said, keeping its orders' history", async () => {
+      const account = await createAccount(app, EMAIL_SUFFIX)
+      const order = await createOrder(account.id, { paymentStatus: "cancelled" })
+      const [profileLine] = await db
+        .insert(auditLogs)
+        .values({
+          userId: account.id,
+          userRole: "customer",
+          entityType: "user",
+          entityId: account.id,
+          action: "user.profile_updated",
+          oldValue: { phone: "+33600000000" },
+          newValue: { firstName: "Jeanne", phone: "+33612345678" },
+        })
+        .returning({ id: auditLogs.id })
+      const [orderLine] = await db
+        .insert(auditLogs)
+        .values({
+          userRole: "system",
+          entityType: "order",
+          entityId: order.id,
+          orderId: order.id,
+          action: "email.order_confirmation.sent",
+          newValue: { recipient: account.email },
+        })
+        .returning({ id: auditLogs.id })
+
+      await deleteOk(account)
+
+      const [scrubbed] = await db.select().from(auditLogs).where(eq(auditLogs.id, profileLine.id))
+      expect(scrubbed).toMatchObject({ action: "user.profile_updated", oldValue: null, newValue: null })
+      // An order's history is kept whole for its 10 years.
+      const [kept] = await db.select().from(auditLogs).where(eq(auditLogs.id, orderLine.id))
+      expect(kept.newValue).toEqual({ recipient: account.email })
+    })
+  })
+
+  describe("the erasure itself", () => {
+    it("checks for a running order inside its own transaction, and leaves the account alone", async () => {
+      const account = await createAccount(app, EMAIL_SUFFIX)
+      await createOrder(account.id, { paymentStatus: "awaiting_transfer" })
+
+      const result = await eraseAccount(account.id, new Date())
+
+      expect(result).toEqual({ blocker: "OrderInProgress" })
+      const [row] = await db.select().from(users).where(eq(users.id, account.id))
+      expect(row.deletedAt).toBeNull()
+      expect(row.email).toBe(account.email)
     })
   })
 })

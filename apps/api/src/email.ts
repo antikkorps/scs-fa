@@ -50,6 +50,12 @@ type EmailType =
   | "account_deleted"
   | "inactive_account_warning"
 
+/**
+ * Story 12.11 — e-mails whose journal line must not name the recipient: the
+ * account they concern has just been erased, and its address with it.
+ */
+const ANONYMOUS_JOURNAL: ReadonlySet<EmailType> = new Set(["account_deleted"])
+
 /** The order first (its history), else the account, else the newsletter contact. */
 function journalEntity(about: EmailAbout): { entityType: string; entityId: string | null } {
   if (about.orderId) return { entityType: "order", entityId: about.orderId }
@@ -77,7 +83,7 @@ async function deliver(type: EmailType, about: EmailAbout, mail: SendMailOptions
       userRole: "system",
       orderId: about.orderId ?? null,
       action: `email.${type}.${event.result === "failure" ? "failed" : "sent"}`,
-      newValue: { recipient: mail.to },
+      newValue: ANONYMOUS_JOURNAL.has(type) ? null : { recipient: mail.to },
       ...event,
     }).catch((error: unknown) => {
       process.emitWarning(`E-mail journal line not written (${type}): ${String(error)}`)

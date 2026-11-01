@@ -5,7 +5,7 @@ import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
 import { reauthenticate, sendReauthRefusal } from "../auth/reauth.js"
 import { validationError } from "../http.js"
-import { completeErasure, deletionBlocker, eraseAccount } from "./erase.js"
+import { completeErasure, eraseAccount } from "./erase.js"
 import { buildAccountExport } from "./export.js"
 
 export const accountDataRoutes: FastifyPluginAsync = async (fastify) => {
@@ -53,14 +53,13 @@ export const accountDataRoutes: FastifyPluginAsync = async (fastify) => {
       if ("refusal" in reauth) return sendReauthRefusal(reply, reauth.refusal)
       const { user } = reauth
 
-      const blocker = await deletionBlocker(user, now)
-      if (blocker) {
+      const erased = await eraseAccount(user.id, now)
+      if (!erased) return sendReauthRefusal(reply, "NotFound")
+      if ("blocker" in erased) {
+        const { blocker } = erased
         const status = blocker === "AdminAccount" || blocker === "OrganisationAccount" ? 403 : 409
         return reply.code(status).send({ error: blocker, message: DELETION_BLOCKER_MESSAGES[blocker] })
       }
-
-      const erased = await eraseAccount(user.id, now)
-      if (!erased) return sendReauthRefusal(reply, "NotFound")
 
       // Names no one: the account is anonymised, its journal line must be too.
       await recordAuditEvent({

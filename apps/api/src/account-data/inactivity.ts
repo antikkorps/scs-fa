@@ -1,20 +1,20 @@
 // Story 12.11 — an account nobody uses is not kept forever (decided with Franck
-// on 2026-11-01): no login and no order for 3 years → a warning e-mail, then
+// on 2026-11-01): no login, no session in use and no order for 3 years → a warning e-mail, then
 // the same anonymisation as a holder's deletion 30 days later, unless a login
 // came in between. Admins and organisation accounts are closed by SCS, never
 // here. Also purges the documents a deleted account's orders relied on, once
 // their 10 years are over.
 import { INACTIVE_ACCOUNT_YEARS, INACTIVITY_NOTICE_DAYS, USED_LEGAL_DOCUMENT_RETENTION_YEARS } from "@armurier/shared"
-import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, notExists, or, sql } from "drizzle-orm"
+import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { startDailyPurge } from "../daily-purge.js"
 import { daysBefore, yearsBefore } from "../dates.js"
 import { db } from "../db/client.js"
-import { legalDocuments, orders, users } from "../db/schema.js"
+import { legalDocuments, orders, refreshTokens, users } from "../db/schema.js"
 import { sendInactiveAccountWarningEmail } from "../email.js"
 import { storage } from "../storage/index.js"
-import { completeErasure, deletionBlocker, eraseAccount } from "./erase.js"
+import { completeErasure, eraseAccount } from "./erase.js"
 
 type Logger = Pick<FastifyBaseLogger, "warn" | "error">
 
@@ -22,8 +22,15 @@ const SILENT: Logger = { warn: () => undefined, error: () => undefined }
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-/** Last sign of life: the last login, else the account's creation. */
-const lastActivity = sql`coalesce(${users.lastLoginAt}, ${users.createdAt})`
+/**
+ * Last sign of life: a login, a session kept alive (sessions slide for days
+ * without a fresh login), an order — else the account's creation.
+ */
+const lastActivity = sql`greatest(
+  coalesce(${users.lastLoginAt}, ${users.createdAt}),
+  (select max(${refreshTokens.lastUsedAt}) from ${refreshTokens} where ${refreshTokens.userId} = ${users.id}),
+  (select max(${orders.createdAt}) from ${orders} where ${orders.userId} = ${users.id})
+)`
 
 /** Accounts the holder deletes themself; admins and organisations are SCS's to close. */
 const purgeableAccount = and(isNull(users.deletedAt), eq(users.role, "customer"), isNull(users.organisationId))
@@ -41,10 +48,6 @@ export async function purgeInactiveAccounts(
 
 async function warnInactiveAccounts(now: Date, log: Logger): Promise<number> {
   const cutoff = yearsBefore(now, INACTIVE_ACCOUNT_YEARS)
-  const recentOrder = db
-    .select({ id: orders.id })
-    .from(orders)
-    .where(and(eq(orders.userId, users.id), gte(orders.createdAt, cutoff)))
 
   // Claimed before the e-mail leaves, so two sweeps never warn twice; released
   // on a failed send, so tomorrow's sweep tries again.
@@ -57,7 +60,6 @@ async function warnInactiveAccounts(now: Date, log: Logger): Promise<number> {
         sql`${lastActivity} < ${cutoff}`,
         // Never warned, or warned before a later login: this is a new silence.
         or(isNull(users.inactivityWarnedAt), sql`${users.inactivityWarnedAt} < ${lastActivity}`),
-        notExists(recentOrder),
       ),
     )
     .returning({ id: users.id, email: users.email })
@@ -78,23 +80,22 @@ async function warnInactiveAccounts(now: Date, log: Logger): Promise<number> {
 
 async function eraseWarnedAccounts(now: Date, log: Logger): Promise<number> {
   const due = await db
-    .select({ id: users.id, role: users.role, organisationId: users.organisationId })
+    .select({ id: users.id })
     .from(users)
     .where(
       and(
         purgeableAccount,
         lte(users.inactivityWarnedAt, daysBefore(now, INACTIVITY_NOTICE_DAYS)),
-        // No login since the warning.
+        // No sign of life since the warning.
         sql`${lastActivity} < ${users.inactivityWarnedAt}`,
       ),
     )
 
   let erased = 0
   for (const account of due) {
-    // An order still running waits for its end; the next sweeps check again.
-    if (await deletionBlocker(account, now)) continue
     const result = await eraseAccount(account.id, now)
-    if (!result) continue
+    // An order still running waits for its end; the next sweeps check again.
+    if (!result || "blocker" in result) continue
     await recordAuditEvent({
       userId: account.id,
       userRole: "system",
