@@ -1,5 +1,5 @@
 import { legalDocumentMetaSchema, uuidParamSchema } from "@armurier/shared"
-import { and, desc, eq, ne } from "drizzle-orm"
+import { and, desc, eq, not } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { db } from "../db/client.js"
@@ -7,6 +7,7 @@ import { legalDocuments } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { storage } from "../storage/index.js"
+import { approvedOnce } from "./approved-once.js"
 import { OWNER_DOC_FIELDS as DOC_FIELDS, receiveDocument, scanInBackground } from "./upload.js"
 
 export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
@@ -69,11 +70,11 @@ export const legalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const owned = and(eq(legalDocuments.id, params.data.id), eq(legalDocuments.userId, request.user.sub))
-    // An approved document is the proof behind a cleared purchase: SCS must keep
-    // it, so only a pending, rejected or expired one may go (story 12.9f).
+    // A document SCS approved (even since expired) backs a cleared purchase:
+    // only one never approved may go (story 12.9f, audit 2026-11-01).
     const [deleted] = await db
       .delete(legalDocuments)
-      .where(and(owned, ne(legalDocuments.verificationStatus, "approved")))
+      .where(and(owned, not(approvedOnce)))
       .returning({ id: legalDocuments.id, s3Key: legalDocuments.s3Key })
     if (!deleted) {
       const [approved] = await db.select({ id: legalDocuments.id }).from(legalDocuments).where(owned)

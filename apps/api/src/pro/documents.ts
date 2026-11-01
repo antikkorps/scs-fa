@@ -4,11 +4,12 @@
 // A, B or C items. The member files, follows and withdraws them here.
 
 import { organisationDocumentMetaSchema, uuidParamSchema } from "@armurier/shared"
-import { and, desc, eq, ne } from "drizzle-orm"
+import { and, desc, eq, not } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { legalDocuments } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { approvedOnce } from "../legal-documents/approved-once.js"
 import { OWNER_DOC_FIELDS, receiveDocument, scanInBackground } from "../legal-documents/upload.js"
 import { storage } from "../storage/index.js"
 import { proOrganisationOf } from "./access.js"
@@ -64,7 +65,7 @@ export const organisationDocumentRoutes: FastifyPluginAsync = async (fastify) =>
     )
     const [deleted] = await db
       .delete(legalDocuments)
-      .where(and(owned, ne(legalDocuments.verificationStatus, "approved")))
+      .where(and(owned, not(approvedOnce)))
       .returning({ s3Key: legalDocuments.s3Key })
     if (!deleted) {
       const [approved] = await db.select({ id: legalDocuments.id }).from(legalDocuments).where(owned)
