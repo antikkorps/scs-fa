@@ -1,27 +1,41 @@
 <script setup lang="ts">
-import { shippingClassLabel } from "@armurier/shared"
-import type { CartSummary } from "~/types/cart"
+import { retailTotals, shippingClassLabel } from "@armurier/shared"
+import type { CartView } from "~/types/cart"
 import { formatEuros } from "~/utils/format"
 
 // The totals of the cart and of the checkout (story 12.3): the customer must see
 // the delivery cost — and so the full price — before ordering (C. conso. L221-5).
-// Rows add up: HT − VIP + delivery HT + VAT = total TTC.
-defineProps<{ summary: CartSummary }>()
+// An individual reads prices VAT included (audit 2026-11-01, I4): goods − VIP +
+// delivery = total TTC, the VAT shown as part of it.
+const props = defineProps<{ cart: CartView }>()
+
+const summary = computed(() => props.cart.summary)
+const totals = computed(() =>
+  retailTotals({
+    lines: [...props.cart.items, ...props.cart.artworkItems].map((line) => ({
+      vatPct: line.vatPct,
+      discountHt: line.discountAmount,
+    })),
+    shippingTtc: summary.value.shipping.totalTtc,
+    vatAmount: summary.value.vatAmount,
+    totalTtc: summary.value.totalTtc,
+  }),
+)
 </script>
 
 <template>
   <dl class="totals">
     <div>
-      <dt>Sous-total HT</dt>
-      <dd>{{ formatEuros(summary.subtotalHt) }}</dd>
+      <dt>Articles</dt>
+      <dd>{{ formatEuros(totals.itemsTtc) }}</dd>
     </div>
-    <div v-if="summary.vipDiscountAmount > 0" class="totals__discount">
+    <div v-if="totals.vipDiscountTtc > 0" class="totals__discount">
       <dt>Remise VIP</dt>
-      <dd>− {{ formatEuros(summary.vipDiscountAmount) }}</dd>
+      <dd>− {{ formatEuros(totals.vipDiscountTtc) }}</dd>
     </div>
     <div v-if="summary.shipping.breakdown.length > 0" class="totals__shipping">
-      <dt>Livraison HT</dt>
-      <dd>{{ summary.shipping.totalHt > 0 ? formatEuros(summary.shipping.totalHt) : "Offerte" }}</dd>
+      <dt>Livraison</dt>
+      <dd>{{ totals.shippingTtc > 0 ? formatEuros(totals.shippingTtc) : "Offerte" }}</dd>
       <ul class="totals__breakdown">
         <li v-for="entry in summary.shipping.breakdown" :key="entry.shippingClass">
           <span>{{ shippingClassLabel(entry) }}</span>
@@ -33,13 +47,13 @@ defineProps<{ summary: CartSummary }>()
         profiter de la livraison offerte sur ces articles.
       </p>
     </div>
-    <div>
-      <dt>TVA</dt>
-      <dd>{{ formatEuros(summary.vatAmount) }}</dd>
-    </div>
     <div class="totals__total">
       <dt>Total TTC</dt>
-      <dd>{{ formatEuros(summary.totalTtc) }}</dd>
+      <dd>{{ formatEuros(totals.totalTtc) }}</dd>
+    </div>
+    <div class="totals__vat">
+      <dt>dont TVA</dt>
+      <dd>{{ formatEuros(totals.vatAmount) }}</dd>
     </div>
   </dl>
 </template>
@@ -86,6 +100,10 @@ defineProps<{ summary: CartSummary }>()
   font-size: var(--fs-sm);
   color: var(--brass);
   line-height: var(--lh-normal);
+}
+.totals__vat {
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
 }
 .totals__total {
   border-top: 1px solid var(--ink-line);

@@ -4,6 +4,7 @@ import {
   type LegalDocRejectionReason,
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
   type OrganisationType,
+  type RetailTotals,
   renderInlinesHtml,
   renderInlinesText,
   renderTermsHtml,
@@ -620,6 +621,11 @@ export type OrderConfirmationEmail = {
   shippingAddress: string[]
   /** CGV version accepted with the order (ISO date). */
   termsVersion: string
+  /**
+   * An individual's order, told VAT included (audit 2026-11-01, I4); null for a
+   * pro order (born of a quote), which keeps the HT breakdown.
+   */
+  retail: RetailTotals | null
 }
 
 const EUROS = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" })
@@ -744,6 +750,30 @@ export async function sendUnpaidOrderCancelledEmail(to: string, c: UnpaidOrderCa
  *
  * Idempotence and retries are the caller's job (orders/confirmation.ts).
  */
+/** An individual's totals, VAT included: goods − VIP + delivery = total, VAT within it. */
+function retailTotalRows(retail: RetailTotals): Array<[string, string]> {
+  return [
+    ["Articles", EUROS.format(retail.itemsTtc)],
+    ...(retail.vipDiscountTtc > 0
+      ? [["Remise VIP", `− ${EUROS.format(retail.vipDiscountTtc)}`] as [string, string]]
+      : []),
+    ["Livraison", retail.shippingTtc > 0 ? EUROS.format(retail.shippingTtc) : "Offerte"],
+    ["Total TTC", EUROS.format(retail.totalTtc)],
+    ["dont TVA", EUROS.format(retail.vatAmount)],
+  ]
+}
+
+/** A pro order's totals, HT like its quote. */
+function proTotalRows(o: OrderConfirmationEmail): Array<[string, string]> {
+  return [
+    ["Sous-total HT", EUROS.format(o.subtotalHt)],
+    ...(o.vipDiscount > 0 ? [["Remise VIP", `− ${EUROS.format(o.vipDiscount)}`] as [string, string]] : []),
+    ["Livraison HT", o.shippingHt > 0 ? EUROS.format(o.shippingHt) : "Offerte"],
+    ["TVA", EUROS.format(o.vat)],
+    ["Total TTC", EUROS.format(o.totalTtc)],
+  ]
+}
+
 export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmationEmail): Promise<void> {
   // The CGV in the e-mail state the seller's facts as the admins entered them.
   const site = { siteUrl: env.WEB_BASE_URL, identity: await loadShopIdentity() }
@@ -752,13 +782,7 @@ export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmatio
   const placed = PARIS_DATETIME.format(o.placedAt)
   const termsDate = PARIS_DATE.format(new Date(o.termsVersion))
 
-  const totals: Array<[string, string]> = [
-    ["Sous-total HT", EUROS.format(o.subtotalHt)],
-    ...(o.vipDiscount > 0 ? ([["Remise VIP", `− ${EUROS.format(o.vipDiscount)}`]] as Array<[string, string]>) : []),
-    ["Livraison HT", o.shippingHt > 0 ? EUROS.format(o.shippingHt) : "Offerte"],
-    ["TVA", EUROS.format(o.vat)],
-    ["Total TTC", EUROS.format(o.totalTtc)],
-  ]
+  const totals = o.retail ? retailTotalRows(o.retail) : proTotalRows(o)
 
   const steps: string[] = []
   if (o.cardTtc > 0)

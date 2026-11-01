@@ -1,7 +1,7 @@
 // @vitest-environment nuxt
 import { mountSuspended } from "@nuxt/test-utils/runtime"
 import { describe, expect, it } from "vitest"
-import type { CartSummary } from "~/types/cart"
+import type { CartProductLine, CartSummary, CartView } from "~/types/cart"
 import CartTotals from "./CartTotals.vue"
 
 const NO_SHIPPING: CartSummary["shipping"] = {
@@ -30,16 +30,36 @@ const summary = (overrides: Partial<CartSummary> = {}): CartSummary => ({
   ...overrides,
 })
 
-const text = async (s: CartSummary) => (await mountSuspended(CartTotals, { props: { summary: s } })).text()
+// One rifle at 1,000 € HT, 20 % VAT — the lines only feed the VIP discount, VAT included.
+const rifle = (discountAmount = 0) => ({ vatPct: 20, discountAmount }) as CartProductLine
+
+const cartOf = (s: CartSummary, items: CartProductLine[] = [rifle()]): CartView => ({
+  isVip: false,
+  items,
+  artworkItems: [],
+  summary: s,
+})
+
+const text = async (s: CartSummary, items?: CartProductLine[]) =>
+  (await mountSuspended(CartTotals, { props: { cart: cartOf(s, items) } })).text()
 
 describe("CartTotals (story 12.3)", () => {
-  it("shows the delivery before the total, HT in the column and TTC per class", async () => {
+  it("shows an individual every row VAT included, the VAT as part of the total (audit 2026-11-01, I4)", async () => {
     const t = await text(summary())
-    expect(t).toContain("Livraison HT")
-    expect(t).toMatch(/20,83/)
+    expect(t).not.toMatch(/\bHT\b/)
+    expect(t).toMatch(/Articles\s*1\s200,00/)
+    expect(t).toMatch(/Livraison\s*25,00/)
+    expect(t).toMatch(/Total TTC\s*1\s225,00/)
+    expect(t).toMatch(/dont TVA\s*204,17/)
     expect(t).toContain("1 colis assuré")
-    expect(t).toMatch(/25,00\s*€ TTC/)
-    expect(t.indexOf("Livraison HT")).toBeLessThan(t.indexOf("Total TTC"))
+    expect(t.indexOf("Livraison")).toBeLessThan(t.indexOf("Total TTC"))
+  })
+
+  it("shows the VIP discount VAT included", async () => {
+    const t = await text(summary({ vipDiscountAmount: 100, vatAmount: 184.17, totalTtc: 1105 }), [rifle(100)])
+    expect(t).toMatch(/Articles\s*1\s200,00/)
+    expect(t).toMatch(/Remise VIP\s*−\s*120,00/)
+    expect(t).toMatch(/Total TTC\s*1\s105,00/)
   })
 
   it("says when delivery is free rather than showing 0", async () => {

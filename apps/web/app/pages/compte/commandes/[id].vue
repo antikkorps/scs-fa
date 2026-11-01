@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { orderReference } from "@armurier/shared"
+import { lineTtc, orderReference, orderRetailTotals } from "@armurier/shared"
 import type { OrderAddressSnapshot, OrderLegal, OrderLineItem, RequiredDoc } from "~/types/account"
 import type { OrderDetail } from "~/types/checkout"
 import { formatDate, formatDateTime, formatEuros, formatPercent } from "~/utils/format"
@@ -33,6 +33,19 @@ const openUpload = ref<string | null>(null)
 const downloads = reactive<Record<string, string>>({})
 
 const items = computed<OrderLineItem[]>(() => (order.value?.items as OrderLineItem[]) ?? [])
+// An individual reads the order VAT included (audit 2026-11-01, I4); a pro order
+// stays HT like its quote.
+const retail = computed(() =>
+  order.value
+    ? orderRetailTotals({
+        quoteRequestId: order.value.quoteRequestId,
+        items: items.value,
+        shippingTtc: order.value.shippingCost,
+        vatAmount: order.value.vatAmount,
+        totalTtc: order.value.totalTtc,
+      })
+    : null,
+)
 const shipping = computed<OrderAddressSnapshot | null>(
   () => (order.value?.shippingAddress as OrderAddressSnapshot) ?? null,
 )
@@ -272,10 +285,26 @@ function toggleUpload(docType: string) {
             <li v-for="(it, i) in items" :key="i" class="item">
               <span class="item__name">{{ it.name }}</span>
               <span class="item__qty">× {{ it.qty }}</span>
-              <span class="item__price">{{ formatEuros(it.priceHt * it.qty) }} HT</span>
+              <span v-if="retail" class="item__price">
+                {{ formatEuros(lineTtc({ priceHt: it.priceHt, qty: it.qty, vatPct: it.vatPct ?? 0 })) }} TTC
+              </span>
+              <span v-else class="item__price">{{ formatEuros(it.priceHt * it.qty) }} HT</span>
             </li>
           </ul>
-          <dl class="totals">
+          <dl v-if="retail" class="totals">
+            <div><dt>Articles</dt><dd>{{ formatEuros(retail.itemsTtc) }}</dd></div>
+            <div v-if="retail.vipDiscountTtc > 0" class="totals__vip">
+              <dt>Remise VIP ({{ formatPercent(order.vipDiscountAppliedPct) }})</dt>
+              <dd>−{{ formatEuros(retail.vipDiscountTtc) }}</dd>
+            </div>
+            <div>
+              <dt>Livraison</dt>
+              <dd>{{ retail.shippingTtc > 0 ? formatEuros(retail.shippingTtc) : "Offerte" }}</dd>
+            </div>
+            <div class="totals__ttc"><dt>Total TTC</dt><dd>{{ formatEuros(retail.totalTtc) }}</dd></div>
+            <div class="totals__vat"><dt>dont TVA</dt><dd>{{ formatEuros(retail.vatAmount) }}</dd></div>
+          </dl>
+          <dl v-else class="totals">
             <div><dt>Sous-total HT</dt><dd>{{ formatEuros(order.subtotalHt) }}</dd></div>
             <div v-if="order.vipDiscountAmount > 0" class="totals__vip">
               <dt>Remise VIP ({{ formatPercent(order.vipDiscountAppliedPct) }})</dt>
@@ -565,6 +594,10 @@ function toggleUpload(docType: string) {
 }
 .totals__vip {
   color: var(--brass);
+}
+.totals__vat {
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
 }
 .totals__ttc {
   font-size: var(--fs-md);
