@@ -30,6 +30,7 @@ import {
   users,
 } from "../db/schema.js"
 import { sendAccountDeletedEmail } from "../email.js"
+import { approvedOnce } from "../legal-documents/approved-once.js"
 import { newsletterEmailHash } from "../newsletter/contact.js"
 import { newsletterProvider } from "../newsletter/service.js"
 import { releaseAllUniquePieces } from "../products/reservation.js"
@@ -119,16 +120,13 @@ export async function eraseAccount(
     const blocker = await deletionBlocker(user, now, tx)
     if (blocker) return { blocker }
 
-    // Documents an order relied on: approved (or since expired), and uploaded no
-    // later than the last verification of this account's orders.
+    // Documents an order relied on: approved once (still valid or since expired),
+    // and uploaded no later than the last verification of this account's orders.
     const lastVerification = tx
       .select({ at: sql`max(${orders.legalVerifiedAt})` })
       .from(orders)
       .where(eq(orders.userId, userId))
-    const reliedOn = and(
-      inArray(legalDocuments.verificationStatus, ["approved", "expired"]),
-      lte(legalDocuments.uploadedAt, sql`(${lastVerification})`),
-    )
+    const reliedOn = and(approvedOnce, lte(legalDocuments.uploadedAt, sql`(${lastVerification})`))
     const erasedDocuments = await tx
       .delete(legalDocuments)
       .where(and(eq(legalDocuments.userId, userId), sql`not coalesce(${reliedOn}, false)`))
