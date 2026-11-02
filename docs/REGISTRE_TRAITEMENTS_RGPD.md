@@ -170,6 +170,18 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Destinataires | Personnel habilité de SCS Firearms ; Hetzner ; Brevo (e-mails de suivi). Le SIRET est vérifié auprès de l'API publique Recherche d'entreprises de l'État, qui ne reçoit que ce numéro |
 | Durée | Demande de devis jamais convertie en commande : 3 ans après sa dernière activité (purge quotidienne). Demande convertie : conservée avec la commande (10 ans). Organisation : tant que le compte existe |
 
+### 13. Formulaire de contact
+
+| | |
+|---|---|
+| Finalité | Recevoir les messages des visiteurs et clients envoyés depuis la page Contact, et y répondre |
+| Base légale | Intérêt légitime : répondre à la demande de la personne |
+| Personnes concernées | Toute personne qui écrit depuis la page Contact |
+| Données | Nom, e-mail, téléphone (facultatif), sujet, référence de commande (facultative), message ; date de réception, statut « à traiter / traité » et administrateur qui l'a traité. Aucune adresse IP n'est conservée avec le message |
+| Destinataires | Personnel habilité de SCS Firearms (écran « Messages » du back-office) ; Hetzner ; Brevo (e-mail d'alerte à l'adresse de contact de la boutique) |
+| Durée | 1 an après le traitement du message, ou 1 an après sa réception s'il n'a pas été traité (purge quotidienne). Supprimés aussi à la suppression du compte de la même adresse, et inclus dans l'export de ses données |
+| Mesures particulières | Anti-spam sans prestataire tiers (champ piège, durée minimale de saisie, limites d'envoi par réseau et par adresse) |
+
 ## Mesures de sécurité communes
 
 - Site servi exclusivement en HTTPS ; serveur limité à SSH, HTTP et HTTPS.
@@ -187,3 +199,4 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | 2026-10-19 | Création, à partir du site et de la politique de confidentialité (story 12.7e) |
 | 2026-10-19 | Mesure d'audience : conservation fixée à 25 mois, purge automatique ; cookie `__cf_bm` de Cloudflare déclaré |
 | 2026-11-01 | Droits d'accès, de portabilité et d'effacement en libre-service (story 12.11) ; durées fixées : compte (3 ans d'inactivité, puis anonymisation), pièces justificatives (10 ans si elles ont servi à une commande) |
+| 2026-11-01 | Formulaire de contact (traitement 13) : messages conservés 1 an après leur traitement ; identité de la boutique saisie au back-office |

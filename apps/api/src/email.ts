@@ -1,5 +1,7 @@
 import {
   type AnyLegalDocType,
+  CONTACT_SUBJECT_LABELS,
+  type ContactSubject,
   escapeHtml,
   type LegalDocRejectionReason,
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
@@ -320,6 +322,40 @@ export async function sendQuoteRequestAlertEmail(to: string[], request: QuoteReq
     subject: `[Devis] ${request.number} — ${request.legalName}`,
     text: lines.join("\n\n"),
     html: lines.map((line) => `<p>${escapeHtml(line)}</p>`).join(""),
+  })
+}
+
+/** Audit 2026-11-01 (I8b) — a message from the contact form, for the shop to answer. */
+export interface ContactMessageAlert {
+  id: string
+  name: string
+  /** The sender: answering the alert replies to them. */
+  replyTo: string
+  phone: string | null
+  subject: ContactSubject
+  orderReference: string | null
+  message: string
+}
+
+export async function sendContactMessageAlertEmail(to: string[], alert: ContactMessageAlert): Promise<void> {
+  if (to.length === 0) return
+  const details = [
+    `De : ${alert.name} <${alert.replyTo}>${alert.phone ? ` — ${alert.phone}` : ""}`,
+    `Sujet : ${CONTACT_SUBJECT_LABELS[alert.subject]}${alert.orderReference ? ` — commande ${alert.orderReference}` : ""}`,
+  ]
+  const footer = `Répondez directement à cet e-mail. Marquez le message comme traité ici : ${env.WEB_BASE_URL}/admin/messages`
+  // An internal alert: not journaled (it concerns no customer's account), and
+  // the sender's address goes in Reply-To, never in From (SPF/DMARC).
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    replyTo: alert.replyTo,
+    subject: `[Contact] ${CONTACT_SUBJECT_LABELS[alert.subject]} — ${alert.name}`,
+    text: `${details.join("\n")}\n\n${alert.message}\n\n${footer}`,
+    html:
+      details.map((line) => `<p>${escapeHtml(line)}</p>`).join("") +
+      `<blockquote style="white-space:pre-wrap">${escapeHtml(alert.message)}</blockquote>` +
+      `<p>${escapeHtml(footer)}</p>`,
   })
 }
 

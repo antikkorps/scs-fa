@@ -6,6 +6,7 @@ import { asc, desc, eq } from "drizzle-orm"
 import { db } from "../db/client.js"
 import {
   addresses,
+  contactMessages,
   legalDocuments,
   newsletterContacts,
   newsletterSubscriptions,
@@ -19,7 +20,7 @@ export async function buildAccountExport(userId: string, now: Date) {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
   if (!user) return null
 
-  const [addressRows, orderRows, quoteRows, documentRows, newsletterRows] = await Promise.all([
+  const [addressRows, orderRows, quoteRows, documentRows, newsletterRows, contactRows] = await Promise.all([
     db
       .select({
         label: addresses.label,
@@ -106,6 +107,18 @@ export async function buildAccountExport(userId: string, now: Date) {
       .innerJoin(newsletterContacts, eq(newsletterContacts.id, newsletterSubscriptions.contactId))
       .where(eq(newsletterContacts.emailHash, newsletterEmailHash(user.email)))
       .orderBy(asc(newsletterSubscriptions.segment)),
+    // Messages sent from the account's address through the contact form.
+    db
+      .select({
+        subject: contactMessages.subject,
+        orderReference: contactMessages.orderReference,
+        message: contactMessages.message,
+        phone: contactMessages.phone,
+        createdAt: contactMessages.createdAt,
+      })
+      .from(contactMessages)
+      .where(eq(contactMessages.email, user.email))
+      .orderBy(desc(contactMessages.createdAt)),
   ])
 
   return {
@@ -135,5 +148,6 @@ export async function buildAccountExport(userId: string, now: Date) {
     quoteRequests: quoteRows,
     legalDocuments: documentRows,
     newsletter: newsletterRows,
+    contactMessages: contactRows,
   }
 }
