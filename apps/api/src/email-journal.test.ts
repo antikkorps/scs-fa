@@ -53,6 +53,7 @@ describe("e-mail journal (story 12.7c)", () => {
       paymentDueAt: new Date(),
       shippingAddress: ["Jean Tireur"],
       termsVersion: CURRENT_TERMS_VERSION,
+      retail: null,
     })
 
   beforeAll(async () => {

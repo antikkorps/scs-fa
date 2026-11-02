@@ -78,3 +78,74 @@ export function htCentsForTtc(ttcCents: number, vatPct: number): number | null {
   }
   return null
 }
+
+/** What the VAT-included totals need of a line: its rate and its VIP discount. */
+export interface RetailLine {
+  vatPct: number
+  /** VIP discount on the whole line, HT. */
+  discountHt: number
+}
+
+export interface RetailTotals {
+  /** Goods before the VIP discount, VAT included. */
+  itemsTtc: number
+  vipDiscountTtc: number
+  shippingTtc: number
+  /** VAT the total includes ("dont TVA"). */
+  vatAmount: number
+  totalTtc: number
+}
+
+/** A line's price VAT included, before any VIP discount. */
+export function lineTtc(line: { priceHt: number; qty: number; vatPct: number }): number {
+  return computePriceTtc(line.priceHt * line.qty, line.vatPct)
+}
+
+/**
+ * The totals an individual reads, VAT included (audit 2026-11-01, I4; pros keep
+ * HT). The total and the VAT stay the ones computed by rate (computeVatTotals);
+ * the goods row takes the rounding cent so goods − discount + delivery = total.
+ */
+export function retailTotals(input: {
+  lines: RetailLine[]
+  shippingTtc: number
+  vatAmount: number
+  totalTtc: number
+}): RetailTotals {
+  const vipDiscountTtc = round2(
+    input.lines.reduce((sum, line) => sum + computePriceTtc(line.discountHt, line.vatPct), 0),
+  )
+  return {
+    itemsTtc: round2(input.totalTtc - input.shippingTtc + vipDiscountTtc),
+    vipDiscountTtc,
+    shippingTtc: input.shippingTtc,
+    vatAmount: input.vatAmount,
+    totalTtc: input.totalTtc,
+  }
+}
+
+/**
+ * How an order is told to its buyer: VAT included for an individual, or null to
+ * keep the HT breakdown — for a pro order, born of a quote and priced HT like it,
+ * and for an old order whose lines never recorded their VAT rate.
+ */
+export function orderRetailTotals(order: {
+  quoteRequestId: string | null | undefined
+  items: Array<{ vatPct?: number; discountHt?: number }>
+  shippingTtc: number
+  vatAmount: number
+  totalTtc: number
+}): RetailTotals | null {
+  if (order.quoteRequestId) return null
+  const lines: RetailLine[] = []
+  for (const item of order.items) {
+    if (item.vatPct === undefined) return null
+    lines.push({ vatPct: item.vatPct, discountHt: item.discountHt ?? 0 })
+  }
+  return retailTotals({
+    lines,
+    shippingTtc: order.shippingTtc,
+    vatAmount: order.vatAmount,
+    totalTtc: order.totalTtc,
+  })
+}

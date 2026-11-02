@@ -121,7 +121,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
 
         <aside class="summary">
           <p v-if="cart.isVip" class="summary__vip">Avantage VIP appliqué</p>
-          <CartTotals :summary="cart.summary" />
+          <CartTotals :cart="cart" />
 
           <button type="button" class="btn btn-primary summary__cta" @click="$router.push('/commande')">
             Passer commande

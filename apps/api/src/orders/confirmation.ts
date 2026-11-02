@@ -1,4 +1,4 @@
-import { orderPaymentDeadline, orderReference } from "@armurier/shared"
+import { orderPaymentDeadline, orderReference, orderRetailTotals } from "@armurier/shared"
 import { and, eq, isNotNull, isNull, lt, sql } from "drizzle-orm"
 import type { FastifyBaseLogger, FastifyInstance } from "fastify"
 import { db } from "../db/client.js"
@@ -77,6 +77,13 @@ export async function sendOrderConfirmation(orderId: string, log: Logger): Promi
           ]
         : [],
       termsVersion,
+      retail: orderRetailTotals({
+        quoteRequestId: order.quoteRequestId,
+        items: order.itemsJson,
+        shippingTtc: Number(order.shippingCost ?? 0),
+        vatAmount: Number(order.vatAmount),
+        totalTtc: Number(order.totalTtc),
+      }),
     })
     return true
   } catch (err) {
