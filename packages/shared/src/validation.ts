@@ -292,6 +292,13 @@ const tagsFilterSchema = z.preprocess((value) => {
   return entries.length > 0 ? [...new Set(entries)] : undefined
 }, z.array(tagSlugSchema).max(MAX_TAG_FILTERS).optional())
 
+/**
+ * How a visitor may order the catalogue (UX audit 2026-11-01, I6). "relevance"
+ * is the default: by search rank when there is a search, else featured then newest.
+ */
+export const PRODUCT_SORTS = ["relevance", "price_asc", "price_desc", "newest"] as const
+export type ProductSort = (typeof PRODUCT_SORTS)[number]
+
 export const productFiltersSchema = z
   .object({
     category: categorySlugSchema.optional(),
@@ -302,6 +309,7 @@ export const productFiltersSchema = z
     maxPrice: z.coerce.number().nonnegative().optional(),
     page: z.coerce.number().int().positive().default(1),
     limit: z.coerce.number().int().positive().max(100).default(20),
+    sort: z.enum(PRODUCT_SORTS).default("relevance"),
   })
   .refine((f) => f.minPrice === undefined || f.maxPrice === undefined || f.maxPrice >= f.minPrice, {
     message: "maxPrice must be greater than or equal to minPrice",

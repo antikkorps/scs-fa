@@ -1,4 +1,4 @@
-import { computePriceTtc, type ProductFilters, productFiltersSchema } from "@armurier/shared"
+import { computePriceTtc, type ProductFilters, type ProductSort, productFiltersSchema } from "@armurier/shared"
 import { and, asc, desc, eq, gte, lte, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
@@ -27,12 +27,32 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
   })
 }
 
+/** The price a visitor reads: tax included, at the product's own rate. */
+const priceTtcSql = sql`${products.priceHt} * (1 + coalesce(${products.vatPct}, 0) / 100)`
+
+/**
+ * The visitor's chosen order (UX audit 2026-11-01, I6). By default, search
+ * results are ranked by relevance; otherwise featured first, then newest.
+ */
+function catalogueOrder(sort: ProductSort, search: string | undefined): SQL[] {
+  if (sort === "price_asc") return [asc(priceTtcSql)]
+  if (sort === "price_desc") return [desc(priceTtcSql)]
+  if (sort === "newest") return [desc(products.createdAt)]
+  if (search) {
+    return [
+      desc(sql`ts_rank(${products.searchVector}, websearch_to_tsquery('french', ${search}))`),
+      desc(products.createdAt),
+    ]
+  }
+  return [desc(products.featured), desc(products.createdAt)]
+}
+
 /**
  * One page of the catalogue, filtered and ranked, under the visibility the
  * caller sets: the public one, or the pro catalogue's (story 12.8c).
  */
 export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
-  const { category, tags: tagSlugs, legalCategory, search, minPrice, maxPrice, page, limit } = filters
+  const { category, tags: tagSlugs, legalCategory, search, minPrice, maxPrice, page, limit, sort } = filters
 
   const conditions: SQL[] = [visibility]
   if (category) conditions.push(eq(productCategories.slug, category))
@@ -46,13 +66,7 @@ export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
 
   const where = and(...conditions)
 
-  // Search results are ranked by relevance; otherwise featured first, then newest
-  const orderBy = search
-    ? [
-        desc(sql`ts_rank(${products.searchVector}, websearch_to_tsquery('french', ${search}))`),
-        desc(products.createdAt),
-      ]
-    : [desc(products.featured), desc(products.createdAt)]
+  const orderBy = catalogueOrder(sort, search)
 
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
