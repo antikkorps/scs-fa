@@ -247,7 +247,16 @@ describe("the deletion of an account by its holder (story 12.11)", () => {
         verificationStatus: "approved",
         uploadedAt: new Date(Date.now() - 60 * DAY_MS),
       })
+      const reliedSinceExpired = await storedDocument(account.id, {
+        verificationStatus: "expired",
+        verifiedAt: new Date(Date.now() - 55 * DAY_MS),
+        uploadedAt: new Date(Date.now() - 60 * DAY_MS),
+      })
       const neverUsed = await storedDocument(account.id, { verificationStatus: "pending" })
+      const expiredUnreviewed = await storedDocument(account.id, {
+        verificationStatus: "expired",
+        uploadedAt: new Date(Date.now() - 60 * DAY_MS),
+      })
       const old = await createOrder(account.id, {
         paymentStatus: "received",
         shippingStatus: "delivered",
@@ -268,9 +277,11 @@ describe("the deletion of an account by its holder (story 12.11)", () => {
         .select({ id: legalDocuments.id })
         .from(legalDocuments)
         .where(eq(legalDocuments.userId, account.id))
-      expect(left.map((doc) => doc.id)).toEqual([relied.id])
+      expect(left.map((doc) => doc.id).sort()).toEqual([relied.id, reliedSinceExpired.id].sort())
       expect(await stillStored(relied.s3Key)).toBe(true)
+      expect(await stillStored(reliedSinceExpired.s3Key)).toBe(true)
       expect(await stillStored(neverUsed.s3Key)).toBe(false)
+      expect(await stillStored(expiredUnreviewed.s3Key)).toBe(false)
     })
 
     it("erases the newsletter address, keeping only the anonymous proof of consent", async () => {

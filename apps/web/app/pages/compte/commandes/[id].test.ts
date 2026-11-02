@@ -105,3 +105,38 @@ describe("my order — unpaid orders (story 12.9a)", () => {
     expect(wrapper.text()).not.toContain("Procéder au paiement")
   })
 })
+
+describe("my order — prices (audit 2026-11-01, I4)", () => {
+  // A rifle at 1,000 € HT with 100 € HT of VIP discount, 20 % VAT, 25 € delivery TTC.
+  const rifleOrder = (overrides: Partial<OrderDetail> = {}) =>
+    order({
+      subtotalHt: 1000,
+      vipDiscountAmount: 100,
+      vipDiscountAppliedPct: 10,
+      shippingCost: 25,
+      shippingHt: 20.83,
+      vatAmount: 184.17,
+      totalTtc: 1105,
+      items: [{ name: "Carabine", qty: 1, priceHt: 1000, vatPct: 20, discountHt: 100 }],
+      ...overrides,
+    })
+
+  it("shows an individual every amount VAT included, the VAT as part of the total", async () => {
+    getOrder.mockResolvedValue(rifleOrder())
+    const text = (await mounted()).find(".block .totals").element.closest("section")?.textContent ?? ""
+    expect(text).not.toMatch(/\bHT\b/)
+    expect(text).toMatch(/1\s200,00\s*€ TTC/)
+    expect(text).toMatch(/Articles\s*1\s200,00/)
+    expect(text).toMatch(/Remise VIP[^−]*−\s*120,00/)
+    expect(text).toMatch(/Livraison\s*25,00/)
+    expect(text).toMatch(/Total TTC\s*1\s105,00/)
+    expect(text).toMatch(/dont TVA\s*184,17/)
+  })
+
+  it("keeps a pro order (born of a quote) HT, as the pro space shows it", async () => {
+    getOrder.mockResolvedValue(rifleOrder({ quoteRequestId: "q-1", vipDiscountAmount: 0 }))
+    const text = (await mounted()).text()
+    expect(text).toContain("Sous-total HT")
+    expect(text).toMatch(/1\s000,00\s*€ HT/)
+  })
+})

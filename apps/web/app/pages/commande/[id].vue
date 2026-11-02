@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { orderReference } from "@armurier/shared"
 import type { OrderDetail } from "~/types/checkout"
-import { formatEuros } from "~/utils/format"
+import { formatEuros, formatIban } from "~/utils/format"
 import { legalStatusLabel, paymentDeadlineNote, paymentStatusLabel, statusTone } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
@@ -161,10 +161,22 @@ async function declareTransfer() {
           </p>
           <dl class="rib">
             <div><dt>Bénéficiaire</dt><dd>{{ virement.accountHolder ?? "—" }}</dd></div>
-            <div><dt>IBAN</dt><dd>{{ virement.iban }}</dd></div>
-            <div><dt>BIC</dt><dd>{{ virement.bic ?? "—" }}</dd></div>
+            <div>
+              <dt>IBAN</dt>
+              <dd><CopyValue :value="virement.iban" :display="formatIban(virement.iban)" label="l'IBAN" /></dd>
+            </div>
+            <div>
+              <dt>BIC</dt>
+              <dd>
+                <CopyValue v-if="virement.bic" :value="virement.bic" label="le BIC" />
+                <template v-else>—</template>
+              </dd>
+            </div>
             <div><dt>Banque</dt><dd>{{ virement.bankName ?? "—" }}</dd></div>
-            <div class="rib__ref"><dt>Référence à indiquer</dt><dd>{{ virement.reference }}</dd></div>
+            <div class="rib__ref">
+              <dt>Référence à indiquer</dt>
+              <dd><CopyValue :value="virement.reference" label="la référence" /></dd>
+            </div>
           </dl>
 
           <template v-if="virementPending">
@@ -314,19 +326,23 @@ async function declareTransfer() {
   display: grid;
   gap: 0.6rem;
 }
+/* A long value (the IBAN) drops under its label on a phone rather than being
+   cut mid-group (audit 2026-11-01, I1). */
 .rib > div {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.25rem 1rem;
   font-size: var(--fs-base);
 }
 .rib dt {
   color: var(--paper-faint);
 }
 .rib dd {
-  margin: 0;
+  margin: 0 0 0 auto;
   text-align: right;
-  word-break: break-all;
+  font-variant-numeric: var(--nums);
 }
 .rib__ref dd {
   color: var(--brass);
