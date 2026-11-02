@@ -2,7 +2,8 @@
 import type { ProductDetail, ProductVariant } from "~/types/product"
 import { availabilityLongLabel, availabilityState, isPurchasable } from "~/utils/availability"
 import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES, ogImageUrl } from "~/utils/format"
-import { conditionLabel, legalCategoryLabel, legalDocLabel, stockLabel } from "~/utils/product"
+import { legalDocLabel } from "~/utils/legal"
+import { conditionLabel, legalCategoryLabel, stockLabel } from "~/utils/product"
 import { productJsonLd } from "~/utils/structuredData"
 
 const route = useRoute()

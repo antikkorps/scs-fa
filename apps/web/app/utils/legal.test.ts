@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { formatFileSize, legalDocUploadMessage, needsUpload, requiredDocStatusLabel, requiredDocTone } from "./legal.js"
+import {
+  formatFileSize,
+  legalDocHelp,
+  legalDocLabel,
+  legalDocUploadMessage,
+  needsUpload,
+  requiredDocStatusLabel,
+  requiredDocTone,
+} from "./legal.js"
 
 describe("requiredDocStatusLabel", () => {
   it("translates required-doc statuses", () => {
@@ -36,7 +44,9 @@ describe("formatFileSize", () => {
   it("formats bytes / Ko / Mo", () => {
     expect(formatFileSize(512)).toBe("512 o")
     expect(formatFileSize(2048)).toBe("2 Ko")
-    expect(formatFileSize(5 * 1024 * 1024)).toBe("5.0 Mo")
+    // French decimals, and no ",0" on a round size.
+    expect(formatFileSize(5 * 1024 * 1024)).toBe("5 Mo")
+    expect(formatFileSize(2.5 * 1024 * 1024)).toBe("2,5 Mo")
   })
 })
 
@@ -49,7 +59,7 @@ describe("legalDocUploadMessage", () => {
     )
   })
   it("translates the size and format refusals", () => {
-    expect(legalDocUploadMessage(apiError(413))).toBe("Fichier trop volumineux (max 10.0 Mo).")
+    expect(legalDocUploadMessage(apiError(413))).toBe("Fichier trop volumineux (max 10 Mo).")
     expect(legalDocUploadMessage(apiError(415, "UnsupportedMediaType"))).toBe(
       "Format de fichier non accepté ou contenu non conforme.",
     )
@@ -59,5 +69,33 @@ describe("legalDocUploadMessage", () => {
       "Document invalide. Vérifiez le fichier et les informations saisies.",
     )
     expect(legalDocUploadMessage(new Error("network"))).toBe("L'envoi a échoué. Veuillez réessayer.")
+  })
+})
+
+// UX audit 2026-11-01 (I2): customers read "cni" or "SIA" without a word of
+// explanation, and could not tell whether a passport would do.
+describe("legalDocLabel", () => {
+  it("names each document in full, a passport counting as an identity document", () => {
+    expect(legalDocLabel("cni")).toBe("Pièce d'identité (carte d'identité ou passeport)")
+    expect(legalDocLabel("sia")).toBe("Numéro de détenteur SIA")
+    expect(legalDocLabel("autorisation_det")).toBe("Autorisation préfectorale de détention")
+  })
+
+  it("names an organisation's documents too", () => {
+    expect(legalDocLabel("autorisation_cnaps")).toBe("Autorisation CNAPS")
+  })
+})
+
+describe("legalDocHelp", () => {
+  it("explains what the SIA is", () => {
+    expect(legalDocHelp("sia")).toMatch(/Système d'information sur les armes/)
+  })
+
+  it("says what to send for an identity document", () => {
+    expect(legalDocHelp("cni")).toMatch(/passeport/)
+  })
+
+  it("has nothing to add for a document that needs no explanation", () => {
+    expect(legalDocHelp("autorisation_cnaps")).toBeNull()
   })
 })
