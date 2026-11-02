@@ -20,7 +20,14 @@ const { product, addVariantMock, navigateToMock, auth } = vi.hoisted(() => ({
     featuredImageUrl: null,
     category: { slug: "carabines", name: "Carabines" },
     tags: [],
-    legalCategory: null,
+    legalCategory: {
+      category: "C",
+      name: "Catégorie C",
+      description: null,
+      requiresVerification: true,
+      minAge: 18,
+      requiredDocTypes: ["hunting_permit"],
+    },
     ageMinRequired: null,
     hasAccessoryRestrictions: false,
     accessoryRestrictionNotes: null,
@@ -101,5 +108,23 @@ describe("boutique/[slug].vue — back from the login", () => {
     const wrapper = await mounted("/boutique/carabine-22?ajouter=someone-else")
     expect(addVariantMock).not.toHaveBeenCalled()
     expect(wrapper.find("[role='alert']").text()).toMatch(/n'est plus disponible/)
+  })
+})
+
+// UX audit 2026-11-01 (I7): at 375 px the purchase came after the whole text,
+// and the box of purchase conditions was titled like the site's legal notice.
+describe("boutique/[slug].vue — page order", () => {
+  it("puts the purchase right after the price and the variants, then the rules, then the text", async () => {
+    const wrapper = await mounted()
+    const blocks = wrapper.findAll(".detail__info > *").map((block) => block.classes())
+    const position = (name: string) => blocks.findIndex((classes) => classes.includes(name))
+    expect(position("variants")).toBeLessThan(position("detail__cta"))
+    expect(position("detail__cta")).toBeLessThan(position("legal"))
+    expect(position("legal")).toBeLessThan(position("detail__desc"))
+  })
+
+  it("titles the box of purchase conditions « Réglementation »", async () => {
+    const wrapper = await mounted()
+    expect(wrapper.find("#legal-h").text()).toBe("Réglementation")
   })
 })
