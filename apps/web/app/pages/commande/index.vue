@@ -2,7 +2,7 @@
 import { CURRENT_TERMS_VERSION, isDeliverableAddress } from "@armurier/shared"
 import type { CartChange, CartView } from "~/types/cart"
 import type { Address } from "~/types/checkout"
-import { cartChangeLabel, earliestHold } from "~/utils/cart"
+import { cartChangeLabel, earliestHold, variantDescription } from "~/utils/cart"
 import { formatDate, formatEuros } from "~/utils/format"
 import { addressLine, UNDELIVERABLE_MESSAGE } from "~/utils/order"
 
@@ -165,6 +165,25 @@ async function placeOrder() {
           <h2 class="section__h">Récapitulatif</h2>
           <CartHoldCountdown v-if="holdEndsAt" :held-until="holdEndsAt" @expired="onHoldExpired" />
           <p v-if="holdNotice" class="hold-notice" role="status">{{ holdNotice }}</p>
+          <!-- What the totals are for (UX audit 2026-11-01, I5). -->
+          <ul class="order-lines" role="list">
+            <li v-for="line in cart.items" :key="line.id" class="order-line">
+              <p class="order-line__name">
+                {{ line.name }}
+                <span v-if="variantDescription(line)" class="order-line__detail">{{ variantDescription(line) }}</span>
+              </p>
+              <p class="order-line__qty">× {{ line.qty }}</p>
+              <p class="order-line__price">{{ formatEuros(line.lineTtc) }}</p>
+            </li>
+            <li v-for="print in cart.artworkItems" :key="print.id" class="order-line">
+              <p class="order-line__name">
+                {{ print.title }}
+                <span class="order-line__detail">Tirage {{ print.printDesignation }} · {{ print.formatId }}</span>
+              </p>
+              <p class="order-line__qty">× 1</p>
+              <p class="order-line__price">{{ formatEuros(print.lineTtc) }}</p>
+            </li>
+          </ul>
           <CartTotals :cart="cart" />
           <label class="terms">
             <input v-model="termsAccepted" type="checkbox" name="terms" required />
@@ -261,6 +280,41 @@ async function placeOrder() {
   border-radius: var(--radius);
   padding: 1.5rem;
   align-self: start;
+}
+.order-lines {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid var(--ink-line);
+  display: grid;
+  gap: 0.75rem;
+}
+.order-line {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: var(--fs-sm);
+}
+.order-line p {
+  margin: 0;
+}
+.order-line__name {
+  color: var(--paper);
+  overflow-wrap: anywhere;
+}
+.order-line__detail {
+  display: block;
+  color: var(--paper-dim);
+}
+.order-line__qty {
+  color: var(--paper-dim);
+  white-space: nowrap;
+}
+.order-line__price {
+  color: var(--paper);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .cart-changes {
   margin: 0 0 1rem;

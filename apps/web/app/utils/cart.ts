@@ -33,3 +33,10 @@ export function cartChangeLabel(change: CartChange, cart: PricedLines): string {
   const after = formatEuros(computePriceTtc(change.priceHt, vatPct))
   return `${change.name} : le prix est passé de ${before} à ${after} TTC.`
 }
+
+type VariantAttributes = Pick<CartView["items"][number], "finition" | "munition" | "couleur">
+
+/** The variant a cart line is for ("Inox · .22 LR"); empty for a product without variants. */
+export function variantDescription(line: VariantAttributes): string {
+  return [line.finition, line.munition, line.couleur].filter(Boolean).join(" · ")
+}

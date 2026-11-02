@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { cartChangeLabel, earliestHold } from "./cart.js"
+import { cartChangeLabel, earliestHold, variantDescription } from "./cart.js"
 import { formatEuros } from "./format.js"
 
 describe("earliestHold (story 12.9a)", () => {
@@ -48,5 +48,15 @@ describe("cartChangeLabel (story 12.9d)", () => {
     expect(cartChangeLabel({ kind: "category_a", lineId: "l-9", name: "Fusil" }, cart)).toBe(
       "Fusil relève de la catégorie A, vendue aux seuls professionnels sur devis : il a été retiré de votre panier.",
     )
+  })
+})
+
+describe("variantDescription", () => {
+  it("joins the variant's own attributes", () => {
+    expect(variantDescription({ finition: "Inox", munition: ".22 LR", couleur: null })).toBe("Inox · .22 LR")
+  })
+
+  it("is empty for a product without variant attributes", () => {
+    expect(variantDescription({ finition: null, munition: null, couleur: null })).toBe("")
   })
 })
