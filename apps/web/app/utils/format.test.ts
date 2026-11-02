@@ -8,6 +8,7 @@ import {
   formatDate,
   formatDateTime,
   formatEuros,
+  formatIban,
   formatNumber,
   formatPercent,
   ogImageSize,
@@ -168,5 +169,15 @@ describe("share-card image", () => {
   it("states a size only for a card, whose size is known", () => {
     expect(ogImageSize(`${SITE}/api/media/${ID}/og.jpg`)).toEqual({ width: 1200, height: 630 })
     expect(ogImageSize("https://cdn.example/a.jpg")).toBeUndefined()
+  })
+})
+
+describe("formatIban", () => {
+  it("groups an IBAN by four, the way a bank prints it", () => {
+    expect(formatIban("FR7630006000011234567890189")).toBe("FR76 3000 6000 0112 3456 7890 189")
+  })
+
+  it("regroups an IBAN stored with its own spacing", () => {
+    expect(formatIban(" fr76 3000 6000 0112 3456 7890 189 ")).toBe("FR76 3000 6000 0112 3456 7890 189")
   })
 })

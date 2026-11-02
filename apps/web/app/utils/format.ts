@@ -213,3 +213,9 @@ export function availabilityLabel(availableCount: number, editionLimit: number):
   if (availableCount === 1) return "Dernier exemplaire"
   return `${availableCount} / ${editionLimit} disponibles`
 }
+
+/** An IBAN grouped by four, as a bank prints it, so it can be read and compared. */
+export function formatIban(iban: string): string {
+  const compact = iban.replace(/\s+/g, "").toUpperCase()
+  return compact.match(/.{1,4}/g)?.join(" ") ?? compact
+}
