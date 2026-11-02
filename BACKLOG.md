@@ -84,7 +84,7 @@
 
 **Story 2.1** — Listing produits avec filtres ✅
 
-- [x] Critères : pagination (page/limit, max 100), filtres catégorie (slug `product_categories`), prix (minPrice/maxPrice sur priceHt), légale (enum A/B/C/D/none), search full-text Postgres
+- [x] Critères : pagination (page/limit, max 100), filtres catégorie (slug `product_categories`), prix (minPrice/maxPrice sur priceHt ; **TTC depuis le 2026-11-02**, cf. story 12.12), légale (enum A/B/C/D/none), search full-text Postgres
 - [x] Endpoint public : `GET /api/products` (published-only, enveloppe `{ data, pagination }`, priceTtc calculé)
 - [x] Full-text : colonne générée `products.search_vector` (tsvector `french`, name=A/description=B/longDescription=C) + index GIN, ranking via `ts_rank` + `websearch_to_tsquery` (appliqué via psql ALTER + reflété dans schema.ts)
 - [x] Validation : `productFiltersSchema` (shared) — slug regex, refine maxPrice ≥ minPrice
@@ -1139,6 +1139,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] I8 aucun contact → **fiche « Identité de la boutique » au back-office** (décision Franck 2026-11-01) : remplace la constante du code, lue par les mentions légales, les CGV, la confidentialité, l'e-mail de commande et la nouvelle page `/contact` (migration 0044) ; une page légale reste non indexée tant qu'un fait manque
 - [x] I8b **formulaire de contact** (décision Franck 2026-11-01) : nom, e-mail, téléphone facultatif, sujet (Commande, Arme ou produit, Gun Art, Compte professionnel, Autre), référence de commande facultative, message ; enregistré en base + écran admin « Messages » (à traiter / traité) + e-mail de notification avec « Répondre à » ; anti-spam champ piège + limite par IP et e-mail + temps minimal, pas de captcha tiers ; conservation 1 an après traitement (purge quotidienne), registre et politique mis à jour
 - [x] Retour au site depuis l'administration (bouton dans la barre du haut ; demande de Franck 2026-11-01)
+- [x] Filtre de prix de la boutique en **TTC** (décision Franck 2026-11-02, suite de I4) : bornes comparées au prix TTC arrondi au centime, au taux de chaque article, champs libellés « TTC » ; le catalogue pro ignore toujours les bornes de prix
 - [ ] I9 back-office : tiroir de vérification d'une pièce sans la commande ni l'arme, ni aperçu ; codes bruts (« clean ») ; recherche de commande par référence
 - [x] Retours de Franck sur l'admin (PR #209) : dates sur une ligne et e-mails coupés dans les listes, actions en icônes avec infobulle, champs du simulateur alignés
 
