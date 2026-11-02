@@ -37,6 +37,13 @@ const base = {
   paymentDueAt: new Date("2026-10-06T14:05:00Z"),
   shippingAddress: ["Jean Dupont", "1 rue X", "75001 Paris"],
   termsVersion: CURRENT_TERMS_VERSION,
+  retail: null as null | {
+    itemsTtc: number
+    vipDiscountTtc: number
+    shippingTtc: number
+    vatAmount: number
+    totalTtc: number
+  },
 }
 
 async function send(overrides: Partial<typeof base> = {}) {
@@ -82,6 +89,24 @@ describe("sendOrderConfirmationEmail (story 12.1)", () => {
     }
     expect(mail.text).toContain("Je vous notifie par la présente ma rétractation")
     expect(mail.text).toMatch(/version du \d{1,2} \S+ \d{4}\)/)
+  })
+
+  it("gives an individual the amounts VAT included, the VAT as part of the total (audit 2026-11-01, I4)", async () => {
+    const mail = await send({
+      retail: { itemsTtc: 1200, vipDiscountTtc: 24, shippingTtc: 25, vatAmount: 200, totalTtc: 1201 },
+    })
+    expect(mail.text).not.toMatch(/\bHT\b/)
+    expect(mail.text).toMatch(/Articles : 1\s200,00\s€/)
+    expect(mail.text).toMatch(/Remise VIP : − 24,00\s€/)
+    expect(mail.text).toMatch(/Livraison : 25,00\s€/)
+    expect(mail.text).toMatch(/Total TTC : 1\s201,00\s€/)
+    expect(mail.text).toMatch(/dont TVA : 200,00\s€/)
+  })
+
+  it("keeps the HT breakdown for a pro order", async () => {
+    const mail = await send()
+    expect(mail.text).toMatch(/Sous-total HT : 1\s000,00\s€/)
+    expect(mail.text).toMatch(/Livraison HT : 20,83\s€/)
   })
 
   it("escapes customer-controlled values in the HTML part", async () => {

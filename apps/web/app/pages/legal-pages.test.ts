@@ -89,4 +89,10 @@ describe("legal pages (story 12.1)", () => {
     expect(rights).toContainEqual(expect.stringMatching(/Télécharger mes données/))
     expect(rights).toContainEqual(expect.stringMatching(/Supprimer mon compte/))
   })
+
+  it("states how long a contact form message is kept (audit 2026-11-01, I8b)", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const row = wrapper.findAll("tr").find((line) => line.text().startsWith("Messages envoyés depuis la page Contact"))
+    expect(row?.text()).toContain("1 an")
+  })
 })

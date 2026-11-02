@@ -129,7 +129,8 @@ describe("commande/index.vue — shipping (story 12.3)", () => {
   it("shows the delivery cost in the summary before ordering", async () => {
     const wrapper = await mountCheckout()
     const text = wrapper.find(".summary").text()
-    expect(text).toContain("Livraison HT")
+    expect(text).toContain("Livraison")
+    expect(text).not.toMatch(/\bHT\b/)
     expect(text).toContain("Munitions et accessoires")
     expect(text).toMatch(/129,00/)
   })

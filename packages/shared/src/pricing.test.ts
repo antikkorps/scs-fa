@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { computeVatTotals, htCentsForTtc } from "./pricing.js"
+import { computeVatTotals, htCentsForTtc, lineTtc, orderRetailTotals, retailTotals, round2 } from "./pricing.js"
 
 describe("computeVatTotals", () => {
   it("adds the HT of each rate before computing its VAT, as Henrri does", () => {
@@ -64,5 +64,70 @@ describe("htCentsForTtc", () => {
 
   it("prices everything at a zero rate", () => {
     expect(htCentsForTtc(1_234, 0)).toBe(1_234)
+  })
+})
+
+describe("retailTotals", () => {
+  it("shows an individual the goods, the VIP discount and the delivery VAT included, adding up to the total", () => {
+    // 100 HT at 20 % with 10 HT off (12 TTC), 7.99 HT at 5.5 %, 12 € delivery TTC (2 of VAT).
+    const totals = retailTotals({
+      lines: [
+        { vatPct: 20, discountHt: 10 },
+        { vatPct: 5.5, discountHt: 0 },
+      ],
+      shippingTtc: 12,
+      vatAmount: 20.44,
+      totalTtc: 128.43,
+    })
+    expect(totals).toEqual({
+      itemsTtc: 128.43,
+      vipDiscountTtc: 12,
+      shippingTtc: 12,
+      vatAmount: 20.44,
+      totalTtc: 128.43,
+    })
+    expect(round2(totals.itemsTtc - totals.vipDiscountTtc + totals.shippingTtc)).toBe(totals.totalTtc)
+  })
+
+  it("takes the rounding cent into the goods so the rows always add up", () => {
+    // Three lines of 0.33 HT: 0.40 TTC each line by line, but 1.19 by rate.
+    const line = { vatPct: 20, discountHt: 0 }
+    const totals = retailTotals({ lines: [line, line, line], shippingTtc: 0, vatAmount: 0.2, totalTtc: 1.19 })
+    expect(totals.itemsTtc).toBe(1.19)
+    expect(totals.vipDiscountTtc).toBe(0)
+  })
+})
+
+describe("lineTtc", () => {
+  it("prices a line VAT included, before any VIP discount", () => {
+    expect(lineTtc({ priceHt: 12.5, qty: 3, vatPct: 20 })).toBe(45)
+  })
+})
+
+describe("orderRetailTotals", () => {
+  const order = {
+    quoteRequestId: null,
+    items: [{ vatPct: 20, discountHt: 10 }],
+    shippingTtc: 0,
+    vatAmount: 18,
+    totalTtc: 108,
+  }
+
+  it("tells an individual's order VAT included", () => {
+    expect(orderRetailTotals(order)).toEqual({
+      itemsTtc: 120,
+      vipDiscountTtc: 12,
+      shippingTtc: 0,
+      vatAmount: 18,
+      totalTtc: 108,
+    })
+  })
+
+  it("leaves a pro order (born of a quote) HT", () => {
+    expect(orderRetailTotals({ ...order, quoteRequestId: "q-1" })).toBeNull()
+  })
+
+  it("leaves HT an old order whose lines carry no VAT rate", () => {
+    expect(orderRetailTotals({ ...order, items: [{ discountHt: 0 }] })).toBeNull()
   })
 })

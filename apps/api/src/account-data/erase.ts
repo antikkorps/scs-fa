@@ -14,6 +14,7 @@ import {
   artworkCartItems,
   auditLogs,
   cartItems,
+  contactMessages,
   legalDocuments,
   loginChallenges,
   newsletterContacts,
@@ -29,6 +30,7 @@ import {
   users,
 } from "../db/schema.js"
 import { sendAccountDeletedEmail } from "../email.js"
+import { approvedOnce } from "../legal-documents/approved-once.js"
 import { newsletterEmailHash } from "../newsletter/contact.js"
 import { newsletterProvider } from "../newsletter/service.js"
 import { releaseAllUniquePieces } from "../products/reservation.js"
@@ -118,16 +120,13 @@ export async function eraseAccount(
     const blocker = await deletionBlocker(user, now, tx)
     if (blocker) return { blocker }
 
-    // Documents an order relied on: approved (or since expired), and uploaded no
-    // later than the last verification of this account's orders.
+    // Documents an order relied on: approved once (still valid or since expired),
+    // and uploaded no later than the last verification of this account's orders.
     const lastVerification = tx
       .select({ at: sql`max(${orders.legalVerifiedAt})` })
       .from(orders)
       .where(eq(orders.userId, userId))
-    const reliedOn = and(
-      inArray(legalDocuments.verificationStatus, ["approved", "expired"]),
-      lte(legalDocuments.uploadedAt, sql`(${lastVerification})`),
-    )
+    const reliedOn = and(approvedOnce, lte(legalDocuments.uploadedAt, sql`(${lastVerification})`))
     const erasedDocuments = await tx
       .delete(legalDocuments)
       .where(and(eq(legalDocuments.userId, userId), sql`not coalesce(${reliedOn}, false)`))
@@ -154,6 +153,8 @@ export async function eraseAccount(
     await tx.delete(recoveryCodes).where(eq(recoveryCodes.userId, userId))
 
     const newsletterErased = await eraseNewsletterAddress(tx, user.email, now)
+    // What the person wrote through the contact form, from this address.
+    await tx.delete(contactMessages).where(eq(contactMessages.email, user.email))
 
     // The account's own journal lines keep their dates and actions (security
     // history, 1 year) but no longer what they said: names, phone, addresses.

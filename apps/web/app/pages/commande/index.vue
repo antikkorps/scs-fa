@@ -165,7 +165,7 @@ async function placeOrder() {
           <h2 class="section__h">Récapitulatif</h2>
           <CartHoldCountdown v-if="holdEndsAt" :held-until="holdEndsAt" @expired="onHoldExpired" />
           <p v-if="holdNotice" class="hold-notice" role="status">{{ holdNotice }}</p>
-          <CartTotals :summary="cart.summary" />
+          <CartTotals :cart="cart" />
           <label class="terms">
             <input v-model="termsAccepted" type="checkbox" name="terms" required />
             <span>

@@ -495,6 +495,8 @@ describe("orders (POST /api/orders)", () => {
       expect(to).toBe(EMAIL)
       expect(payload).toMatchObject({ orderId: id, termsVersion: CURRENT_TERMS_VERSION, cardTtc: expect.any(Number) })
       expect(payload?.lines).toHaveLength(1)
+      // An individual's order is told VAT included (audit 2026-11-01, I4).
+      expect(payload?.retail).toMatchObject({ totalTtc: payload?.totalTtc, vatAmount: payload?.vat })
       await vi.waitFor(async () => expect(await sentAt(id)).not.toBeNull())
 
       // A second attempt (retry pass, double submit) never mails again.

@@ -1,10 +1,17 @@
 import { createHash } from "node:crypto"
-import { eq, inArray } from "drizzle-orm"
+import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { addresses, auditLogs, legalDocuments, newsletterContacts, newsletterSubscriptions } from "../db/schema.js"
+import {
+  addresses,
+  auditLogs,
+  contactMessages,
+  legalDocuments,
+  newsletterContacts,
+  newsletterSubscriptions,
+} from "../db/schema.js"
 import { ACCOUNT_PASSWORD, createAccount, createOrder, deleteAccounts } from "../test/account-fixtures.js"
 
 const EMAIL_SUFFIX = "@account-export.local"
@@ -28,6 +35,7 @@ describe("the export of an account's data (story 12.11)", () => {
 
   afterAll(async () => {
     if (contactIds.length > 0) await db.delete(newsletterContacts).where(inArray(newsletterContacts.id, contactIds))
+    await db.delete(contactMessages).where(like(contactMessages.email, `%${EMAIL_SUFFIX}`))
     await deleteAccounts(EMAIL_SUFFIX)
     await app.close()
   })
@@ -116,6 +124,10 @@ describe("the export of an account's data (story 12.11)", () => {
       consentIp: "203.0.113.7",
     })
 
+    await db
+      .insert(contactMessages)
+      .values({ name: "Jeanne", email: account.email, subject: "order", message: "Où en est ma commande ?" })
+
     const res = await exportFor(account.token, { password: ACCOUNT_PASSWORD })
 
     expect(res.statusCode).toBe(200)
@@ -146,6 +158,9 @@ describe("the export of an account's data (story 12.11)", () => {
       expect.objectContaining({ segment: "armurerie", status: "confirmed", consentIp: "203.0.113.7" }),
     ])
     expect(data.quoteRequests).toEqual([])
+    expect(data.contactMessages).toEqual([
+      expect.objectContaining({ subject: "order", message: "Où en est ma commande ?" }),
+    ])
 
     // Never a secret, an internal storage key, nor anyone else's data.
     const raw = res.body

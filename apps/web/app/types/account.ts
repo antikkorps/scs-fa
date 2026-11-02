@@ -60,6 +60,10 @@ export interface OrderLineItem {
   name: string
   qty: number
   priceHt: number
+  /** Recorded on every order since the cart froze it; absent on the oldest ones. */
+  vatPct?: number
+  /** VIP discount on the whole line, HT. */
+  discountHt?: number
   sku?: string
   category?: string
   legalCategory?: string | null

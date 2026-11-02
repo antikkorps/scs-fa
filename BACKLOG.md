@@ -1132,12 +1132,13 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] I1 IBAN et référence de virement coupés à 375 px, pas de bouton copier — IBAN groupé par 4, valeur sous son libellé si trop longue, bouton copier (IBAN, BIC, référence) avec « Copié » annoncé
 - [ ] I2 libellés des pièces (« cni », « SIA » sans explication, passeport ?, « En attente » quand c'est au client d'agir)
 - [ ] I3 ajout au panier sans compte : article perdu, l'inscription perd la page d'origine
-- [ ] I4 **prix TTC seulement pour les particuliers** (décision Franck 2026-11-01 ; le HT reste pour les pros)
+- [x] I4 **prix TTC seulement pour les particuliers** (décision Franck 2026-11-01 ; le HT reste pour les pros) — panier, tunnel, détail de commande et e-mail de confirmation en TTC (« dont TVA ») ; commande issue d’un devis pro et vieilles commandes sans taux de TVA par ligne : détail HT conservé
 - [ ] I5 récapitulatif sans les articles ; formulaire d'adresse sans libellés
 - [ ] I6 boutique à 375 px : ~900 px de filtres avant le premier produit, pas de tri
 - [ ] I7 fiche produit à 375 px : bouton d'achat loin ; encadré titré « Mentions légales » ; catégorie C sans la licence de tir (attend Fred et Steph)
 - [x] I8 aucun contact → **fiche « Identité de la boutique » au back-office** (décision Franck 2026-11-01) : remplace la constante du code, lue par les mentions légales, les CGV, la confidentialité, l'e-mail de commande et la nouvelle page `/contact` (migration 0044) ; une page légale reste non indexée tant qu'un fait manque
-- [ ] I8b **formulaire de contact** (décision Franck 2026-11-01) : nom, e-mail, téléphone facultatif, sujet (Commande, Arme ou produit, Gun Art, Compte professionnel, Autre), référence de commande facultative, message ; enregistré en base + écran admin « Messages » (à traiter / traité) + e-mail de notification avec « Répondre à » ; anti-spam champ piège + limite par IP et e-mail + temps minimal, pas de captcha tiers ; conservation 1 an après traitement (purge quotidienne), registre et politique mis à jour
+- [x] I8b **formulaire de contact** (décision Franck 2026-11-01) : nom, e-mail, téléphone facultatif, sujet (Commande, Arme ou produit, Gun Art, Compte professionnel, Autre), référence de commande facultative, message ; enregistré en base + écran admin « Messages » (à traiter / traité) + e-mail de notification avec « Répondre à » ; anti-spam champ piège + limite par IP et e-mail + temps minimal, pas de captcha tiers ; conservation 1 an après traitement (purge quotidienne), registre et politique mis à jour
+- [x] Retour au site depuis l'administration (bouton dans la barre du haut ; demande de Franck 2026-11-01)
 - [ ] I9 back-office : tiroir de vérification d'une pièce sans la commande ni l'arme, ni aperçu ; codes bruts (« clean ») ; recherche de commande par référence
 - [x] Retours de Franck sur l'admin (PR #209) : dates sur une ligne et e-mails coupés dans les listes, actions en icônes avec infobulle, champs du simulateur alignés
 

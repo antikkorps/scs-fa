@@ -101,6 +101,11 @@ usePageSeo({
             <td>Consentement, retirable à tout moment</td>
           </tr>
           <tr>
+            <td>Répondre à vos messages envoyés depuis la page Contact</td>
+            <td>Nom, e-mail, téléphone (facultatif), sujet, référence de commande (facultative), message</td>
+            <td>Intérêt légitime : répondre à votre demande</td>
+          </tr>
+          <tr>
             <td>Sécuriser le site et garder la trace des opérations sensibles</td>
             <td>
               Adresse IP, navigateur, actions effectuées (connexion, modification d'une commande, validation d'un
@@ -243,6 +248,10 @@ usePageSeo({
           <tr>
             <td>Commandes et factures</td>
             <td>10 ans, au titre des obligations comptables (article L123-22 du Code de commerce)</td>
+          </tr>
+          <tr>
+            <td>Messages envoyés depuis la page Contact</td>
+            <td>1 an après le traitement de votre demande (1 an après sa réception si elle n'a pas été traitée), puis suppression automatique ; supprimés aussi avec votre compte</td>
           </tr>
           <tr>
             <td>Demandes de devis (comptes professionnels)</td>

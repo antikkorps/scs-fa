@@ -2,7 +2,8 @@
 import { telHref } from "~/utils/contact"
 
 // Audit 2026-11-01 (I8) — the site had no way to reach the shop. What shows
-// here is the shop_identity record the admins fill in the back-office.
+// here is the shop_identity record the admins fill in the back-office, then
+// the contact form (I8b).
 const identity = await loadShopIdentity()
 
 usePageSeo({
@@ -47,6 +48,8 @@ const hasDetails = computed(() =>
     <p v-else class="contact__pending">Nos coordonnées seront bientôt disponibles ici.</p>
 
     <p v-if="identity.contactNote" class="contact__note">{{ identity.contactNote }}</p>
+
+    <ContactForm />
   </article>
 </template>
 

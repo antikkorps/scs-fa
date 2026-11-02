@@ -1,9 +1,12 @@
 import {
   type AnyLegalDocType,
+  CONTACT_SUBJECT_LABELS,
+  type ContactSubject,
   escapeHtml,
   type LegalDocRejectionReason,
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
   type OrganisationType,
+  type RetailTotals,
   renderInlinesHtml,
   renderInlinesText,
   renderTermsHtml,
@@ -322,6 +325,40 @@ export async function sendQuoteRequestAlertEmail(to: string[], request: QuoteReq
   })
 }
 
+/** Audit 2026-11-01 (I8b) — a message from the contact form, for the shop to answer. */
+export interface ContactMessageAlert {
+  id: string
+  name: string
+  /** The sender: answering the alert replies to them. */
+  replyTo: string
+  phone: string | null
+  subject: ContactSubject
+  orderReference: string | null
+  message: string
+}
+
+export async function sendContactMessageAlertEmail(to: string[], alert: ContactMessageAlert): Promise<void> {
+  if (to.length === 0) return
+  const details = [
+    `De : ${alert.name} <${alert.replyTo}>${alert.phone ? ` — ${alert.phone}` : ""}`,
+    `Sujet : ${CONTACT_SUBJECT_LABELS[alert.subject]}${alert.orderReference ? ` — commande ${alert.orderReference}` : ""}`,
+  ]
+  const footer = `Répondez directement à cet e-mail. Marquez le message comme traité ici : ${env.WEB_BASE_URL}/admin/messages`
+  // An internal alert: not journaled (it concerns no customer's account), and
+  // the sender's address goes in Reply-To, never in From (SPF/DMARC).
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to,
+    replyTo: alert.replyTo,
+    subject: `[Contact] ${CONTACT_SUBJECT_LABELS[alert.subject]} — ${alert.name}`,
+    text: `${details.join("\n")}\n\n${alert.message}\n\n${footer}`,
+    html:
+      details.map((line) => `<p>${escapeHtml(line)}</p>`).join("") +
+      `<blockquote style="white-space:pre-wrap">${escapeHtml(alert.message)}</blockquote>` +
+      `<p>${escapeHtml(footer)}</p>`,
+  })
+}
+
 export interface OrganisationRequestAlert {
   legalName: string
   siret: string
@@ -620,6 +657,11 @@ export type OrderConfirmationEmail = {
   shippingAddress: string[]
   /** CGV version accepted with the order (ISO date). */
   termsVersion: string
+  /**
+   * An individual's order, told VAT included (audit 2026-11-01, I4); null for a
+   * pro order (born of a quote), which keeps the HT breakdown.
+   */
+  retail: RetailTotals | null
 }
 
 const EUROS = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" })
@@ -744,6 +786,30 @@ export async function sendUnpaidOrderCancelledEmail(to: string, c: UnpaidOrderCa
  *
  * Idempotence and retries are the caller's job (orders/confirmation.ts).
  */
+/** An individual's totals, VAT included: goods − VIP + delivery = total, VAT within it. */
+function retailTotalRows(retail: RetailTotals): Array<[string, string]> {
+  return [
+    ["Articles", EUROS.format(retail.itemsTtc)],
+    ...(retail.vipDiscountTtc > 0
+      ? [["Remise VIP", `− ${EUROS.format(retail.vipDiscountTtc)}`] as [string, string]]
+      : []),
+    ["Livraison", retail.shippingTtc > 0 ? EUROS.format(retail.shippingTtc) : "Offerte"],
+    ["Total TTC", EUROS.format(retail.totalTtc)],
+    ["dont TVA", EUROS.format(retail.vatAmount)],
+  ]
+}
+
+/** A pro order's totals, HT like its quote. */
+function proTotalRows(o: OrderConfirmationEmail): Array<[string, string]> {
+  return [
+    ["Sous-total HT", EUROS.format(o.subtotalHt)],
+    ...(o.vipDiscount > 0 ? [["Remise VIP", `− ${EUROS.format(o.vipDiscount)}`] as [string, string]] : []),
+    ["Livraison HT", o.shippingHt > 0 ? EUROS.format(o.shippingHt) : "Offerte"],
+    ["TVA", EUROS.format(o.vat)],
+    ["Total TTC", EUROS.format(o.totalTtc)],
+  ]
+}
+
 export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmationEmail): Promise<void> {
   // The CGV in the e-mail state the seller's facts as the admins entered them.
   const site = { siteUrl: env.WEB_BASE_URL, identity: await loadShopIdentity() }
@@ -752,13 +818,7 @@ export async function sendOrderConfirmationEmail(to: string, o: OrderConfirmatio
   const placed = PARIS_DATETIME.format(o.placedAt)
   const termsDate = PARIS_DATE.format(new Date(o.termsVersion))
 
-  const totals: Array<[string, string]> = [
-    ["Sous-total HT", EUROS.format(o.subtotalHt)],
-    ...(o.vipDiscount > 0 ? ([["Remise VIP", `− ${EUROS.format(o.vipDiscount)}`]] as Array<[string, string]>) : []),
-    ["Livraison HT", o.shippingHt > 0 ? EUROS.format(o.shippingHt) : "Offerte"],
-    ["TVA", EUROS.format(o.vat)],
-    ["Total TTC", EUROS.format(o.totalTtc)],
-  ]
+  const totals = o.retail ? retailTotalRows(o.retail) : proTotalRows(o)
 
   const steps: string[] = []
   if (o.cardTtc > 0)
