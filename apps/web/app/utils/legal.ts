@@ -3,37 +3,21 @@
 // `~/utils/status` (single source of truth) — here we only add the customer
 // checklist statuses (ORDER_REQUIRED_DOC_STATUS) and small UI helpers.
 
-import { MAX_LEGAL_DOC_SIZE_BYTES } from "@armurier/shared"
+import { type AnyLegalDocType, LEGAL_DOC_HELP, LEGAL_DOC_LABELS, MAX_LEGAL_DOC_SIZE_BYTES } from "@armurier/shared"
 import { apiErrorCode, authErrorStatus } from "./formErrors"
 import { docTypeLabel } from "./status"
 
-// What a customer reads for each document they must send (UX audit 2026-11-01,
-// I2): the back-office's short codes ("CNI", "SIA") meant nothing to them.
-// An organisation's documents keep the back-office wording, already in full.
-const CUSTOMER_DOC_LABELS: Record<string, string> = {
-  cni: "Pièce d'identité (carte d'identité ou passeport)",
-  permis_chasse: "Permis de chasser validé",
-  autorisation_det: "Autorisation préfectorale de détention",
-  sia: "Numéro de détenteur SIA",
-  expertise: "Certificat d'expertise",
-}
-
-const CUSTOMER_DOC_HELP: Record<string, string> = {
-  cni: "Carte d'identité recto verso, ou passeport, en cours de validité.",
-  permis_chasse: "Le permis de chasser et sa validation pour la saison en cours.",
-  autorisation_det: "L'autorisation délivrée par la préfecture pour détenir une arme de catégorie B.",
-  sia: "Le Système d'information sur les armes (SIA) est le service en ligne du ministère de l'Intérieur où chaque détenteur d'arme a un compte personnel ; son numéro figure dans votre espace SIA.",
-}
-
 /** A document's name, in full, as the customer reads it. */
 export function legalDocLabel(code: string): string {
-  return CUSTOMER_DOC_LABELS[code] ?? docTypeLabel(code)
+  return isLegalDocCode(code) ? LEGAL_DOC_LABELS[code] : docTypeLabel(code)
 }
 
 /** What the document is or what to send, when its name is not enough; null otherwise. */
 export function legalDocHelp(code: string): string | null {
-  return CUSTOMER_DOC_HELP[code] ?? null
+  return (isLegalDocCode(code) && LEGAL_DOC_HELP[code]) || null
 }
+
+const isLegalDocCode = (code: string): code is AnyLegalDocType => Object.hasOwn(LEGAL_DOC_LABELS, code)
 
 const REQUIRED_DOC_STATUS_LABELS: Record<string, string> = {
   missing: "À fournir",

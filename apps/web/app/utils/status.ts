@@ -1,3 +1,5 @@
+import { LEGAL_DOC_LABELS, ORGANISATION_DOC_TYPES } from "@armurier/shared"
+
 // Human labels (FR) and a coarse severity for order/document statuses, shared by
 // the admin tables, badges and detail screens. Severity drives the colour of the
 // status pill: "ok" (brass/green), "warn" (amber), "bad" (red), "muted" (grey).
@@ -100,13 +102,8 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   autorisation_det: "Autorisation détention",
   sia: "SIA",
   expertise: "Expertise",
-  // Story 12.8d — an organisation's documents.
-  agrement_armurier: "Agrément d'armurier",
-  autorisation_commerce: "Autorisation de commerce (AFCI)",
-  affiliation_federale: "Affiliation fédérale",
-  autorisation_prefectorale: "Autorisation préfectorale",
-  autorisation_cnaps: "Autorisation CNAPS",
-  bon_de_commande: "Bon de commande signé",
+  // Story 12.8d — an organisation's documents, named in full everywhere.
+  ...Object.fromEntries(ORGANISATION_DOC_TYPES.map((type) => [type, LEGAL_DOC_LABELS[type]])),
 }
 export function docTypeLabel(value: string): string {
   return DOC_TYPE_LABELS[value] ?? value

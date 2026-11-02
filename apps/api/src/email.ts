@@ -3,8 +3,11 @@ import {
   CONTACT_SUBJECT_LABELS,
   type ContactSubject,
   escapeHtml,
+  LEGAL_DOC_LABELS,
+  LEGAL_DOC_REVIEW_SLA_HOURS,
   type LegalDocRejectionReason,
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
+  ORGANISATION_DOC_TYPES,
   type OrganisationType,
   type RetailTotals,
   renderInlinesHtml,
@@ -110,13 +113,15 @@ export async function sendPasswordResetEmail(to: string, token: string, about: E
   await deliver("password_reset", about, {
     from: env.SMTP_FROM,
     to,
-    subject: "Reset your password",
-    text: `You requested a password reset.\n\nClick the link below (valid 1 hour):\n${resetUrl}\n\nIf you did not request this, ignore this email.`,
-    html: `
-      <p>You requested a password reset.</p>
-      <p><a href="${resetUrl}">Reset my password</a> (valid 1 hour)</p>
-      <p>If you did not request this, ignore this email.</p>
-    `,
+    subject: "Réinitialisation de votre mot de passe SCS Firearms",
+    text:
+      `Vous avez demandé à réinitialiser votre mot de passe.\n\n` +
+      `Choisissez-en un nouveau avec ce lien, valable 1 heure :\n${resetUrl}\n\n` +
+      `Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.`,
+    html:
+      `<p>Vous avez demandé à réinitialiser votre mot de passe.</p>` +
+      `<p><a href="${resetUrl}">Choisir un nouveau mot de passe</a> (lien valable 1 heure)</p>` +
+      `<p>Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.</p>`,
   })
 }
 
@@ -390,29 +395,15 @@ export async function sendOrganisationRequestAlertEmail(
   })
 }
 
-const DOC_TYPE_LABELS: Record<AnyLegalDocType, string> = {
-  cni: "identity card",
-  permis_chasse: "hunting permit",
-  autorisation_det: "detention authorization",
-  sia: "SIA certificate",
-  expertise: "expertise certificate",
-  agrement_armurier: "gunsmith licence",
-  autorisation_commerce: "arms trade authorisation",
-  affiliation_federale: "federation affiliation",
-  autorisation_prefectorale: "prefectoral authorisation",
-  autorisation_cnaps: "CNAPS authorisation",
-  bon_de_commande: "signed purchase order",
-}
-
 const REJECTION_REASON_LABELS: Record<LegalDocRejectionReason, string> = {
-  document_expired: "the document has expired",
-  document_illegible: "the document is not legible",
-  wrong_document_type: "the document does not match the expected type",
-  information_mismatch: "the information does not match your account details",
-  document_incomplete: "the document is incomplete",
-  underage: "the legal age requirement is not met",
-  suspected_fraud: "the document could not be authenticated",
-  other: "see the details below",
+  document_expired: "le document est expiré",
+  document_illegible: "le document est illisible",
+  wrong_document_type: "le document ne correspond pas à la pièce demandée",
+  information_mismatch: "les informations ne correspondent pas à celles de votre compte",
+  document_incomplete: "le document est incomplet",
+  underage: "l'âge légal requis n'est pas atteint",
+  suspected_fraud: "le document n'a pas pu être authentifié",
+  other: "voir les précisions ci-dessous",
 }
 
 export async function sendLegalDocApprovedEmail(
@@ -420,18 +411,11 @@ export async function sendLegalDocApprovedEmail(
   doc: { docType: AnyLegalDocType },
   about: EmailAbout = {},
 ): Promise<void> {
-  const label = DOC_TYPE_LABELS[doc.docType]
-  await deliver("legal_doc_approved", about, {
-    from: env.SMTP_FROM,
-    to,
-    subject: "Your legal document has been approved",
-    text: `Good news!\n\nYour ${label} has been reviewed and approved.\n\nYou can now proceed with your orders requiring this document.`,
-    html: `
-      <p>Good news!</p>
-      <p>Your <strong>${label}</strong> has been reviewed and <strong>approved</strong>.</p>
-      <p>You can now proceed with your orders requiring this document.</p>
-    `,
-  })
+  await deliverParagraphs("legal_doc_approved", about, to, "Votre pièce justificative est validée", [
+    "Bonjour,",
+    `Votre pièce « ${LEGAL_DOC_LABELS[doc.docType]} » a été vérifiée et validée.`,
+    "Les commandes qui l'attendaient peuvent maintenant poursuivre leur chemin.",
+  ])
 }
 
 export type SlaBreachItem = {
@@ -449,27 +433,20 @@ export async function sendLegalDocSlaBreachEmail(to: string[], breaches: SlaBrea
   if (to.length === 0 || breaches.length === 0) return
 
   const queueUrl = `${env.WEB_BASE_URL}/admin/legal-documents`
+  const count =
+    breaches.length > 1 ? `${breaches.length} pièces justificatives attendent` : "1 pièce justificative attend"
   const line = (b: SlaBreachItem) =>
-    `${b.customerName} — ${DOC_TYPE_LABELS[b.docType]} (deadline ${b.deadline.toISOString()}, ${b.hoursOverdue}h overdue)`
-  const rows = breaches
-    .map(
-      (b) =>
-        `<li>${escapeHtml(b.customerName)} — <strong>${DOC_TYPE_LABELS[b.docType]}</strong> ` +
-        `(deadline ${b.deadline.toISOString()}, <strong>${b.hoursOverdue}h overdue</strong>)</li>`,
-    )
-    .join("")
+    `${b.customerName} — ${LEGAL_DOC_LABELS[b.docType]} (échéance ${PARIS_DATETIME.format(b.deadline)}, en retard de ${b.hoursOverdue} h)`
 
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to,
-    subject: `[Action required] ${breaches.length} legal document(s) past the 48h review SLA`,
-    text:
-      `${breaches.length} legal document(s) have exceeded the 48h validation SLA and are still pending:\n\n` +
-      `${breaches.map(line).join("\n")}\n\nReview them now: ${queueUrl}`,
+    subject: `[À traiter] ${count} depuis plus de ${LEGAL_DOC_REVIEW_SLA_HOURS} h`,
+    text: `${count} une vérification depuis plus de ${LEGAL_DOC_REVIEW_SLA_HOURS} h :\n\n${breaches.map(line).join("\n")}\n\nLes vérifier : ${queueUrl}`,
     html:
-      `<p><strong>${breaches.length}</strong> legal document(s) have exceeded the 48h validation SLA and are still pending:</p>` +
-      `<ul>${rows}</ul>` +
-      `<p><a href="${queueUrl}">Open the validation queue</a></p>`,
+      `<p>${escapeHtml(count)} une vérification depuis plus de ${LEGAL_DOC_REVIEW_SLA_HOURS} h :</p>` +
+      `<ul>${breaches.map((b) => `<li>${escapeHtml(line(b))}</li>`).join("")}</ul>` +
+      `<p><a href="${queueUrl}">Ouvrir la file de vérification</a></p>`,
   })
 }
 
@@ -509,26 +486,22 @@ export async function sendErrorAlertEmail(to: string[], item: ErrorAlertItem): P
   })
 }
 
+const isOrganisationDocType = (type: AnyLegalDocType): boolean =>
+  (ORGANISATION_DOC_TYPES as readonly string[]).includes(type)
+
 export async function sendLegalDocRejectedEmail(
   to: string,
   doc: { docType: AnyLegalDocType; reason: LegalDocRejectionReason; notes?: string | null },
   about: EmailAbout = {},
 ): Promise<void> {
-  const label = DOC_TYPE_LABELS[doc.docType]
-  const reasonLabel = REJECTION_REASON_LABELS[doc.reason]
-  const notesText = doc.notes ? `\n\nDetails: ${doc.notes}` : ""
-  await deliver("legal_doc_rejected", about, {
-    from: env.SMTP_FROM,
-    to,
-    subject: "Your legal document was rejected",
-    text: `Your ${label} has been reviewed and rejected.\n\nReason: ${reasonLabel}.${notesText}\n\nPlease upload a new document from your account.`,
-    html: `
-      <p>Your <strong>${label}</strong> has been reviewed and <strong>rejected</strong>.</p>
-      <p>Reason: ${reasonLabel}.</p>
-      ${doc.notes ? `<p>Details: ${escapeHtml(doc.notes)}</p>` : ""}
-      <p>Please upload a new document from your account.</p>
-    `,
-  })
+  await deliverParagraphs("legal_doc_rejected", about, to, "Votre pièce justificative a été refusée", [
+    "Bonjour,",
+    `Votre pièce « ${LEGAL_DOC_LABELS[doc.docType]} » a été vérifiée, mais nous ne pouvons pas l'accepter : ${REJECTION_REASON_LABELS[doc.reason]}.`,
+    ...(doc.notes ? [`Précisions : ${doc.notes}`] : []),
+    isOrganisationDocType(doc.docType)
+      ? `Merci d'en envoyer une nouvelle depuis les documents de votre organisation : ${env.WEB_BASE_URL}/pro/documents`
+      : `Merci d'en envoyer une nouvelle depuis vos commandes : ${env.WEB_BASE_URL}/compte/commandes`,
+  ])
 }
 
 export type ShipmentShippedEmail = {

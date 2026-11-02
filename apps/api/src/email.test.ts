@@ -8,6 +8,9 @@ vi.mock("./audit/record.js", () => ({ recordAuditEvent: vi.fn().mockResolvedValu
 
 const {
   sendInvoiceAvailableEmail,
+  sendLegalDocApprovedEmail,
+  sendLegalDocRejectedEmail,
+  sendLegalDocSlaBreachEmail,
   sendLoginCodeEmail,
   sendNewsletterConfirmationEmail,
   sendPasswordResetEmail,
@@ -217,5 +220,71 @@ describe("link tokens", () => {
     expect(mail.text).toContain(`/newsletter/confirmation#token=${TOKEN}`)
     expect(mail.text).not.toContain(`?token=${TOKEN}`)
     expect(mail.text).toContain(`/newsletter/desabonnement?token=${"u".repeat(43)}`)
+  })
+})
+
+// Found during the UX audit follow-up (2026-11-02): three customer e-mails, and
+// the shop's review reminder, were still in English.
+describe("e-mails in French", () => {
+  const ENGLISH = /\b(Your|your|has been|Please|password|reviewed|overdue)\b/
+  /** The words of a mail, its links aside (`/reset-password` is a path, not English copy). */
+  const words = (mail: { subject: string; text: string }) => `${mail.subject} ${mail.text}`.replace(/https?:\S+/g, "")
+
+  it("sends the password reset link in French", async () => {
+    await sendPasswordResetEmail("jean@example.fr", "t".repeat(43))
+    const mail = sent()
+    expect(mail.subject).toBe("Réinitialisation de votre mot de passe SCS Firearms")
+    expect(mail.text).toContain("valable 1 heure")
+    expect(words(mail)).not.toMatch(ENGLISH)
+  })
+
+  it("names the approved document as the customer reads it on the site", async () => {
+    await sendLegalDocApprovedEmail("jean@example.fr", { docType: "cni" })
+    const mail = sent()
+    expect(mail.subject).toBe("Votre pièce justificative est validée")
+    expect(mail.text).toContain("Pièce d'identité (carte d'identité ou passeport)")
+    expect(words(mail)).not.toMatch(ENGLISH)
+  })
+
+  it("says why a document was refused, and what to do", async () => {
+    await sendLegalDocRejectedEmail("jean@example.fr", {
+      docType: "sia",
+      reason: "document_illegible",
+      notes: "Photo floue",
+    })
+    const mail = sent()
+    expect(mail.subject).toBe("Votre pièce justificative a été refusée")
+    expect(mail.text).toContain("Numéro de détenteur SIA")
+    expect(mail.text).toContain("le document est illisible")
+    expect(mail.text).toContain("Précisions : Photo floue")
+    expect(mail.text).toContain("/compte/commandes")
+    expect(words(mail)).not.toMatch(ENGLISH)
+  })
+
+  it("sends an organisation back to its own documents page", async () => {
+    await sendLegalDocRejectedEmail("achat@club.fr", { docType: "autorisation_cnaps", reason: "document_expired" })
+    const mail = sent()
+    expect(mail.text).toContain("Autorisation CNAPS")
+    expect(mail.text).toContain("/pro/documents")
+    expect(mail.text).not.toContain("/compte/commandes")
+  })
+
+  it("reminds the shop of documents waiting past the review deadline", async () => {
+    await sendLegalDocSlaBreachEmail(
+      ["admin@example.fr"],
+      [
+        {
+          customerName: "Jean Dupont",
+          docType: "autorisation_det",
+          deadline: new Date("2026-11-02T10:00:00Z"),
+          hoursOverdue: 5,
+        },
+      ],
+    )
+    const mail = sent()
+    expect(mail.subject).toBe("[À traiter] 1 pièce justificative attend depuis plus de 48 h")
+    expect(mail.text).toContain("Jean Dupont — Autorisation préfectorale de détention")
+    expect(mail.text).toContain("en retard de 5 h")
+    expect(words(mail)).not.toMatch(ENGLISH)
   })
 })
