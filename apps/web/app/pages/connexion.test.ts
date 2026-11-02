@@ -3,6 +3,7 @@
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { flushPromises } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { returnOf } from "../../tests/helpers/links"
 import Connexion from "./connexion.vue"
 
 const { login, verifyLoginCode, resendLoginCode, navigateToMock, isAuthenticated } = vi.hoisted(() => ({
@@ -13,7 +14,13 @@ const { login, verifyLoginCode, resendLoginCode, navigateToMock, isAuthenticated
   isAuthenticated: { value: false },
 }))
 
-mockNuxtImport("useAuth", () => () => ({ login, verifyLoginCode, resendLoginCode, isAuthenticated }))
+mockNuxtImport("useAuth", () => () => ({
+  login,
+  verifyLoginCode,
+  resendLoginCode,
+  isAuthenticated,
+  isAdmin: { value: false },
+}))
 mockNuxtImport("navigateTo", () => navigateToMock)
 
 beforeEach(() => {
@@ -234,5 +241,30 @@ describe("connexion.vue", () => {
       await flushPromises()
       expect(navigateToMock).toHaveBeenCalledWith("/")
     })
+  })
+})
+
+// UX audit 2026-11-01 (I3): coming from "add to cart" without an account.
+describe("connexion.vue — coming from the cart", () => {
+  const FROM_CART = "/connexion?redirect=%2Fboutique%2Ffusil-x%3Fajouter%3Dv2&motif=panier"
+
+  it("says the item will be added once signed in", async () => {
+    const wrapper = await mountSuspended(Connexion, { route: FROM_CART })
+    expect(wrapper.text()).toContain("l'article sera ajouté à votre panier")
+  })
+
+  it("keeps the way back on the sign-up link", async () => {
+    const wrapper = await mountSuspended(Connexion, { route: FROM_CART })
+    expect(returnOf(wrapper.find('a[href^="/inscription"]').attributes("href"))).toEqual({
+      path: "/inscription",
+      redirect: "/boutique/fusil-x?ajouter=v2",
+      motif: "panier",
+    })
+  })
+
+  it("keeps the ordinary wording otherwise", async () => {
+    const wrapper = await mountSuspended(Connexion)
+    expect(wrapper.text()).not.toContain("l'article sera ajouté à votre panier")
+    expect(wrapper.find('a[href^="/inscription"]').attributes("href")).toBe("/inscription")
   })
 })

@@ -43,11 +43,21 @@ const adding = ref(false)
 const addedDesignation = ref("")
 const addError = ref("")
 
+// Without an account, the chosen print waits in the way back and is added on return (I3).
+const cartIntent = useCartIntent("exemplaire", async (printId) => {
+  if (!availablePrints.value.some((p) => p.id === printId)) {
+    addError.value = "Cet exemplaire n'est plus disponible. Choisissez-en un autre."
+    return
+  }
+  chosenPrintId.value = printId
+  await addChosenPrint()
+})
+
 async function addChosenPrint() {
   const print = chosenPrint.value
   if (!print || adding.value) return
   if (!isAuthenticated.value) {
-    await navigateTo(`/connexion?redirect=${encodeURIComponent(route.fullPath)}`)
+    await navigateTo(cartIntent.loginPath(print.id))
     return
   }
   adding.value = true

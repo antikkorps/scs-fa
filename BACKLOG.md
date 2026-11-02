@@ -1131,7 +1131,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 
 - [x] I1 IBAN et référence de virement coupés à 375 px, pas de bouton copier — IBAN groupé par 4, valeur sous son libellé si trop longue, bouton copier (IBAN, BIC, référence) avec « Copié » annoncé
 - [ ] I2 libellés des pièces (« cni », « SIA » sans explication, passeport ?, « En attente » quand c'est au client d'agir)
-- [ ] I3 ajout au panier sans compte : article perdu, l'inscription perd la page d'origine
+- [x] I3 ajout au panier sans compte : article perdu, l'inscription perd la page d'origine — l'article choisi (variante ou exemplaire numéroté) voyage dans l'adresse de retour et s'ajoute au retour sur la fiche, une seule fois (effacé de l'adresse avant l'ajout) ; connexion et inscription se passent l'adresse de retour et annoncent « l'article sera ajouté à votre panier » ; pièce partie entre-temps : message, rien n'est ajouté
 - [x] I4 **prix TTC seulement pour les particuliers** (décision Franck 2026-11-01 ; le HT reste pour les pros) — panier, tunnel, détail de commande et e-mail de confirmation en TTC (« dont TVA ») ; commande issue d’un devis pro et vieilles commandes sans taux de TVA par ligne : détail HT conservé
 - [ ] I5 récapitulatif sans les articles ; formulaire d'adresse sans libellés
 - [ ] I6 boutique à 375 px : ~900 px de filtres avant le premier produit, pas de tri

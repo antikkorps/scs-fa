@@ -76,10 +76,21 @@ const adding = ref(false)
 const added = ref(false)
 const addError = ref("")
 
+// Without an account, the chosen variant waits in the way back and is added on return (I3).
+const cartIntent = useCartIntent("ajouter", async (variantId) => {
+  const variant = variants.value.find((v) => v.id === variantId)
+  if (!variant || !inStock(variant.stockQty)) {
+    addError.value = "Cet article n'est plus disponible dans la variante choisie."
+    return
+  }
+  selectedVariantId.value = variant.id
+  await addToCart()
+})
+
 async function addToCart() {
   if (!selectedVariant.value) return
   if (!isAuthenticated.value) {
-    await navigateTo(`/connexion?redirect=${encodeURIComponent(route.fullPath)}`)
+    await navigateTo(cartIntent.loginPath(selectedVariant.value.id))
     return
   }
   adding.value = true
