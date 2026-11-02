@@ -17,6 +17,9 @@ const error = ref("")
 const loading = ref(false)
 
 const redirectTo = computed(() => safeInternalPath(route.query.redirect))
+// Moving to the sign-up keeps the way back (UX audit 2026-11-01, I3).
+const returnQuery = computed(() => authReturnQuery(route.query))
+const forCart = computed(() => returnQuery.value.motif === CART_REASON)
 
 // Already signed in? Skip the form.
 if (isAuthenticated.value) {
@@ -80,7 +83,10 @@ async function signedIn() {
       />
 
       <form v-else novalidate @submit.prevent="submit">
-        <p class="auth-card__lede">Accédez à vos commandes et à vos documents.</p>
+        <p v-if="forCart" class="auth-card__lede">
+          Connectez-vous ou créez un compte : l'article sera ajouté à votre panier.
+        </p>
+        <p v-else class="auth-card__lede">Accédez à vos commandes et à vos documents.</p>
 
         <label class="auth-field">
           <span>Email</span>
@@ -105,7 +111,7 @@ async function signedIn() {
         </p>
         <p class="auth-alt">
           Pas encore de compte ?
-          <NuxtLink to="/inscription">Créer un compte</NuxtLink>
+          <NuxtLink :to="{ path: '/inscription', query: returnQuery }">Créer un compte</NuxtLink>
         </p>
       </form>
     </div>
