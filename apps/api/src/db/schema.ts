@@ -1651,6 +1651,35 @@ export const shopSettings = pgTable(
   ],
 )
 
+// Audit 2026-11-01 (I8b) — messages sent through the contact form: the admins'
+// inbox ("à traiter" / "traité"). Kept 1 year after handling, or after receipt
+// if never handled (daily purge, contact/retention.ts). CONTACT_SUBJECTS /
+// CONTACT_STATUSES in @armurier/shared.
+export const contactSubjectEnum = pgEnum("contact_subject", ["order", "product", "gun_art", "pro_account", "other"])
+export const contactStatusEnum = pgEnum("contact_status", ["new", "handled"])
+
+export const contactMessages = pgTable(
+  "contact_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 100 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    phone: varchar("phone", { length: 20 }),
+    subject: contactSubjectEnum("subject").notNull(),
+    orderReference: varchar("order_reference", { length: 40 }),
+    message: text("message").notNull(),
+    status: contactStatusEnum("status").notNull().default("new"),
+    handledAt: timestamp("handled_at"),
+    handledBy: uuid("handled_by"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_contact_messages_status_created").on(t.status, t.createdAt),
+    index("idx_contact_messages_email_created").on(t.email, t.createdAt),
+    foreignKey({ columns: [t.handledBy], foreignColumns: [users.id] }).onDelete("set null"),
+  ],
+)
+
 // Audit 2026-11-01 (I8) — who the shop is (the legal facts every legal page,
 // the CGV and the order e-mail state) and how to reach it (/contact): ONE row,
 // filled by the admins in the back-office. Null = not supplied yet.

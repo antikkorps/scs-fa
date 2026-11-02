@@ -14,6 +14,7 @@ import {
   artworkCartItems,
   auditLogs,
   cartItems,
+  contactMessages,
   legalDocuments,
   loginChallenges,
   newsletterContacts,
@@ -152,6 +153,8 @@ export async function eraseAccount(
     await tx.delete(recoveryCodes).where(eq(recoveryCodes.userId, userId))
 
     const newsletterErased = await eraseNewsletterAddress(tx, user.email, now)
+    // What the person wrote through the contact form, from this address.
+    await tx.delete(contactMessages).where(eq(contactMessages.email, user.email))
 
     // The account's own journal lines keep their dates and actions (security
     // history, 1 year) but no longer what they said: names, phone, addresses.

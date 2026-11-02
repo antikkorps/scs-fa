@@ -30,6 +30,8 @@ describe("contact.vue (audit 2026-11-01, I8)", () => {
     expect(wrapper.text()).toContain("3 quai du Stand, 69002 Lyon")
     expect(wrapper.text()).toContain("Du mardi au samedi, 9 h – 18 h")
     expect(wrapper.text()).toContain("Retrait en boutique sur rendez-vous.")
+    // Then the form (I8b), whatever the identity holds.
+    expect(wrapper.find("form textarea[name='message']").exists()).toBe(true)
   })
 
   it("says the details are coming rather than showing empty lines", async () => {
