@@ -77,10 +77,21 @@ const adding = ref(false)
 const added = ref(false)
 const addError = ref("")
 
+// Without an account, the chosen variant waits in the way back and is added on return (I3).
+const cartIntent = useCartIntent("ajouter", async (variantId) => {
+  const variant = variants.value.find((v) => v.id === variantId)
+  if (!variant || !inStock(variant.stockQty)) {
+    addError.value = "Cet article n'est plus disponible dans la variante choisie."
+    return
+  }
+  selectedVariantId.value = variant.id
+  await addToCart()
+})
+
 async function addToCart() {
   if (!selectedVariant.value) return
   if (!isAuthenticated.value) {
-    await navigateTo(`/connexion?redirect=${encodeURIComponent(route.fullPath)}`)
+    await navigateTo(cartIntent.loginPath(selectedVariant.value.id))
     return
   }
   adding.value = true
@@ -225,6 +236,83 @@ useHead({
             </div>
           </fieldset>
 
+          <!-- The purchase comes right after the price and the variants: at 375 px it
+               used to sit under the whole text (UX audit 2026-11-01, I7).
+               Story 12.10: before the opening, neither a purchase nor a quote. -->
+          <SalesClosedNotice
+            v-if="!salesOpen"
+            class="detail__cta"
+            :segments="[ancient ? 'collection' : 'armurerie']"
+          />
+          <div v-else-if="asksForQuote && selectedVariant" class="detail__cta">
+            <ProQuoteButton :variant-id="selectedVariant.id" />
+          </div>
+          <div v-else class="detail__cta">
+            <button type="button" class="btn btn-primary buy" :disabled="!available || adding" @click="addToCart">
+              {{
+                available
+                  ? adding
+                    ? "Ajout…"
+                    : "Ajouter au panier"
+                  : heldByOther
+                    ? "Momentanément réservée"
+                    : availabilityLongLabel(state)
+              }}
+            </button>
+            <p v-if="heldByOther" class="detail__held">
+              Un autre client a cette pièce dans son panier. Elle redeviendra disponible s'il ne finalise pas.
+            </p>
+            <p v-if="added" class="detail__added" role="status">
+              Ajouté au panier. <NuxtLink to="/panier">Voir le panier</NuxtLink>
+            </p>
+            <p v-if="addError" class="detail__error" role="alert">{{ addError }}</p>
+
+            <!-- Story 11.4: an unavailable piece is the moment a visitor most
+                 wants to be told about the next one. Pre-ticks the universe this
+                 product belongs to, never the whole set. -->
+            <NewsletterSignup
+              v-if="!available"
+              class="detail__news"
+              :default-segments="[ancient ? 'collection' : 'armurerie']"
+              source="/boutique"
+              title="Se tenir informé des arrivées"
+              :description="
+                isSold
+                  ? 'Cette pièce est vendue. Prévenez-moi lorsqu\'une pièce comparable rejoint le catalogue.'
+                  : 'Prévenez-moi du retour de cet article et des prochaines arrivées.'
+              "
+            />
+          </div>
+
+          <!-- What buying it takes, right under the purchase (UX audit 2026-11-01, I7):
+               the regulated-commerce differentiator. Not « Mentions légales »,
+               which names the site's legal notice. -->
+          <section v-if="legal" class="legal" aria-labelledby="legal-h">
+            <h2 id="legal-h" class="legal__h">Réglementation</h2>
+            <dl class="legal__list">
+              <div>
+                <dt>Catégorie</dt>
+                <dd>{{ legal.name }}<span v-if="legal.description"> — {{ legal.description }}</span></dd>
+              </div>
+              <div v-if="product.ageMinRequired ?? legal.minAge">
+                <dt>Âge minimum</dt>
+                <dd>{{ product.ageMinRequired ?? legal.minAge }} ans</dd>
+              </div>
+              <div v-if="legal.requiredDocTypes.length > 0 && !asksForQuote">
+                <dt>Documents requis</dt>
+                <dd>
+                  <ul class="legal__docs">
+                    <li v-for="code in legal.requiredDocTypes" :key="code">{{ legalDocLabel(code) }}</li>
+                  </ul>
+                </dd>
+              </div>
+            </dl>
+            <ProductLegalNote v-if="legal.requiresVerification" :pro="asksForQuote" />
+            <p v-if="product.hasAccessoryRestrictions && product.accessoryRestrictionNotes" class="legal__note">
+              {{ product.accessoryRestrictionNotes }}
+            </p>
+          </section>
+
           <p v-if="product.description" class="detail__desc">{{ product.description }}</p>
           <!-- Rich text. Safe to inject because every write path sanitises it
                server-side (apps/api/src/sanitize.ts) — do not render any field
@@ -278,79 +366,6 @@ useHead({
             </dl>
             <p v-if="ancient.isUnique" class="hist__unique">Pièce unique — un seul exemplaire disponible.</p>
           </section>
-
-          <!-- Legal mentions: the regulated-commerce differentiator -->
-          <section v-if="legal" class="legal" aria-labelledby="legal-h">
-            <h2 id="legal-h" class="legal__h">Mentions légales</h2>
-            <dl class="legal__list">
-              <div>
-                <dt>Catégorie</dt>
-                <dd>{{ legal.name }}<span v-if="legal.description"> — {{ legal.description }}</span></dd>
-              </div>
-              <div v-if="product.ageMinRequired ?? legal.minAge">
-                <dt>Âge minimum</dt>
-                <dd>{{ product.ageMinRequired ?? legal.minAge }} ans</dd>
-              </div>
-              <div v-if="legal.requiredDocTypes.length > 0 && !asksForQuote">
-                <dt>Documents requis</dt>
-                <dd>
-                  <ul class="legal__docs">
-                    <li v-for="code in legal.requiredDocTypes" :key="code">{{ legalDocLabel(code) }}</li>
-                  </ul>
-                </dd>
-              </div>
-            </dl>
-            <ProductLegalNote v-if="legal.requiresVerification" :pro="asksForQuote" />
-            <p v-if="product.hasAccessoryRestrictions && product.accessoryRestrictionNotes" class="legal__note">
-              {{ product.accessoryRestrictionNotes }}
-            </p>
-          </section>
-
-          <!-- Story 12.10: before the opening, neither a purchase nor a quote. -->
-          <SalesClosedNotice
-            v-if="!salesOpen"
-            class="detail__cta"
-            :segments="[ancient ? 'collection' : 'armurerie']"
-          />
-          <div v-else-if="asksForQuote && selectedVariant" class="detail__cta">
-            <ProQuoteButton :variant-id="selectedVariant.id" />
-          </div>
-          <div v-else class="detail__cta">
-            <button type="button" class="btn btn-primary buy" :disabled="!available || adding" @click="addToCart">
-              {{
-                available
-                  ? adding
-                    ? "Ajout…"
-                    : "Ajouter au panier"
-                  : heldByOther
-                    ? "Momentanément réservée"
-                    : availabilityLongLabel(state)
-              }}
-            </button>
-            <p v-if="heldByOther" class="detail__held">
-              Un autre client a cette pièce dans son panier. Elle redeviendra disponible s'il ne finalise pas.
-            </p>
-            <p v-if="added" class="detail__added" role="status">
-              Ajouté au panier. <NuxtLink to="/panier">Voir le panier</NuxtLink>
-            </p>
-            <p v-if="addError" class="detail__error" role="alert">{{ addError }}</p>
-
-            <!-- Story 11.4: an unavailable piece is the moment a visitor most
-                 wants to be told about the next one. Pre-ticks the universe this
-                 product belongs to, never the whole set. -->
-            <NewsletterSignup
-              v-if="!available"
-              class="detail__news"
-              :default-segments="[ancient ? 'collection' : 'armurerie']"
-              source="/boutique"
-              title="Se tenir informé des arrivées"
-              :description="
-                isSold
-                  ? 'Cette pièce est vendue. Prévenez-moi lorsqu\'une pièce comparable rejoint le catalogue.'
-                  : 'Prévenez-moi du retour de cet article et des prochaines arrivées.'
-              "
-            />
-          </div>
         </div>
       </div>
 

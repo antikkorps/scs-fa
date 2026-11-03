@@ -4,6 +4,7 @@ import { CURRENT_TERMS_VERSION } from "@armurier/shared"
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { flushPromises } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { formatEuros } from "~/utils/format"
 import Commande from "./index.vue"
 
 const { fetchCart, listAddresses, createOrder, push } = vi.hoisted(() => ({
@@ -152,5 +153,48 @@ describe("commande/index.vue — shipping (story 12.3)", () => {
     await wrapper.find(".summary__cta").trigger("click")
     await flushPromises()
     expect(wrapper.find('[role="alert"]').text()).toContain("France métropolitaine, Corse comprise")
+  })
+})
+
+// UX audit 2026-11-01 (I5): the summary showed totals without saying what they were for.
+describe("commande/index.vue — what is being ordered", () => {
+  it("lists every article in the summary, with its quantity and its price tax included", async () => {
+    fetchCart.mockResolvedValue({
+      items: [
+        {
+          id: "l-1",
+          name: "Carabine .22 LR",
+          finition: "Inox",
+          munition: null,
+          couleur: null,
+          qty: 2,
+          vatPct: 20,
+          lineTtc: 1200,
+          heldUntil: null,
+        },
+      ],
+      artworkItems: [
+        {
+          id: "a-1",
+          title: "Éclat de Bronze",
+          printDesignation: "7/25",
+          formatId: "A2",
+          vatPct: 20,
+          lineTtc: 450,
+          heldUntil: "2099-01-01T00:00:00.000Z",
+        },
+      ],
+      summary: { ...summary, itemCount: 3 },
+    })
+    const wrapper = await mountCheckout()
+    const lines = wrapper.findAll(".summary .order-lines li").map((line) => line.text())
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toContain("Carabine .22 LR")
+    expect(lines[0]).toContain("Inox")
+    expect(lines[0]).toContain("× 2")
+    expect(lines[0]).toContain(formatEuros(1200))
+    expect(lines[1]).toContain("Éclat de Bronze")
+    expect(lines[1]).toContain("Tirage 7/25 · A2")
+    expect(lines[1]).toContain(formatEuros(450))
   })
 })

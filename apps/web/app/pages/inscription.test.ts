@@ -3,6 +3,7 @@
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { flushPromises } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { returnOf } from "../../tests/helpers/links"
 import Inscription from "./inscription.vue"
 
 const { register, navigateToMock, isAuthenticated } = vi.hoisted(() => ({
@@ -11,7 +12,7 @@ const { register, navigateToMock, isAuthenticated } = vi.hoisted(() => ({
   isAuthenticated: { value: false },
 }))
 
-mockNuxtImport("useAuth", () => () => ({ register, isAuthenticated }))
+mockNuxtImport("useAuth", () => () => ({ register, isAuthenticated, isAdmin: { value: false } }))
 mockNuxtImport("navigateTo", () => navigateToMock)
 
 beforeEach(() => {
@@ -76,5 +77,30 @@ describe("inscription.test.ts before the opening (story 12.10)", () => {
     const wrapper = await mountSuspended(Inscription)
     expect(wrapper.find('input[type="password"]').exists()).toBe(false)
     expect(wrapper.text()).toContain("La création de compte ouvre avec la boutique")
+  })
+})
+
+// UX audit 2026-11-01 (I3): the sign-up used to lose the page the visitor came from.
+describe("inscription.vue — coming from the cart", () => {
+  const FROM_CART = "/inscription?redirect=%2Fboutique%2Ffusil-x%3Fajouter%3Dv2&motif=panier"
+
+  it("goes back to the product, with the item to add, once the account is created", async () => {
+    register.mockResolvedValue({ role: "customer" })
+    const wrapper = await mountSuspended(Inscription, { route: FROM_CART })
+    await fillValidForm(wrapper)
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+    expect(navigateToMock).toHaveBeenCalledWith("/boutique/fusil-x?ajouter=v2")
+  })
+
+  it("says the item will be added, and keeps the way back on the login link", async () => {
+    const wrapper = await mountSuspended(Inscription, { route: FROM_CART })
+    expect(wrapper.text()).toContain("l'article sera ajouté à votre panier")
+    expect(returnOf(wrapper.find('a[href^="/connexion"]').attributes("href"))).toEqual({
+      path: "/connexion",
+      redirect: "/boutique/fusil-x?ajouter=v2",
+      motif: "panier",
+    })
   })
 })
