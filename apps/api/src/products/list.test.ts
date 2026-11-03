@@ -202,6 +202,19 @@ describe("GET /api/products", () => {
     expect(skus).toEqual([`${SKU_PREFIX}gamma`])
   })
 
+  // A visitor reads prices tax included: the price filter compares them too
+  // (decision Franck 2026-11-02, after the individuals' TTC prices of I4).
+  it("filters on the price tax included, at each product's own rate", async () => {
+    // alpha: 800 € HT = 960 € TTC; zeta: 850 € HT = 896,75 € TTC.
+    const res = await app.inject({ method: "GET", url: "/api/products?minPrice=890&maxPrice=900&limit=100" })
+    expect(testSkus(res.json())).toEqual([`${SKU_PREFIX}zeta`])
+  })
+
+  it("keeps a product whose price tax included is exactly the bound", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/products?minPrice=960&maxPrice=960&limit=100" })
+    expect(testSkus(res.json())).toEqual([`${SKU_PREFIX}alpha`])
+  })
+
   it("performs full-text search on name/description", async () => {
     const res = await app.inject({ method: "GET", url: "/api/products?search=pistolet&limit=100" })
     expect(res.statusCode).toBe(200)

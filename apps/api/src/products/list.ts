@@ -1,5 +1,5 @@
 import { computePriceTtc, type ProductFilters, type ProductSort, productFiltersSchema } from "@armurier/shared"
-import { and, asc, desc, eq, gte, lte, ne, type SQL, sql } from "drizzle-orm"
+import { and, asc, desc, eq, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { ancientWeapons, legalCategories, productCategories, products } from "../db/schema.js"
@@ -27,8 +27,11 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
   })
 }
 
-/** The price a visitor reads: tax included, at the product's own rate. */
-const priceTtcSql = sql`${products.priceHt} * (1 + coalesce(${products.vatPct}, 0) / 100)`
+/**
+ * The price a visitor reads: tax included, at the product's own rate, rounded
+ * to the cent like `computePriceTtc`. The sort and the price filter use it.
+ */
+const priceTtcSql = sql`round(${products.priceHt} * (1 + coalesce(${products.vatPct}, 0) / 100), 2)`
 
 /**
  * The visitor's chosen order (UX audit 2026-11-01, I6). By default, search
@@ -57,8 +60,10 @@ export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
   const conditions: SQL[] = [visibility]
   if (category) conditions.push(eq(productCategories.slug, category))
   if (legalCategory) conditions.push(eq(legalCategories.category, legalCategory))
-  if (minPrice !== undefined) conditions.push(gte(products.priceHt, minPrice.toString()))
-  if (maxPrice !== undefined) conditions.push(lte(products.priceHt, maxPrice.toString()))
+  // Tax included, as displayed (decision Franck 2026-11-02). The pro catalogue
+  // never passes a price bound: it would give the public price away.
+  if (minPrice !== undefined) conditions.push(sql`${priceTtcSql} >= ${minPrice}`)
+  if (maxPrice !== undefined) conditions.push(sql`${priceTtcSql} <= ${maxPrice}`)
   if (search) {
     conditions.push(sql`${products.searchVector} @@ websearch_to_tsquery('french', ${search})`)
   }
