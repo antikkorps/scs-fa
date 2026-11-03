@@ -3,8 +3,21 @@
 // `~/utils/status` (single source of truth) — here we only add the customer
 // checklist statuses (ORDER_REQUIRED_DOC_STATUS) and small UI helpers.
 
-import { MAX_LEGAL_DOC_SIZE_BYTES } from "@armurier/shared"
+import { type AnyLegalDocType, LEGAL_DOC_HELP, LEGAL_DOC_LABELS, MAX_LEGAL_DOC_SIZE_BYTES } from "@armurier/shared"
 import { apiErrorCode, authErrorStatus } from "./formErrors"
+import { docTypeLabel } from "./status"
+
+/** A document's name, in full, as the customer reads it. */
+export function legalDocLabel(code: string): string {
+  return isLegalDocCode(code) ? LEGAL_DOC_LABELS[code] : docTypeLabel(code)
+}
+
+/** What the document is or what to send, when its name is not enough; null otherwise. */
+export function legalDocHelp(code: string): string | null {
+  return (isLegalDocCode(code) && LEGAL_DOC_HELP[code]) || null
+}
+
+const isLegalDocCode = (code: string): code is AnyLegalDocType => Object.hasOwn(LEGAL_DOC_LABELS, code)
 
 const REQUIRED_DOC_STATUS_LABELS: Record<string, string> = {
   missing: "À fournir",
@@ -31,10 +44,12 @@ export function needsUpload(status: string | null | undefined): boolean {
   return status === "missing" || status === "rejected" || status === "infected"
 }
 
+const MEGABYTES = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 })
+
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
+  return `${MEGABYTES.format(bytes / (1024 * 1024))} Mo`
 }
 
 // Maps the API's upload refusal to French copy for the customer.

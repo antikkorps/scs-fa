@@ -278,26 +278,26 @@ useHead({
             </div>
 
             <div class="filters__field filters__price">
-              <label class="sr-only" for="shop-min">Prix minimum</label>
+              <label class="sr-only" for="shop-min">Prix minimum TTC</label>
               <input
                 id="shop-min"
                 class="input"
                 type="number"
                 min="0"
                 inputmode="numeric"
-                placeholder="Prix min €"
+                placeholder="Min € TTC"
                 :value="minPrice"
                 @change="setFilter('minPrice', ($event.target as HTMLInputElement).value)"
               />
               <span aria-hidden="true">–</span>
-              <label class="sr-only" for="shop-max">Prix maximum</label>
+              <label class="sr-only" for="shop-max">Prix maximum TTC</label>
               <input
                 id="shop-max"
                 class="input"
                 type="number"
                 min="0"
                 inputmode="numeric"
-                placeholder="Prix max €"
+                placeholder="Max € TTC"
                 :value="maxPrice"
                 @change="setFilter('maxPrice', ($event.target as HTMLInputElement).value)"
               />

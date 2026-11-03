@@ -179,4 +179,15 @@ describe("ShopCatalogue (story 9.6)", () => {
       expect(panel.find("#shop-search").exists()).toBe(false)
     })
   })
+
+  it("says the price bounds are tax included, like the prices shown", async () => {
+    const wrapper = await mountSuspended(ShopCatalogue, {
+      props: { category: "", basePath: "/boutique", listName: "x" },
+      route: "/boutique",
+    })
+    expect(wrapper.find("label[for='shop-min']").text()).toBe("Prix minimum TTC")
+    expect(wrapper.find("label[for='shop-max']").text()).toBe("Prix maximum TTC")
+    expect(wrapper.find("#shop-min").attributes("placeholder")).toBe("Min € TTC")
+    expect(wrapper.find("#shop-max").attributes("placeholder")).toBe("Max € TTC")
+  })
 })

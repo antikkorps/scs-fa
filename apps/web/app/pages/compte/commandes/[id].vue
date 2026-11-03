@@ -4,7 +4,7 @@ import type { OrderAddressSnapshot, OrderLegal, OrderLineItem, RequiredDoc } fro
 import type { OrderDetail } from "~/types/checkout"
 import { formatDate, formatDateTime, formatEuros, formatPercent } from "~/utils/format"
 import { henrriDocumentLabel, invoiceDownloadUrl } from "~/utils/henrri"
-import { needsUpload, requiredDocStatusLabel, requiredDocTone } from "~/utils/legal"
+import { legalDocHelp, legalDocLabel, needsUpload, requiredDocStatusLabel, requiredDocTone } from "~/utils/legal"
 import {
   legalStatusLabel,
   parcelItemLabel,
@@ -202,7 +202,8 @@ function toggleUpload(docType: string) {
             <li v-for="doc in legal.requiredDocs" :key="doc.docType" class="doc">
               <div class="doc__row">
                 <div>
-                  <p class="doc__name">{{ docTypeLabel(doc.docType) }}</p>
+                  <p class="doc__name">{{ legalDocLabel(doc.docType) }}</p>
+                  <p v-if="legalDocHelp(doc.docType)" class="doc__help">{{ legalDocHelp(doc.docType) }}</p>
                   <p class="doc__status" :class="`tone-${requiredDocTone(doc.status)}`">
                     {{ requiredDocStatusLabel(doc.status) }}
                     <template v-if="doc.status === 'rejected' && doc.rejectionReason">
@@ -478,6 +479,11 @@ function toggleUpload(docType: string) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+}
+.doc__help {
+  margin: 0.2rem 0 0;
+  font-size: var(--fs-sm);
+  color: var(--paper-faint);
 }
 .doc__name {
   margin: 0 0 0.25rem;

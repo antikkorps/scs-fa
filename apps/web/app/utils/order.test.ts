@@ -32,7 +32,7 @@ describe("shipping labels (story 11.9)", () => {
 describe("paymentStatusLabel", () => {
   it("translates payment statuses to French", () => {
     expect(paymentStatusLabel("received")).toBe("Payée")
-    expect(paymentStatusLabel("pending")).toBe("En attente")
+    expect(paymentStatusLabel("pending")).toBe("À régler")
     expect(paymentStatusLabel("refunded")).toBe("Remboursée")
   })
   it("falls back to an em dash for unknown/empty", () => {
@@ -79,5 +79,13 @@ describe("paymentDeadlineNote (story 12.9a)", () => {
 
   it("says nothing once there is no deadline", () => {
     expect(paymentDeadlineNote(null)).toBe("")
+  })
+})
+
+// UX audit 2026-11-01 (I2): "En attente" read as if the shop had to act, when
+// it was the customer's turn.
+describe("customer-facing statuses when it is the customer's turn", () => {
+  it("asks for the documents while some are missing", () => {
+    expect(legalStatusLabel("pending")).toBe("Documents à fournir")
   })
 })
