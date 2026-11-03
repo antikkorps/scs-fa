@@ -103,4 +103,80 @@ describe("ShopCatalogue (story 9.6)", () => {
       expect(push).toHaveBeenCalledWith({ path: "/boutique/categorie/munition", query: { tags: "occasion" } })
     })
   })
+
+  // UX audit 2026-11-01 (I6): ~900 px of filters before the first product on a
+  // phone, and no way to sort.
+  describe("sorting", () => {
+    it("offers the sorts, relevance first", async () => {
+      const wrapper = await mountSuspended(ShopCatalogue, {
+        props: { category: "", basePath: "/boutique", listName: "x" },
+        route: "/boutique",
+      })
+      const options = wrapper.findAll("#shop-sort option")
+      expect(options.map((o) => o.text())).toEqual(["Pertinence", "Prix croissant", "Prix décroissant", "Nouveautés"])
+      expect(wrapper.find("label[for='shop-sort']").text()).toBe("Trier par")
+    })
+
+    it("sorts from the first page, keeping the filters", async () => {
+      const wrapper = await mountSuspended(ShopCatalogue, {
+        props: { category: "", basePath: "/boutique", listName: "x" },
+        route: "/boutique?legalCategory=B&page=3",
+      })
+      const push = spyPush()
+      await wrapper.find("#shop-sort").setValue("price_asc")
+      expect(push).toHaveBeenCalledWith({ query: { legalCategory: "B", sort: "price_asc" } })
+    })
+
+    it("asks the API for the sort in the address, and keeps it when filtering", async () => {
+      productQueries.length = 0
+      const wrapper = await mountSuspended(ShopCatalogue, {
+        props: { category: "", basePath: "/boutique", listName: "x" },
+        route: "/boutique?sort=price_desc",
+      })
+      expect(productQueries.at(-1)).toMatchObject({ sort: "price_desc" })
+      const push = spyPush()
+      await wrapper.find("#shop-legal").setValue("C")
+      expect(push).toHaveBeenCalledWith({ query: { legalCategory: "C", sort: "price_desc" } })
+    })
+
+    it("leaves an unknown sort out of the API request", async () => {
+      productQueries.length = 0
+      await mountSuspended(ShopCatalogue, {
+        props: { category: "", basePath: "/boutique", listName: "x" },
+        route: "/boutique?sort=bogus",
+      })
+      expect(productQueries.at(-1)).not.toHaveProperty("sort")
+    })
+  })
+
+  describe("filters panel on a phone", () => {
+    it("is folded behind a button that says how many filters are on", async () => {
+      const wrapper = await mountSuspended(ShopCatalogue, {
+        props: { category: "", basePath: "/boutique", listName: "x" },
+        route: "/boutique?legalCategory=B&tags=occasion",
+      })
+      const toggle = wrapper.find("button.filters__toggle")
+      expect(toggle.text()).toBe("Filtres (2)")
+      expect(toggle.attributes("aria-expanded")).toBe("false")
+      const panel = wrapper.find(`#${toggle.attributes("aria-controls")}`)
+      expect(panel.classes()).not.toContain("is-open")
+
+      await toggle.trigger("click")
+      expect(toggle.attributes("aria-expanded")).toBe("true")
+      expect(panel.classes()).toContain("is-open")
+    })
+
+    it("holds the category, legal category, price and tag filters, not the search", async () => {
+      const wrapper = await mountSuspended(ShopCatalogue, {
+        props: { category: "", basePath: "/boutique", listName: "x" },
+        route: "/boutique",
+      })
+      const panel = wrapper.find("#shop-filters")
+      expect(wrapper.find("button.filters__toggle").text()).toBe("Filtres")
+      for (const selector of ["#shop-category", "#shop-legal", "#shop-min", "#shop-max", ".tagf"]) {
+        expect(panel.find(selector).exists()).toBe(true)
+      }
+      expect(panel.find("#shop-search").exists()).toBe(false)
+    })
+  })
 })
