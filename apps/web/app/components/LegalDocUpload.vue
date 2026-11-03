@@ -6,7 +6,7 @@ import {
   parisToday,
 } from "@armurier/shared"
 import type { LegalDocument } from "~/types/account"
-import { formatFileSize, legalDocUploadMessage } from "~/utils/legal"
+import { formatFileSize, legalDocHelp, legalDocLabel, legalDocUploadMessage } from "~/utils/legal"
 
 // `base`: "/pro/documents" files it on the organisation (story 12.8d).
 const props = defineProps<{ docType: AnyLegalDocType; base?: string }>()
@@ -22,6 +22,9 @@ const error = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const ACCEPT = ALLOWED_LEGAL_DOC_MIME_TYPES.join(",")
+const maxSize = formatFileSize(MAX_LEGAL_DOC_SIZE_BYTES)
+// The document's full name and what to send (UX audit 2026-11-01, I2).
+const help = computed(() => legalDocHelp(props.docType))
 // An already-expired document is refused by the API (story 12.9f).
 const minExpiry = parisToday()
 
@@ -72,7 +75,8 @@ async function submit() {
 
 <template>
   <form class="up" @submit.prevent="submit">
-    <p class="up__lede">Envoyez votre {{ docTypeLabel(docType).toLowerCase() }} (PDF, JPEG ou PNG, 10 Mo max).</p>
+    <p class="up__lede">{{ legalDocLabel(docType) }} : PDF, JPEG ou PNG, {{ maxSize }} max.</p>
+    <p v-if="help" class="up__help">{{ help }}</p>
 
     <label class="up__file">
       <input ref="fileInput" type="file" :accept="ACCEPT" @change="onFileChange" />
@@ -104,6 +108,11 @@ async function submit() {
   flex-direction: column;
   gap: 0.85rem;
   margin-top: 0.75rem;
+}
+.up__help {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--paper-faint);
 }
 .up__lede {
   margin: 0;

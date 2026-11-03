@@ -3,8 +3,10 @@ import { formatDate, formatDateTime } from "./format"
 // French labels for order statuses shown to the customer (mirror the API enums
 // ORDER_PAYMENT_STATUSES / ORDER_LEGAL_STATUSES).
 
+// "En attente" read as if the shop had to act, when it is the customer's turn
+// (UX audit 2026-11-01, I2).
 const PAYMENT_LABELS: Record<string, string> = {
-  pending: "En attente",
+  pending: "À régler",
   awaiting_transfer: "En attente du virement",
   transfer_claimed: "Virement déclaré",
   received: "Payée",
@@ -16,7 +18,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 }
 
 const LEGAL_LABELS: Record<string, string> = {
-  pending: "En attente",
+  pending: "Documents à fournir",
   docs_verifying: "Documents en vérification",
   docs_verified: "Documents validés",
   docs_rejected: "Documents refusés",

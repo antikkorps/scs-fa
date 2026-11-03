@@ -31,19 +31,6 @@ export function stockLabel(stockQty: number | null | undefined): string {
   return "En stock"
 }
 
-// French labels for the required legal document types (codes from the API).
-const DOC_LABELS: Record<string, string> = {
-  cni: "Carte nationale d'identité",
-  permis_chasse: "Permis de chasser validé",
-  autorisation_det: "Autorisation de détention préfectorale",
-  sia: "Numéro SIA (compte personnel)",
-  expertise: "Certificat d'expertise",
-}
-
-export function legalDocLabel(code: string): string {
-  return DOC_LABELS[code] ?? code
-}
-
 // Condition grades of a collection weapon (mirror the ancient_weapons values).
 const CONDITION_LABELS: Record<string, string> = {
   excellent: "Excellent",

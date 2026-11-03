@@ -5,13 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { OrderDetail } from "~/types/checkout"
 import OrderPage from "./[id].vue"
 
-const { getOrder, ORDER_ID } = vi.hoisted(() => ({
+const { getOrder, orderLegal, ORDER_ID } = vi.hoisted(() => ({
   getOrder: vi.fn(),
+  orderLegal: vi.fn(),
   ORDER_ID: "0b7d1f3e-8a51-4c1e-9d0a-2f6b1c3e4d5f",
 }))
 mockNuxtImport("useOrders", () => () => ({ get: getOrder }))
 mockNuxtImport("useDocuments", () => () => ({
-  orderLegal: () => Promise.resolve({ requiresVerification: false, requiredDocs: [] }),
+  orderLegal,
   get: vi.fn(),
 }))
 mockNuxtImport("useRoute", () => () => ({
@@ -49,6 +50,7 @@ function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
 
 beforeEach(() => {
   getOrder.mockReset()
+  orderLegal.mockReset().mockResolvedValue({ requiresVerification: false, requiredDocs: [] })
 })
 
 const mounted = async () => {
@@ -138,5 +140,27 @@ describe("my order — prices (audit 2026-11-01, I4)", () => {
     const text = (await mounted()).text()
     expect(text).toContain("Sous-total HT")
     expect(text).toMatch(/1\s000,00\s*€ HT/)
+  })
+})
+
+// UX audit 2026-11-01 (I2): "CNI", "SIA" meant nothing to a customer.
+describe("my order — the documents to send", () => {
+  it("names each document in full and says what the SIA is", async () => {
+    getOrder.mockResolvedValue(order({ legalVerificationStatus: "pending" }))
+    orderLegal.mockResolvedValue({
+      requiresVerification: true,
+      legalVerificationStatus: "pending",
+      legalRejectionReason: null,
+      requiredDocs: [
+        { docType: "cni", status: "missing", documentId: null, uploadedAt: null, rejectionReason: null },
+        { docType: "sia", status: "missing", documentId: null, uploadedAt: null, rejectionReason: null },
+      ],
+    })
+    const wrapper = await mounted()
+    const docs = wrapper.findAll(".doc").map((doc) => doc.text())
+    expect(docs[0]).toContain("Pièce d'identité (carte d'identité ou passeport)")
+    expect(docs[1]).toContain("Numéro de détenteur SIA")
+    expect(docs[1]).toContain("Système d'information sur les armes")
+    expect(wrapper.text()).toContain("Documents à fournir")
   })
 })
