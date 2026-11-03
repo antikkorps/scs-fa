@@ -56,6 +56,7 @@ describe("GET /api/products", () => {
         priceHt: "800.00",
         requiresLegalVerification: true,
         published: true,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
       },
       {
         sku: `${SKU_PREFIX}beta`,
@@ -67,6 +68,7 @@ describe("GET /api/products", () => {
         priceHt: "1200.00",
         requiresLegalVerification: true,
         published: true,
+        createdAt: new Date("2026-02-01T00:00:00Z"),
       },
       {
         sku: `${SKU_PREFIX}gamma`,
@@ -78,6 +80,22 @@ describe("GET /api/products", () => {
         priceHt: "25.00",
         requiresLegalVerification: false,
         published: true,
+        createdAt: new Date("2026-03-01T00:00:00Z"),
+      },
+      {
+        // 850 € HT but 896,75 € TTC at 5.5 %: dearer than alpha before tax,
+        // cheaper after it. A visitor reads TTC prices, so the sort does too.
+        sku: `${SKU_PREFIX}zeta`,
+        slug: `${SKU_PREFIX}zeta`,
+        name: "Accessoire Test Zeta",
+        description: "Accessoire à taux réduit",
+        categoryId: accessoire,
+        legalCategoryId: legalNone,
+        priceHt: "850.00",
+        vatPct: "5.50",
+        requiresLegalVerification: false,
+        published: true,
+        createdAt: new Date("2025-12-01T00:00:00Z"),
       },
       {
         sku: `${SKU_PREFIX}delta`,
@@ -184,6 +202,19 @@ describe("GET /api/products", () => {
     expect(skus).toEqual([`${SKU_PREFIX}gamma`])
   })
 
+  // A visitor reads prices tax included: the price filter compares them too
+  // (decision Franck 2026-11-02, after the individuals' TTC prices of I4).
+  it("filters on the price tax included, at each product's own rate", async () => {
+    // alpha: 800 € HT = 960 € TTC; zeta: 850 € HT = 896,75 € TTC.
+    const res = await app.inject({ method: "GET", url: "/api/products?minPrice=890&maxPrice=900&limit=100" })
+    expect(testSkus(res.json())).toEqual([`${SKU_PREFIX}zeta`])
+  })
+
+  it("keeps a product whose price tax included is exactly the bound", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/products?minPrice=960&maxPrice=960&limit=100" })
+    expect(testSkus(res.json())).toEqual([`${SKU_PREFIX}alpha`])
+  })
+
   it("performs full-text search on name/description", async () => {
     const res = await app.inject({ method: "GET", url: "/api/products?search=pistolet&limit=100" })
     expect(res.statusCode).toBe(200)
@@ -209,5 +240,32 @@ describe("GET /api/products", () => {
     const res = await app.inject({ method: "GET", url: "/api/products?category=Arme_Poing" })
     expect(res.statusCode).toBe(400)
     expect(res.json().error).toBe("ValidationError")
+  })
+
+  // UX audit 2026-11-01 (I6): the visitor can sort the catalogue.
+  describe("sort", () => {
+    const sorted = async (sort: string) => {
+      const res = await app.inject({ method: "GET", url: `/api/products?sort=${sort}&limit=100` })
+      expect(res.statusCode).toBe(200)
+      return testSkus(res.json())
+    }
+
+    it("sorts by price tax included, cheapest first", async () => {
+      expect(await sorted("price_asc")).toEqual(["gamma", "zeta", "alpha", "beta"].map((s) => `${SKU_PREFIX}${s}`))
+    })
+
+    it("sorts by price tax included, dearest first", async () => {
+      expect(await sorted("price_desc")).toEqual(["beta", "alpha", "zeta", "gamma"].map((s) => `${SKU_PREFIX}${s}`))
+    })
+
+    it("sorts the newest first", async () => {
+      expect(await sorted("newest")).toEqual(["gamma", "beta", "alpha", "zeta"].map((s) => `${SKU_PREFIX}${s}`))
+    })
+
+    it("refuses an unknown sort", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/products?sort=name" })
+      expect(res.statusCode).toBe(400)
+      expect(res.json().error).toBe("ValidationError")
+    })
   })
 })

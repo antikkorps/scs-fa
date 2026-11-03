@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PRODUCT_SORTS, type ProductSort } from "@armurier/shared"
 import type { LegalCategoryCode, ProductListResponse } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/product"
 
@@ -44,6 +45,18 @@ const term = ref(q("search"))
 const legalCategory = computed(() => q("legalCategory"))
 const minPrice = computed(() => q("minPrice"))
 const maxPrice = computed(() => q("maxPrice"))
+// UX audit 2026-11-01 (I6). "relevance", the default, stays out of the address.
+const SORT_LABELS: Record<ProductSort, string> = {
+  relevance: "Pertinence",
+  price_asc: "Prix croissant",
+  price_desc: "Prix décroissant",
+  newest: "Nouveautés",
+}
+const isProductSort = (value: string): value is ProductSort => (PRODUCT_SORTS as readonly string[]).includes(value)
+const sort = computed<ProductSort>(() => {
+  const value = q("sort")
+  return isProductSort(value) ? value : "relevance"
+})
 const page = computed(() => {
   const n = Number.parseInt(q("page"), 10)
   return Number.isFinite(n) && n > 0 ? n : 1
@@ -85,6 +98,7 @@ const apiQuery = computed(() => {
   if (term.value.trim()) query.search = term.value.trim()
   if (minPrice.value) query.minPrice = minPrice.value
   if (maxPrice.value) query.maxPrice = maxPrice.value
+  if (sort.value !== "relevance") query.sort = sort.value
   return query
 })
 
@@ -106,6 +120,7 @@ function filterQuery(overrides: Record<string, string | undefined>, resetPage = 
     legalCategory: legalCategory.value,
     minPrice: minPrice.value,
     maxPrice: maxPrice.value,
+    sort: sort.value === "relevance" ? "" : sort.value,
     page: resetPage ? "" : String(page.value),
     ...overrides,
   }
@@ -137,6 +152,9 @@ onBeforeUnmount(() => {
 function setFilter(key: string, value: string) {
   navigate({ [key]: value || undefined })
 }
+function setSort(value: string) {
+  navigate({ sort: isProductSort(value) && value !== "relevance" ? value : "" })
+}
 function goToPage(n: number) {
   navigate({ page: String(n) }, false)
 }
@@ -149,6 +167,16 @@ const hasFiltersBesidesTags = computed(() =>
   Boolean(legalCategory.value || minPrice.value || maxPrice.value || term.value.trim()),
 )
 const hasFilters = computed(() => hasFiltersBesidesTags.value || selectedTags.value.length > 0)
+
+// On a phone the filters fold behind one button (UX audit 2026-11-01, I6: they
+// took ~900 px before the first product). The search and the sort stay out.
+const filtersOpen = ref(false)
+const activeFilterCount = computed(
+  () => [legalCategory.value, minPrice.value, maxPrice.value].filter(Boolean).length + selectedTags.value.length,
+)
+const filtersToggleLabel = computed(() =>
+  activeFilterCount.value > 0 ? `Filtres (${activeFilterCount.value})` : "Filtres",
+)
 
 const canonicalPath = computed(() =>
   catalogueCanonicalPath(props.basePath, selectedTags.value, hasFiltersBesidesTags.value),
@@ -196,72 +224,95 @@ useHead({
           />
         </div>
 
-        <div class="filters__field">
-          <label class="sr-only" for="shop-category">Catégorie</label>
-          <select
-            id="shop-category"
-            class="input"
-            @change="selectCategory(($event.target as HTMLSelectElement).value)"
+        <div class="toolbar">
+          <button
+            type="button"
+            class="filters__toggle"
+            aria-controls="shop-filters"
+            :aria-expanded="filtersOpen"
+            @click="filtersOpen = !filtersOpen"
           >
-            <!-- `:selected` per option, not `:value` on the select: the latter is
-                 neither rendered server-side nor re-applied when the options
-                 arrive after it, so the page's own category showed as "all". -->
-            <option value="" :selected="!category">Toutes les catégories</option>
-            <option v-for="c in categories" :key="c.slug" :value="c.slug" :selected="c.slug === category">
-              {{ c.name }}
-            </option>
-          </select>
+            {{ filtersToggleLabel }}
+          </button>
+          <div class="toolbar__sort">
+            <label for="shop-sort">Trier par</label>
+            <select id="shop-sort" class="input" @change="setSort(($event.target as HTMLSelectElement).value)">
+              <option v-for="value in PRODUCT_SORTS" :key="value" :value="value" :selected="value === sort">
+                {{ SORT_LABELS[value] }}
+              </option>
+            </select>
+          </div>
         </div>
 
-        <div class="filters__field">
-          <label class="sr-only" for="shop-legal">Catégorie légale</label>
-          <select
-            id="shop-legal"
-            class="input"
-            @change="setFilter('legalCategory', ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="" :selected="!legalCategory">Toute catégorie légale</option>
-            <option v-for="code in LEGAL_CODES" :key="code" :value="code" :selected="code === legalCategory">
-              {{ legalCategoryLabel(code) }}
-            </option>
-          </select>
-        </div>
+        <div id="shop-filters" class="filters__panel" :class="{ 'is-open': filtersOpen }">
+          <div class="filters__fields">
+            <div class="filters__field">
+              <label class="sr-only" for="shop-category">Catégorie</label>
+              <select
+                id="shop-category"
+                class="input"
+                @change="selectCategory(($event.target as HTMLSelectElement).value)"
+              >
+                <!-- `:selected` per option, not `:value` on the select: the latter is
+                     neither rendered server-side nor re-applied when the options
+                     arrive after it, so the page's own category showed as "all". -->
+                <option value="" :selected="!category">Toutes les catégories</option>
+                <option v-for="c in categories" :key="c.slug" :value="c.slug" :selected="c.slug === category">
+                  {{ c.name }}
+                </option>
+              </select>
+            </div>
 
-        <div class="filters__field filters__price">
-          <label class="sr-only" for="shop-min">Prix minimum</label>
-          <input
-            id="shop-min"
-            class="input"
-            type="number"
-            min="0"
-            inputmode="numeric"
-            placeholder="Prix min €"
-            :value="minPrice"
-            @change="setFilter('minPrice', ($event.target as HTMLInputElement).value)"
+            <div class="filters__field">
+              <label class="sr-only" for="shop-legal">Catégorie légale</label>
+              <select
+                id="shop-legal"
+                class="input"
+                @change="setFilter('legalCategory', ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="" :selected="!legalCategory">Toute catégorie légale</option>
+                <option v-for="code in LEGAL_CODES" :key="code" :value="code" :selected="code === legalCategory">
+                  {{ legalCategoryLabel(code) }}
+                </option>
+              </select>
+            </div>
+
+            <div class="filters__field filters__price">
+              <label class="sr-only" for="shop-min">Prix minimum TTC</label>
+              <input
+                id="shop-min"
+                class="input"
+                type="number"
+                min="0"
+                inputmode="numeric"
+                placeholder="Min € TTC"
+                :value="minPrice"
+                @change="setFilter('minPrice', ($event.target as HTMLInputElement).value)"
+              />
+              <span aria-hidden="true">–</span>
+              <label class="sr-only" for="shop-max">Prix maximum TTC</label>
+              <input
+                id="shop-max"
+                class="input"
+                type="number"
+                min="0"
+                inputmode="numeric"
+                placeholder="Max € TTC"
+                :value="maxPrice"
+                @change="setFilter('maxPrice', ($event.target as HTMLInputElement).value)"
+              />
+            </div>
+
+            <button v-if="hasFilters" type="button" class="filters__reset" @click="resetFilters">Réinitialiser</button>
+          </div>
+          <ProductTagFilters
+            :facets="facets"
+            :selected="appliedTags"
+            @toggle="toggleTag"
+            @clear="navigate({ tags: undefined })"
           />
-          <span aria-hidden="true">–</span>
-          <label class="sr-only" for="shop-max">Prix maximum</label>
-          <input
-            id="shop-max"
-            class="input"
-            type="number"
-            min="0"
-            inputmode="numeric"
-            placeholder="Prix max €"
-            :value="maxPrice"
-            @change="setFilter('maxPrice', ($event.target as HTMLInputElement).value)"
-          />
         </div>
-
-        <button v-if="hasFilters" type="button" class="filters__reset" @click="resetFilters">Réinitialiser</button>
       </form>
-
-      <ProductTagFilters
-        :facets="facets"
-        :selected="appliedTags"
-        @toggle="toggleTag"
-        @clear="navigate({ tags: undefined })"
-      />
 
       <p v-if="error" class="state">La boutique est indisponible pour le moment. Revenez bientôt.</p>
       <p v-else-if="isEmpty" class="state">Aucun article ne correspond à votre recherche.</p>
@@ -294,9 +345,54 @@ useHead({
 <style scoped>
 .filters {
   display: grid;
-  grid-template-columns: 1fr;
   gap: 0.75rem;
   margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+}
+.toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.filters__toggle {
+  height: 48px;
+  padding: 0 1.1rem;
+  color: var(--paper);
+  background: transparent;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: var(--fs-base);
+  cursor: pointer;
+}
+.filters__toggle[aria-expanded="true"] {
+  border-color: var(--brass);
+  color: var(--brass);
+}
+.toolbar__sort {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
+  white-space: nowrap;
+}
+.toolbar__sort .input {
+  width: auto;
+}
+/* Folded on a phone until asked for; always shown from 720px. */
+.filters__panel {
+  display: none;
+}
+.filters__panel.is-open {
+  display: grid;
+  gap: 0.75rem;
+}
+.filters__fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
 }
 .filters__price {
   display: flex;
@@ -389,12 +485,16 @@ select.input {
   }
 }
 @media (min-width: 720px) {
-  .filters {
+  .filters__toggle {
+    display: none;
+  }
+  .filters__panel {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .filters__fields {
     grid-template-columns: 2fr 1fr 1fr;
     align-items: center;
-  }
-  .filters__search {
-    grid-column: 1 / -1;
   }
 }
 @media (min-width: 960px) {
