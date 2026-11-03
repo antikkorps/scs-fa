@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CartView } from "~/types/cart"
+import { variantDescription } from "~/utils/cart"
 import { formatEuros } from "~/utils/format"
 
 definePageMeta({ middleware: "auth" })
@@ -48,9 +49,6 @@ async function onHoldExpired() {
   holdNotice.value = "Le délai de réservation d'un article est écoulé : il a été remis en vente."
   await load()
 }
-
-const variantAttrs = (l: { finition: string | null; munition: string | null; couleur: string | null }) =>
-  [l.finition, l.munition, l.couleur].filter(Boolean).join(" · ")
 </script>
 
 <template>
@@ -70,7 +68,7 @@ const variantAttrs = (l: { finition: string | null; munition: string | null; cou
           <li v-for="l in cart.items" :key="l.id" class="line">
             <div class="line__main">
               <p class="line__name">{{ l.name }}</p>
-              <p v-if="variantAttrs(l)" class="line__variant">{{ variantAttrs(l) }}</p>
+              <p v-if="variantDescription(l)" class="line__variant">{{ variantDescription(l) }}</p>
               <p class="line__unit">{{ formatEuros(l.unitPriceHt * (1 + l.vatPct / 100)) }} TTC / unité</p>
               <CartHoldCountdown v-if="l.heldUntil" :held-until="l.heldUntil" @expired="onHoldExpired" />
             </div>
