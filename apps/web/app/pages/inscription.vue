@@ -20,6 +20,9 @@ const error = ref("")
 const loading = ref(false)
 
 const redirectTo = computed(() => safeInternalPath(route.query.redirect))
+// Moving to the login keeps the way back (UX audit 2026-11-01, I3).
+const returnQuery = computed(() => authReturnQuery(route.query))
+const forCart = computed(() => returnQuery.value.motif === CART_REASON)
 
 if (isAuthenticated.value) {
   await navigateTo(redirectTo.value)
@@ -67,7 +70,10 @@ async function submit() {
     <form v-else class="auth-card" novalidate @submit.prevent="submit">
       <p class="eyebrow">Espace client</p>
       <h1 class="auth-card__title">Créer un compte</h1>
-      <p class="auth-card__lede">Quelques informations pour démarrer.</p>
+      <p v-if="forCart" class="auth-card__lede">
+        Quelques informations, puis l'article sera ajouté à votre panier.
+      </p>
+      <p v-else class="auth-card__lede">Quelques informations pour démarrer.</p>
 
       <div class="auth-row">
         <label class="auth-field">
@@ -114,7 +120,7 @@ async function submit() {
 
       <p class="auth-alt">
         Déjà un compte ?
-        <NuxtLink to="/connexion">Se connecter</NuxtLink>
+        <NuxtLink :to="{ path: '/connexion', query: returnQuery }">Se connecter</NuxtLink>
       </p>
       <p class="auth-alt">
         Armurier, club, sécurité privée ou administration ?
