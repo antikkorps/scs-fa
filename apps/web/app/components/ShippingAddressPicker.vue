@@ -78,18 +78,41 @@ async function save() {
       Ajouter une adresse
     </button>
 
-    <form v-else class="addr-form" @submit.prevent="save">
+    <!-- Visible labels, not placeholders (UX audit 2026-11-01, I5). `novalidate`:
+         the form says itself what is missing, in one message. -->
+    <form v-else class="addr-form" novalidate @submit.prevent="save">
       <div class="row">
-        <input v-model="form.firstName" class="input" placeholder="Prénom *" autocomplete="given-name" />
-        <input v-model="form.lastName" class="input" placeholder="Nom *" autocomplete="family-name" />
+        <label class="field">
+          <span>Prénom</span>
+          <input v-model="form.firstName" class="input" required autocomplete="given-name" />
+        </label>
+        <label class="field">
+          <span>Nom</span>
+          <input v-model="form.lastName" class="input" required autocomplete="family-name" />
+        </label>
       </div>
-      <input v-model="form.line1" class="input" placeholder="Adresse *" autocomplete="address-line1" />
-      <input v-model="form.line2" class="input" placeholder="Complément" autocomplete="address-line2" />
+      <label class="field">
+        <span>Adresse</span>
+        <input v-model="form.line1" class="input" required autocomplete="address-line1" />
+      </label>
+      <label class="field">
+        <span>Complément d'adresse <small>(facultatif)</small></span>
+        <input v-model="form.line2" class="input" autocomplete="address-line2" />
+      </label>
       <div class="row">
-        <input v-model="form.postal" class="input" placeholder="Code postal *" autocomplete="postal-code" />
-        <input v-model="form.city" class="input" placeholder="Ville *" autocomplete="address-level2" />
+        <label class="field">
+          <span>Code postal</span>
+          <input v-model="form.postal" class="input" required inputmode="numeric" autocomplete="postal-code" />
+        </label>
+        <label class="field">
+          <span>Ville</span>
+          <input v-model="form.city" class="input" required autocomplete="address-level2" />
+        </label>
       </div>
-      <input v-model="form.phone" class="input" type="tel" placeholder="Téléphone" autocomplete="tel" />
+      <label class="field">
+        <span>Téléphone <small>(facultatif)</small></span>
+        <input v-model="form.phone" class="input" type="tel" autocomplete="tel" />
+      </label>
       <p v-if="formError" class="err" role="alert">{{ formError }}</p>
       <div class="addr-form__actions">
         <button type="submit" class="btn btn-primary" :disabled="saving">
@@ -141,6 +164,19 @@ async function save() {
   display: grid;
   gap: 0.7rem;
   grid-template-columns: 1fr 1fr;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
+}
+.field small {
+  /* The browser's `smaller` would drop the label's size under 12 px. */
+  font-size: inherit;
+  color: var(--paper-faint);
 }
 .input {
   width: 100%;
