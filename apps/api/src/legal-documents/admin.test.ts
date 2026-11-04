@@ -1,4 +1,4 @@
-import { CURRENT_RGPD_CONSENT_VERSION, LEGAL_DOC_REVIEW_SLA_HOURS } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, LEGAL_DOC_REVIEW_SLA_HOURS, orderReference } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
@@ -6,7 +6,7 @@ import FormData from "form-data"
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { auditLogs, legalDocuments, users } from "../db/schema.js"
+import { auditLogs, legalDocuments, orders, users } from "../db/schema.js"
 import { sendLegalDocApprovedEmail, sendLegalDocRejectedEmail } from "../email.js"
 import { signIn } from "../test/sign-in.js"
 
@@ -33,6 +33,7 @@ describe("admin legal document validation (/api/admin/legal-documents)", () => {
 
   async function cleanup() {
     const userIds = db.select({ id: users.id }).from(users).where(like(users.email, "legaladmin-test%"))
+    await db.delete(orders).where(inArray(orders.userId, userIds))
     await db.delete(legalDocuments).where(inArray(legalDocuments.userId, userIds))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, userIds))
     await db.delete(users).where(like(users.email, "legaladmin-test%"))
@@ -79,6 +80,31 @@ describe("admin legal document validation (/api/admin/legal-documents)", () => {
     return row
   }
 
+  /** Insert an order whose lines carry the given legal categories (null = no category). */
+  async function seedOrder(lines: Array<{ name: string; legalCategory: string | null }>, legalStatus = "pending") {
+    const [row] = await db
+      .insert(orders)
+      .values({
+        userId: customerId,
+        itemsJson: lines.map((line, index) => ({
+          qty: 1,
+          priceHt: 100,
+          name: line.name,
+          sku: `LEGALADMIN-${index}`,
+          category: "arme-longue",
+          legalCategory: line.legalCategory,
+          requiresPaymentVirement: false,
+        })),
+        subtotalHt: "100.00",
+        vatAmount: "20.00",
+        totalTtc: "120.00",
+        paymentStatus: "pending",
+        legalVerificationStatus: legalStatus as never,
+      })
+      .returning({ id: orders.id })
+    return row.id
+  }
+
   function adminGet(url: string, token = adminToken) {
     return app.inject({ method: "GET", url, headers: { authorization: `Bearer ${token}` } })
   }
@@ -113,6 +139,7 @@ describe("admin legal document validation (/api/admin/legal-documents)", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    await db.delete(orders).where(inArray(orders.userId, [customerId, customer2Id]))
     await db.delete(legalDocuments).where(inArray(legalDocuments.userId, [customerId, customer2Id]))
     await db.delete(auditLogs).where(inArray(auditLogs.userId, [adminId]))
   })
@@ -223,6 +250,36 @@ describe("admin legal document validation (/api/admin/legal-documents)", () => {
     expect(res.statusCode).toBe(200)
     expect(typeof res.json().data.downloadUrl).toBe("string")
     expect(res.json().data.user.email).toBe(CUSTOMER_EMAIL)
+  })
+
+  it("lists the customer's open orders waiting for this kind of document, with the weapons concerned (I9)", async () => {
+    const waiting = await seedOrder([
+      { name: "Carabine Browning", legalCategory: "C" },
+      { name: "Mallette", legalCategory: null },
+    ])
+    await seedOrder([{ name: "Pistolet Glock", legalCategory: "B" }]) // B does not ask for a hunting licence
+    await seedOrder([{ name: "Fusil Beretta", legalCategory: "C" }], "completed") // closed
+    const doc = await seedDoc({ userId: customerId, docType: "permis_chasse" })
+
+    const res = await adminGet(`/api/admin/legal-documents/${doc.id}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data.orders).toEqual([
+      {
+        id: waiting,
+        reference: orderReference(waiting),
+        createdAt: expect.any(String),
+        legalVerificationStatus: "pending",
+        paymentStatus: "pending",
+        items: [{ name: "Carabine Browning", legalCategory: "C" }],
+      },
+    ])
+  })
+
+  it("lists no order when the customer has none waiting", async () => {
+    const doc = await seedDoc({ userId: customerId, docType: "cni" })
+    const res = await adminGet(`/api/admin/legal-documents/${doc.id}`)
+    expect(res.json().data.orders).toEqual([])
   })
 
   it("returns 404 for an unknown document", async () => {

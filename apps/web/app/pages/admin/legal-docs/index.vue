@@ -4,7 +4,14 @@ import type { LegalDocDetail, LegalDocQueueItem } from "~/types/admin"
 import type { Pagination } from "~/types/pagination"
 import { formatDate, formatDateTime } from "~/utils/format"
 import { legalDocOwner } from "~/utils/organisation"
-import { docTypeLabel, docVerificationStatus, REJECTION_REASON_OPTIONS, rejectionLabel } from "~/utils/status"
+import {
+  docScanStatus,
+  docTypeLabel,
+  docVerificationStatus,
+  legalStatus,
+  REJECTION_REASON_OPTIONS,
+  rejectionLabel,
+} from "~/utils/status"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Documents — Administration SCS" })
@@ -34,6 +41,8 @@ const rejectNotes = ref("")
 const mode = ref<"view" | "reject">("view")
 // The API refuses to approve a document past its expiry date (story 12.9f).
 const selectedExpired = computed(() => isLegalDocExpired(selected.value?.expiresAt, parisToday()))
+// Photos are shown in the drawer; a PDF opens in a new tab (no frame-src widening for an ID document).
+const selectedIsImage = computed(() => Boolean(selected.value?.mimeType?.startsWith("image/")))
 
 function startReject() {
   if (selectedExpired.value) rejectReason.value = "document_expired"
@@ -139,9 +148,7 @@ function setStatus(s: typeof status.value) {
             <td class="cell-date">{{ formatDateTime(d.uploadedAt) }}</td>
             <td>{{ docTypeLabel(d.docType) }}</td>
             <td class="email cell-break">{{ legalDocOwner(d).name }}<span v-if="d.organisation" class="muted"> · {{ legalDocOwner(d).contact }}</span></td>
-            <td>
-              <span class="scan" :class="`scan--${d.scanStatus}`">{{ d.scanStatus }}</span>
-            </td>
+            <td><AdminStatusTag v-bind="docScanStatus(d.scanStatus)" /></td>
             <td><AdminStatusTag v-bind="docVerificationStatus(d.verificationStatus)" /></td>
             <td>
               <span v-if="d.overdue" class="overdue">En retard</span>
@@ -172,11 +179,38 @@ function setStatus(s: typeof status.value) {
           <dl class="meta">
             <div><dt>Statut</dt><dd><AdminStatusTag v-bind="docVerificationStatus(selected.verificationStatus)" /></dd></div>
             <div v-if="selected.docNumber"><dt>N° document</dt><dd>{{ selected.docNumber }}</dd></div>
-            <div><dt>Antivirus</dt><dd>{{ selected.scanStatus }}</dd></div>
+            <div><dt>Antivirus</dt><dd><AdminStatusTag v-bind="docScanStatus(selected.scanStatus)" /></dd></div>
             <div v-if="selected.expiresAt"><dt>Expire le</dt><dd>{{ formatDate(selected.expiresAt) }}</dd></div>
           </dl>
 
-          <a :href="selected.downloadUrl" target="_blank" rel="noopener" class="btn btn-ghost dl">Ouvrir le document ↗</a>
+          <template v-if="selected.downloadUrl">
+            <img
+              v-if="selectedIsImage"
+              :src="selected.downloadUrl"
+              :alt="`${docTypeLabel(selected.docType)} déposé par ${legalDocOwner(selected).name}`"
+              class="preview"
+            />
+            <a :href="selected.downloadUrl" target="_blank" rel="noopener" class="btn btn-ghost dl">Ouvrir le document ↗</a>
+          </template>
+          <p v-else class="hint file-pending">Fichier consultable après l'analyse antivirus.</p>
+
+          <section class="waiting" aria-labelledby="waiting-title">
+            <h3 id="waiting-title" class="waiting__title">Commandes concernées</h3>
+            <p v-if="selected.organisation" class="hint">Pièce d'un compte pro : elle sert à accepter ses devis.</p>
+            <p v-else-if="selected.orders.length === 0" class="hint">Aucune commande en cours n'attend cette pièce.</p>
+            <ul v-else class="waiting__list">
+              <li v-for="order in selected.orders" :key="order.id" class="waiting-order">
+                <NuxtLink :to="`/admin/orders/${order.id}`" class="waiting-order__ref">{{ order.reference }}</NuxtLink>
+                <span class="muted">{{ formatDate(order.createdAt) }}</span>
+                <AdminStatusTag v-bind="legalStatus(order.legalVerificationStatus)" />
+                <ul class="waiting-order__items">
+                  <li v-for="item in order.items" :key="item.name">
+                    {{ item.name }}<span v-if="item.legalCategory" class="muted"> · Catégorie {{ item.legalCategory }}</span>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </section>
 
           <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
 
@@ -294,20 +328,6 @@ function setStatus(s: typeof status.value) {
 .email {
   color: var(--paper-dim);
 }
-.scan {
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--ls-wide);
-}
-.scan--clean {
-  color: var(--brass);
-}
-.scan--infected {
-  color: var(--danger);
-}
-.scan--pending {
-  color: var(--paper-faint);
-}
 .overdue {
   color: var(--danger);
   font-weight: var(--fw-semibold);
@@ -391,10 +411,60 @@ function setStatus(s: typeof status.value) {
   margin: 0;
   text-align: right;
 }
+.preview {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  background: var(--ink);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  margin-bottom: 0.8rem;
+}
 .dl {
   width: 100%;
   justify-content: center;
   margin-bottom: 1.4rem;
+}
+.file-pending {
+  margin: 0 0 1.4rem;
+}
+.waiting {
+  margin-bottom: 1.4rem;
+}
+.waiting__title {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  font-weight: var(--fw-semibold);
+  margin: 0 0 0.6rem;
+}
+.waiting .hint {
+  margin-top: 0;
+}
+.waiting__list,
+.waiting-order__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.waiting-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--ink-line);
+}
+.waiting-order__ref {
+  color: var(--brass);
+  font-weight: var(--fw-semibold);
+}
+.waiting-order__items {
+  flex-basis: 100%;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
 }
 .actions {
   display: flex;
