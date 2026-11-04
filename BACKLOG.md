@@ -1119,6 +1119,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] M1 pièce approuvée puis expirée supprimable → gardée (PR #210)
 - [x] M2, B2, B3 effacement RGPD (dans la #207, avant merge) ; B1 re-saisie comptée dans le blocage, B4 mot de passe pour activer l'application, désactivation en 403 (PR #211)
 - [ ] B5 **avant ouverture** : vérifier que chaque admin a enrôlé son application d'authentification (sans elle, le mot de passe seul ouvre la session)
+- [x] **Revue 2026-11-04** (deux points faibles) : le **rôle est relu en base à chaque requête** (comme la suppression) — un admin rétrogradé perd le back-office tout de suite, pas à l'expiration de son jeton (≤ 1 h) ; un compte disparu répond 401 ; la **réinitialisation de la double authentification d'un autre compte demande le mot de passe et le code de l'admin** (même re-saisie que l'export et la suppression, comptée dans le blocage), formulaire dans Clients et Organisations au lieu d'un simple « OK »
 - [ ] B6 avis moyens/bas de `pnpm audit --prod` (surtout outils de build) : suivis par Renovate ; B7 formulation « pseudonymisée » de l'empreinte newsletter dans la politique
 
 **UX/UI — bloquants (PR #209) :**

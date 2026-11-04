@@ -125,18 +125,24 @@ const saveTerms = () => act("", { method: "PATCH", body: termsBody() }, "L'enreg
 const reinstate = () => act("/reinstate", { method: "POST" }, "Le rétablissement a échoué.")
 // Story 12.8e — the member lost their phone and their recovery codes: they enrol the app again.
 const totpNotice = ref("")
-async function resetTotp() {
-  const member = selected.value?.member
-  if (!member || !confirm(`Réinitialiser la double authentification de ${member.email} ?`)) return
+const confirmingReset = ref(false)
+function startTotpReset() {
   actionError.value = ""
   totpNotice.value = ""
-  try {
-    await api(`/admin/users/${member.id}/totp/reset`, { method: "POST" })
-    totpNotice.value =
-      "Double authentification réinitialisée : le membre la configurera à sa prochaine connexion s'il le souhaite."
-  } catch (err) {
-    actionError.value = errorMessage(err, "La réinitialisation a échoué.")
-  }
+  confirmingReset.value = true
+}
+// Another organisation opened (or none): its member's reset starts closed.
+watch(
+  () => selected.value?.id,
+  () => {
+    confirmingReset.value = false
+    totpNotice.value = ""
+  },
+)
+function totpResetDone() {
+  confirmingReset.value = false
+  totpNotice.value =
+    "Double authentification réinitialisée : le membre la configurera à sa prochaine connexion s'il le souhaite."
 }
 
 const saveBilling = () =>
@@ -321,7 +327,14 @@ const memberName = (row: AdminOrganisationRow) =>
         <section v-if="selected.member" class="block">
           <h3 class="block__h">Double authentification du membre</h3>
           <p class="hint">Téléphone perdu sans codes de secours : la réinitialiser lui permet d'en configurer une nouvelle.</p>
-          <button type="button" class="btn btn-ghost reset-totp" :disabled="acting" @click="resetTotp">
+          <AdminTotpResetConfirm
+            v-if="confirmingReset"
+            :user-id="selected.member.id"
+            :email="selected.member.email"
+            @done="totpResetDone"
+            @cancel="confirmingReset = false"
+          />
+          <button v-else type="button" class="btn btn-ghost reset-totp" :disabled="acting" @click="startTotpReset">
             Réinitialiser la double authentification
           </button>
           <p v-if="totpNotice" class="hint" role="status">{{ totpNotice }}</p>
