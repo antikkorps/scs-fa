@@ -14,6 +14,7 @@ import { MAX_CROSS_SELLS_PER_PRODUCT } from "./cross-sell.js"
 import { LAUNCH_STAGES } from "./launch.js"
 import { NEWSLETTER_SEGMENTS, NEWSLETTER_SUBSCRIPTION_STATUS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
+import { requiresValidityEnd } from "./required-docs.js"
 import {
   MAX_PARCELS_PER_ARTICLE,
   ORDER_SHIPPING_STATUSES,
@@ -212,18 +213,25 @@ export const createOrderSchema = z
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected an ISO date (YYYY-MM-DD)")
 
 function documentMetaSchema<T extends readonly [string, ...string[]]>(types: T) {
-  return z
-    .object({
-      docType: z.enum(types),
-      docNumber: z.string().min(1).max(100).optional(),
-      issuedAt: isoDateSchema.optional(),
-      expiresAt: isoDateSchema.optional(),
-    })
-    .strict()
-    .refine((d) => d.issuedAt === undefined || d.expiresAt === undefined || d.expiresAt >= d.issuedAt, {
-      message: "expiresAt must be on or after issuedAt",
-      path: ["expiresAt"],
-    })
+  return (
+    z
+      .object({
+        docType: z.enum(types),
+        docNumber: z.string().min(1).max(100).optional(),
+        issuedAt: isoDateSchema.optional(),
+        expiresAt: isoDateSchema.optional(),
+      })
+      .strict()
+      .refine((d) => d.issuedAt === undefined || d.expiresAt === undefined || d.expiresAt >= d.issuedAt, {
+        message: "expiresAt must be on or after issuedAt",
+        path: ["expiresAt"],
+      })
+      // I7 — a licence renewed every season says until when it is valid.
+      .refine((d) => d.expiresAt !== undefined || !requiresValidityEnd(d.docType), {
+        message: "expiresAt is required for a document renewed every season",
+        path: ["expiresAt"],
+      })
+  )
 }
 
 export const legalDocumentMetaSchema = documentMetaSchema(LEGAL_DOC_TYPES)

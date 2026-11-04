@@ -82,7 +82,8 @@ export const ORDER_REQUIRED_DOC_STATUS = [
 export type OrderRequiredDocStatus = (typeof ORDER_REQUIRED_DOC_STATUS)[number]
 
 // Legal document types a customer can upload (matches the `doc_type` DB enum)
-export const LEGAL_DOC_TYPES = ["cni", "permis_chasse", "autorisation_det", "sia", "expertise"] as const
+// licence_tir: the sport-shooting licence, the alternative to the hunting licence in category C (I7, 2026-11-04).
+export const LEGAL_DOC_TYPES = ["cni", "permis_chasse", "licence_tir", "autorisation_det", "sia", "expertise"] as const
 export type LegalDocType = (typeof LEGAL_DOC_TYPES)[number]
 
 // Story 12.8d — what an organisation files on its own account, judged by SCS
@@ -109,6 +110,7 @@ export type AnyLegalDocType = LegalDocType | OrganisationDocType
 export const LEGAL_DOC_LABELS: Record<AnyLegalDocType, string> = {
   cni: "Pièce d'identité (carte d'identité ou passeport)",
   permis_chasse: "Permis de chasser validé",
+  licence_tir: "Licence de tir sportif",
   autorisation_det: "Autorisation préfectorale de détention",
   sia: "Numéro de détenteur SIA",
   expertise: "Certificat d'expertise",
@@ -124,6 +126,7 @@ export const LEGAL_DOC_LABELS: Record<AnyLegalDocType, string> = {
 export const LEGAL_DOC_HELP: Partial<Record<AnyLegalDocType, string>> = {
   cni: "Carte d'identité recto verso, ou passeport, en cours de validité.",
   permis_chasse: "Le permis de chasser et sa validation pour la saison en cours.",
+  licence_tir: "La licence de la Fédération française de tir pour la saison en cours.",
   autorisation_det: "L'autorisation délivrée par la préfecture pour détenir une arme de catégorie B.",
   sia: "Le Système d'information sur les armes (SIA) est le service en ligne du ministère de l'Intérieur où chaque détenteur d'arme a un compte personnel ; son numéro figure dans votre espace SIA.",
 }

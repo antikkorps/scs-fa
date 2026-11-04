@@ -70,7 +70,8 @@ export interface LegalCategoryRef {
   description: string | null
   requiresVerification: boolean | null
   minAge: number | null
-  requiredDocTypes: string[]
+  /** Each entry a type, or a group of alternatives (I7): read with parseRequiredDocEntries. */
+  requiredDocTypes: Array<string | string[]>
 }
 
 export interface ProductVariant {
@@ -177,7 +178,7 @@ export interface ProductDetail {
     description: string | null
     requiresVerification: boolean | null
     minAge: number | null
-    requiredDocTypes: string[]
+    requiredDocTypes: Array<string | string[]>
   } | null
   createdAt: string
   updatedAt: string

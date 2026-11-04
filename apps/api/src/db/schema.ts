@@ -99,6 +99,8 @@ export const loginChallengeMethodEnum = pgEnum("login_challenge_method", ["email
 export const docTypeEnum = pgEnum("doc_type", [
   "cni",
   "permis_chasse",
+  // I7 (2026-11-04) — the alternative to the hunting licence in category C.
+  "licence_tir",
   "autorisation_det",
   "sia",
   "expertise",
@@ -777,7 +779,9 @@ export const legalCategories = pgTable("legal_categories", {
   description: text("description"),
   requiresVerification: boolean("requires_verification").notNull().default(true),
   minAge: integer("min_age").default(18),
-  requiredDocTypes: jsonb("required_doc_types").$type<string[]>().default(sql`'[]'::jsonb`), // ["cni", "permis_chasse", ...]
+  // Each entry a document type, or a group of alternatives of which one is
+  // enough (I7): ["cni", ["permis_chasse", "licence_tir"]]. Read with parseRequiredDocEntries.
+  requiredDocTypes: jsonb("required_doc_types").$type<Array<string | string[]>>().default(sql`'[]'::jsonb`),
   createdAt: timestamp("created_at").defaultNow(),
 })
 

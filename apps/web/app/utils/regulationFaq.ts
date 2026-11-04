@@ -67,9 +67,8 @@ export const REGULATION_FAQ: FaqSection[] = [
       {
         question: "Que faut-il pour acheter une arme de catégorie C ?",
         answer: [
-          "Un permis de chasser accompagné de sa validation pour l'année en cours, une pièce d'identité, et votre identifiant SIA.",
+          "Une pièce d'identité, et au choix un permis de chasser accompagné de sa validation pour la saison en cours, ou une licence de tir sportif de la saison en cours. Ces deux pièces se renouvellent chaque année : à chaque commande, celle que vous envoyez doit être valable.",
         ],
-        todo: "La licence de tir en cours de validité ouvre aussi l'achat d'une arme de catégorie C, mais le site ne propose aujourd'hui que le permis de chasser comme pièce : à confirmer, et à ajouter aux pièces acceptées le cas échéant.",
       },
       {
         question: "Qu'est-ce que le SIA ?",

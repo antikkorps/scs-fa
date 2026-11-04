@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, requiresValidityEnd } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { and, eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
@@ -23,6 +23,8 @@ const CUSTOMER_EMAIL = "orderlegal-test-customer@orderlegal-test.local"
 const OTHER_EMAIL = "orderlegal-test-other@orderlegal-test.local"
 
 const PDF = Buffer.from("%PDF-1.4\n%fake pdf for tests\n")
+// The end of next season: a licence still valid whenever the suite runs.
+const NEXT_SEASON_END = `${new Date().getFullYear() + 1}-06-30`
 
 describe("order legal status (/api/orders/:id/legal)", () => {
   let app: FastifyInstance
@@ -88,6 +90,8 @@ describe("order legal status (/api/orders/:id/legal)", () => {
   async function uploadDoc(docType: string, token = customerToken, { scan = true } = {}) {
     const form = new FormData()
     form.append("docType", docType)
+    // A licence renewed every season says until when it is valid (I7).
+    if (requiresValidityEnd(docType)) form.append("expiresAt", NEXT_SEASON_END)
     form.append("file", PDF, { filename: `${docType}.pdf`, contentType: "application/pdf" })
     const res = await app.inject({
       method: "POST",
@@ -180,7 +184,7 @@ describe("order legal status (/api/orders/:id/legal)", () => {
   // ── Endpoint basics ───────────────────────────────────────────────────────
 
   it("requires authentication and enforces ownership", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
+    const orderId = await seedOrder(customerId, ["B"])
     const anon = await app.inject({ method: "GET", url: `/api/orders/${orderId}/legal` })
     expect(anon.statusCode).toBe(401)
     const theirs = await getLegal(orderId, otherToken)
@@ -208,7 +212,7 @@ describe("order legal status (/api/orders/:id/legal)", () => {
   // ── Required docs derivation ──────────────────────────────────────────────
 
   it("derives required doc types from the order's legal categories, all missing initially", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
+    const orderId = await seedOrder(customerId, ["B"])
     const res = await getLegal(orderId)
     expect(res.statusCode).toBe(200)
     const { data } = res.json()
@@ -217,7 +221,7 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     const byType = Object.fromEntries(
       data.requiredDocs.map((d: { docType: string; status: string }) => [d.docType, d.status]),
     )
-    expect(byType).toEqual({ cni: "missing", permis_chasse: "missing", sia: "missing" })
+    expect(byType).toEqual({ cni: "missing", autorisation_det: "missing", sia: "missing" })
   })
 
   it("unions required docs across several legal categories", async () => {
@@ -233,7 +237,7 @@ describe("order legal status (/api/orders/:id/legal)", () => {
   // ── Transitions driven by document lifecycle ──────────────────────────────
 
   it("stays pending while required docs are missing, and reflects uploaded doc states", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
+    const orderId = await seedOrder(customerId, ["B"])
     const docId = await uploadDoc("cni", customerToken, { scan: false })
 
     // Upload hook ran, but two docs are still missing → order stays pending
@@ -250,16 +254,16 @@ describe("order legal status (/api/orders/:id/legal)", () => {
   })
 
   it("moves to docs_verifying once every required doc is uploaded", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
+    const orderId = await seedOrder(customerId, ["B"])
     await uploadDoc("cni")
-    await uploadDoc("permis_chasse")
+    await uploadDoc("autorisation_det")
     await uploadDoc("sia")
     expect((await orderStatusInDb(orderId)).status).toBe("docs_verifying")
   })
 
   it("moves to docs_verified when the admin approves every required doc", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
-    const ids = [await uploadDoc("cni"), await uploadDoc("permis_chasse"), await uploadDoc("sia")]
+    const orderId = await seedOrder(customerId, ["B"])
+    const ids = [await uploadDoc("cni"), await uploadDoc("autorisation_det"), await uploadDoc("sia")]
     for (const id of ids) {
       const res = await decide(id, "approve")
       expect(res.statusCode).toBe(200)
@@ -277,9 +281,9 @@ describe("order legal status (/api/orders/:id/legal)", () => {
   })
 
   it("moves to docs_rejected when a required doc is rejected, exposing the reason", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
+    const orderId = await seedOrder(customerId, ["B"])
     const cniId = await uploadDoc("cni")
-    const permisId = await uploadDoc("permis_chasse")
+    const permisId = await uploadDoc("autorisation_det")
     await uploadDoc("sia")
     await decide(cniId, "approve")
     const rej = await decide(permisId, "reject", { reason: "document_expired", notes: "Expired in 2023" })
@@ -290,14 +294,14 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     expect(row.rejectionReason).toBe("document_expired")
 
     const res = await getLegal(orderId)
-    const permis = res.json().data.requiredDocs.find((d: { docType: string }) => d.docType === "permis_chasse")
+    const permis = res.json().data.requiredDocs.find((d: { docType: string }) => d.docType === "autorisation_det")
     expect(permis).toMatchObject({ status: "rejected", rejectionReason: "document_expired" })
   })
 
   it("returns to docs_verifying after re-uploading a rejected doc (D1: re-upload allowed)", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
+    const orderId = await seedOrder(customerId, ["B"])
     const cniId = await uploadDoc("cni")
-    const permisId = await uploadDoc("permis_chasse")
+    const permisId = await uploadDoc("autorisation_det")
     const siaId = await uploadDoc("sia")
     await decide(cniId, "approve")
     await decide(siaId, "approve")
@@ -305,16 +309,16 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     expect((await orderStatusInDb(orderId)).status).toBe("docs_rejected")
 
     // Customer re-uploads the rejected doc type → back under review
-    await uploadDoc("permis_chasse")
+    await uploadDoc("autorisation_det")
     const row = await orderStatusInDb(orderId)
     expect(row.status).toBe("docs_verifying")
     expect(row.rejectionReason).toBeNull()
   })
 
   it("regresses to pending when a doc under review is deleted", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
+    const orderId = await seedOrder(customerId, ["B"])
     await uploadDoc("cni")
-    await uploadDoc("permis_chasse")
+    await uploadDoc("autorisation_det")
     const siaId = await uploadDoc("sia")
     expect((await orderStatusInDb(orderId)).status).toBe("docs_verifying")
 
@@ -340,9 +344,9 @@ describe("order legal status (/api/orders/:id/legal)", () => {
   })
 
   it("no longer clears an order with an approved document past its expiry date (story 12.9f)", async () => {
-    const orderId = await seedOrder(customerId, ["C"])
+    const orderId = await seedOrder(customerId, ["B"])
     const cniId = await uploadDoc("cni")
-    const permisId = await uploadDoc("permis_chasse")
+    const permisId = await uploadDoc("autorisation_det")
     const siaId = await uploadDoc("sia")
     await decide(cniId, "approve")
     await db.update(legalDocuments).set({ expiresAt: "2020-01-31" }).where(eq(legalDocuments.id, cniId))
@@ -472,5 +476,75 @@ describe("order legal status (/api/orders/:id/legal)", () => {
     // A later recompute (e.g. refund bookkeeping) must not undo completion
     await recomputeOrderLegalStatus(customerId)
     expect((await orderStatusInDb(orderId)).status).toBe("completed")
+  })
+
+  // ── Category C (I7, decision Franck 2026-11-04) ──────────────────────────
+  // An identity document and EITHER a hunting licence validated for the
+  // season OR a sport-shooting licence; no SIA number.
+
+  type DocLine = { docType: string; status: string; alternatives?: string[]; documentId?: string }
+  const licenceLine = async (orderId: string) =>
+    ((await getLegal(orderId)).json().data.requiredDocs as DocLine[]).find((line) => line.alternatives)
+
+  it("asks for C an identity document and one licence of the customer's choice, nothing more", async () => {
+    const orderId = await seedOrder(customerId, ["C"])
+
+    const lines = (await getLegal(orderId)).json().data.requiredDocs as DocLine[]
+
+    expect(lines).toEqual([
+      { docType: "cni", status: "missing" },
+      { docType: "permis_chasse", alternatives: ["permis_chasse", "licence_tir"], status: "missing" },
+    ])
+  })
+
+  it("clears a C order with a shooting licence instead of a hunting licence", async () => {
+    const orderId = await seedOrder(customerId, ["C"])
+    const cniId = await uploadDoc("cni")
+    const licenceId = await uploadDoc("licence_tir")
+    expect(await licenceLine(orderId)).toMatchObject({
+      docType: "licence_tir",
+      status: "pending_review",
+      documentId: licenceId,
+    })
+
+    await decide(cniId, "approve")
+    await decide(licenceId, "approve")
+
+    expect((await orderStatusInDb(orderId)).status).toBe("docs_verified")
+  })
+
+  it("lets a fresh licence of the other kind take over from an expired one", async () => {
+    const orderId = await seedOrder(customerId, ["C"])
+    const cniId = await uploadDoc("cni")
+    const permisId = await uploadDoc("permis_chasse")
+    await decide(cniId, "approve")
+    await decide(permisId, "approve")
+    expect((await orderStatusInDb(orderId)).status).toBe("docs_verified")
+
+    // A later order, once the season of the hunting licence is over
+    await db.update(legalDocuments).set({ expiresAt: "2020-06-30" }).where(eq(legalDocuments.id, permisId))
+    const nextOrder = await seedOrder(customerId, ["C"])
+    await recomputeOrderLegalStatus(customerId)
+    expect(await licenceLine(nextOrder)).toMatchObject({ docType: "permis_chasse", status: "rejected" })
+
+    const licenceId = await uploadDoc("licence_tir")
+    expect(await licenceLine(nextOrder)).toMatchObject({ docType: "licence_tir", documentId: licenceId })
+    await decide(licenceId, "approve")
+    expect((await orderStatusInDb(nextOrder)).status).toBe("docs_verified")
+  })
+
+  it("refuses a licence sent without the end of its validity", async () => {
+    const form = new FormData()
+    form.append("docType", "licence_tir")
+    form.append("file", PDF, { filename: "licence.pdf", contentType: "application/pdf" })
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/legal-documents",
+      headers: { authorization: `Bearer ${customerToken}`, ...form.getHeaders() },
+      payload: form,
+    })
+
+    expect(res.statusCode).toBe(400)
   })
 })
