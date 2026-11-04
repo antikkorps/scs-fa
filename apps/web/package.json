@@ -18,7 +18,7 @@
   "dependencies": {
     "@armurier/shared": "workspace:*",
     "@nuxt/fonts": "0.14.0",
-    "@stripe/stripe-js": "9.12.1",
+    "@stripe/stripe-js": "9.13.0",
     "@tiptap/extension-image": "3.30.5",
     "@tiptap/extension-link": "3.30.5",
     "@tiptap/pm": "3.30.5",
