@@ -22,6 +22,11 @@ export type NewsletterSubscriptionStatus = (typeof NEWSLETTER_SUBSCRIPTION_STATU
 // long as the address exists (they travel in every letter we send).
 export const NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS = 72
 
+// After an unsubscribe, the proof that consent existed (address hash, dates, IP
+// and browser) is kept for the civil limitation period, then erased (decision
+// Franck 2026-11-04, audit B7).
+export const NEWSLETTER_CONSENT_PROOF_YEARS = 5
+
 /** Wording shown next to each opt-in checkbox (front + transactional emails). */
 export const NEWSLETTER_SEGMENT_LABELS: Record<NewsletterSegment, string> = {
   armurerie: "Armurerie — nouveautés, réassorts et conseils",

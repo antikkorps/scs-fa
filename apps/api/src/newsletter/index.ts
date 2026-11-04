@@ -107,7 +107,7 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
       const emailHash = newsletterEmailHash(email)
       const now = new Date()
 
-      // Re-subscribing after a purge finds the anonymised trace by its hash and
+      // Re-subscribing after a purge finds the consent proof by its hash and
       // puts the address back on it, instead of forking a second contact.
       const [contact] = await db
         .insert(newsletterContacts)
@@ -283,7 +283,8 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
    *
    * The token is NOT single-use: it travels in every letter and must keep working
    * as long as the address exists. When the last segment goes, the address is
-   * **purged** — row kept, anonymised, so the consent history stays provable.
+   * **purged** — the row stays without the address (pseudonymised: hash, dates,
+   * IP, browser) for 5 years, so the consent history stays provable.
    */
   fastify.post(
     "/unsubscribe",
@@ -332,8 +333,8 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
       await syncProvider(request, contact.id, contact.email, segments)
 
       if (!stillSubscribed) {
-        // GDPR purge: the address goes, the anonymised trace (hash + consent and
-        // withdrawal timestamps) stays. Tokens go with it, so the links in mails
+        // GDPR purge: the address goes, the consent proof (hash, consent and
+        // withdrawal dates, IP, browser) stays 5 years — pseudonymised, not anonymous. Tokens go with it, so the links in mails
         // already delivered stop resolving to anything.
         await db
           .update(newsletterContacts)

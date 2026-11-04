@@ -214,7 +214,7 @@ describe("Newsletter — double opt-in, segments and GDPR purge (story 11.4)", (
     expect(listing.json().data.segments).toEqual([{ segment: "armurerie", status: "confirmed" }])
   })
 
-  it("purges the address on a full unsubscribe but keeps an anonymous consent trace", async () => {
+  it("purges the address on a full unsubscribe but keeps the consent proof", async () => {
     const address = email("purge")
     const mail = await subscribeAndGetTokens(address, ["armurerie", "gun_art"])
     await app.inject({ method: "POST", url: "/api/newsletter/confirm", payload: { token: mail.confirmToken } })

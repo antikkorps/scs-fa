@@ -63,6 +63,19 @@ describe("legal pages (story 12.1)", () => {
     expect(row?.text()).toContain("30 minutes")
   })
 
+  // Audit 2026-11-01 B7 + decision Franck 2026-11-04: the address hash is
+  // pseudonymised data, not anonymous; the whole proof is kept 5 years.
+  it("says what the newsletter consent proof holds, that it is pseudonymised, and for how long", async () => {
+    const wrapper = await mountSuspended(Confidentialite)
+    const row = wrapper.findAll("tr").find((line) => line.text().startsWith("Abonnement à la lettre d'information"))
+    const text = row?.text().replace(/\s+/g, " ") ?? ""
+    expect(text).toContain("pseudonymisée")
+    expect(text).toContain("adresse IP")
+    expect(text).toContain("navigateur")
+    expect(text).toContain("5 ans après votre désinscription")
+    expect(text).not.toContain("non réversible")
+  })
+
   it("states how long the journal of sensitive operations is kept (story 12.7e)", async () => {
     const wrapper = await mountSuspended(Confidentialite)
     const row = wrapper.findAll("tr").find((line) => line.text().startsWith("Journal des opérations sensibles"))

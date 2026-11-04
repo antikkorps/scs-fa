@@ -1,8 +1,9 @@
 // Back-office view of the newsletter subscribers: how many per segment and
 // status, and who, with the proof of each consent. Read-only — letters are
 // written and sent from the provider (Brevo), and a contact leaves through the
-// unsubscribe link of every letter. Anonymised traces (address erased after a
-// full unsubscribe) are counted but never listed: nothing about them is personal.
+// unsubscribe link of every letter. Consent proofs (address erased after a full
+// unsubscribe, kept 5 years) are counted but never listed: a reviewer has no use
+// for them, and they stay pseudonymised data (audit B7).
 
 import {
   type AdminNewsletterQuery,

@@ -1119,7 +1119,8 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] M1 pièce approuvée puis expirée supprimable → gardée (PR #210)
 - [x] M2, B2, B3 effacement RGPD (dans la #207, avant merge) ; B1 re-saisie comptée dans le blocage, B4 mot de passe pour activer l'application, désactivation en 403 (PR #211)
 - [ ] B5 **avant ouverture** : vérifier que chaque admin a enrôlé son application d'authentification (sans elle, le mot de passe seul ouvre la session)
-- [ ] B6 avis moyens/bas de `pnpm audit --prod` (surtout outils de build) : suivis par Renovate ; B7 formulation « pseudonymisée » de l'empreinte newsletter dans la politique
+- [ ] B6 avis moyens/bas de `pnpm audit --prod` (surtout outils de build) : suivis par Renovate
+- [x] B7 empreinte newsletter : la politique et le registre la disent **pseudonymisée** (SHA-256 de l'adresse : une adresse connue se retrouve), et nomment tout ce que garde la preuve (dates, adresse IP, navigateur) ; **conservée 5 ans après la désinscription puis effacée** par la purge quotidienne (décision Franck 2026-11-04 ; auparavant gardée sans limite)
 
 **UX/UI — bloquants (PR #209) :**
 
