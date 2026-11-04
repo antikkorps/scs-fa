@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { BankImportReport, Pagination, VirementRow } from "~/types/admin"
+import type { BankImportReport, VirementRow } from "~/types/admin"
+import type { Pagination } from "~/types/pagination"
 import { formatDateTime, formatEuros } from "~/utils/format"
 import { paymentStatus } from "~/utils/status"
 

@@ -1,4 +1,5 @@
 import type { AnyLegalDocType, LegalDocType, OrderRequiredDocStatus } from "@armurier/shared"
+import type { Pagination } from "./pagination"
 
 // Authenticated user profile (GET/PATCH /auth/me — returned without a `data` envelope).
 export interface Profile {
@@ -27,14 +28,6 @@ export interface UpdateProfile {
   addressPostal?: string | null
   addressCity?: string | null
   addressCountry?: string
-}
-
-export interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasMore: boolean
 }
 
 export interface Paginated<T> {
