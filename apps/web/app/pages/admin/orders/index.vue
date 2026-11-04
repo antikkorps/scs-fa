@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { AdminOrderListItem, Pagination } from "~/types/admin"
+import type { AdminOrderListItem } from "~/types/admin"
+import type { Pagination } from "~/types/pagination"
 import { formatDateTime, formatEuros } from "~/utils/format"
 import {
   LEGAL_STATUS_OPTIONS,

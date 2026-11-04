@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { isLegalDocExpired, parisToday } from "@armurier/shared"
-import type { LegalDocDetail, LegalDocQueueItem, Pagination } from "~/types/admin"
+import type { LegalDocDetail, LegalDocQueueItem } from "~/types/admin"
+import type { Pagination } from "~/types/pagination"
 import { formatDate, formatDateTime } from "~/utils/format"
 import { legalDocOwner } from "~/utils/organisation"
 import { docTypeLabel, docVerificationStatus, REJECTION_REASON_OPTIONS, rejectionLabel } from "~/utils/status"

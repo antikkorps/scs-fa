@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { OrganisationStatus } from "@armurier/shared"
-import type { Pagination } from "~/types/admin"
 import type { AdminOrganisationDetail, AdminOrganisationRow } from "~/types/organisation"
+import type { Pagination } from "~/types/pagination"
 import { formatDateTime } from "~/utils/format"
 import { organisationStatus, organisationTypeLabel, registryCheckLabel } from "~/utils/organisation"
 

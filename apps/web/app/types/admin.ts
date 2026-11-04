@@ -16,14 +16,6 @@ export interface AuthUser {
   role: "customer" | "vendor" | "admin"
 }
 
-export interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasMore: boolean
-}
-
 export interface OrderCustomer {
   id: string
   email: string

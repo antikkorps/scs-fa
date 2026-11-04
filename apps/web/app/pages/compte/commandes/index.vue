@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { orderReference } from "@armurier/shared"
-import type { OrderSummary, Pagination } from "~/types/account"
+import type { OrderSummary } from "~/types/account"
+import type { Pagination } from "~/types/pagination"
 import { formatDate, formatEuros } from "~/utils/format"
 import { legalStatusLabel, paymentStatusLabel, statusTone } from "~/utils/order"
 

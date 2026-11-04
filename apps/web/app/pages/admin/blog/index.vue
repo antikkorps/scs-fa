@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { AdminBlogListItem, Pagination } from "~/types/admin"
+import type { AdminBlogListItem } from "~/types/admin"
+import type { Pagination } from "~/types/pagination"
 import { formatDate, formatDateTime } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
