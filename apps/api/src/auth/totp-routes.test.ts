@@ -166,13 +166,41 @@ describe("the authenticator app from the account (story 12.8e)", () => {
       const user = await account()
       await enable(user)
 
-      const res = await call("POST", `/api/admin/users/${user.id}/totp/reset`, admin.token)
+      const { secret } = await enable(admin)
+      const confirmed = () => ({ password: PASSWORD, code: codeAt(secret, 1) })
+
+      const res = await call("POST", `/api/admin/users/${user.id}/totp/reset`, admin.token, confirmed())
 
       expect(res.statusCode).toBe(200)
       expect((await call("GET", "/api/auth/totp", user.token)).json().data.enabled).toBe(false)
       expect(await actions(user.id)).toContain("user.totp_reset")
-      expect((await call("POST", `/api/admin/users/${admin.id}/totp/reset`, admin.token)).statusCode).toBe(409)
-      expect((await call("POST", `/api/admin/users/${user.id}/totp/reset`, user.token)).statusCode).toBe(403)
+      expect((await call("POST", `/api/admin/users/${admin.id}/totp/reset`, admin.token, confirmed())).statusCode).toBe(
+        409,
+      )
+      expect((await call("POST", `/api/admin/users/${user.id}/totp/reset`, user.token, confirmed())).statusCode).toBe(
+        403,
+      )
+    })
+
+    // Review 2026-11-04: a stolen admin session alone must not strip another
+    // account of its second factor — the admin confirms with password and code.
+    it("asks the admin's password and code first, and leaves the app in place otherwise", async () => {
+      const admin = await account("admin")
+      const { secret } = await enable(admin)
+      const user = await account()
+      await enable(user)
+      const reset = (payload?: object) => call("POST", `/api/admin/users/${user.id}/totp/reset`, admin.token, payload)
+
+      expect((await reset()).statusCode).toBe(400)
+      const badPassword = await reset({ password: "wrong-password-entirely", code: codeAt(secret, 1) })
+      expect(badPassword.statusCode).toBe(403)
+      expect(badPassword.json().error).toBe("InvalidCredentials")
+      const noCode = await reset({ password: PASSWORD })
+      expect(noCode.statusCode).toBe(400)
+      expect(noCode.json().error).toBe("TotpCodeRequired")
+
+      expect((await call("GET", "/api/auth/totp", user.token)).json().data.enabled).toBe(true)
+      expect(await actions(user.id)).not.toContain("user.totp_reset")
     })
   })
 })
