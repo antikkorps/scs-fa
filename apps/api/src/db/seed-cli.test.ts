@@ -30,6 +30,15 @@ async function countRows(table: string, where = "true"): Promise<number> {
   }
 }
 
+// Production refuses the sample values of the committed examples (story 12.9b):
+// a production run gets real-looking ones, so only the seed decides the outcome.
+const PRODUCTION = {
+  NODE_ENV: "production",
+  S3_ACCESS_KEY: "SCWREALACCESSKEY0000",
+  S3_SECRET_KEY: "a-real-secret-key-for-the-seed-check",
+  VIREMENT_IBAN: "FR1420041010050500013M02606",
+}
+
 function runSeed(args: string[], env: Record<string, string> = {}) {
   const result = spawnSync("pnpm", ["exec", "tsx", "src/db/seed-cli.ts", ...args], {
     env: { ...process.env, DATABASE_URL: seedDatabaseUrl, NODE_ENV: "test", STORAGE_DRIVER: "memory", ...env },
@@ -49,11 +58,21 @@ describe("seed CLI (deployment)", () => {
     await onServer(`DROP DATABASE IF EXISTS ${SEED_DATABASE} WITH (FORCE)`)
   })
 
-  // A missing password falls back to the same sample, so this covers both.
-  it("refuses to create the production admin with the sample password of .env.example", () => {
-    const { status, output } = runSeed([], { NODE_ENV: "production", ADMIN_SEED_PASSWORD: "AdminSCS-ChangeMe-2026!" })
+  // Decision 2026-11-04: a live site's admins are invited (`just admin-invite`),
+  // never created with a password from the .env — even a strong one.
+  it("creates no admin in production, and points to the invitation instead", async () => {
+    const { status, output } = runSeed([], { ...PRODUCTION, ADMIN_SEED_PASSWORD: "Un-Vrai-Mot-De-Passe-Long-2026" })
+    expect(status, output).toBe(0)
+    expect(output).toMatch(/admin-invite/)
+    expect(await countRows("users", "role = 'admin'")).toBe(0)
+  }, 60_000)
+
+  // A demo server keeps its known admin; a missing password falls back to the same sample.
+  it("refuses the sample password for a demo server's admin", () => {
+    const { status, output } = runSeed(["--demo"], { ...PRODUCTION, ADMIN_SEED_PASSWORD: "AdminSCS-ChangeMe-2026!" })
     expect(status).not.toBe(0)
     expect(output).toMatch(/ADMIN_SEED_PASSWORD/)
+    expect(output).not.toMatch(/S3_ACCESS_KEY|VIREMENT_IBAN/)
   }, 60_000)
 
   it("lays the reference data a live site needs, and no demo content", async () => {

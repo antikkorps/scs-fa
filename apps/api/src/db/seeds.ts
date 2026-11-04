@@ -27,13 +27,20 @@ import { seedSuppliers } from "./seed-suppliers.js"
 
 /**
  * What a live site needs to work: the legal and product categories, the tags
- * that carry a weapon's state and era, the collected suppliers and the admin
- * account. Every step is idempotent, so a deployment can run it again.
+ * that carry a weapon's state and era, the collected suppliers, and outside
+ * production the admin account. Every step is idempotent, so a deployment can
+ * run it again.
  */
 export async function seedReferenceData() {
   console.log("🌱 Seeding reference data...")
 
-  await seedAdminUser()
+  // Decision 2026-11-04: a live site's admins are invited, never created with
+  // a password from the .env (it would have to travel, and sit on the server).
+  if (process.env.NODE_ENV === "production") {
+    console.log("ℹ️  No admin seeded in production: invite each one with `just admin-invite <email> <prénom> <nom>`")
+  } else {
+    await seedAdminUser()
+  }
   await seedSuppliers()
 
   // ========================================================================
@@ -198,6 +205,8 @@ export async function seedReferenceData() {
 export async function seedDemoData() {
   console.log("🎭 Seeding demo data...")
 
+  // A demo server keeps a known admin (DEMO_PLAN.md); the sample password is still refused.
+  await seedAdminUser()
   await seedGunArt()
   await seedArmurerie()
   await seedBlog()
@@ -459,7 +468,8 @@ const GUN_ART_PIECES = [
 // The sample password of `.env.example`, also the development default.
 const SAMPLE_ADMIN_PASSWORD = "AdminSCS-ChangeMe-2026!"
 
-// Idempotent admin account so the backoffice is usable right after a seed.
+// Idempotent admin account so the backoffice is usable right after a seed — in
+// development and on demo servers only (a live site invites its admins).
 // Credentials come from env (ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD) with dev
 // defaults — which production refuses, like any sample value (story 12.9b): a
 // copied example would otherwise open the back office with a published password.

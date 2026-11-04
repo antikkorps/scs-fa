@@ -36,6 +36,7 @@ export interface EmailAbout {
 
 type EmailType =
   | "password_reset"
+  | "admin_invitation"
   | "legal_doc_approved"
   | "legal_doc_rejected"
   | "shipment_shipped"
@@ -122,6 +123,39 @@ export async function sendPasswordResetEmail(to: string, token: string, about: E
       `<p>Vous avez demandé à réinitialiser votre mot de passe.</p>` +
       `<p><a href="${resetUrl}">Choisir un nouveau mot de passe</a> (lien valable 1 heure)</p>` +
       `<p>Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.</p>`,
+  })
+}
+
+/**
+ * Decision 2026-11-04 — an invitation to administer the shop: the invited
+ * person chooses their own password through a single-use link (the reset
+ * mechanism, token in the fragment), then enrols their authenticator app.
+ */
+export async function sendAdminInvitationEmail(
+  to: string,
+  link: string,
+  validHours: number,
+  about: EmailAbout = {},
+): Promise<void> {
+  const loginUrl = `${env.WEB_BASE_URL}/admin/login`
+  await deliver("admin_invitation", about, {
+    from: env.SMTP_FROM,
+    to,
+    subject: "Votre accès à l'administration de SCS Firearms",
+    text:
+      `Un accès à l'administration de SCS Firearms a été créé pour vous.\n\n` +
+      `Choisissez votre mot de passe avec ce lien, valable ${validHours} heures et utilisable une seule fois :\n${link}\n\n` +
+      `Connectez-vous ensuite à l'administration : ${loginUrl}\n` +
+      `À votre première connexion, vous associerez une application d'authentification (Google Authenticator, ` +
+      `Microsoft Authenticator, 1Password…) à votre compte : gardez votre téléphone à portée de main.\n\n` +
+      `Si vous n'attendiez pas cette invitation, ignorez ce message et prévenez l'équipe de SCS Firearms.`,
+    html:
+      `<p>Un accès à l'administration de SCS Firearms a été créé pour vous.</p>` +
+      `<p><a href="${link}">Choisir mon mot de passe</a> (lien valable ${validHours} heures, utilisable une seule fois)</p>` +
+      `<p>Connectez-vous ensuite à l'administration : <a href="${loginUrl}">${loginUrl}</a><br>` +
+      `À votre première connexion, vous associerez une application d'authentification (Google Authenticator, ` +
+      `Microsoft Authenticator, 1Password…) à votre compte : gardez votre téléphone à portée de main.</p>` +
+      `<p>Si vous n'attendiez pas cette invitation, ignorez ce message et prévenez l'équipe de SCS Firearms.</p>`,
   })
 }
 

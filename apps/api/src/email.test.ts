@@ -7,6 +7,7 @@ vi.mock("nodemailer", () => ({ createTransport: () => ({ sendMail }) }))
 vi.mock("./audit/record.js", () => ({ recordAuditEvent: vi.fn().mockResolvedValue(undefined) }))
 
 const {
+  sendAdminInvitationEmail,
   sendInvoiceAvailableEmail,
   sendLegalDocApprovedEmail,
   sendLegalDocRejectedEmail,
@@ -286,5 +287,21 @@ describe("e-mails in French", () => {
     expect(mail.text).toContain("Jean Dupont — Autorisation préfectorale de détention")
     expect(mail.text).toContain("en retard de 5 h")
     expect(words(mail)).not.toMatch(ENGLISH)
+  })
+})
+
+// Decision 2026-11-04 — an admin is invited, never handed a password.
+describe("sendAdminInvitationEmail", () => {
+  it("gives the single-use link, how long it lasts, where to log in, and what the first login asks", async () => {
+    const link = "https://www.scs-firearms.com/reset-password#token=abc"
+    await sendAdminInvitationEmail("fred@example.fr", link, 72)
+    const mail = sent()
+    expect(mail.subject).toContain("administration")
+    for (const body of [mail.text, mail.html]) {
+      expect(body).toContain(link)
+      expect(body).toContain("72 heures")
+      expect(body).toContain("/admin/login")
+      expect(body).toContain("application d'authentification")
+    }
   })
 })
