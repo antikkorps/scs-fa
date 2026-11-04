@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { NEWSLETTER_SEGMENTS, type NewsletterSegment } from "@armurier/shared"
-import type {
-  AdminNewsletterContact,
-  AdminNewsletterSubscription,
-  AdminNewsletterSummary,
-  Pagination,
-} from "~/types/admin"
+import type { AdminNewsletterContact, AdminNewsletterSubscription, AdminNewsletterSummary } from "~/types/admin"
+import type { Pagination } from "~/types/pagination"
 import { formatDate, formatNumber, plural } from "~/utils/format"
 import { NEWSLETTER_STATUS_OPTIONS, newsletterStatus } from "~/utils/status"
 

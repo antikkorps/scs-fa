@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { AdminOrderListItem, Pagination } from "~/types/admin"
+import type { AdminOrderListItem } from "~/types/admin"
+import type { Pagination } from "~/types/pagination"
 import { formatDateTime, formatEuros } from "~/utils/format"
 import {
   LEGAL_STATUS_OPTIONS,
@@ -107,7 +108,7 @@ watch(
     </header>
 
     <form class="filters" @submit.prevent="applyFilters">
-      <input v-model="search" class="ctl" type="search" placeholder="Email client…" />
+      <input v-model="search" class="ctl" type="search" placeholder="E-mail ou référence (0B7D1F3E)…" aria-label="Rechercher par e-mail du client ou référence de commande" />
       <select v-model="paymentFilter" class="ctl" @change="applyFilters">
         <option value="">Tous paiements</option>
         <option v-for="o in PAYMENT_STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
