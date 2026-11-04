@@ -19,6 +19,7 @@ const groups = [
       { to: "/admin/livraison", label: "Frais de port", icon: "⇶" },
       { to: "/admin/reglages", label: "Réglages", icon: "⚙" },
       { to: "/admin/identite", label: "Identité de la boutique", icon: "◈" },
+      { to: "/admin/administrateurs", label: "Administrateurs", icon: "⚿" },
     ],
   },
   {
