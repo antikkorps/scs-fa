@@ -109,6 +109,7 @@ export const NEWSLETTER_STATUS_OPTIONS = Object.entries(NEWSLETTER).map(([value,
 const DOC_TYPE_LABELS: Record<string, string> = {
   cni: "CNI",
   permis_chasse: "Permis de chasse",
+  licence_tir: "Licence de tir",
   autorisation_det: "Autorisation détention",
   sia: "SIA",
   expertise: "Expertise",

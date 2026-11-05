@@ -27,4 +27,15 @@ describe("regulation FAQ (story 9.6)", () => {
       expect(text).toContain(needle)
     }
   })
+
+  // I7 — decision Franck 2026-11-04 (answer of Fred and Steph).
+  it("says what category C takes: either licence for the season and an identity document, no SIA number", () => {
+    const entry = REGULATION_FAQ.flatMap((s) => s.entries).find((e) => e.question.includes("catégorie C"))
+    const answer = entry?.answer.join(" ") ?? ""
+    expect(answer).toContain("permis de chasser")
+    expect(answer).toContain("licence de tir sportif")
+    expect(answer).toContain("pièce d'identité")
+    expect(answer).not.toContain("SIA")
+    expect(entry?.todo).toBeUndefined()
+  })
 })

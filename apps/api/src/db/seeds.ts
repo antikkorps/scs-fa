@@ -70,7 +70,8 @@ export async function seedReferenceData() {
       description: "Armes soumises à déclaration (fusils de chasse, carabines)",
       requiresVerification: true,
       minAge: 18,
-      requiredDocTypes: ["cni", "permis_chasse", "sia"], // CNI + Permis de chasser + SIA
+      // Pièce d'identité + (permis de chasser validé OU licence de tir sportif) — I7, 2026-11-04
+      requiredDocTypes: ["cni", ["permis_chasse", "licence_tir"]],
     },
     {
       category: "D" as const,

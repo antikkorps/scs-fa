@@ -103,7 +103,10 @@ export interface LegalDocumentMeta {
 
 // One required document on an order's legal checklist (GET /orders/:id/legal).
 export interface RequiredDoc {
+  /** The document sent for the line, or its first alternative. */
   docType: LegalDocType
+  /** A line any one of these satisfies (I7: hunting or shooting licence). */
+  alternatives?: LegalDocType[]
   status: OrderRequiredDocStatus
   documentId?: string
   uploadedAt?: string | null

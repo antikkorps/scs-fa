@@ -4,19 +4,23 @@ import {
   type AnyLegalDocType,
   MAX_LEGAL_DOC_SIZE_BYTES,
   parisToday,
+  requiresValidityEnd,
 } from "@armurier/shared"
 import type { LegalDocument } from "~/types/account"
 import { formatFileSize, legalDocHelp, legalDocLabel, legalDocUploadMessage } from "~/utils/legal"
 
 // `base`: "/pro/documents" files it on the organisation (story 12.8d).
-const props = defineProps<{ docType: AnyLegalDocType; base?: string }>()
+// `alternatives`: a line any one of these satisfies (I7: hunting or shooting
+// licence) — the customer says which one they send.
+const props = defineProps<{ docType: AnyLegalDocType; alternatives?: AnyLegalDocType[]; base?: string }>()
 const emit = defineEmits<{ uploaded: [doc: LegalDocument] }>()
 
 const { upload } = useDocuments(props.base)
 
 const file = ref<File | null>(null)
 const docNumber = ref("")
-const expiresAt = ref("") // YYYY-MM-DD, optional
+const expiresAt = ref("") // YYYY-MM-DD; required for a licence renewed every season (I7)
+const chosenType = ref<AnyLegalDocType>(props.docType)
 const submitting = ref(false)
 const error = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -24,7 +28,9 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const ACCEPT = ALLOWED_LEGAL_DOC_MIME_TYPES.join(",")
 const maxSize = formatFileSize(MAX_LEGAL_DOC_SIZE_BYTES)
 // The document's full name and what to send (UX audit 2026-11-01, I2).
-const help = computed(() => legalDocHelp(props.docType))
+const help = computed(() => legalDocHelp(chosenType.value))
+const validityEndRequired = computed(() => requiresValidityEnd(chosenType.value))
+const ready = computed(() => Boolean(file.value) && (!validityEndRequired.value || Boolean(expiresAt.value)))
 // An already-expired document is refused by the API (story 12.9f).
 const minExpiry = parisToday()
 
@@ -51,12 +57,12 @@ function validate(f: File): boolean {
 }
 
 async function submit() {
-  if (!file.value || submitting.value) return
+  if (!file.value || !ready.value || submitting.value) return
   submitting.value = true
   error.value = null
   try {
     const doc = await upload(file.value, {
-      docType: props.docType,
+      docType: chosenType.value,
       ...(docNumber.value.trim() ? { docNumber: docNumber.value.trim() } : {}),
       ...(expiresAt.value ? { expiresAt: expiresAt.value } : {}),
     })
@@ -75,7 +81,15 @@ async function submit() {
 
 <template>
   <form class="up" @submit.prevent="submit">
-    <p class="up__lede">{{ legalDocLabel(docType) }} : PDF, JPEG ou PNG, {{ maxSize }} max.</p>
+    <fieldset v-if="alternatives && alternatives.length > 1" class="up__choice">
+      <legend>Quel document envoyez-vous ?</legend>
+      <label v-for="type in alternatives" :key="type" class="up__option">
+        <input v-model="chosenType" type="radio" name="doc-type" :value="type" />
+        <span>{{ legalDocLabel(type) }}</span>
+      </label>
+    </fieldset>
+
+    <p class="up__lede">{{ legalDocLabel(chosenType) }} : PDF, JPEG ou PNG, {{ maxSize }} max.</p>
     <p v-if="help" class="up__help">{{ help }}</p>
 
     <label class="up__file">
@@ -89,14 +103,15 @@ async function submit() {
         <input v-model="docNumber" class="input" type="text" maxlength="100" autocomplete="off" />
       </label>
       <label class="up__field">
-        <span>Date d'expiration <em>(facultatif)</em></span>
-        <input v-model="expiresAt" class="input" type="date" :min="minExpiry" />
+        <span v-if="validityEndRequired">Fin de validité <em>(obligatoire : fin de la saison en cours)</em></span>
+        <span v-else>Date d'expiration <em>(facultatif)</em></span>
+        <input v-model="expiresAt" class="input" type="date" :min="minExpiry" :required="validityEndRequired" />
       </label>
     </div>
 
     <p v-if="error" class="err" role="alert">{{ error }}</p>
 
-    <button type="submit" class="btn btn-primary" :disabled="!file || submitting">
+    <button type="submit" class="btn btn-primary" :disabled="!ready || submitting">
       {{ submitting ? "Envoi…" : "Envoyer le document" }}
     </button>
   </form>
@@ -108,6 +123,27 @@ async function submit() {
   flex-direction: column;
   gap: 0.85rem;
   margin-top: 0.75rem;
+}
+.up__choice {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+}
+.up__choice legend {
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
+  margin-bottom: 0.4rem;
+  padding: 0;
+}
+.up__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: var(--fs-sm);
+  cursor: pointer;
 }
 .up__help {
   margin: 0;

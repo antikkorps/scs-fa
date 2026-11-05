@@ -198,7 +198,8 @@ describe("legal documents (/api/legal-documents)", () => {
 
   it("lists the user's documents, newest first and scoped to the owner", async () => {
     await upload({ fields: { docType: "cni" }, file: validPdf })
-    await upload({ fields: { docType: "permis_chasse" }, file: validPdf })
+    // A licence renewed every season says until when it is valid (I7).
+    await upload({ fields: { docType: "permis_chasse", expiresAt: "2099-06-30" }, file: validPdf })
     await upload({ fields: { docType: "sia" }, file: validPdf, authToken: otherToken })
 
     const res = await app.inject({
