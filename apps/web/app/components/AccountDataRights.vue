@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { accountExportFilename } from "@armurier/shared"
+import { REAUTH_REFUSALS } from "~/utils/reauth"
 
 // Story 12.11 — the holder's rights over their data, in "Mon compte": download
 // everything the account holds (JSON), or delete the account. Both ask for the
@@ -22,10 +23,7 @@ onMounted(async () => {
 })
 
 const REFUSALS: Record<string, string> = {
-  InvalidCredentials: "Mot de passe incorrect.",
-  TotpCodeRequired: "Saisissez aussi le code de votre application d'authentification.",
-  InvalidTotpCode: "Code de l'application incorrect.",
-  AccountLocked: "Trop d'essais : votre compte est bloqué pour 15 minutes.",
+  ...REAUTH_REFUSALS,
   OrderInProgress:
     "Une commande est encore en cours (paiement, expédition, ou délai de rétractation de 14 jours après la livraison). Vous pourrez supprimer votre compte une fois qu'elle sera terminée.",
   QuoteInProgress: "Un devis est encore en cours. Vous pourrez supprimer votre compte une fois qu'il sera clos.",
