@@ -82,6 +82,10 @@ just admin-invite fred@scs-firearms.com Fred Martin
 just admin-invite steph@scs-firearms.com Stéphane Durand
 ```
 
+Afterwards, admins invite their helpers (full admins) and take an access back
+from the back-office, *Administrateurs* — each change asks their password and
+code. The command stays for the first admin and for when no admin can log in.
+
 Verify:
 
 ```bash

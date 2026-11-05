@@ -46,29 +46,7 @@ async function submit() {
       <em>votre</em> mot de passe et le code de <em>votre</em> application.
     </p>
     <form @submit.prevent="submit">
-      <label class="field">
-        <span>Votre mot de passe</span>
-        <input
-          v-model="password"
-          class="ctl"
-          type="password"
-          name="admin-password"
-          autocomplete="current-password"
-          required
-        />
-      </label>
-      <label class="field">
-        <span>Code de votre application</span>
-        <input
-          v-model="code"
-          class="ctl"
-          type="text"
-          name="admin-code"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          required
-        />
-      </label>
+      <AdminReauthFields v-model:password="password" v-model:code="code" />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="actions">
         <button type="submit" class="btn btn-primary" :disabled="busy">Réinitialiser</button>
@@ -95,32 +73,6 @@ async function submit() {
 .email {
   color: var(--paper);
   overflow-wrap: anywhere;
-}
-.field {
-  display: block;
-  margin-bottom: 0.9rem;
-}
-.field span {
-  display: block;
-  font-size: var(--fs-xs);
-  letter-spacing: var(--ls-eyebrow);
-  text-transform: uppercase;
-  color: var(--paper-faint);
-  margin-bottom: 0.4rem;
-}
-.ctl {
-  width: 100%;
-  padding: 0.6rem 0.7rem;
-  background: var(--ink);
-  border: 1px solid var(--ink-line);
-  border-radius: var(--radius);
-  color: var(--paper);
-  font-family: inherit;
-  font-size: var(--fs-base);
-}
-.ctl:focus {
-  outline: none;
-  border-color: var(--brass);
 }
 .error {
   color: var(--danger);

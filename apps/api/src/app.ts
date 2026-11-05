@@ -17,6 +17,7 @@ import { artworkRoutes } from "./artworks/index.js"
 import { adminArtworkPricingRoutes } from "./artworks/pricing.js"
 import { runWithRequestContext } from "./audit/context.js"
 import { startAuditPurgeScheduler } from "./audit/retention.js"
+import { adminTeamRoutes } from "./auth/admin-team.js"
 import { adminTwoFactorRoutes } from "./auth/admin-two-factor.js"
 import { authRoutes } from "./auth/index.js"
 import { startLoginChallengePurgeScheduler } from "./auth/login-code.js"
@@ -177,6 +178,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(adminPaymentRoutes, { prefix: "/api/admin/payments" })
   await fastify.register(adminOrderRoutes, { prefix: "/api/admin/orders" })
   await fastify.register(adminOrganisationRoutes, { prefix: "/api/admin/organisations" })
+  await fastify.register(adminTeamRoutes, { prefix: "/api/admin/admins" })
   await fastify.register(adminTwoFactorRoutes, { prefix: "/api/admin/users" })
   await fastify.register(adminUserRoutes, { prefix: "/api/admin/users" })
   await fastify.register(adminNewsletterRoutes, { prefix: "/api/admin/newsletter" })
