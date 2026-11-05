@@ -1,11 +1,11 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { flushPromises } from "@vue/test-utils"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { AdminUserRow } from "~/types/admin"
 import Clients from "./clients.vue"
 
-const { apiMock, confirmMock } = vi.hoisted(() => ({ apiMock: vi.fn(), confirmMock: vi.fn() }))
+const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }))
 mockNuxtImport("useApi", () => () => apiMock)
 
 const JEANNE: AdminUserRow = {
@@ -31,13 +31,16 @@ async function searchFor(text: string) {
 beforeEach(() => {
   apiMock.mockReset()
   apiMock.mockImplementation(async () => ({ data: [{ ...JEANNE }, { ...PAUL }] }))
-  confirmMock.mockReset().mockReturnValue(true)
-  vi.stubGlobal("confirm", confirmMock)
 })
 
-afterEach(() => {
-  vi.unstubAllGlobals()
-})
+/** Opens the confirmation for the first row and confirms with the admin's password and code. */
+async function confirmReset(wrapper: Awaited<ReturnType<typeof searchFor>>) {
+  await wrapper.find(".reset-totp").trigger("click")
+  await wrapper.find(".totp-reset-confirm input[type=password]").setValue("MonMotDePasse")
+  await wrapper.find(".totp-reset-confirm input[autocomplete=one-time-code]").setValue("123456")
+  await wrapper.find(".totp-reset-confirm form").trigger("submit")
+  await flushPromises()
+}
 
 describe("admin/clients.vue — find a customer, reset their authenticator app", () => {
   it("lists nothing before a search, and asks for three characters", async () => {
@@ -57,30 +60,34 @@ describe("admin/clients.vue — find a customer, reset their authenticator app",
     expect(wrapper.findAll("tbody tr")[1]?.find(".reset-totp").exists()).toBe(false)
   })
 
-  it("resets the app after confirmation, and the row follows", async () => {
+  it("resets the app once the admin confirms with password and code, and the row follows", async () => {
     const wrapper = await searchFor("armand")
     apiMock.mockResolvedValueOnce({ data: { enabled: false } })
     await wrapper.find(".reset-totp").trigger("click")
-    await flushPromises()
-    expect(confirmMock).toHaveBeenCalledWith(expect.stringContaining("jeanne@example.fr"))
-    expect(apiMock).toHaveBeenCalledWith("/admin/users/u1/totp/reset", { method: "POST" })
+    expect(wrapper.find(".totp-reset-confirm").text()).toContain("jeanne@example.fr")
+    await confirmReset(wrapper)
+    expect(apiMock).toHaveBeenCalledWith("/admin/users/u1/totp/reset", {
+      method: "POST",
+      body: { password: "MonMotDePasse", code: "123456" },
+    })
     expect(wrapper.find("tbody tr").text()).toContain("Désactivée")
     expect(wrapper.find("[role=status]").text()).toContain("jeanne@example.fr")
+    expect(wrapper.find(".totp-reset-confirm").exists()).toBe(false)
   })
 
   it("does nothing when the admin cancels", async () => {
-    confirmMock.mockReturnValue(false)
     const wrapper = await searchFor("armand")
     await wrapper.find(".reset-totp").trigger("click")
+    await wrapper.find(".totp-reset-confirm button.cancel").trigger("click")
     await flushPromises()
+    expect(wrapper.find(".totp-reset-confirm").exists()).toBe(false)
     expect(apiMock).not.toHaveBeenCalledWith(expect.stringContaining("/totp/reset"), expect.anything())
   })
 
   it("explains that an admin's own app goes through another admin", async () => {
     const wrapper = await searchFor("armand")
     apiMock.mockRejectedValueOnce({ data: { error: "OwnAccount" } })
-    await wrapper.find(".reset-totp").trigger("click")
-    await flushPromises()
+    await confirmReset(wrapper)
     expect(wrapper.find("[role=alert]").text()).toContain("autre administrateur")
   })
 

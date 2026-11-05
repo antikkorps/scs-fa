@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto"
-import { USER_ROLES } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, USER_ROLES, type UserRole } from "@armurier/shared"
+import { like } from "drizzle-orm"
 import type { FastifyInstance, InjectOptions } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
+import { db } from "../db/client.js"
+import { users } from "../db/schema.js"
 
 // Inventory guard (story 12.9f): every route under /api/admin, present and
 // future, refuses anonymous callers and every role but admin. A new admin
@@ -12,6 +15,7 @@ const ADMIN_PREFIX = "/api/admin"
 const NON_ADMIN_ROLES = USER_ROLES.filter((role) => role !== "admin")
 // HEAD mirrors GET; OPTIONS is the CORS preflight, answered for every path.
 const SKIPPED_METHODS = new Set(["HEAD", "OPTIONS"])
+const EMAIL_SUFFIX = "@admin-routes-guard.local"
 
 type InjectMethod = NonNullable<InjectOptions["method"]>
 
@@ -51,6 +55,21 @@ function concreteUrl(pattern: string): string {
 let app: FastifyInstance
 let adminRoutes: RouteEntry[]
 
+/** A token for a real account of that role: the role is read from the account (review 2026-11-04). */
+async function tokenFor(role: UserRole): Promise<string> {
+  const [row] = await db
+    .insert(users)
+    .values({
+      email: `${role}-${randomUUID()}${EMAIL_SUFFIX}`,
+      passwordHash: "not-used",
+      role,
+      rgpdConsentAt: new Date(),
+      rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
+    })
+    .returning({ id: users.id })
+  return app.jwt.sign({ sub: row.id, role })
+}
+
 describe("admin routes refuse non-admins (story 12.9f)", () => {
   beforeAll(async () => {
     app = await buildApp()
@@ -61,6 +80,7 @@ describe("admin routes refuse non-admins (story 12.9f)", () => {
   })
 
   afterAll(async () => {
+    await db.delete(users).where(like(users.email, `%${EMAIL_SUFFIX}`))
     await app.close()
   })
 
@@ -80,7 +100,7 @@ describe("admin routes refuse non-admins (story 12.9f)", () => {
   })
 
   it.each(NON_ADMIN_ROLES)("answers 403 to a %s", async (role) => {
-    const token = app.jwt.sign({ sub: randomUUID(), role })
+    const token = await tokenFor(role)
     const statuses = await Promise.all(
       adminRoutes.map(async (route) => {
         const res = await app.inject({

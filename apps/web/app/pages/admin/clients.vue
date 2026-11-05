@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AdminUserRow } from "~/types/admin"
 import { formatDate } from "~/utils/format"
-import { apiErrorCode, apiErrorField } from "~/utils/formErrors"
+import { apiErrorField } from "~/utils/formErrors"
 
 // A customer lost their phone and their recovery codes: SCS finds the account
 // by name or e-mail and resets its authenticator app (story 12.8e). A search,
@@ -15,18 +15,13 @@ const api = useApi()
 const search = ref("")
 const rows = ref<AdminUserRow[] | null>(null)
 const searching = ref(false)
-const resetting = ref<string | null>(null)
+// The account whose app the admin is about to reset, while they confirm.
+const confirming = ref<AdminUserRow | null>(null)
 const notice = ref("")
 const error = ref("")
 
-const ERROR_MESSAGES: Record<string, string> = {
-  OwnAccount: "Votre propre double authentification se réinitialise par un autre administrateur.",
-  NotFound: "Ce compte n'existe plus.",
-}
-
 function errorMessage(err: unknown, fallback: string): string {
-  const code = apiErrorCode(err)
-  return (code && ERROR_MESSAGES[code]) || apiErrorField<string>(err, "message") || fallback
+  return apiErrorField<string>(err, "message") || fallback
 }
 
 const fullName = (row: AdminUserRow) => [row.firstname, row.lastname].filter(Boolean).join(" ") || "—"
@@ -57,23 +52,21 @@ async function runSearch() {
   }
 }
 
-async function resetTotp(row: AdminUserRow) {
-  if (!confirm(`Réinitialiser la double authentification de ${row.email} ?`)) return
+function startReset(row: AdminUserRow) {
   notice.value = ""
   error.value = ""
-  resetting.value = row.id
-  try {
-    await api(`/admin/users/${row.id}/totp/reset`, { method: "POST" })
-    row.totpEnabled = false
-    notice.value =
-      row.role === "admin"
-        ? `Double authentification de ${row.email} réinitialisée : elle sera à reconfigurer à la prochaine connexion.`
-        : `Double authentification de ${row.email} réinitialisée : le client pourra en configurer une nouvelle depuis son compte.`
-  } catch (err) {
-    error.value = errorMessage(err, "La réinitialisation a échoué.")
-  } finally {
-    resetting.value = null
-  }
+  confirming.value = row
+}
+
+function resetDone() {
+  const row = confirming.value
+  confirming.value = null
+  if (!row) return
+  row.totpEnabled = false
+  notice.value =
+    row.role === "admin"
+      ? `Double authentification de ${row.email} réinitialisée : elle sera à reconfigurer à la prochaine connexion.`
+      : `Double authentification de ${row.email} réinitialisée : le client pourra en configurer une nouvelle depuis son compte.`
 }
 </script>
 
@@ -102,6 +95,15 @@ async function resetTotp(row: AdminUserRow) {
 
     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
+
+    <AdminTotpResetConfirm
+      v-if="confirming"
+      :key="confirming.id"
+      :user-id="confirming.id"
+      :email="confirming.email"
+      @done="resetDone"
+      @cancel="confirming = null"
+    />
 
     <p v-if="searching" class="state">Recherche…</p>
     <p v-else-if="rows && rows.length === 0" class="state">Aucun compte ne correspond.</p>
@@ -133,8 +135,8 @@ async function resetTotp(row: AdminUserRow) {
                 v-if="row.totpEnabled"
                 type="button"
                 class="btn btn-ghost reset-totp"
-                :disabled="resetting !== null"
-                @click="resetTotp(row)"
+                :disabled="confirming !== null"
+                @click="startReset(row)"
               >
                 Réinitialiser
               </button>

@@ -28,7 +28,7 @@
 - [ ] **Web** up : `pnpm dev:web` (port 3000).
 - [ ] **Paiement CB** : `stripe listen --forward-to localhost:8081/api/...` +
       carte test **4242 4242 4242 4242** (date future, CVC quelconque).
-- [ ] **Admin** : connu (`ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` du `.env`),
+- [ ] **Admin** : connu (`ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` du `.env`, créé par `just seed-demo` — jamais sur le site réel, où les admins sont invités),
       testé sur `/admin/login`.
 - [ ] **Compte client de démo** créé à l'avance via `/inscription` (évite de
       taper un mot de passe en live) — mais **garder l'inscription montrable**.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  adminInvitationSchema,
   adminNewsletterQuerySchema,
   adminUserSearchQuerySchema,
   blogArticleCreateSchema,
@@ -370,5 +371,23 @@ describe("payoutPeriodQuerySchema (accounting export of the payouts)", () => {
     expect(payoutPeriodQuerySchema.safeParse({ from: "2026-09-01", to: "2026-09-30", status: "paid" }).success).toBe(
       false,
     )
+  })
+})
+
+// Decision 2026-11-04 — inviting an admin (server command and back-office).
+describe("adminInvitationSchema", () => {
+  it("takes an e-mail and a name, trimmed and the e-mail lower-cased", () => {
+    expect(
+      adminInvitationSchema.parse({ email: " Fred@Example.FR ", firstname: " Fred ", lastname: " Martin " }),
+    ).toEqual({ email: "fred@example.fr", firstname: "Fred", lastname: "Martin" })
+  })
+
+  it("refuses a missing name or a malformed e-mail", () => {
+    expect(
+      adminInvitationSchema.safeParse({ email: "fred@example.fr", firstname: "", lastname: "Martin" }).success,
+    ).toBe(false)
+    expect(
+      adminInvitationSchema.safeParse({ email: "pas-un-email", firstname: "Fred", lastname: "Martin" }).success,
+    ).toBe(false)
   })
 })

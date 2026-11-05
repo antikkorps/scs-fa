@@ -2,10 +2,14 @@
 // confirmation link has expired (72 h, NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS), the
 // request and the address behind it go. What was consented to before is kept:
 // a confirmed segment stays, and a returning contact who never confirmed goes
-// back to the anonymous consent trace an unsubscribe leaves.
+// back to the consent proof an unsubscribe leaves.
+//
+// Audit B7 — that proof (address hash, dates, IP and browser) is pseudonymised,
+// not anonymous: hashing a known address finds it. It is kept
+// NEWSLETTER_CONSENT_PROOF_YEARS after the unsubscribe, then erased.
 
-import { NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS } from "@armurier/shared"
-import { and, eq, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm"
+import { NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS, NEWSLETTER_CONSENT_PROOF_YEARS } from "@armurier/shared"
+import { and, eq, inArray, isNotNull, isNull, lt, notInArray, sql } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { startDailyPurge } from "../daily-purge.js"
 import { db } from "../db/client.js"
@@ -13,12 +17,20 @@ import { newsletterContacts, newsletterSubscriptions, newsletterTokens } from ".
 
 const CONFIRM_TOKEN_TTL_MS = NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS * 60 * 60 * 1000
 
+/** The moment before which an unsubscribe's consent proof is past its retention. */
+function consentProofCutoff(now: Date): Date {
+  const cutoff = new Date(now)
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - NEWSLETTER_CONSENT_PROOF_YEARS)
+  return cutoff
+}
+
 /** Delete what is past its retention. Idempotent: run it as often as you like. */
-export async function purgeUnconfirmedNewsletterRequests(now: Date = new Date()): Promise<{
+export async function purgeNewsletterRetention(now: Date = new Date()): Promise<{
   pendingRequests: number
   erasedContacts: number
-  anonymisedContacts: number
+  addressesErased: number
   expiredConfirmLinks: number
+  expiredConsentProofs: number
 }> {
   return db.transaction(async (tx) => {
     const stale = await tx
@@ -35,7 +47,7 @@ export async function purgeUnconfirmedNewsletterRequests(now: Date = new Date())
     const touched = [...new Set(stale.map((row) => row.contactId))]
 
     let erasedContacts = 0
-    let anonymisedContacts = 0
+    let addressesErased = 0
     if (touched.length > 0) {
       const withHistory = tx
         .select({ contactId: newsletterSubscriptions.contactId })
@@ -57,9 +69,9 @@ export async function purgeUnconfirmedNewsletterRequests(now: Date = new Date())
             inArray(newsletterSubscriptions.status, ["confirmed", "pending"]),
           ),
         )
-      // Only withdrawn segments left: same anonymous trace as a full unsubscribe,
+      // Only withdrawn segments left: same consent proof as a full unsubscribe,
       // dated by the withdrawal it records rather than by this purge.
-      const anonymised = await tx
+      const addressGone = await tx
         .update(newsletterContacts)
         .set({
           email: null,
@@ -74,12 +86,12 @@ export async function purgeUnconfirmedNewsletterRequests(now: Date = new Date())
           ),
         )
         .returning({ id: newsletterContacts.id })
-      anonymisedContacts = anonymised.length
-      if (anonymised.length > 0) {
+      addressesErased = addressGone.length
+      if (addressGone.length > 0) {
         await tx.delete(newsletterTokens).where(
           inArray(
             newsletterTokens.contactId,
-            anonymised.map((row) => row.id),
+            addressGone.map((row) => row.id),
           ),
         )
       }
@@ -90,16 +102,24 @@ export async function purgeUnconfirmedNewsletterRequests(now: Date = new Date())
       .where(and(eq(newsletterTokens.purpose, "confirm"), lt(newsletterTokens.expiresAt, now)))
       .returning({ id: newsletterTokens.id })
 
+    // An unsubscribed contact's proof, past its retention; segments go by cascade.
+    // A contact with an address is still a subscriber and is never touched here.
+    const proofs = await tx
+      .delete(newsletterContacts)
+      .where(and(isNull(newsletterContacts.email), lt(newsletterContacts.unsubscribedAt, consentProofCutoff(now))))
+      .returning({ id: newsletterContacts.id })
+
     return {
       pendingRequests: stale.length,
       erasedContacts,
-      anonymisedContacts,
+      addressesErased,
       expiredConfirmLinks: expired.length,
+      expiredConsentProofs: proofs.length,
     }
   })
 }
 
 /** Purge at startup, then once a day. */
 export function startNewsletterPurgeScheduler(app: FastifyInstance): void {
-  startDailyPurge(app, "newsletter sign-up", purgeUnconfirmedNewsletterRequests)
+  startDailyPurge(app, "newsletter", purgeNewsletterRetention)
 }
