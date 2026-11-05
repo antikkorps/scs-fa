@@ -5,6 +5,7 @@ import {
   extractTransferReference,
   orderPaymentDeadline,
   orderReference,
+  orderReferenceIdPrefix,
   PAYMENT_SPLIT,
   parseBankAmount,
   parseBankStatementCsv,
@@ -192,6 +193,25 @@ describe("calculateOrderPaymentSplit", () => {
 describe("orderReference", () => {
   it("is the first eight characters of the id, upper-cased", () => {
     expect(orderReference("0b7d1f3e-8a51-4c1e-9d0a-2f6b1c3e4d5f")).toBe("0B7D1F3E")
+  })
+})
+
+describe("orderReferenceIdPrefix (audit 2026-11-01, I9)", () => {
+  it("turns a typed reference into the lower-case id prefix it stands for", () => {
+    expect(orderReferenceIdPrefix("0B7D1F3E")).toBe("0b7d1f3e")
+    expect(orderReferenceIdPrefix("0b7d1f3e")).toBe("0b7d1f3e")
+  })
+
+  it("accepts the reference as people paste it: spaces or a leading #", () => {
+    expect(orderReferenceIdPrefix("  0B7D1F3E ")).toBe("0b7d1f3e")
+    expect(orderReferenceIdPrefix("#0B7D1F3E")).toBe("0b7d1f3e")
+  })
+
+  it("is null for anything that is not an eight-character reference", () => {
+    expect(orderReferenceIdPrefix("jean@example.fr")).toBeNull()
+    expect(orderReferenceIdPrefix("0B7D1F3")).toBeNull()
+    expect(orderReferenceIdPrefix("0B7D1F3E9")).toBeNull()
+    expect(orderReferenceIdPrefix("0B7D1F3G")).toBeNull()
   })
 })
 

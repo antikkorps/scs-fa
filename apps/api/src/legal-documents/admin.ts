@@ -16,7 +16,7 @@ import { db } from "../db/client.js"
 import { legalDocuments, organisations, users } from "../db/schema.js"
 import { sendLegalDocApprovedEmail, sendLegalDocRejectedEmail } from "../email.js"
 import { validationError } from "../http.js"
-import { recomputeOrderLegalStatus } from "../orders/legal-status.js"
+import { ordersAwaitingDocType, recomputeOrderLegalStatus } from "../orders/legal-status.js"
 import { storage } from "../storage/index.js"
 import { expireLegalDocuments } from "./expiry.js"
 import type { DocumentOwner } from "./upload.js"
@@ -181,7 +181,9 @@ export const adminLegalDocumentRoutes: FastifyPluginAsync = async (fastify) => {
     // that isn't "clean" can't be approved anyway (see the approve gate below),
     // so we never deliver unscanned/infected content to an admin's browser.
     const downloadUrl = doc.scanStatus === "clean" ? await storage.getUrl(s3Key) : null
-    return reply.code(200).send({ data: { ...withOverdue(doc), downloadUrl } })
+    // The orders this document is for; an organisation's document is judged on its quotes instead.
+    const waitingOrders = doc.user ? await ordersAwaitingDocType(doc.user.id, doc.docType) : []
+    return reply.code(200).send({ data: { ...withOverdue(doc), downloadUrl, orders: waitingOrders } })
   })
 
   // POST /api/admin/legal-documents/:id/approve

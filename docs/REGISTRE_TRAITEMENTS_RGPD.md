@@ -91,7 +91,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Personnes concernées | Abonnés |
 | Données | E-mail, thèmes choisis, preuve du consentement (date, adresse IP et navigateur à l'inscription et à la confirmation) |
 | Destinataires | Brevo (uniquement les contacts dont l'inscription est confirmée) |
-| Durée | Jusqu'à la désinscription ; l'adresse est alors effacée, seules une empreinte non réversible et les dates du consentement sont gardées comme preuve. Inscription non confirmée : lien valable 72 heures, puis la demande et l'adresse sont effacées (purge quotidienne) |
+| Durée | Jusqu'à la désinscription ; l'adresse est alors effacée. La preuve du consentement est gardée **5 ans après la désinscription** (prescription civile), puis effacée par la purge quotidienne : empreinte SHA-256 de l'adresse, dates de consentement et de désinscription, adresse IP et navigateur. C'est une donnée **pseudonymisée**, pas anonyme : hacher une adresse connue la retrouve (audit 2026-11-01 B7, décision 2026-11-04). Inscription non confirmée : lien valable 72 heures, puis la demande et l'adresse sont effacées (purge quotidienne) |
 
 ### 6. E-mails de service et suivi de leur remise
 
