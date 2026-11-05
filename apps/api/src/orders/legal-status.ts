@@ -1,4 +1,5 @@
 import {
+  docTypesOf,
   isLegalDocExpired,
   LEGAL_DOC_TYPES,
   type LegalDocType,
@@ -6,6 +7,9 @@ import {
   orderReference,
   PAID_PAYMENT_STATUSES,
   parisToday,
+  parseRequiredDocEntries,
+  type RequiredDocEntry,
+  requiredDocEntryKey,
 } from "@armurier/shared"
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { recordOrderStatusChange } from "../audit/record.js"
@@ -25,7 +29,10 @@ const READY_LEGAL_STATES = ["docs_verified", "payment_pending"] as const
 const RECOMPUTABLE_LEGAL_STATES = [...ACTIVE_LEGAL_STATES, ...READY_LEGAL_STATES] as const
 
 export type RequiredDocView = {
+  /** The document that stands for the line: the one sent, or the first alternative. */
   docType: LegalDocType
+  /** A line satisfied by any one of these (I7: hunting or shooting licence). */
+  alternatives?: LegalDocType[]
   status: OrderRequiredDocStatus
   documentId?: string
   uploadedAt?: Date | null
@@ -34,13 +41,18 @@ export type RequiredDocView = {
 
 type OwnedDoc = typeof legalDocuments.$inferSelect
 
+/** Where an entry sorts: the place of its first type in the canonical list. */
+const entryRank = (entry: RequiredDocEntry) => LEGAL_DOC_TYPES.indexOf(docTypesOf(entry)[0] as LegalDocType)
+
 /**
- * Required doc types for an order = union of the `requiredDocTypes` of the
- * verification-requiring legal categories present on its lines.
+ * Required documents for an order = union of the entries of the
+ * verification-requiring legal categories present on its lines. An entry is a
+ * type, or a group of alternatives (I7); a group is dropped when one of its
+ * types is required on its own anyway, since that document satisfies both.
  */
 export async function requiredDocTypesFor(
   itemsJson: Array<{ legalCategory?: string | null }>,
-): Promise<LegalDocType[]> {
+): Promise<RequiredDocEntry[]> {
   const cats = [...new Set(itemsJson.map((i) => i.legalCategory).filter((c): c is string => Boolean(c)))]
   if (cats.length === 0) return []
 
@@ -52,13 +64,17 @@ export async function requiredDocTypesFor(
     .from(legalCategories)
     .where(inArray(legalCategories.category, cats as never))
 
-  const types = new Set<string>()
+  const entries = new Map<string, RequiredDocEntry>()
   for (const row of rows) {
     if (!row.requiresVerification) continue
-    for (const t of row.requiredDocTypes ?? []) types.add(t)
+    for (const entry of parseRequiredDocEntries(row.requiredDocTypes)) entries.set(requiredDocEntryKey(entry), entry)
   }
+  const singles = new Set([...entries.values()].filter((entry) => !Array.isArray(entry)))
+  const needed = [...entries.values()].filter(
+    (entry) => !Array.isArray(entry) || !entry.some((type) => singles.has(type)),
+  )
   // Stable, canonical ordering
-  return LEGAL_DOC_TYPES.filter((t) => types.has(t))
+  return needed.sort((a, b) => entryRank(a) - entryRank(b))
 }
 
 /** Legal categories whose verification asks for this document type. */
@@ -69,7 +85,8 @@ async function categoriesRequiring(docType: string): Promise<Set<string>> {
     .where(
       and(
         eq(legalCategories.requiresVerification, true),
-        sql`${legalCategories.requiredDocTypes} @> ${JSON.stringify([docType])}::jsonb`,
+        // On its own, or within a group of alternatives (I7).
+        sql`(${legalCategories.requiredDocTypes} @> ${JSON.stringify([docType])}::jsonb or ${legalCategories.requiredDocTypes} @> ${JSON.stringify([[docType]])}::jsonb)`,
       ),
     )
   return new Set(rows.map((row) => row.category))
@@ -111,13 +128,15 @@ function isValidApproval(doc: OwnedDoc, today: string): boolean {
 }
 
 /**
- * The document that represents a doc type for review purposes: a still-valid
- * approved one if it exists, otherwise the latest upload (so re-uploading after
- * a rejection or an expiry supersedes the old document — clarification D1).
+ * The document that represents a required entry for review purposes: a
+ * still-valid approved one of its types if it exists, otherwise the latest
+ * upload of any of them (so re-uploading after a rejection or an expiry — or
+ * sending the other licence, I7 — supersedes the old document, clarification D1).
  */
-function representativeDoc(docs: OwnedDoc[], docType: LegalDocType, today: string): OwnedDoc | undefined {
-  const ofType = docs.filter((d) => d.docType === docType)
-  return ofType.find((d) => isValidApproval(d, today)) ?? ofType[0]
+function representativeDoc(docs: OwnedDoc[], entry: RequiredDocEntry, today: string): OwnedDoc | undefined {
+  const types: ReadonlyArray<string> = docTypesOf(entry)
+  const candidates = docs.filter((d) => types.includes(d.docType))
+  return candidates.find((d) => isValidApproval(d, today)) ?? candidates[0]
 }
 
 function docStatus(doc: OwnedDoc | undefined, today: string): OrderRequiredDocStatus {
@@ -133,15 +152,16 @@ function docStatus(doc: OwnedDoc | undefined, today: string): OrderRequiredDocSt
 }
 
 export function buildRequiredDocsView(
-  requiredTypes: LegalDocType[],
+  required: RequiredDocEntry[],
   docs: OwnedDoc[],
   today = parisToday(),
 ): RequiredDocView[] {
-  return requiredTypes.map((docType) => {
-    const doc = representativeDoc(docs, docType, today)
+  return required.map((entry) => {
+    const doc = representativeDoc(docs, entry, today)
     const status = docStatus(doc, today)
     return {
-      docType,
+      docType: (doc?.docType as LegalDocType | undefined) ?? (docTypesOf(entry)[0] as LegalDocType),
+      ...(Array.isArray(entry) && { alternatives: entry }),
       status,
       ...(doc && {
         documentId: doc.id,

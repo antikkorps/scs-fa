@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { lineTtc, orderReference, orderRetailTotals } from "@armurier/shared"
+import { lineTtc, orderReference, orderRetailTotals, requiredDocEntryLabel } from "@armurier/shared"
 import type { OrderAddressSnapshot, OrderLegal, OrderLineItem, RequiredDoc } from "~/types/account"
 import type { OrderDetail } from "~/types/checkout"
 import { formatDate, formatDateTime, formatEuros, formatPercent } from "~/utils/format"
@@ -116,8 +116,16 @@ async function view(doc: RequiredDoc) {
   }
 }
 
-function toggleUpload(docType: string) {
-  openUpload.value = openUpload.value === docType ? null : docType
+function toggleUpload(key: string) {
+  openUpload.value = openUpload.value === key ? null : key
+}
+
+// A line is one document, or a group any one of which is enough (I7).
+const lineKey = (doc: RequiredDoc) => (doc.alternatives ?? [doc.docType]).join("|")
+/** What to send: each alternative's help, for a line either licence satisfies. */
+function lineHelp(doc: RequiredDoc): string | null {
+  const helps = (doc.alternatives ?? [doc.docType]).map(legalDocHelp).filter((help): help is string => Boolean(help))
+  return helps.length > 0 ? helps.join(" ") : null
 }
 </script>
 
@@ -199,11 +207,11 @@ function toggleUpload(docType: string) {
           </p>
 
           <ul class="docs" role="list">
-            <li v-for="doc in legal.requiredDocs" :key="doc.docType" class="doc">
+            <li v-for="doc in legal.requiredDocs" :key="lineKey(doc)" class="doc">
               <div class="doc__row">
                 <div>
-                  <p class="doc__name">{{ legalDocLabel(doc.docType) }}</p>
-                  <p v-if="legalDocHelp(doc.docType)" class="doc__help">{{ legalDocHelp(doc.docType) }}</p>
+                  <p class="doc__name">{{ doc.alternatives ? requiredDocEntryLabel(doc.alternatives) : legalDocLabel(doc.docType) }}</p>
+                  <p v-if="lineHelp(doc)" class="doc__help">{{ lineHelp(doc) }}</p>
                   <p class="doc__status" :class="`tone-${requiredDocTone(doc.status)}`">
                     {{ requiredDocStatusLabel(doc.status) }}
                     <template v-if="doc.status === 'rejected' && doc.rejectionReason">
@@ -225,14 +233,19 @@ function toggleUpload(docType: string) {
                     v-if="needsUpload(doc.status)"
                     type="button"
                     class="btn btn-primary btn-sm"
-                    @click="toggleUpload(doc.docType)"
+                    @click="toggleUpload(lineKey(doc))"
                   >
-                    {{ openUpload === doc.docType ? "Annuler" : doc.status === "missing" ? "Envoyer" : "Renvoyer" }}
+                    {{ openUpload === lineKey(doc) ? "Annuler" : doc.status === "missing" ? "Envoyer" : "Renvoyer" }}
                   </button>
                 </div>
               </div>
 
-              <LegalDocUpload v-if="openUpload === doc.docType" :doc-type="doc.docType" @uploaded="onUploaded" />
+              <LegalDocUpload
+                v-if="openUpload === lineKey(doc)"
+                :doc-type="doc.docType"
+                :alternatives="doc.alternatives"
+                @uploaded="onUploaded"
+              />
             </li>
           </ul>
         </section>

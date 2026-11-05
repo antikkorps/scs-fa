@@ -26,7 +26,8 @@ const { product, addVariantMock, navigateToMock, auth } = vi.hoisted(() => ({
       description: null,
       requiresVerification: true,
       minAge: 18,
-      requiredDocTypes: ["hunting_permit"],
+      // I7 (2026-11-04): an identity document and either licence.
+      requiredDocTypes: ["cni", ["permis_chasse", "licence_tir"]],
     },
     ageMinRequired: null,
     hasAccessoryRestrictions: false,
@@ -126,5 +127,17 @@ describe("boutique/[slug].vue — page order", () => {
   it("titles the box of purchase conditions « Réglementation »", async () => {
     const wrapper = await mounted()
     expect(wrapper.find("#legal-h").text()).toBe("Réglementation")
+  })
+})
+
+// I7 — decision Franck 2026-11-04: category C asks either licence.
+describe("product page — the documents a category C weapon asks", () => {
+  it("lists the identity document and either licence, as one line", async () => {
+    const wrapper = await mounted()
+    const docs = wrapper.findAll(".legal__docs li").map((item) => item.text())
+    expect(docs).toEqual([
+      "Pièce d'identité (carte d'identité ou passeport)",
+      "Permis de chasser validé ou licence de tir sportif",
+    ])
   })
 })

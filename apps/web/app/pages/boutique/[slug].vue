@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { parseRequiredDocEntries, requiredDocEntryKey, requiredDocEntryLabel } from "@armurier/shared"
 import type { ProductDetail, ProductVariant } from "~/types/product"
 import { availabilityLongLabel, availabilityState, isPurchasable } from "~/utils/availability"
 import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES, ogImageUrl } from "~/utils/format"
-import { legalDocLabel } from "~/utils/legal"
 import { conditionLabel, legalCategoryLabel, stockLabel } from "~/utils/product"
 import { productJsonLd } from "~/utils/structuredData"
 
@@ -24,6 +24,8 @@ const image = computed(() =>
   artworkImage(product.value.featuredImageUrl, product.value.slug, CARD_GEOMETRY.width, CARD_GEOMETRY.height),
 )
 const legal = computed(() => product.value.legalCategory)
+// What the category asks, a group of alternatives on one line (I7: « … ou … »).
+const requiredDocs = computed(() => parseRequiredDocEntries(legal.value?.requiredDocTypes))
 
 // Collection weapons carry a historical dossier; ordinary products don't.
 const ancient = computed(() => product.value.ancientWeapon)
@@ -298,11 +300,11 @@ useHead({
                 <dt>Âge minimum</dt>
                 <dd>{{ product.ageMinRequired ?? legal.minAge }} ans</dd>
               </div>
-              <div v-if="legal.requiredDocTypes.length > 0 && !asksForQuote">
+              <div v-if="requiredDocs.length > 0 && !asksForQuote">
                 <dt>Documents requis</dt>
                 <dd>
                   <ul class="legal__docs">
-                    <li v-for="code in legal.requiredDocTypes" :key="code">{{ legalDocLabel(code) }}</li>
+                    <li v-for="entry in requiredDocs" :key="requiredDocEntryKey(entry)">{{ requiredDocEntryLabel(entry) }}</li>
                   </ul>
                 </dd>
               </div>

@@ -164,3 +164,33 @@ describe("my order — the documents to send", () => {
     expect(wrapper.text()).toContain("Documents à fournir")
   })
 })
+
+// I7 — decision Franck 2026-11-04: category C takes either licence.
+describe("my order — a line either licence satisfies", () => {
+  it("names the line by both licences and lets the customer say which one they send", async () => {
+    getOrder.mockResolvedValue(order({ legalVerificationStatus: "pending" }))
+    orderLegal.mockResolvedValue({
+      requiresVerification: true,
+      legalVerificationStatus: "pending",
+      legalRejectionReason: null,
+      requiredDocs: [
+        {
+          docType: "permis_chasse",
+          alternatives: ["permis_chasse", "licence_tir"],
+          status: "missing",
+          documentId: null,
+          uploadedAt: null,
+          rejectionReason: null,
+        },
+      ],
+    })
+    const wrapper = await mounted()
+    const line = wrapper.find(".doc")
+    expect(line.find(".doc__name").text()).toBe("Permis de chasser validé ou licence de tir sportif")
+
+    await line.find("button.btn-primary").trigger("click")
+
+    const choices = wrapper.findAll(".doc input[type=radio]").map((choice) => choice.attributes("value"))
+    expect(choices).toEqual(["permis_chasse", "licence_tir"])
+  })
+})
