@@ -1,4 +1,4 @@
-import { adminOrderQuerySchema, uuidParamSchema } from "@armurier/shared"
+import { adminOrderQuerySchema, orderReferenceIdPrefix, uuidParamSchema } from "@armurier/shared"
 import { and, count, desc, eq, ilike, inArray, ne, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { orderHistory } from "../audit/history.js"
@@ -37,6 +37,13 @@ const LIST_FIELDS = {
 } as const
 
 // Admin orders dashboard API. Mounted under /api/admin/orders.
+/** An order reference (`0B7D1F3E`) finds that order; any other text searches the customer's e-mail. */
+function searchCondition(search: string) {
+  const idPrefix = orderReferenceIdPrefix(search)
+  if (idPrefix) return sql`${orders.id}::text LIKE ${`${idPrefix}%`}`
+  return ilike(users.email, `%${search}%`)
+}
+
 export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", authenticate)
   fastify.addHook("preHandler", requireRole("admin"))
@@ -90,7 +97,7 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
       shippingStatus ? eq(orders.shippingStatus, shippingStatus) : undefined,
       invoices === "attention" ? inArray(orders.id, ordersNeedingAttention()) : undefined,
       payments === "overdue" ? paymentOverdue() : undefined,
-      search ? ilike(users.email, `%${search}%`) : undefined,
+      search ? searchCondition(search) : undefined,
     ].filter(Boolean)
     const where = conditions.length ? and(...conditions) : undefined
 

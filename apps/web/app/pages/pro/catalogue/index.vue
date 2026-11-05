@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Pagination } from "~/types/account"
+import type { Pagination } from "~/types/pagination"
 import type { ProProductCard } from "~/types/quote"
 import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES } from "~/utils/format"
 import { isRegulated, legalCategoryLabel } from "~/utils/product"

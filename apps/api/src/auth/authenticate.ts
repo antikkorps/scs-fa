@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { FastifyReply, FastifyRequest } from "fastify"
 import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
@@ -12,12 +12,16 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     return reply.code(401).send(UNAUTHORIZED)
   }
 
-  // Story 12.11 — an access token outlives a deletion by up to an hour: a
-  // deleted account's session stops at once, not when its token expires.
-  const [deleted] = await db
-    .select({ id: users.id })
+  // An access token lives up to an hour; the account is read again on every
+  // request so a change made meanwhile applies at once:
+  //  - a deleted (story 12.11) or vanished account's session stops;
+  //  - the role comes from the account, not the token, so a demoted admin
+  //    loses the back-office straight away (review 2026-11-04).
+  const [account] = await db
+    .select({ role: users.role, deletedAt: users.deletedAt })
     .from(users)
-    .where(and(eq(users.id, request.user.sub), isNotNull(users.deletedAt)))
+    .where(eq(users.id, request.user.sub))
     .limit(1)
-  if (deleted) return reply.code(401).send(UNAUTHORIZED)
+  if (!account || account.deletedAt) return reply.code(401).send(UNAUTHORIZED)
+  request.user.role = account.role
 }

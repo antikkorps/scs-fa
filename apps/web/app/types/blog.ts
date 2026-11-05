@@ -1,3 +1,5 @@
+import type { Pagination } from "./pagination"
+
 export interface BlogListItem {
   id: string
   slug: string
@@ -25,14 +27,6 @@ export interface BlogArticleDetail {
   publishedAt: string | null
   updatedAt: string | null
   authorName: string | null
-}
-
-export interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasMore: boolean
 }
 
 export interface BlogListResponse {

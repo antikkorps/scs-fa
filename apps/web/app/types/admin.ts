@@ -16,14 +16,6 @@ export interface AuthUser {
   role: "customer" | "vendor" | "admin"
 }
 
-export interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasMore: boolean
-}
-
 export interface OrderCustomer {
   id: string
   email: string
@@ -286,7 +278,20 @@ export interface LegalDocDetail extends LegalDocQueueItem {
   issuedAt: string | null
   expiresAt: string | null
   verificationNotes: string | null
-  downloadUrl: string
+  /** Null until the antivirus has passed the file. */
+  downloadUrl: string | null
+  /** The owner's open orders waiting for this kind of document (always empty for an organisation's). */
+  orders: LegalDocWaitingOrder[]
+}
+
+export interface LegalDocWaitingOrder {
+  id: string
+  reference: string
+  createdAt: string
+  legalVerificationStatus: string
+  paymentStatus: string
+  /** Only the lines that ask for this document: the weapons it is for. */
+  items: Array<{ name: string; legalCategory: string | null }>
 }
 
 // Story 9.4 — blog backoffice

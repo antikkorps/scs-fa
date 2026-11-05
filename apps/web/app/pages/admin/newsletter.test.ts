@@ -3,7 +3,8 @@ import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { flushPromises } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { clearNuxtData } from "#imports"
-import type { AdminNewsletterContact, AdminNewsletterSummary, Pagination } from "~/types/admin"
+import type { AdminNewsletterContact, AdminNewsletterSummary } from "~/types/admin"
+import type { Pagination } from "~/types/pagination"
 import Newsletter from "./newsletter.vue"
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }))
