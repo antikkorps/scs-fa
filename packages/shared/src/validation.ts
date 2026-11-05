@@ -129,6 +129,17 @@ export const forgotPasswordSchema = z.object({
   email: emailSchema,
 })
 
+// Decision 2026-11-04 — an admin is invited (server command, back-office),
+// never handed a password: who to invite.
+export const adminInvitationSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().pipe(emailSchema),
+    firstname: z.string().trim().min(1).max(100),
+    lastname: z.string().trim().min(1).max(100),
+  })
+  .strict()
+export type AdminInvitationInput = z.infer<typeof adminInvitationSchema>
+
 export const resetPasswordSchema = z.object({
   token: z.string().min(20).max(256),
   password: passwordSchema,

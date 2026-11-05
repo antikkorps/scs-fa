@@ -32,9 +32,14 @@ check-db-roles:
 migrate:
     {{ compose }} --profile migrate run --rm migrate
 
-# Seed reference data + admin user (idempotent, safe to re-run). No demo content.
+# Seed reference data (idempotent, safe to re-run). No demo content, and no admin in production: invite them.
 seed:
     {{ compose }} exec api node_modules/.bin/tsx src/db/seed-cli.ts
+
+# Again for the same admin: a new link, the previous one stops working. Ex: just admin-invite fred@scs-firearms.com Fred Martin
+# Invite an admin: account without a password + single-use link (72 h) to choose one, e-mailed and printed
+admin-invite email firstname +lastname:
+    {{ compose }} exec api node_modules/.bin/tsx src/auth/admin-invite-cli.ts {{ email }} {{ firstname }} {{ lastname }}
 
 # Reference data + the demo catalogue (fake products, artworks, posts) — demo servers only, never the live site
 seed-demo:

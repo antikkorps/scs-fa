@@ -71,10 +71,15 @@ docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
 # Build + start the stack.
 docker compose -f docker-compose.prod.yml up -d --build
 
-# Seed reference data + the admin user (idempotent; safe to re-run). No demo
-# content: `--demo` (just seed-demo) is for demo servers only. Set
-# ADMIN_SEED_PASSWORD first — production refuses the sample one.
+# Seed reference data (idempotent; safe to re-run). No demo content: `--demo`
+# (just seed-demo) is for demo servers only. No admin either: they are invited.
 docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/db/seed-cli.ts
+
+# Invite each admin (decision 2026-11-04): an account without a password and a
+# single-use link, valid 72 h, to choose one — e-mailed and printed. Pass the
+# printed link another way (Signal, phone) if the e-mail does not arrive.
+just admin-invite fred@scs-firearms.com Fred Martin
+just admin-invite steph@scs-firearms.com Stéphane Durand
 ```
 
 Verify:
@@ -257,8 +262,14 @@ below is the recommended path.
       seed included), the sample IBAN, the same value for both JWT secrets, or
       `TOTP_ENCRYPTION_KEY` (story 12.8e, `openssl rand -base64 48`) equal to the
       JWT secret. `just logs api` then names the variables to fix, never their values.
+- [ ] **Each admin has their own account, invited** (`just admin-invite`, never a
+      shared or provisional password) and **used the link themselves**: a link
+      that answers « invalide » to its owner was used by someone else — invite
+      again (the old link dies) and look at the account's journal.
 - [ ] **Admins enrol their authenticator app** at their first login (mandatory,
-      story 12.8e) and keep their recovery codes. One who loses both is reset by
+      story 12.8e) and keep their recovery codes. Check it before opening (audit
+      B5): in *Clients*, each admin account shows « Activée » under
+      « Double authentification ». One who loses both is reset by
       another admin (*Comptes pro* for a pro member, or the API), or on the server:
       `docker compose exec api pnpm auth:totp-reset <email>`. Never rotate
       `TOTP_ENCRYPTION_KEY` casually: every enrolled app would have to enrol again.
