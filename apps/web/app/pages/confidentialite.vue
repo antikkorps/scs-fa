@@ -15,7 +15,7 @@ const REVIEWED = EDITORIAL_PAGES.confidentialite.reviewed
 // of the index until it is validated AND every fact is supplied.
 const identity = await loadShopIdentity()
 const PUBLISHABLE = isEditorialPagePublishable("confidentialite", identity.value)
-const UPDATED_ON = "19 octobre 2026"
+const UPDATED_ON = "4 novembre 2026"
 
 usePageSeo({
   title: "Politique de confidentialité",
@@ -268,8 +268,11 @@ usePageSeo({
           <tr>
             <td>Abonnement à la lettre d'information</td>
             <td>
-              Jusqu'à votre désinscription. Votre adresse est alors effacée ; seules une empreinte non réversible et
-              les dates de votre consentement sont conservées, pour pouvoir prouver qu'il a existé
+              Jusqu'à votre désinscription. Votre adresse est alors effacée. Pour pouvoir prouver que votre
+              consentement a existé, nous gardons une preuve pseudonymisée pendant 5 ans après votre désinscription,
+              puis nous l'effaçons : une empreinte de l'adresse (elle ne la contient plus, mais permet de la reconnaître
+              si elle nous est de nouveau soumise), les dates de votre consentement et de votre désinscription, ainsi
+              que l'adresse IP et le navigateur utilisés pour vous inscrire
             </td>
           </tr>
           <tr>

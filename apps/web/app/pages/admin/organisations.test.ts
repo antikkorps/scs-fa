@@ -182,16 +182,20 @@ describe("admin/organisations.vue (story 12.8b)", () => {
   })
 
   // Story 12.8e — a lost phone without recovery codes.
-  it("resets the member's authenticator app, after a confirmation", async () => {
-    vi.stubGlobal("confirm", () => true)
+  it("resets the member's authenticator app once the admin confirms with password and code", async () => {
     serve({ ...DETAIL, status: "approved" })
     const wrapper = await openFirst()
 
     await wrapper.find("button.reset-totp").trigger("click")
+    await wrapper.find(".totp-reset-confirm input[type=password]").setValue("MonMotDePasse")
+    await wrapper.find(".totp-reset-confirm input[autocomplete=one-time-code]").setValue("123456")
+    await wrapper.find(".totp-reset-confirm form").trigger("submit")
     await flushPromises()
 
-    expect(callsTo("/admin/users/u1/totp/reset")[0]?.[1]).toEqual({ method: "POST" })
+    expect(callsTo("/admin/users/u1/totp/reset")[0]?.[1]).toEqual({
+      method: "POST",
+      body: { password: "MonMotDePasse", code: "123456" },
+    })
     expect(wrapper.text()).toContain("réinitialisée")
-    vi.unstubAllGlobals()
   })
 })

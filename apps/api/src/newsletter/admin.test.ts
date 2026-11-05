@@ -17,7 +17,7 @@ describe("/api/admin/newsletter — subscribers in the back-office", () => {
   const tag = `n${Date.now()}`
   const contactIds: string[] = []
 
-  /** A contact with its subscriptions; `email: null` is an anonymised trace. */
+  /** A contact with its subscriptions; `email: null` is a consent proof, address erased. */
   async function contact(local: string | null, subscriptions: Subscription[], createdAt = new Date()) {
     const email = local === null ? null : `${tag}-${local}${EMAIL_SUFFIX}`
     const [row] = await db

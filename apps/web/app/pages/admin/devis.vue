@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { QuoteRequestStatus } from "@armurier/shared"
-import type { Pagination } from "~/types/admin"
+import type { Pagination } from "~/types/pagination"
 import type { AdminQuoteRequestDetail, AdminQuoteRequestRow } from "~/types/quote"
 import { formatDateTime, formatEuros, formatPercent } from "~/utils/format"
 import { organisationTypeLabel, quoteRequestStatus } from "~/utils/organisation"

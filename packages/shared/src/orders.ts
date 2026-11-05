@@ -248,3 +248,15 @@ export function transferReminderDate(placedAt: Date): Date {
 export function orderReference(orderId: string): string {
   return orderId.slice(0, 8).toUpperCase()
 }
+
+const ORDER_REFERENCE_REGEX = /^#?([0-9a-f]{8})$/i
+
+/**
+ * The id prefix a typed order reference stands for (`#0B7D1F3E` → `0b7d1f3e`),
+ * or null when the text is not a reference — so a back-office search can tell a
+ * reference from an e-mail address. Inverse of `orderReference`.
+ */
+export function orderReferenceIdPrefix(text: string): string | null {
+  const match = text.trim().match(ORDER_REFERENCE_REGEX)
+  return match?.[1] ? match[1].toLowerCase() : null
+}

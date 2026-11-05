@@ -39,6 +39,13 @@ const DOC_VERIFICATION: Record<string, StatusMeta> = {
   expired: { label: "Expiré", severity: "muted" },
 }
 
+// Antivirus result of an uploaded document (audit 2026-11-01, I9: no raw codes).
+const DOC_SCAN: Record<string, StatusMeta> = {
+  pending: { label: "Analyse en cours", severity: "warn" },
+  clean: { label: "Sain", severity: "ok" },
+  infected: { label: "Infecté", severity: "bad" },
+}
+
 const REFUND: Record<string, StatusMeta> = {
   pending: { label: "En cours", severity: "warn" },
   succeeded: { label: "Effectué", severity: "ok" },
@@ -76,6 +83,9 @@ export function legalStatus(value: string): StatusMeta {
 }
 export function docVerificationStatus(value: string): StatusMeta {
   return DOC_VERIFICATION[value] ?? FALLBACK(value)
+}
+export function docScanStatus(value: string): StatusMeta {
+  return DOC_SCAN[value] ?? FALLBACK(value)
 }
 export function refundStatus(value: string): StatusMeta {
   return REFUND[value] ?? FALLBACK(value)

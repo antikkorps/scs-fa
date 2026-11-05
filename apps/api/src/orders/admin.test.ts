@@ -1,4 +1,4 @@
-import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
+import { CURRENT_RGPD_CONSENT_VERSION, orderReference } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
 import { and, eq, inArray, like, sql } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
@@ -154,6 +154,20 @@ describe("admin orders dashboard API (Story 7.1)", () => {
       expect(hit.json().data.length).toBeGreaterThan(0)
       const miss = await adminGet("/api/admin/orders?search=nobody-xyz@nowhere.local")
       expect(miss.json().data).toHaveLength(0)
+    })
+
+    it("finds an order by its short reference, whatever the case (audit 2026-11-01, I9)", async () => {
+      const wanted = await insertOrder(customerId)
+      const other = await insertOrder(customerId)
+      const reference = orderReference(wanted)
+
+      for (const search of [reference, reference.toLowerCase(), ` ${reference} `]) {
+        const ids = (await adminGet(`/api/admin/orders?search=${encodeURIComponent(search)}&limit=100`))
+          .json()
+          .data.map((o: { id: string }) => o.id)
+        expect(ids).toEqual([wanted])
+        expect(ids).not.toContain(other)
+      }
     })
 
     it("rejects an out-of-range status filter (400)", async () => {

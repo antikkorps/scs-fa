@@ -3,10 +3,11 @@ import {
   LEGAL_DOC_TYPES,
   type LegalDocType,
   type OrderRequiredDocStatus,
+  orderReference,
   PAID_PAYMENT_STATUSES,
   parisToday,
 } from "@armurier/shared"
-import { and, desc, eq, inArray } from "drizzle-orm"
+import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { recordOrderStatusChange } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { legalCategories, legalDocuments, orders } from "../db/schema.js"
@@ -58,6 +59,50 @@ export async function requiredDocTypesFor(
   }
   // Stable, canonical ordering
   return LEGAL_DOC_TYPES.filter((t) => types.has(t))
+}
+
+/** Legal categories whose verification asks for this document type. */
+async function categoriesRequiring(docType: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ category: legalCategories.category })
+    .from(legalCategories)
+    .where(
+      and(
+        eq(legalCategories.requiresVerification, true),
+        sql`${legalCategories.requiredDocTypes} @> ${JSON.stringify([docType])}::jsonb`,
+      ),
+    )
+  return new Set(rows.map((row) => row.category))
+}
+
+/**
+ * The customer's orders still waiting on their documents that ask for this
+ * document type, newest first, each with only the lines that ask for it — so a
+ * reviewer sees which weapon the document is for (audit 2026-11-01, I9).
+ */
+export async function ordersAwaitingDocType(userId: string, docType: string) {
+  const [open, categories] = await Promise.all([
+    db
+      .select({
+        id: orders.id,
+        createdAt: orders.createdAt,
+        legalVerificationStatus: orders.legalVerificationStatus,
+        paymentStatus: orders.paymentStatus,
+        itemsJson: orders.itemsJson,
+      })
+      .from(orders)
+      .where(and(eq(orders.userId, userId), inArray(orders.legalVerificationStatus, [...ACTIVE_LEGAL_STATES])))
+      .orderBy(desc(orders.createdAt)),
+    categoriesRequiring(docType),
+  ])
+
+  return open.flatMap(({ itemsJson, ...order }) => {
+    const items = itemsJson
+      .filter((item) => item.legalCategory && categories.has(item.legalCategory))
+      .map((item) => ({ name: item.name, legalCategory: item.legalCategory }))
+    if (items.length === 0) return []
+    return [{ ...order, reference: orderReference(order.id), items }]
+  })
 }
 
 /** An approval no longer counts once the document's expiry date has passed (story 12.9f). */
