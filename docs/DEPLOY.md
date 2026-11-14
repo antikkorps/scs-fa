@@ -261,6 +261,9 @@ re-run it after changing a `DB_*_PASSWORD`, then restart the services that use
 it. It is safe to re-run, and hands objects the superuser created earlier over
 to `scs_owner`. `just check-db-roles` (dev machine, Docker) checks the script
 against a throwaway Postgres with the real migrations.
+`just check-migrate` runs `db-roles` then `migrate` through the production
+compose services (the migrate image included) and checks every migration got
+applied — the CI applies them on the host, so this is the deploy path's check.
 
 > Caddy refuses to start without `certs/origin.pem` and `certs/origin-key.pem`
 > (§ 2). A `526 Invalid SSL certificate` from Cloudflare means the origin did not
