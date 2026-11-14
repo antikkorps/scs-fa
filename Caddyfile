@@ -1,12 +1,23 @@
-# Caddy reverse proxy — automatic HTTPS (Let's Encrypt) + security headers.
+# Caddy reverse proxy — TLS with the Cloudflare Origin Certificate + security headers.
 # Single public origin: the API is served under /api on the same domain as the
 # front, so browser → API calls are same-origin (no CORS). Backend service names
 # (`api`, `web`) resolve on the prod compose network (Story 8.3).
 #
 # Canonical host is www.{$DOMAIN}; the apex redirects to it.
-# Configure via env: DOMAIN (e.g. scs-firearms.com) and ACME_EMAIL.
+# Configure via env: DOMAIN (e.g. scs-firearms.com).
+#
+# TLS (decision 2026-11-14): Cloudflare proxies every host in Full (strict)
+# mode and answers the browsers; this origin only talks to Cloudflare. It
+# serves a Cloudflare Origin Certificate (covers the apex and *.DOMAIN, valid
+# 15 years) mounted from ./certs by docker-compose.prod.yml — no ACME: Let's
+# Encrypt cannot reach an origin hidden behind the proxy without DNS-01 API
+# tokens on the server. The certificate is trusted by Cloudflare only, so the
+# site works through the orange cloud, never on its bare IP (docs/DEPLOY.md § 2).
+# Check: `just check-caddyfile`.
 {
-	email {$ACME_EMAIL}
+	# Never fall back to ACME, even for a name the certificate does not cover:
+	# such a request fails loudly instead. HTTP → HTTPS redirects stay on.
+	auto_https disable_certs
 
 	# The real client IP (story 9.6). Cloudflare sits in front: its edges are the
 	# only proxies trusted, and CF-Connecting-IP names the visitor. A request that
@@ -17,12 +28,16 @@
 		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
 		client_ip_headers CF-Connecting-IP
 	}
-	# Uncomment to test against Let's Encrypt staging (avoids rate limits):
-	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Every site serves the origin certificate; nothing is requested from an ACME CA.
+(origin_tls) {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin-key.pem
 }
 
 # Canonical site.
 www.{$DOMAIN} {
+	import origin_tls
 	encode zstd gzip
 
 	# --- Security headers (applied to every response) ---
@@ -75,6 +90,7 @@ www.{$DOMAIN} {
 # Umami dashboard (story 9.6), behind Umami's own login. Needs a DNS record for
 # stats.DOMAIN (proxied through Cloudflare like www).
 stats.{$DOMAIN} {
+	import origin_tls
 	encode zstd gzip
 	# A first lock in front of Umami's login (story 12.9g): a fresh install
 	# answers admin / umami until someone changes it. The tracker is not
@@ -101,5 +117,6 @@ stats.{$DOMAIN} {
 
 # Apex → canonical www.
 {$DOMAIN} {
+	import origin_tls
 	redir https://www.{$DOMAIN}{uri} permanent
 }

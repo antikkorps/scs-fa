@@ -250,49 +250,23 @@
 
 ---
 
-## J. INFRA & GO-LIVE (migration OVH → Hetzner + Cloudflare)
+## J. INFRA & GO-LIVE (IONOS + Cloudflare) — tranché le 2026-11-14
 
-> Contexte : l'ancien site est chez **OVH**, la cible est un VM **Hetzner** +
-> **Cloudflare** devant. Runbook & checklist complète : `docs/DEPLOY.md §7`.
+> Runbook & checklist : `docs/DEPLOY.md` (§ 1–2 et § 7).
 
-### J1. Registrar & DNS
-
-- [ ] Le domaine est-il **enregistré chez OVH** (registrar) ou ailleurs ? →
-      conditionne le changement de **nameservers** vers Cloudflare.
-- [ ] **MX / SPF / DKIM / DMARC** actuels : on les récupère tels quels sur
-      Cloudflare (sinon l'email transactionnel casse au cutover).
-- [ ] Fenêtre de bascule (heure creuse) + durée de rétention de l'ancien OVH
-      pour rollback ?
-
-### J2. Cloudflare — proxy & TLS
-
-- [ ] **Proxifié (orange, CDN/WAF/anti-DDoS)** ou **DNS-only (gris)** ? (reco :
-      proxifié).
-- [ ] TLS origine : **Cloudflare Origin Certificate** sur Caddy (reco, simple)
-      **ou** garder Let's Encrypt via challenge **DNS-01** ? Mode CF = **Full
-      (strict)** dans tous les cas.
-- [ ] Verrouiller le firewall Hetzner sur les **plages IP Cloudflare** (empêche
-      le bypass du WAF) — OK ?
-
-### J3. IP client réelle (sécurité)
-
-- [ ] Confirmer la config **`trusted_proxies` (Caddy) + `trustProxy` (Fastify)**
-      sur les IP Cloudflare : sinon le **rate-limiter** et les **audit logs**
-      voient les IP de Cloudflare, pas celles des clients.
-
-### J4. Stockage objet
-
-- [ ] Rester sur le provider **S3 actuel** (`S3_ENDPOINT`) ou migrer vers
-      **Cloudflare R2** (S3-compatible, sans frais d'egress) pour uploads +
-      backups ? (impact : endpoint + credentials, pas le code).
-- [ ] Chiffrement au repos + object-lock/versioning sur le bucket de **backups**
-      (contient de la PII) — à activer ?
-
-### J5. Emails transactionnels
-
-- [ ] Quel **relais SMTP** en prod (le VM Hetzner enverra-t-il en direct, ou via
-      un service — SES, Postmark, OVH mail… ) ? Délivrabilité sur domaine
-      réglementé = point sensible.
+- [x] **J1 Registrar & DNS** : `scs-firearms.com` est chez **OVH** (expire le
+      2027-02-05). Le site actuel est une coquille vide : pas de migration ni de
+      fenêtre de retour arrière. Aucun MX aujourd'hui ; SPF/DKIM/DMARC à créer
+      avec Brevo. Le site Safety Case Solutions (même hébergement OVH, domaine et
+      DNS chez IONOS) n'est pas concerné ; on garde l'hébergement OVH pour lui.
+- [x] **J2 Cloudflare** : tout est **proxifié** ; TLS = **certificat d'origine
+      Cloudflare** sur Caddy, mode **Full (strict)**. Serveur chez **IONOS** (pas
+      Hetzner) : verrouillage des ports 80/443 sur les plages Cloudflare via la
+      politique de pare-feu IONOS (ufw est contourné par Docker).
+- [x] **J3 IP client réelle** : fait en story 9.6 (`trusted_proxies` Caddy +
+      un seul saut privé côté Fastify).
+- [x] **J4 Stockage objet** : Scaleway (décision 2026-09-06), pas R2.
+- [x] **J5 Emails** : relais SMTP Brevo (décision 2026-09-06).
 
 ---
 
