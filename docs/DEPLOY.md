@@ -1,67 +1,163 @@
-# Deployment — Hetzner (Docker Compose)
+# Deployment — IONOS VPS (Docker Compose)
 
 Production runs the whole stack from `docker-compose.prod.yml` on a single
-Hetzner Cloud VM: **Postgres + API + Web + Caddy** on one private Docker network.
-Caddy is the only thing exposed to the internet (80/443); it terminates TLS
-(Let's Encrypt) and routes everything on one public origin — so the browser
-never makes a cross-origin API call.
+IONOS VPS: **Postgres + API + Web + Caddy** on one private Docker network.
+Cloudflare proxies every public host (CDN, WAF, DDoS) and answers the browsers;
+Caddy is the only thing the VPS exposes (80/443). It serves a **Cloudflare
+Origin Certificate** (TLS mode *Full (strict)*) and routes everything on one
+public origin — so the browser never makes a cross-origin API call.
 
 ```
-internet ──443──▶ caddy ──/api/*, /health──▶ api:8080
-                        └──everything else──▶ web:3000
-                                                api ──▶ postgres:5432
+browser ──443──▶ Cloudflare ──443──▶ caddy ──/api/*, /health──▶ api:8080
+                                           └──everything else──▶ web:3000
+                                                                api ──▶ postgres:5432
 ```
+
+> **Nothing is built with Node on the server.** No Node, no pnpm there: every
+> image installs its own dependencies inside Docker. The server needs Docker
+> (with the compose plugin), git and `just` — nothing else.
 
 > **Ops shortcuts (`just`).** The Compose operations in this guide are wrapped as
 > [`just`](https://github.com/casey/just) recipes in the repo-root `justfile`, so
-> go-live steps are runnable, not copy-pasted. Install with `brew install just`
-> (or your distro package), then run `just` from the repo root to list them:
+> go-live steps are runnable, not copy-pasted. Install with `apt install just`
+> (Ubuntu 24.04+) or `brew install just`, then run `just` from the repo root to list them:
 > `just deploy` · `just migrate` · `just seed` · `just update` · `just logs api` ·
 > `just ps` · `just psql` · `just db-roles` · `just backup` · `just restore <key> [dump]`. They complement
 > the pnpm scripts (dev/build/test stay in `package.json`).
 
-## 1. Provision the server
+## 1. Prepare the server
 
-- **Hetzner Cloud** VM, e.g. `CPX21` (3 vCPU / 4 GB) in `nbg1`/`fsn1`, Ubuntu 24.04.
-- Add your SSH key at creation. SSH in as `root`, then:
+The VPS (Ubuntu) is already hardened (2026-11-14): SSH by key only, password
+logins refused, ufw, fail2ban. Check that no drop-in file re-enables passwords
+— Ubuntu cloud images ship `/etc/ssh/sshd_config.d/50-cloud-init.conf`, which
+wins over `sshd_config`:
 
 ```bash
-# System user + Docker
-adduser --disabled-password --gecos "" deploy
-usermod -aG sudo deploy
-curl -fsSL https://get.docker.com | sh
-usermod -aG docker deploy
-
-# Firewall: only SSH + HTTP + HTTPS
-ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
+sudo sshd -T | grep -E '^(passwordauthentication|kbdinteractiveauthentication|permitrootlogin)'
+# expected: passwordauthentication no · kbdinteractiveauthentication no · permitrootlogin no (or prohibit-password)
 ```
 
-Prefer Hetzner Cloud Firewall too (same three ports) as a second layer.
+Then, as a sudoer:
+
+```bash
+# System user + Docker + tools
+sudo adduser --gecos "" deploy        # set a strong password: § 1.1, console access
+sudo usermod -aG sudo deploy
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker deploy
+sudo apt install -y git just
+```
+
+**Firewall.** ufw keeps SSH + 80 + 443. ⚠️ Docker publishes its ports through
+its own iptables rules, **ahead of ufw**: a ufw rule cannot restrict who reaches
+80/443. Restrictions on those ports belong to the **IONOS firewall policy**
+(Cloud Panel › Network › Firewall Policies), which filters before the VPS:
+SSH (22), 80 and 443 over TCP only — and, once Cloudflare is in front, 80/443
+only from the Cloudflare ranges (§ 7, *Lock the origin*). Compose also publishes
+443/udp (HTTP/3); Cloudflare reaches the origin over TCP, so leaving UDP closed
+in the policy is intended.
+
+**Read access to the repo — a deploy key.** The server clones from Forgejo
+with its own key, read-only, scoped to this repo (never a personal key):
+
+```bash
+# as deploy
+install -d -m 700 ~/.ssh
+ssh-keygen -t ed25519 -f ~/.ssh/forgejo_deploy -N "" -C "scs-prod deploy key"
+cat >> ~/.ssh/config <<'CFG'
+Host git.fvienot.link
+  IdentityFile ~/.ssh/forgejo_deploy
+  IdentitiesOnly yes
+CFG
+cat ~/.ssh/forgejo_deploy.pub
+```
+
+Add the public key in Forgejo: repository › Settings › Deploy keys, **without**
+write access. A compromised server can then read the code, not change it.
 
 Once the repo is cloned (§3), install the log retention: § 5 › Logs.
 
-## 2. DNS
+### 1.1 Emergency access — when the Mac is gone
 
-Point both records at the VM's public IPv4 (and AAAA for IPv6 if enabled):
+The everyday key lives on Franck's Mac. Losing the Mac must not mean losing the
+server, so two independent ways in are set up **and tested** before go-live:
 
-| Type | Name  | Value          |
-| ---- | ----- | -------------- |
-| A    | `@`   | `<server IP>`  |
-| A    | `www` | `<server IP>`  |
+1. **A second SSH key in Bitwarden** (preferred). Create an *SSH key* item in
+   the vault (Ed25519), add its public key to `/home/deploy/.ssh/authorized_keys`
+   (and to any other sudoer's). From any machine with the Bitwarden desktop app,
+   enable its SSH agent and `ssh deploy@<server IP>`: the private key never sits
+   on that machine's disk. Optional third key: the YubiKey, as a resident FIDO2
+   key (`ssh-keygen -t ed25519-sk -O resident -O verify-required`), recoverable
+   on any computer with `ssh-keygen -K`.
+2. **The IONOS remote console** (Cloud Panel › the server › Actions › remote
+   console / KVM). It needs no SSH and no network on the VPS, but it asks for a
+   **local password**: that is why `deploy` has one (stored in Bitwarden). SSH
+   still refuses passwords; only the console accepts it. Last resort: IONOS's
+   recovery/rescue system boots the VPS from another image to fix a broken disk
+   or reset a password.
 
-Caddy serves the canonical `www.<DOMAIN>` and 301-redirects the apex. ACME
-HTTP/TLS challenges need these resolving **before** first boot, or cert issuance
-fails (Caddy retries, so it self-heals once DNS propagates).
+Around them:
+
+- **2FA on the IONOS, Cloudflare and Forgejo accounts**, recovery codes in
+  Bitwarden — the console is only as safe as the IONOS login.
+- **Off-server, off-Mac copies in Bitwarden**: the production `.env`, the age
+  identity and `BACKUP_OBJECTS_PASSWORD` (§ 6), the origin certificate's key
+  (§ 2 — it can also be revoked and re-issued). The client holds a second copy
+  of the backup keys.
+- **Test it once**: log in from another device with the Bitwarden key, and
+  through the IONOS console with the password. An access never tried is a hope.
+
+## 2. DNS and TLS — Cloudflare from the first boot
+
+The origin certificate is trusted by Cloudflare only, so the site is reached
+**through Cloudflare** from the start, never on the bare IP. The domain
+`scs-firearms.com` is registered at **OVH** (renewal due 2027-02-05: keep
+auto-renew on, account in the client's name); its current site is an empty
+shell, nothing to migrate.
+
+1. **Add the zone to Cloudflare** (free plan) with the client's account. Drop
+   the imported records that point at the old OVH hosting (`145.239.37.162`)
+   and create, all **proxied** (orange cloud):
+
+   | Type | Name    | Value         |
+   | ---- | ------- | ------------- |
+   | A    | `@`     | `<server IP>` |
+   | A    | `www`   | `<server IP>` |
+   | A    | `stats` | `<server IP>` |
+
+   (+ `AAAA` if the VPS has IPv6.) Keep the TXT records; the e-mail ones (SPF,
+   DKIM, DMARC for Brevo) are set up with Brevo — the domain has no MX today.
+2. **Switch the nameservers** at OVH (Domain › DNS servers) to the two
+   Cloudflare gives. Propagation: minutes to a few hours.
+3. **SSL/TLS** in Cloudflare: mode **Full (strict)**, *Always Use HTTPS* on,
+   minimum TLS 1.2.
+4. **Origin certificate**: SSL/TLS › Origin Server › *Create certificate*,
+   hostnames `scs-firearms.com` and `*.scs-firearms.com`, validity 15 years,
+   PEM. The key is shown **once**: save both blocks in Bitwarden right away.
+   They go onto the server after the clone (§ 3). `just check-caddyfile` (dev
+   machine) checks the Caddyfile serves them and never falls back to ACME.
+
+**Safety Case Solutions is not affected.** It lives on the same OVH hosting but
+under its own domain, registered and served by IONOS DNS (MX included): moving
+`scs-firearms.com` to Cloudflare does not touch it. Do **not** cancel the OVH
+hosting while that site is on it.
 
 ## 3. Deploy
 
 ```bash
 su - deploy
-git clone <gitea-repo-url> scsFirearm && cd scsFirearm
+git clone git@git.fvienot.link:antikkorps/scs-firearms.git scsFirearm && cd scsFirearm
 git checkout main
 
+# The origin certificate from § 2 (ignored by git and by the Docker build
+# context; Caddy mounts the folder read-only and refuses to start without it).
+mkdir -p certs && chmod 700 certs
+nano certs/origin.pem       # the certificate
+nano certs/origin-key.pem   # the private key
+chmod 600 certs/origin-key.pem
+
 cp .env.prod.example .env
-nano .env            # fill EVERY secret; set DOMAIN + ACME_EMAIL
+nano .env            # fill EVERY secret; set DOMAIN
                      # BACKUP_AGE_RECIPIENT: § 6 (the key pair is made off the server)
 
 # Least-privilege database roles (§ Database roles below), then the schema.
@@ -115,9 +211,10 @@ it. It is safe to re-run, and hands objects the superuser created earlier over
 to `scs_owner`. `just check-db-roles` (dev machine, Docker) checks the script
 against a throwaway Postgres with the real migrations.
 
-> Tip: while DNS/setup is in flux, uncomment `acme_ca …staging…` in the
-> `Caddyfile` to use Let's Encrypt **staging** and avoid hitting prod rate
-> limits. Switch back (and `docker compose … restart caddy`) once it's green.
+> Caddy refuses to start without `certs/origin.pem` and `certs/origin-key.pem`
+> (§ 2). A `526 Invalid SSL certificate` from Cloudflare means the origin did not
+> present a certificate Cloudflare trusts for that hostname: `certs/` missing or
+> holding something else, or a hostname the certificate does not cover.
 
 ## 4. Updates
 
@@ -147,8 +244,8 @@ docker compose -f docker-compose.prod.yml exec postgres psql -U armurier -d armu
 ```
 
 **Persistent state** lives in named volumes: `postgres_data` (the database) and
-`caddy_data` (TLS certs + ACME account — losing it re-issues certs and can hit
-rate limits). Snapshot the VM from the Hetzner console before risky changes;
+`caddy_data` (Caddy's own state; the TLS certificate is the file in `certs/`).
+Snapshot the VPS from the IONOS Cloud Panel before risky changes;
 uptime monitoring is **Story 8.5**.
 
 ### Logs (story 12.7a)
@@ -249,17 +346,22 @@ backup you've never restored is a hypothesis, not a backup. On a dev machine,
 `just check-backup` runs the whole cycle (dump, restore, objects, retention)
 against a throwaway Postgres and S3.
 
-## 7. Migration OVH → Hetzner + Cloudflare (go-live)
+## 7. Go-live (IONOS + Cloudflare)
 
-The current site is hosted at **OVH**; go-live moves it to a **Hetzner** VM
-(sections 1–6) with **Cloudflare** in front (CDN + WAF + DDoS). A few decisions
-are still open — see `docs/CLARIFICATIONS_A_TRANCHER.md` §J — but the target
-below is the recommended path.
+The old site on OVH is an empty shell: nothing to migrate, no rollback window
+to keep. Sections 1–6 bring the stack up behind Cloudflare; the *launch stage*
+(below) keeps the shop on its waiting page until it is opened from the
+back-office, so the DNS can move early.
 
-### Pre-flight checklist (before touching DNS)
+### Pre-flight checklist (before opening the shop)
 
-- [ ] VM provisioned + hardened (§1), Docker firewall = SSH/80/443 only.
-- [ ] `.env` filled: every secret, `DOMAIN`, `ACME_EMAIL`, `S3_*`, Stripe **live**
+- [ ] VPS prepared (§ 1): `sshd -T` shows no password login, IONOS firewall
+      policy = SSH/80/443 only, deploy key read-only.
+- [ ] **Emergency access tested** (§ 1.1): SSH from another device with the
+      Bitwarden key, and a login through the IONOS console.
+- [ ] Cloudflare in front (§ 2): nameservers switched, Full (strict), origin
+      certificate in `certs/` (§ 3); `curl -fsS https://www.<DOMAIN>/health` answers.
+- [ ] `.env` filled: every secret, `DOMAIN`, `S3_*`, Stripe **live**
       keys, SMTP creds, the real `VIREMENT_*` account. No placeholder left — the
       API refuses to start otherwise (story 12.9b): any secret still holding a
       `CHANGE-ME` / `replace-me` / `your-…` sample (Postgres, Umami and the admin
@@ -312,30 +414,18 @@ below is the recommended path.
       fetched from where it is kept (a backup you've never restored is a hypothesis).
 - [ ] age identity file and `BACKUP_OBJECTS_PASSWORD` stored off the server, with
       a second copy held by the client (§ 6 Keys).
-- [ ] Content parity check with the old OVH site (products, artworks, legal pages).
+- [ ] Legal notice and privacy policy name the real host (IONOS entity on the
+      contract, data-centre country): `packages/shared/src/legal-identity.ts`,
+      `confidentialite.vue`, `docs/REGISTRE_TRAITEMENTS_RGPD.md`.
 - [ ] `smtp` deliverability from the VM IP (or relay) confirmed — regulated-domain
       mail is easily flagged as spam.
 
-### DNS cutover (OVH → Cloudflare)
-
-1. **Lower the TTL** on the current OVH records to 300s a few days ahead, so the
-   switch propagates fast.
-2. Add the domain to **Cloudflare**, let it import existing records. **Verify MX +
-   SPF + DKIM + DMARC are carried over** — moving nameservers without them breaks
-   email (the API sends transactional mail via nodemailer). Where is the domain
-   registered? If at OVH, change the **nameservers** to Cloudflare's at the registrar.
-3. Point `A @`, `A www` (+ `AAAA` if IPv6) at the **Hetzner IP**, **proxied**
-   (orange cloud).
-4. Cut over during low traffic; watch `caddy` + `api` logs. Keep the OVH box up
-   read-only for a rollback window, then decommission.
-
 ### Cloudflare configuration
 
-- **TLS mode = Full (strict).** Origin needs a real cert. Recommended:
-  a **Cloudflare Origin Certificate** on Caddy (15-year, CF-trusted) instead of
-  Let's Encrypt — simpler than ACME behind a proxy. This swaps Caddy's automatic
-  HTTPS for an explicit `tls <cert> <key>` (Caddyfile change). *Decision: Origin
-  Cert vs keep LE via DNS-01 challenge — see §J.*
+- **TLS mode = Full (strict)** with a **Cloudflare Origin Certificate** on
+  Caddy (decision 2026-11-14, § 2): no ACME behind the proxy, no DNS API token
+  on the server. Certificate automation is off in the `Caddyfile`
+  (`auto_https disable_certs`); `just check-caddyfile` guards it.
 - **Real client IP — done in story 9.6, keep it that way.** Behind the proxy,
   Caddy/Fastify would otherwise see Cloudflare IPs — which would poison the
   **rate-limiter**, **audit logs** and **newsletter consent proofs**:
@@ -352,12 +442,14 @@ below is the recommended path.
     crawler exhausts it and the catalogue starts answering errors.
   - ⚠️ Nuxt trusts `X-Forwarded-For` unconditionally. That is sound only because
     `web` publishes no port — Caddy is its sole client. Never publish it.
-- **Lock the origin to Cloudflare.** Set the Hetzner Cloud Firewall to accept
-  80/443 **only from Cloudflare IP ranges** (`https://www.cloudflare.com/ips`),
-  so no one can bypass the WAF by hitting the IP directly.
+- **Lock the origin to Cloudflare.** In the IONOS firewall policy, accept
+  80/443 **only from the Cloudflare IP ranges** (`https://www.cloudflare.com/ips`),
+  so no one can bypass the WAF by hitting the IP directly. Not with ufw: Docker's
+  published ports bypass it (§ 1). If the policy cannot hold the ~22 ranges,
+  the alternative is Cloudflare *Authenticated Origin Pulls* (Caddy then demands
+  Cloudflare's client certificate) — a Caddyfile change, not done yet.
 - Optional: WAF managed rules, a rate-limit rule on `/api/auth/*`, cache rules for
-  static assets. *Decision: move object storage to Cloudflare **R2** (S3-compatible,
-  no egress) or keep the current S3 provider — see §J.*
+  static assets. Object storage stays on Scaleway (decision 2026-09-06).
 
 ### Security hardening at go-live (currently deferred — see BACKLOG Phase 8.6)
 

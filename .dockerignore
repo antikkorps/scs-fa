@@ -20,3 +20,5 @@
 !**/.env.example
 # Supplier catalogues collected locally (story 12.2) — business data, never shipped.
 tools/catalog-collect/work
+# Cloudflare Origin Certificate and its private key (Caddy mounts them at runtime).
+certs

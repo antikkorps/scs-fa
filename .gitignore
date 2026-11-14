@@ -10,6 +10,8 @@ dist/
 .env
 .env.local
 .env.*.local
+# Cloudflare Origin Certificate + private key, mounted into Caddy in production.
+/certs/
 .DS_Store
 coverage/
 .turbo/
