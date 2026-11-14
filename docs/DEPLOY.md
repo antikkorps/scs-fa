@@ -354,6 +354,38 @@ the backups along with the data. The encryption keeps them unreadable, not safe
 from deletion. Moving them later is one variable (`BACKUP_S3_BUCKET`) plus a
 second bucket and key without delete rights, with a lifecycle rule for expiry.
 
+### Object storage — Scaleway bucket and key
+
+- **Bucket** `scs-firearms-prod`, region `fr-par`, **private**. No SSE-C (the
+  API does not send a key with each request: every read and write would fail),
+  no versioning and no Object Lock: both keep deleted objects, which breaks the
+  privacy register's promise that an erased file survives 30 days, in the
+  backups only (Object Lock cannot even be turned off later). Protecting the
+  backups against deletion belongs to a separate backup bucket (§ 6 above).
+- **Key**: an IAM *application* `scs-prod-api` (not a personal key), policy
+  *ObjectStorageFullAccess* on the bucket's project; generated with "used for
+  Object Storage" = yes and that project as preferred one, or the API answers
+  `NoSuchBucket`. `.env`: `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`
+  (endpoint and region are already right; the API builds the bucket URL).
+- ⚠️ **The key expires after one year at most** (Scaleway allows no "never").
+  An expired key breaks uploads loudly (5xx, admin alert e-mails) but stops the
+  **backups silently** — hence the monitoring in the go-live checklist (§ 7).
+  A month before the date kept in Bitwarden: generate a new key, put it in
+  `.env`, `docker compose -f docker-compose.prod.yml up -d api backup`, check
+  with the test below, then delete the old key in Scaleway.
+- Check a key — write, read, delete — without printing it (as `deploy`):
+
+  ```bash
+  cd /srv/scs-firearm
+  s3() { docker run --rm -i \
+    -e AWS_ACCESS_KEY_ID="$(grep '^S3_ACCESS_KEY=' .env | cut -d= -f2-)" \
+    -e AWS_SECRET_ACCESS_KEY="$(grep '^S3_SECRET_KEY=' .env | cut -d= -f2-)" \
+    amazon/aws-cli --endpoint-url https://s3.fr-par.scw.cloud --region fr-par "$@"; }
+  echo test | s3 s3 cp - s3://scs-firearms-prod/_check/test.txt \
+    && s3 s3 cp s3://scs-firearms-prod/_check/test.txt - \
+    && s3 s3 rm s3://scs-firearms-prod/_check/test.txt && echo "S3 OK"
+  ```
+
 ### Keys — made once, kept off the server
 
 ```bash
@@ -460,6 +492,10 @@ back-office, so the DNS can move early.
 - [ ] **Henrri production** API key in `.env` (`HENRRI_BASE_URL=https://api.henrri.io`,
       `HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`) → `pnpm henrri:check` green. See the
       Henrri section below.
+- [ ] **Backup monitoring live** (story 8.5, healthchecks.io): the backup job
+      pings a dead man's switch each night and a missed ping e-mails the admins.
+      A prerequisite, not an option: the Scaleway key expires every year (§ 6)
+      and an expired key stops the backups without any visible error.
 - [ ] Backups verified: `just backup` produces an encrypted dump and the object
       copy, **and** a `just restore` round-trip works with the identity file
       fetched from where it is kept (a backup you've never restored is a hypothesis).
