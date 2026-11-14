@@ -6,7 +6,7 @@
 # docs/DEPLOY.md (§3–§7), so go-live steps are runnable instead of copy-pasted.
 #
 # Run `just` (no args) to list recipes. Meant to run from the repo root on the
-# Hetzner host, where `.env` holds the production secrets.
+# IONOS host, where `.env` holds the production secrets.
 
 set dotenv-load := true
 
@@ -27,6 +27,10 @@ db-roles:
 # Check infra/postgres/roles.sql against a throwaway Postgres (needs Docker; dev machine)
 check-db-roles:
     ./infra/postgres/check-roles.sh
+
+# Check the Caddyfile (origin certificate, no ACME) with the real Caddy image (needs Docker; dev machine)
+check-caddyfile:
+    ./infra/caddy/check-caddyfile.sh
 
 # Apply the DB schema (profile-gated migrate service)
 migrate:
