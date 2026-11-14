@@ -97,7 +97,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["pnpm", "--filter", "@armurier/api", "exec", "drizzle-kit", "migrate"]
+    # The binary directly, not `pnpm --filter … exec`: pnpm 11 first re-checks
+    # the install, finds the workspace touched by the Dockerfile's
+    # `pnpm deploy --prod`, reinstalls it and then misses drizzle-kit (a dev
+    # dependency). `just check-migrate` runs this path end to end.
+    working_dir: /repo/apps/api
+    command: ["node_modules/.bin/drizzle-kit", "migrate"]
     networks: [internal]
 
   api:
