@@ -24,7 +24,7 @@
 
 | Prestataire | Rôle | Données concernées | Localisation |
 |---|---|---|---|
-| Hetzner | Hébergement du site et de la base de données | Toutes les données du site | Allemagne (UE) |
+| IONOS SE | Hébergement du site et de la base de données | Toutes les données du site | Allemagne (UE) |
 | Cloudflare | Acheminement et protection du site (DNS, anti-attaques) | Adresse IP, requêtes ; cookie technique `__cf_bm` (30 minutes) quand la protection anti-robots est active | Mondial — transferts encadrés [À vérifier : clauses contractuelles types] |
 | Scaleway | Stockage des fichiers (pièces justificatives chiffrées, images) et des sauvegardes | Pièces justificatives, sauvegardes de la base | France (UE) |
 | Stripe | Paiement par carte bancaire | Données de carte (saisies chez Stripe), montant, e-mail | UE et États-Unis — transferts encadrés [À vérifier] |
@@ -45,7 +45,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Base légale | Exécution du contrat (clients) ; intérêt légitime (personnel) |
 | Personnes concernées | Clients, administrateurs |
 | Données | Nom, prénom, e-mail, téléphone, mot de passe haché (Argon2id, jamais en clair), adresses, rôle, date et version du consentement à la politique de confidentialité |
-| Destinataires | Personnel habilité de SCS Firearms ; Hetzner |
+| Destinataires | Personnel habilité de SCS Firearms ; IONOS |
 | Durée | Client : tant qu'il utilise son compte ; sans connexion ni commande pendant 3 ans, avertissement par e-mail puis anonymisation 30 jours plus tard (tâche quotidienne). Suppression immédiate à sa demande, depuis son compte (sauf commande ou devis en cours) : le compte est anonymisé, ses commandes restent (10 ans). Personnel et comptes d'organisation : fermés par SCS |
 
 ### 2. Commandes, livraison et facturation
@@ -167,7 +167,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Base légale | Mesures précontractuelles prises à la demande de la personne ; intérêt légitime (vérifier qu'un compte pro correspond à un établissement réel) |
 | Personnes concernées | Représentants des organisations professionnelles |
 | Données | Nom, prénom, e-mail du représentant ; raison sociale, SIRET, type d'organisation, réponse du registre des entreprises au moment de la demande ; décision de SCS et son motif ; conditions commerciales ; articles et quantités demandés, message libre |
-| Destinataires | Personnel habilité de SCS Firearms ; Hetzner ; Brevo (e-mails de suivi). Le SIRET est vérifié auprès de l'API publique Recherche d'entreprises de l'État, qui ne reçoit que ce numéro |
+| Destinataires | Personnel habilité de SCS Firearms ; IONOS ; Brevo (e-mails de suivi). Le SIRET est vérifié auprès de l'API publique Recherche d'entreprises de l'État, qui ne reçoit que ce numéro |
 | Durée | Demande de devis jamais convertie en commande : 3 ans après sa dernière activité (purge quotidienne). Demande convertie : conservée avec la commande (10 ans). Organisation : tant que le compte existe |
 
 ### 13. Formulaire de contact
@@ -178,7 +178,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Base légale | Intérêt légitime : répondre à la demande de la personne |
 | Personnes concernées | Toute personne qui écrit depuis la page Contact |
 | Données | Nom, e-mail, téléphone (facultatif), sujet, référence de commande (facultative), message ; date de réception, statut « à traiter / traité » et administrateur qui l'a traité. Aucune adresse IP n'est conservée avec le message |
-| Destinataires | Personnel habilité de SCS Firearms (écran « Messages » du back-office) ; Hetzner ; Brevo (e-mail d'alerte à l'adresse de contact de la boutique) |
+| Destinataires | Personnel habilité de SCS Firearms (écran « Messages » du back-office) ; IONOS ; Brevo (e-mail d'alerte à l'adresse de contact de la boutique) |
 | Durée | 1 an après le traitement du message, ou 1 an après sa réception s'il n'a pas été traité (purge quotidienne). Supprimés aussi à la suppression du compte de la même adresse, et inclus dans l'export de ses données |
 | Mesures particulières | Anti-spam sans prestataire tiers (champ piège, durée minimale de saisie, limites d'envoi par réseau et par adresse) |
 

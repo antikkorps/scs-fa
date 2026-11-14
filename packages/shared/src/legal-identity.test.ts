@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { EMPTY_SHOP_IDENTITY, missingLegalFacts, shopIdentitySchema } from "./legal-identity.js"
+import { EMPTY_SHOP_IDENTITY, missingLegalFacts, SITE_HOST, shopIdentitySchema } from "./legal-identity.js"
 
 const complete = {
   companyName: "SCS Firearms",
@@ -50,5 +50,18 @@ describe("the shop's identity (audit 2026-11-01, I8)", () => {
     const { contactHours: _dropped, ...partial } = complete
     expect(shopIdentitySchema.safeParse(partial).success).toBe(false)
     expect(shopIdentitySchema.safeParse({ ...complete, isAdmin: true }).success).toBe(false)
+  })
+})
+
+describe("the site's host (LCEN art. 6)", () => {
+  // The production VPS is at IONOS, in Germany (decision 2026-11-14); the
+  // details are the ones of IONOS SE's own imprint (ionos.de/impressum).
+  it("names IONOS SE with its registered address and phone", () => {
+    expect(SITE_HOST).toEqual({
+      name: "IONOS SE",
+      address: "Elgendorfer Str. 57, 56410 Montabaur, Allemagne",
+      phone: "+49 721 170 5522",
+      url: "https://www.ionos.de",
+    })
   })
 })

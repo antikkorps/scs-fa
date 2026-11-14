@@ -15,7 +15,7 @@ const REVIEWED = EDITORIAL_PAGES.confidentialite.reviewed
 // of the index until it is validated AND every fact is supplied.
 const identity = await loadShopIdentity()
 const PUBLISHABLE = isEditorialPagePublishable("confidentialite", identity.value)
-const UPDATED_ON = "4 novembre 2026"
+const UPDATED_ON = "14 novembre 2026"
 
 usePageSeo({
   title: "Politique de confidentialité",
@@ -192,7 +192,7 @@ usePageSeo({
       prestataires suivants, qui n'agissent que sur nos instructions :
     </p>
     <ul>
-      <li><strong>Hetzner</strong> — hébergement du site et de la base de données (Allemagne) ;</li>
+      <li><strong>IONOS</strong> — hébergement du site et de la base de données (Allemagne) ;</li>
       <li>
         <strong>Cloudflare</strong> — acheminement et protection du site contre les attaques ; voit passer votre
         adresse IP ;
