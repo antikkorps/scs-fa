@@ -129,8 +129,8 @@ export const shopIdentitySchema = z
  * (docs/DEPLOY.md), not something the client supplies.
  */
 export const SITE_HOST = {
-  name: "Hetzner Online GmbH",
-  address: "Industriestr. 25, 91710 Gunzenhausen, Allemagne",
-  phone: "+49 9831 505-0",
-  url: "https://www.hetzner.com",
+  name: "IONOS SE",
+  address: "Elgendorfer Str. 57, 56410 Montabaur, Allemagne",
+  phone: "+49 721 170 5522",
+  url: "https://www.ionos.de",
 } as const
