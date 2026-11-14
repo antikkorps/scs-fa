@@ -165,13 +165,24 @@ shell, nothing to migrate.
    | A    | `www`   | `<server IP>` |
    | A    | `stats` | `<server IP>` |
 
-   (+ `AAAA` if the VPS has IPv6.) Keep the TXT records; the e-mail ones (SPF,
-   DKIM, DMARC for Brevo) are set up with Brevo — the domain has no MX today.
-2. **Switch the nameservers** at OVH (Domain › DNS servers) to the two
+   (+ `AAAA` if the VPS has IPv6.) **The client's mailboxes are at OVH (MX
+   Plan)**: keep, unproxied (grey cloud), the three `MX` (`mx1`/`mx2`/`mx3.mail.ovh.net`,
+   priorities 1/5/100), the `autodiscover` and `autoconfig` CNAMEs to
+   `mailconfig.ovh.net`, and the SPF TXT (`include:mx.ovh.com`), which Brevo's
+   `include:` joins later in the same record. Compare with the OVH zone (DNS
+   zone › text mode) before switching: a missing MX loses incoming mail.
+   Query the domain's real servers (`dig MX <domain> @dns200.anycast.me`), not a
+   resolver or an old OVH server, which may answer an empty zone.
+2. **DNSSEC: turn it off at OVH first** (Domain › DNSSEC), then wait out the
+   `DS` record's 24 h TTL before step 3. Switching the nameservers while the
+   registry still publishes OVH's `DS` makes validating resolvers reject the
+   whole domain, mail included. Re-enable it at Cloudflare after the switch
+   (DNS › Settings › DNSSEC) and give OVH the new `DS`.
+3. **Switch the nameservers** at OVH (Domain › DNS servers) to the two
    Cloudflare gives. Propagation: minutes to a few hours.
-3. **SSL/TLS** in Cloudflare: mode **Full (strict)**, *Always Use HTTPS* on,
+4. **SSL/TLS** in Cloudflare: mode **Full (strict)**, *Always Use HTTPS* on,
    minimum TLS 1.2.
-4. **Origin certificate**: SSL/TLS › Origin Server › *Create certificate*,
+5. **Origin certificate**: SSL/TLS › Origin Server › *Create certificate*,
    hostnames `scs-firearms.com` and `*.scs-firearms.com`, validity 15 years,
    PEM. The key is shown **once**: save both blocks in Bitwarden right away.
    They go onto the server after the clone (§ 3). `just check-caddyfile` (dev
