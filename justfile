@@ -32,6 +32,10 @@ check-db-roles:
 check-caddyfile:
     ./infra/caddy/check-caddyfile.sh
 
+# Run db-roles + migrate as production does, against a throwaway database (needs Docker; dev machine)
+check-migrate:
+    ./infra/postgres/check-migrate.sh
+
 # Apply the DB schema (profile-gated migrate service)
 migrate:
     {{ compose }} --profile migrate run --rm migrate
