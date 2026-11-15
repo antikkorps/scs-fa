@@ -17,11 +17,15 @@ import { env } from "./env.js"
 const SITE_HOST = new URL(env.WEB_BASE_URL).hostname.replace(/^www\./, "")
 const SITE_HOSTS = new Set([SITE_HOST, `www.${SITE_HOST}`])
 
-/** A web page on another site (protocol-relative included); not a path, a mailto, nor a scheme the filter drops. */
+/**
+ * A web page on another site; not one of the site's own, a mailto, nor a
+ * scheme the filter drops. Resolved against the site the way a browser does
+ * (WHATWG URL): "/\\evil.example" or a path hiding a tab lands on another host,
+ * so no shortcut on a leading slash.
+ */
 function isExternalWebLink(href: string): boolean {
-  if (href.startsWith("/") && !href.startsWith("//")) return false
   try {
-    const url = new URL(href, "https://relative.invalid")
+    const url = new URL(href, env.WEB_BASE_URL)
     return (url.protocol === "https:" || url.protocol === "http:") && !SITE_HOSTS.has(url.hostname)
   } catch {
     return false

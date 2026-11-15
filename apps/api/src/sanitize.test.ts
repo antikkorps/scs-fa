@@ -34,6 +34,15 @@ describe("sanitizeRichTextHtml", () => {
       )
     })
 
+    it("reads a path the way a browser does: a backslash or a tab can hide another host", () => {
+      // Browsers turn "\\" into "/" and drop tabs: these go to evil.example.
+      for (const href of ["/\\evil.example/x", "/&#9;/evil.example/x"]) {
+        expect(sanitizeRichTextHtml(`<a href="${href}" target="_blank">x</a>`), href).toContain(
+          'rel="noopener noreferrer nofollow"',
+        )
+      }
+    })
+
     it("still drops a javascript: link target", () => {
       expect(sanitizeRichTextHtml('<a href="javascript:alert(1)">x</a>')).toBe("<a>x</a>")
     })
