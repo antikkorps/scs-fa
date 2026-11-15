@@ -16,7 +16,7 @@ if (!tag.value) {
 const name = computed(() => tag.value?.name ?? "")
 
 usePageSeo({
-  title: () => `${name.value} — Boutique armurerie`,
+  title: () => pagedTitle(`${name.value} — Boutique armurerie`, pageFromQuery(route.query.page)),
   socialTitle: () => `${name.value} — SCS Firearms`,
   description: () => tagMetaDescription(name.value, tag.value?.description),
   path: () => tagPath(slug.value),

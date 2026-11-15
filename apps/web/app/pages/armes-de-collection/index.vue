@@ -25,10 +25,7 @@ const selectedTags = computed(() =>
     .filter(Boolean),
 )
 const showSold = computed(() => q("vendues") === "1")
-const page = computed(() => {
-  const n = Number.parseInt(q("page"), 10)
-  return Number.isFinite(n) && n > 0 ? n : 1
-})
+const page = computed(() => pageFromQuery(route.query.page))
 
 const { facets } = useTags()
 // Only the period facet makes sense here — every piece in this universe is
@@ -61,7 +58,8 @@ const cards = computed(() =>
 const pagination = computed(() => data.value?.pagination)
 const isEmpty = computed(() => !pending.value && !error.value && weapons.value.length === 0)
 
-function navigate(overrides: Record<string, string | undefined>, resetPage = true) {
+/** The current filters + overrides, empties dropped. */
+function collectionQuery(overrides: Record<string, string | undefined>, resetPage = true): Record<string, string> {
   const next: Record<string, string> = {}
   const base = {
     tags: selectedTags.value.join(","),
@@ -72,11 +70,21 @@ function navigate(overrides: Record<string, string | undefined>, resetPage = tru
   for (const [k, v] of Object.entries(base)) {
     if (v) next[k] = v
   }
-  router.push({ query: next })
+  return next
 }
 
-function goToPage(n: number) {
-  navigate({ page: String(n) }, false)
+function navigate(overrides: Record<string, string | undefined>, resetPage = true) {
+  router.push({ query: collectionQuery(overrides, resetPage) })
+}
+
+/** Page N of these results, as a real link (SEO audit 2026-11-15, finding 1). */
+function pageLink(n: number) {
+  return { query: collectionQuery({ page: n > 1 ? String(n) : undefined }, false) }
+}
+
+// A page past the last one is a 404, not an empty listing (finding 13).
+if (pagination.value && page.value > Math.max(pagination.value.totalPages, 1)) {
+  throw createError({ statusCode: 404, statusMessage: "Page introuvable", fatal: true })
 }
 
 function toggleTag(slug: string) {
@@ -91,7 +99,7 @@ const description =
   "Armes anciennes et historiques, pièces uniques expertisées : provenance documentée, état détaillé, vente encadrée par la réglementation française."
 
 usePageSeo({
-  title: "Armes de collection & historiques",
+  title: () => pagedTitle("Armes de collection & historiques", pageFromQuery(route.query.page)),
   description,
   path: "/armes-de-collection",
   // Later pages of results canonicalise to themselves, below.
@@ -199,13 +207,12 @@ useHead({
           </li>
         </ul>
 
-        <nav v-if="pagination && pagination.totalPages > 1" class="pager" aria-label="Pagination">
-          <button type="button" class="pager__btn" :disabled="page <= 1" @click="goToPage(page - 1)">Précédent</button>
-          <span class="pager__info">Page {{ page }} / {{ pagination.totalPages }}</span>
-          <button type="button" class="pager__btn" :disabled="!pagination.hasMore" @click="goToPage(page + 1)">
-            Suivant
-          </button>
-        </nav>
+        <CatalogPager
+          v-if="pagination && pagination.totalPages > 1"
+          :page="page"
+          :total-pages="pagination.totalPages"
+          :link-for="pageLink"
+        />
       </template>
 
       <!-- Story 11.4: collection pieces are one-offs — the visitor who arrives
@@ -383,27 +390,5 @@ useHead({
 .collection__news {
   margin: 2rem 0 4rem;
   max-width: 44rem;
-}
-.pager {
-  align-items: center;
-  display: flex;
-  gap: 1.25rem;
-  justify-content: center;
-  padding: 2rem 0 4rem;
-}
-.pager__btn {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: inherit;
-  cursor: pointer;
-  padding: 0.6rem 1.1rem;
-}
-.pager__btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-.pager__info {
-  color: var(--paper-dim);
-  font-size: var(--fs-sm);
 }
 </style>
