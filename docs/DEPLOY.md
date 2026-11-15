@@ -211,9 +211,13 @@ cp .env.prod.example .env
 nano .env            # fill EVERY secret; set DOMAIN
                      # BACKUP_AGE_RECIPIENT: § 6 (the key pair is made off the server)
 
+# No sample value left in .env (story 12.9b) — names what to fix, then exits.
+docker compose -f docker-compose.prod.yml --profile env-check run --rm --build env-check
+
 # Least-privilege database roles (§ Database roles below), then the schema.
+# --build: the migrate image must carry the migrations of the current checkout.
 docker compose -f docker-compose.prod.yml --profile db-roles run --rm db-roles
-docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
+docker compose -f docker-compose.prod.yml --profile migrate run --rm --build migrate
 
 # Build + start the stack.
 docker compose -f docker-compose.prod.yml up -d --build
@@ -273,12 +277,13 @@ applied — the CI applies them on the host, so this is the deploy path's check.
 ## 4. Updates
 
 ```bash
-cd /srv/scs-firearm && git pull
-# If schema.ts changed:
-docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
-docker compose -f docker-compose.prod.yml up -d --build
-docker image prune -f
+cd /srv/scs-firearm && just update
 ```
+
+`just update` pulls, runs `env-check`, applies the new migrations and rebuilds.
+The migrate image is rebuilt every time (`--build`): without it, compose reuses
+the image of the first deploy, whose `drizzle/` folder predates every later
+migration — the new API would then start on the old schema.
 
 CI (Forgejo Actions) already runs lint + typecheck + tests on every PR/push to
 `main`, so only green commits should reach the server.
@@ -450,12 +455,14 @@ back-office, so the DNS can move early.
 - [ ] `.env` filled: every secret, `DOMAIN`, `S3_*`, Stripe **live**
       keys, SMTP creds, the real `VIREMENT_*` account (optional to boot, but
       without it every order with a regulated firearm is refused — the API logs
-      a warning at startup; set it, then `just up` recreates the API). No placeholder left — the
-      API refuses to start otherwise (story 12.9b): any secret still holding a
-      `CHANGE-ME` / `replace-me` / `your-…` sample (Postgres, Umami and the admin
-      seed included), the sample IBAN, the same value for both JWT secrets, or
+      a warning at startup; set it, then `just up` recreates the API). No
+      placeholder left (story 12.9b): `just deploy` / `just update` first run
+      `env-check` on the whole `.env` and stop on any secret still holding a
+      `CHANGE-ME` / `replace-me` / `your-…` sample (Postgres, Umami and backups
+      included), the sample IBAN, the same value for both JWT secrets, or
       `TOTP_ENCRYPTION_KEY` (story 12.8e, `openssl rand -base64 48`) equal to the
-      JWT secret. `just logs api` then names the variables to fix, never their values.
+      JWT secret; the API repeats the check on its own variables at startup.
+      Both name the variables to fix, never their values.
 - [ ] **Each admin has their own account, invited** (`just admin-invite`, never a
       shared or provisional password) and **used the link themselves**: a link
       that answers « invalide » to its owner was used by someone else — invite
@@ -667,9 +674,14 @@ docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/med
 ## Notes / gotchas
 
 - `.env` is the single source of truth: docker-compose reads it for `${VAR}`
-  interpolation (postgres/web/caddy) **and** injects it into the API via
-  `env_file`. `DATABASE_URL` is set by compose to the in-network `postgres`
-  host, so it is deliberately absent from `.env.prod.example`.
+  interpolation, and each service receives **only the variables it lists**.
+  The API gets an allowlist (`environment:` keys without a value, read from
+  `.env` by name), never the Postgres superuser, schema-owner, backup or Umami
+  secrets (audit 2026-11-15). A new API variable must be added to that list —
+  `deploy-files.test.ts` fails until it is. Compose fills those keys from the
+  shell FIRST, then `.env`: never `export` a production variable in the deploy
+  user's shell, or it silently beats `.env`. `DATABASE_URL` is set by compose to
+  the in-network `postgres` host, so it is deliberately absent from `.env.prod.example`.
 - The `migrate` service builds the API **build stage** (which has the full
   workspace incl. `drizzle-kit`); the runtime API image ships prod deps only.
 - Postgres is **not** published to the host — reach it via

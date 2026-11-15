@@ -201,4 +201,7 @@ if (parsed.NODE_ENV === "production") {
 }
 
 export const env = parsed
+// The production compose passes the API exactly these variables, by name, rather
+// than the whole shared .env (deploy-files.test.ts keeps the two in step).
+export const API_ENV_KEYS = Object.keys(envSchema.shape)
 export type Env = z.infer<typeof envSchema>

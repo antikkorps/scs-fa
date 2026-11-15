@@ -3,9 +3,10 @@
 // pass the schema (a "CHANGE-ME…" JWT secret is long enough), yet anyone who has
 // read the repository could forge an admin token with one.
 //
-// Pure on purpose: env.ts calls it on the parsed environment at startup, and
-// the whole production `.env` reaches the API container (Postgres, Umami and the
-// admin seed included), so one check covers every secret of the deployment.
+// Pure on purpose, with two callers: env.ts checks the API's own variables at
+// startup, and env-check-cli.ts checks the WHOLE production `.env` (Postgres,
+// backups and Umami included, which the API no longer receives) before
+// `just deploy` / `just update` start anything.
 
 // The placeholders the examples use: CHANGE-ME, change-me, ChangeMe, replace-me, your-…
 const SAMPLE_PLACEHOLDER = /change-?me|replace-?me|your-/i
