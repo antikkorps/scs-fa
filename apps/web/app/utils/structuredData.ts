@@ -6,6 +6,7 @@
 // an object holding a `data:` placeholder, which no crawler can use — and the
 // blog passed a relative path where schema.org wants an absolute URL.
 
+import { normaliseEan } from "@armurier/shared"
 import type { AvailabilityState } from "./availability"
 import { availabilitySchemaUrl } from "./availability"
 
@@ -45,11 +46,14 @@ export interface ProductLdInput {
 type GtinProperty = "gtin8" | "gtin12" | "gtin13" | "gtin14"
 const GTIN_PROPERTY: Record<number, GtinProperty> = { 8: "gtin8", 12: "gtin12", 13: "gtin13", 14: "gtin14" }
 
-/** `{ gtin13: "…" }` for a barcode of a known length, nothing for anything else. */
+/**
+ * `{ gtin13: "…" }` for a valid barcode, nothing otherwise. Supplier imports
+ * store the EAN unchecked: a wrong check digit is an invalid GTIN for Google.
+ */
 function gtinProperty(gtin: string | null): Partial<Record<GtinProperty, string>> {
-  const code = gtin?.trim() ?? ""
-  const property = /^\d+$/.test(code) ? GTIN_PROPERTY[code.length] : undefined
-  return property ? { [property]: code } : {}
+  const code = gtin ? normaliseEan(gtin) : null
+  const property = code ? GTIN_PROPERTY[code.length] : undefined
+  return code && property ? { [property]: code } : {}
 }
 
 /**

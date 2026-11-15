@@ -48,9 +48,9 @@ describe("productJsonLd", () => {
 
   // Finding 5: Google expects a brand and an identifier on a product snippet.
   it("names the brand and the barcode when the product has them", () => {
-    const ld = productJsonLd({ ...product, brand: "Glock", gtin: "9120039381234" })
+    const ld = productJsonLd({ ...product, brand: "Glock", gtin: "9120039381237" })
     expect(ld.brand).toEqual({ "@type": "Brand", name: "Glock" })
-    expect(ld.gtin13).toBe("9120039381234")
+    expect(ld.gtin13).toBe("9120039381237")
   })
 
   it("files each barcode length under its own property, and drops one that is not a barcode", () => {
@@ -58,6 +58,12 @@ describe("productJsonLd", () => {
     expect(productJsonLd({ ...product, gtin: "012345678905" }).gtin12).toBe("012345678905")
     const invalid = productJsonLd({ ...product, gtin: "ABC-123" })
     expect(Object.keys(invalid).some((key) => key.startsWith("gtin"))).toBe(false)
+  })
+
+  it("drops a mistyped barcode (wrong check digit) rather than hand Google an invalid GTIN", () => {
+    const mistyped = productJsonLd({ ...product, gtin: "9120039381234" })
+    expect(Object.keys(mistyped).some((key) => key.startsWith("gtin"))).toBe(false)
+    expect(productJsonLd({ ...product, gtin: "4 006381 333931" }).gtin13).toBe("4006381333931")
   })
 
   // Finding 8: the main visual first, the share card as an alternative.

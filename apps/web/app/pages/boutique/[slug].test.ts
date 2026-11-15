@@ -20,7 +20,7 @@ const { product, addVariantMock, navigateToMock, auth, launch } = vi.hoisted(() 
     stockQty: 4,
     featuredImageUrl: null,
     brand: "CZ",
-    ean: "8594003181234",
+    ean: "8594003181238",
     category: { slug: "carabines", name: "Carabines" },
     tags: [],
     legalCategory: {
@@ -159,7 +159,7 @@ describe("boutique/[slug].vue — structured data (SEO audit 2026-11-15)", () =>
     await mounted()
     const ld = await productLd()
     expect(ld.brand).toEqual({ "@type": "Brand", name: "CZ" })
-    expect(ld.gtin13).toBe("8594003181234")
+    expect(ld.gtin13).toBe("8594003181238")
     expect(ld.offers).toMatchObject({ availability: "https://schema.org/InStock" })
   })
 
