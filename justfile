@@ -16,8 +16,9 @@ compose := "docker compose -f docker-compose.prod.yml"
 default:
     @just --list
 
-# Build images and (re)start the whole stack
+# Check the whole .env for sample values, then build images and (re)start the whole stack
 deploy:
+    {{ compose }} --profile env-check run --rm --build env-check
     {{ compose }} up -d --build
 
 # Create or update the least-privilege database roles (story 12.9f); safe to re-run
@@ -38,7 +39,7 @@ check-migrate:
 
 # Apply the DB schema (profile-gated migrate service)
 migrate:
-    {{ compose }} --profile migrate run --rm migrate
+    {{ compose }} --profile migrate run --rm --build migrate
 
 # Seed reference data (idempotent, safe to re-run). No demo content, and no admin in production: invite them.
 seed:
@@ -53,15 +54,17 @@ admin-invite email firstname +lastname:
 seed-demo:
     {{ compose }} exec api node_modules/.bin/tsx src/db/seed-cli.ts --demo
 
-# Update flow: pull, migrate, rebuild, prune dangling images
+# Update flow: pull, check .env, migrate (rebuilt: new migrations ship), rebuild, prune dangling images
 update:
     git pull
-    {{ compose }} --profile migrate run --rm migrate
+    {{ compose }} --profile env-check run --rm --build env-check
+    {{ compose }} --profile migrate run --rm --build migrate
     {{ compose }} up -d --build
     docker image prune -f
 
-# Start the stack (no rebuild)
+# Check the whole .env, then start the stack (no rebuild)
 up:
+    {{ compose }} --profile env-check run --rm env-check
     {{ compose }} up -d
 
 # Stop the stack (keeps named volumes)

@@ -6,12 +6,12 @@
 # Setup:  cp .env.prod.example .env  &&  edit .env  (secrets + DOMAIN)
 # TLS:    Cloudflare Origin Certificate in ./certs (docs/DEPLOY.md § 2)
 # Roles:  docker compose -f docker-compose.prod.yml --profile db-roles run --rm db-roles
-# Schema: docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
+# Schema: docker compose -f docker-compose.prod.yml --profile migrate run --rm --build migrate
 # Up:     docker compose -f docker-compose.prod.yml up -d --build
 # Seed:   docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/db/seed-cli.ts
 #
-# Compose interpolation (${VAR}) reads the project-dir `.env`; the API also loads
-# that same file via env_file, so there is a single source of truth for secrets.
+# Compose interpolation (${VAR}) reads the project-dir `.env`, the single source
+# of truth for secrets; each service receives only the variables it lists.
 
 name: scs-firearm
 
@@ -105,6 +105,21 @@ services:
     command: ["node_modules/.bin/drizzle-kit", "migrate"]
     networks: [internal]
 
+  # One-off check of the WHOLE .env (story 12.9b): the API only receives its own
+  # variables, so the Postgres, backup and Umami secrets are checked here for the
+  # committed examples' sample values. Same image as the API, no network at all,
+  # gated behind a profile; `just deploy` / `just update` run it first.
+  env-check:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: scs-api:latest
+    profiles: ["env-check"]
+    env_file: [.env]
+    network_mode: none
+    security_opt: ["no-new-privileges:true"]
+    command: ["node_modules/.bin/tsx", "src/env-check-cli.ts"]
+
   api:
     logging: *logging
     build:
@@ -112,10 +127,13 @@ services:
       dockerfile: apps/api/Dockerfile
     image: scs-api:latest
     restart: unless-stopped
-    # All API secrets (JWT, S3, SMTP, Stripe, RIB, admin seed…) come from .env.
-    env_file: [.env]
-    # These override .env to wire the API to the in-network services + prod mode.
+    # An allowlist, not `env_file: [.env]`: the shared .env also holds the
+    # Postgres superuser, schema-owner and backup secrets, which a code execution
+    # in the API must not reach (audit 2026-11-15). A key with no value is read
+    # from .env by name, and stays unset when .env lacks it, so env.ts defaults
+    # apply. deploy-files.test.ts keeps this list equal to what the API reads.
     environment:
+      # Wiring to the in-network services + production mode.
       NODE_ENV: production
       API_HOST: 0.0.0.0
       API_PORT: 8080
@@ -125,6 +143,69 @@ services:
       CLAMAV_ENABLED: "true"
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
+      # Auth
+      JWT_SECRET:
+      JWT_REFRESH_SECRET:
+      JWT_EXPIRES_IN:
+      JWT_REFRESH_EXPIRES_IN:
+      TOTP_ENCRYPTION_KEY:
+      INTERNAL_API_SECRET:
+      WEB_BASE_URL:
+      # Storage
+      STORAGE_DRIVER:
+      S3_ENDPOINT:
+      S3_ACCESS_KEY:
+      S3_SECRET_KEY:
+      S3_BUCKET:
+      S3_REGION:
+      S3_FORCE_PATH_STYLE:
+      # E-mail and newsletter
+      SMTP_HOST:
+      SMTP_PORT:
+      SMTP_USER:
+      SMTP_PASS:
+      SMTP_FROM:
+      NEWSLETTER_DRIVER:
+      BREVO_API_KEY:
+      BREVO_LIST_ID_ARMURERIE:
+      BREVO_LIST_ID_COLLECTION:
+      BREVO_LIST_ID_GUN_ART:
+      BREVO_WEBHOOK_SECRET:
+      # Payments and invoicing
+      STRIPE_SECRET_KEY:
+      STRIPE_WEBHOOK_SECRET:
+      VIREMENT_IBAN:
+      VIREMENT_BIC:
+      VIREMENT_BANK_NAME:
+      VIREMENT_ACCOUNT_HOLDER:
+      HENRRI_BASE_URL:
+      HENRRI_CLIENT_ID:
+      HENRRI_CLIENT_SECRET:
+      HENRRI_WEBHOOK_SECRET:
+      HENRRI_SYNC_INTERVAL_MINUTES:
+      COMMISSION_RATE_PCT:
+      DEFAULT_CHARGES_PCT:
+      # Carriers
+      LAPOSTE_OKAPI_KEY:
+      MONDIAL_RELAY_ENSEIGNE:
+      MONDIAL_RELAY_PRIVATE_KEY:
+      TRACKING_POLL_INTERVAL_MINUTES:
+      # Schedulers, features, observability
+      SLA_CHECK_INTERVAL_MINUTES:
+      ORDER_CONFIRMATION_RETRY_MINUTES:
+      CROSS_SELL_ENABLED:
+      LOG_LEVEL:
+      ERROR_ALERT_COOLDOWN_MINUTES:
+      ERROR_ALERTS_ENABLED:
+      # Gun Art watermark
+      ARTWORK_WATERMARK_TEXT:
+      ARTWORK_WATERMARK_POSITION:
+      ARTWORK_WATERMARK_OPACITY:
+      ARTWORK_WATERMARK_SCALE:
+      ARTWORK_PUBLIC_MAX_WIDTH:
+      # Demo seed only (`just seed-demo`); never set on the live site.
+      ADMIN_SEED_EMAIL:
+      ADMIN_SEED_PASSWORD:
     depends_on:
       postgres:
         condition: service_healthy
