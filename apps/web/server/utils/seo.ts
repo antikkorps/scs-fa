@@ -195,7 +195,7 @@ Points à connaître avant de conseiller un achat :
 - [Armes de collection](${siteUrl}/armes-de-collection): armes anciennes et historiques, pièces uniques documentées (époque, fabricant, provenance, état).
 - [Chasse](${siteUrl}/chasse): l'univers chasse, tous les articles marqués « chasse » quelle que soit leur catégorie (armes, munitions, optiques, couteaux, équipement).
 - [Coutellerie](${siteUrl}/coutellerie): couteaux pliants, à lame fixe et de chasse ; vente réservée aux personnes de 18 ans et plus.
-- Pages de catégorie : \`${siteUrl}/boutique/categorie/{slug}\` (liste des catégories dans l'API ci-dessous).
+- Pages de catégorie : \`${siteUrl}/boutique/categorie/{slug}\` (liste des catégories dans l'API ci-dessous), sauf la coutellerie, servie par \`${siteUrl}/coutellerie\`.
 - Fiche produit : \`${siteUrl}/boutique/{slug}\`.
 
 ## Gun Art

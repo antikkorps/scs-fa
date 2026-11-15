@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { UNIVERSES } from "#shared/utils/universes"
-
 // Story 12.13 — the knife universe: the « coutellerie » category, sold to
 // adults only (12.13c). Introduction = first draft, to be read by Fred.
-const universe = UNIVERSES.find((u) => u.path === "/coutellerie") as (typeof UNIVERSES)[number]
+const { universe, noindex } = await useUniverse("/coutellerie")
 const route = useRoute()
 
 usePageSeo({
@@ -12,6 +10,7 @@ usePageSeo({
   description:
     "La coutellerie SCS Firearms : couteaux pliants, à lame fixe et de chasse, des meilleures marques. Vente réservée aux personnes majeures.",
   path: "/coutellerie",
+  noindex,
   // ShopCatalogue states the canonical: it knows the page of results.
   canonical: false,
 })

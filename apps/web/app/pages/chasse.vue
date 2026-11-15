@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { UNIVERSES } from "#shared/utils/universes"
-
 // Story 12.13 — the hunting universe: every product tagged « chasse », whatever
 // its category. Introduction = first draft, to be read by Fred.
-const universe = UNIVERSES.find((u) => u.path === "/chasse") as (typeof UNIVERSES)[number]
+const { universe, noindex } = await useUniverse("/chasse")
 const route = useRoute()
 
 usePageSeo({
@@ -12,6 +10,7 @@ usePageSeo({
   description:
     "L'univers chasse de SCS Firearms : carabines et fusils de chasse, munitions, optiques, couteaux et équipement du chasseur. Catégories légales, prix TTC et stock en temps réel.",
   path: "/chasse",
+  noindex,
   // ShopCatalogue states the canonical: it knows the page of results.
   canonical: false,
 })

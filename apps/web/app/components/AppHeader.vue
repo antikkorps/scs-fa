@@ -464,10 +464,13 @@ async function signOut() {
 .nav {
   display: none;
   align-items: center;
-  gap: 2rem;
+  /* Six entries since story 12.13: tighter until the header has room. */
+  gap: clamp(1rem, 2.6vw - 0.5rem, 2rem);
   margin: 0 auto;
 }
 .nav__link {
+  /* « Gun Art », « À propos » must never break onto two lines. */
+  white-space: nowrap;
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   letter-spacing: var(--ls-wide);
