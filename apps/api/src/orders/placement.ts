@@ -8,6 +8,7 @@ import { and, eq, gte, isNull, lt, or, sql } from "drizzle-orm"
 import type { DbExecutor } from "../artworks/reservation.js"
 import { addresses, type OrderAddressSnapshot, paymentCarte, paymentVirement, productVariants } from "../db/schema.js"
 import { env } from "../env.js"
+import { bankDetailsFrom } from "../payments/bank-details.js"
 
 export class OrderError extends Error {
   constructor(
@@ -95,7 +96,8 @@ export async function decrementVariantStock(
  * row) and the bank-transfer bucket (story 6.2). The RIB is snapshotted from
  * env onto the row so later config changes never rewrite an order's
  * already-issued instructions, and a unique, typo-resistant reference is
- * allocated for the customer's transfer label / admin reconciliation.
+ * allocated for the customer's transfer label / admin reconciliation. While no
+ * RIB is configured, an order that needs a transfer is refused.
  */
 export async function insertPaymentBuckets(tx: DbExecutor, orderId: string, split: PaymentSplit): Promise<void> {
   if (split.carte.amountTtc > 0) {
@@ -108,6 +110,11 @@ export async function insertPaymentBuckets(tx: DbExecutor, orderId: string, spli
   }
 
   if (split.virement.amountTtc > 0) {
+    const bank = bankDetailsFrom(env)
+    if (!bank) {
+      // Thrown inside the order transaction: stock, cart and prints roll back.
+      throw new OrderError(503, "BankTransferUnavailable", "Bank transfer payments are not available yet")
+    }
     let reference = virementReferenceFromBytes(randomBytes(8))
     for (let attempt = 0; attempt < 5; attempt++) {
       const [clash] = await tx
@@ -122,10 +129,10 @@ export async function insertPaymentBuckets(tx: DbExecutor, orderId: string, spli
       orderId,
       amountExpectedTtc: split.virement.amountTtc.toFixed(2),
       currency: "EUR",
-      ibanRecipient: env.VIREMENT_IBAN,
-      bicRecipient: env.VIREMENT_BIC,
-      bankName: env.VIREMENT_BANK_NAME,
-      accountHolderName: env.VIREMENT_ACCOUNT_HOLDER,
+      ibanRecipient: bank.iban,
+      bicRecipient: bank.bic,
+      bankName: bank.bankName,
+      accountHolderName: bank.accountHolder,
       paymentReference: reference,
       paymentStatus: "awaiting_transfer",
     })

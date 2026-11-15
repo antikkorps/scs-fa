@@ -1,5 +1,6 @@
 import type { OrganisationStatus, OrganisationType, QuoteRequestStatus } from "@armurier/shared"
 import { SHOP_NOT_OPEN_MESSAGE } from "~/utils/launch"
+import { BANK_TRANSFER_UNAVAILABLE_MESSAGE } from "~/utils/order"
 import type { Severity } from "~/utils/status"
 
 // Story 12.8b — French labels for pro accounts, shared by the signup form, the
@@ -101,6 +102,7 @@ const ACCEPTANCE_MESSAGES: Record<string, string> = {
   UndeliverableAddress: "Nous livrons uniquement en France métropolitaine, Corse comprise.",
   InvalidStatusTransition: "Ce devis a déjà été accepté ou n'est plus ouvert.",
   ShopNotOpen: SHOP_NOT_OPEN_MESSAGE,
+  BankTransferUnavailable: BANK_TRANSFER_UNAVAILABLE_MESSAGE,
 }
 
 export function quoteAcceptanceMessage(code: string | null | undefined): string {
