@@ -18,8 +18,16 @@ export const proCatalogueRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = productFiltersSchema.safeParse(request.query)
     if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
     const organisation = proOrganisationOf(request)
-    // Price filters would give the public price away by bisection.
-    const filters = { ...parsed.data, minPrice: undefined, maxPrice: undefined }
+    // Price filters would give the public price away by bisection; a price
+    // sort would give its order away (audit 2026-11-15, B4) — allowed only
+    // once prices are shown, when one discount rate keeps the same order.
+    const priceSort = parsed.data.sort === "price_asc" || parsed.data.sort === "price_desc"
+    const filters = {
+      ...parsed.data,
+      minPrice: undefined,
+      maxPrice: undefined,
+      ...(priceSort && !organisation?.showPrices && { sort: "relevance" as const }),
+    }
 
     const page = await listCatalogue(filters, proCatalogueVisible())
     return reply.send({

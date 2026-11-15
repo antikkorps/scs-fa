@@ -43,6 +43,18 @@ export class NotAnAdminError extends Error {
   }
 }
 
+/**
+ * Audit 2026-11-15, B3: an admin who already enrolled their app is active. A
+ * new link would reset their password and let whoever got it act under their
+ * name; a lost phone goes through the TOTP reset first.
+ */
+export class AdminAlreadyActiveError extends Error {
+  constructor(email: string) {
+    super(`${email} is an admin already active: reset their app first if they lost access`)
+    this.name = "AdminAlreadyActiveError"
+  }
+}
+
 /** Create the admin (or find them) and give them a fresh single-use link; earlier unused links stop working. */
 export async function inviteAdmin(
   input: AdminInvitationInput,
@@ -56,11 +68,12 @@ export async function inviteAdmin(
 
   const { userId, created } = await db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({ id: users.id, role: users.role })
+      .select({ id: users.id, role: users.role, totpEnabledAt: users.totpEnabledAt })
       .from(users)
       .where(eq(users.email, email))
       .limit(1)
     if (existing && existing.role !== "admin") throw new NotAnAdminError(email)
+    if (existing?.totpEnabledAt) throw new AdminAlreadyActiveError(email)
 
     let id = existing?.id
     if (!id) {

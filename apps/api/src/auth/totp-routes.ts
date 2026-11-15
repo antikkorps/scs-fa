@@ -10,6 +10,7 @@ import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { authenticate } from "./authenticate.js"
+import { clearFailedLogins, countFailedLogin, lockoutRemainingSeconds } from "./lockout.js"
 import { reauthenticate, sendReauthRefusal } from "./reauth.js"
 import {
   beginEnrollment,
@@ -92,9 +93,15 @@ export const totpRoutes: FastifyPluginAsync = async (fastify) => {
       if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
       const user = await currentUser(request)
       if (!user) return notFound(reply)
+      // Audit 2026-11-15, B1: wrong codes count towards the account lockout, as
+      // a re-entry does — with a stolen session they could otherwise be tried
+      // from many addresses, past the per-IP rate limit.
+      if (lockoutRemainingSeconds(user) !== null) return sendReauthRefusal(reply, "AccountLocked")
       if (!(await verifySecondFactor(user.id, parsed.data.code, new Date()))) {
-        return reply.code(400).send(INVALID_CODE)
+        const { locked } = await countFailedLogin(user.id)
+        return locked ? sendReauthRefusal(reply, "AccountLocked") : reply.code(400).send(INVALID_CODE)
       }
+      await clearFailedLogins(user.id)
       const recoveryCodes = await regenerateRecoveryCodes(user.id)
       await journal(request, user, "user.recovery_codes_regenerated")
       return reply.send({ data: { recoveryCodes } })

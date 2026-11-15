@@ -1,4 +1,4 @@
-import { ADMIN_INVITATION_TTL_HOURS, inviteAdmin, NotAnAdminError } from "./admin-invite.js"
+import { ADMIN_INVITATION_TTL_HOURS, AdminAlreadyActiveError, inviteAdmin, NotAnAdminError } from "./admin-invite.js"
 
 // Decision 2026-11-04 — `pnpm auth:admin-invite <email> <prénom> <nom>` (on the
 // server: `just admin-invite …`): creates an admin without a password and sends
@@ -30,6 +30,10 @@ try {
   if (error instanceof NotAnAdminError) {
     console.error(
       `❌ ${email.trim().toLowerCase()} n'est pas un compte administrateur : une invitation ne change jamais un rôle.`,
+    )
+  } else if (error instanceof AdminAlreadyActiveError) {
+    console.error(
+      `❌ ${email.trim().toLowerCase()} est déjà actif. S'il a perdu son téléphone : réinitialisez d'abord son application (back-office ou \`pnpm auth:totp-reset\`), puis réinvitez-le.`,
     )
   } else {
     console.error("❌ Invitation impossible :", error instanceof Error ? error.message : error)

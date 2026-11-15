@@ -12,9 +12,10 @@ import {
 } from "./constants.js"
 import { MAX_CROSS_SELLS_PER_PRODUCT } from "./cross-sell.js"
 import { LAUNCH_STAGES } from "./launch.js"
+import { parisToday } from "./legal-documents.js"
 import { NEWSLETTER_SEGMENTS, NEWSLETTER_SUBSCRIPTION_STATUS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
-import { requiresValidityEnd } from "./required-docs.js"
+import { latestSeasonalExpiry, requiresValidityEnd } from "./required-docs.js"
 import {
   MAX_PARCELS_PER_ARTICLE,
   ORDER_SHIPPING_STATUSES,
@@ -247,6 +248,13 @@ function documentMetaSchema<T extends readonly [string, ...string[]]>(types: T) 
         message: "expiresAt is required for a document renewed every season",
         path: ["expiresAt"],
       })
+      .refine(
+        (d) =>
+          !requiresValidityEnd(d.docType) ||
+          d.expiresAt === undefined ||
+          d.expiresAt <= latestSeasonalExpiry(parisToday()),
+        { message: "a season licence cannot be valid more than 18 months ahead", path: ["expiresAt"] },
+      )
   )
 }
 
