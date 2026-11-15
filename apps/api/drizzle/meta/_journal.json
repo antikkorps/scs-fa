@@ -344,6 +344,13 @@
       "when": 1794754647547,
       "tag": "0048_users_email_verified_at",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794760488627,
+      "tag": "0049_hunting_knife_universes",
+      "breakpoints": true
     }
   ]
 }

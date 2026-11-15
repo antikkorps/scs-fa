@@ -9,6 +9,7 @@ const FACET_LABELS: Record<string, string> = {
   etat: "État",
   epoque: "Époque",
   caracteristique: "Caractéristique",
+  usage: "Usage",
 }
 
 const fields: AdminField[] = [

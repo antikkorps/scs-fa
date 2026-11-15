@@ -186,7 +186,15 @@ describe("Tags (story 11.1)", () => {
       const res = await app.inject({ method: "GET", url: "/api/tags" })
       expect(res.statusCode).toBe(200)
       const data = res.json().data as Array<{ facet: string; tags: Array<{ slug: string }> }>
-      expect(data.map((g) => g.facet)).toEqual(["etat", "epoque", "caracteristique"])
+      expect(data.map((g) => g.facet)).toEqual(["etat", "epoque", "caracteristique", "usage"])
+    })
+
+    it("holds the hunting universe's tag in the 'usage' facet (story 12.13)", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/tags" })
+      const data = res.json().data as Array<{ facet: string; tags: Array<{ slug: string; name: string }> }>
+      expect(data.find((g) => g.facet === "usage")?.tags).toContainEqual(
+        expect.objectContaining({ slug: "chasse", name: "Chasse" }),
+      )
     })
 
     it("counts only published armurerie products, excluding Gun Art", async () => {

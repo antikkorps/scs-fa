@@ -6,6 +6,7 @@ const FACET_LABELS: Record<TagFacet, string> = {
   etat: "État",
   epoque: "Époque",
   caracteristique: "Caractéristiques",
+  usage: "Usage",
 }
 
 export function tagFacetLabel(facet: TagFacet): string {

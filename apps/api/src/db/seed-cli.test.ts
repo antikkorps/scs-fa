@@ -80,8 +80,8 @@ describe("seed CLI (deployment)", () => {
     expect(status, output).toBe(0)
 
     expect(await countRows("legal_categories")).toBe(5)
-    expect(await countRows("product_categories")).toBe(8)
-    expect(await countRows("tags")).toBe(3)
+    expect(await countRows("product_categories")).toBe(9) // coutellerie, story 12.13
+    expect(await countRows("tags")).toBe(4) // chasse, story 12.13
     expect(await countRows("suppliers")).toBe(6)
     expect(await countRows("users", "role = 'admin'")).toBe(1)
 
