@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, users } from "../db/schema.js"
+import { MAX_FAILED_ATTEMPTS } from "./lockout.js"
 import { base32Decode, totpCode } from "./totp.js"
 
 const PASSWORD = "MotDePasseTresLong123!"
@@ -124,6 +125,24 @@ describe("the authenticator app from the account (story 12.8e)", () => {
     expect(res.json().data.recoveryCodes).toHaveLength(10)
     expect(res.json().data.recoveryCodes).not.toContain(recoveryCodes[0])
     expect(await actions(user.id)).toContain("user.recovery_codes_regenerated")
+  })
+
+  // Audit 2026-11-15, B1: with a stolen session, codes were tried here without
+  // ever locking the account (only the per-IP rate limit applied).
+  it("counts wrong codes towards the account lockout when regenerating the recovery codes", async () => {
+    const user = await account()
+    const { secret } = await enable(user)
+    const wrong = String((Number(codeAt(secret, 1)) + 1) % 1_000_000).padStart(6, "0")
+
+    let last = await call("POST", "/api/auth/totp/recovery-codes", user.token, { code: wrong })
+    for (let attempt = 1; attempt < MAX_FAILED_ATTEMPTS; attempt++) {
+      last = await call("POST", "/api/auth/totp/recovery-codes", user.token, { code: wrong })
+    }
+    expect(last.statusCode).toBe(423)
+    expect(last.json().error).toBe("AccountLocked")
+    // Locked: even the right code is refused now.
+    const right = await call("POST", "/api/auth/totp/recovery-codes", user.token, { code: codeAt(secret, 2) })
+    expect(right.statusCode).toBe(423)
   })
 
   it("turns the app off with the password and a code", async () => {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { UNIVERSES } from "#shared/utils/universes"
 import type { LegalCategoryCode } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/product"
 
@@ -130,12 +131,14 @@ async function signOut() {
               <div class="mega__col">
                 <p class="mega__label">Collection</p>
                 <NuxtLink to="/armes-de-collection" class="mega__link">Armes de collection &amp; historiques</NuxtLink>
-                <NuxtLink to="/boutique?tags=occasion" class="mega__link">Armes d'occasion</NuxtLink>
+                <!-- The tag's own page, not a filtered view of /boutique (SEO audit 2026-11-15, 11). -->
+                <NuxtLink :to="tagPath('occasion')" class="mega__link">Armes d'occasion</NuxtLink>
                 <p class="mega__label mega__label--spaced">Par catégorie légale</p>
                 <NuxtLink
                   v-for="l in LEGAL"
                   :key="l.code"
                   :to="`/boutique?legalCategory=${l.code}`"
+                  rel="nofollow"
                   class="mega__link"
                 >
                   {{ l.label }}
@@ -148,6 +151,11 @@ async function signOut() {
             </div>
           </Transition>
         </div>
+
+        <!-- Story 12.13: the hunting and knife universes, a page each. -->
+        <NuxtLink v-for="universe in UNIVERSES" :key="universe.path" :to="universe.path" class="nav__link">
+          {{ universe.name }}
+        </NuxtLink>
 
         <!-- Gun Art universe → mega-menu -->
         <div
@@ -363,7 +371,18 @@ async function signOut() {
               </li>
 
               <!-- Gun Art accordion -->
-              <li class="mnav__item" :style="{ '--i': 1 }">
+              <li
+                v-for="(universe, index) in UNIVERSES"
+                :key="universe.path"
+                class="mnav__item"
+                :style="{ '--i': 1 + index }"
+              >
+                <NuxtLink :to="universe.path" class="mlink">
+                  <span>{{ universe.name }}</span><span class="mlink__chev" aria-hidden="true">›</span>
+                </NuxtLink>
+              </li>
+
+              <li class="mnav__item" :style="{ '--i': 3 }">
                 <button
                   type="button"
                   class="mlink mlink--toggle"
@@ -385,12 +404,12 @@ async function signOut() {
                 </div>
               </li>
 
-              <li class="mnav__item" :style="{ '--i': 2 }">
+              <li class="mnav__item" :style="{ '--i': 4 }">
                 <NuxtLink to="/blog" class="mlink">
                   <span>Journal</span><span class="mlink__chev" aria-hidden="true">›</span>
                 </NuxtLink>
               </li>
-              <li class="mnav__item" :style="{ '--i': 3 }">
+              <li class="mnav__item" :style="{ '--i': 5 }">
                 <a href="/#about" class="mlink" @click="closeAll">
                   <span>À propos</span><span class="mlink__chev" aria-hidden="true">›</span>
                 </a>
@@ -447,10 +466,13 @@ async function signOut() {
 .nav {
   display: none;
   align-items: center;
-  gap: 2rem;
+  /* Six entries since story 12.13: tighter until the header has room. */
+  gap: clamp(1rem, 2.6vw - 0.5rem, 2rem);
   margin: 0 auto;
 }
 .nav__link {
+  /* « Gun Art », « À propos » must never break onto two lines. */
+  white-space: nowrap;
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   letter-spacing: var(--ls-wide);

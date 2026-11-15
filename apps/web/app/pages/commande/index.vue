@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CURRENT_TERMS_VERSION, isDeliverableAddress } from "@armurier/shared"
+import { ADULT_AGE, CURRENT_TERMS_VERSION, isDeliverableAddress } from "@armurier/shared"
 import type { CartChange, CartView } from "~/types/cart"
 import type { Address } from "~/types/checkout"
 import { cartChangeLabel, earliestHold, variantDescription } from "~/utils/cart"
@@ -7,7 +7,7 @@ import { formatDate, formatEuros } from "~/utils/format"
 import { addressLine, ageRequirementMessage, placeOrderErrorMessage, UNDELIVERABLE_MESSAGE } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Commande — SCS Firearms" })
+useHead({ title: "Commande" })
 
 const { fetchCart, count: cartCount } = useCart()
 const { list: listAddresses } = useAddresses()
@@ -31,8 +31,10 @@ const termsVersionLabel = formatDate(CURRENT_TERMS_VERSION)
 const placing = ref(false)
 const placeError = ref("")
 // Story 12.13c: asked once the API says the cart holds articles reserved to adults.
-const birthDateRequired = ref(false)
-const birthDate = ref("")
+const adultDeclarationRequired = ref(false)
+const adultDeclared = ref(false)
+// The age the cart requires, as the API states it (18 for a knife, or an article's own).
+const requiredAge = ref(ADULT_AGE)
 const cartChanges = ref<string[]>([])
 
 // Story 12.9a — held items go back on sale when their time runs out, checkout or not.
@@ -87,8 +89,8 @@ async function placeOrder() {
     placeError.value = "Acceptez les conditions générales de vente pour commander."
     return
   }
-  if (birthDateRequired.value && !birthDate.value) {
-    placeError.value = "Indiquez votre date de naissance pour confirmer la commande."
+  if (adultDeclarationRequired.value && !adultDeclared.value) {
+    placeError.value = "Cochez la déclaration pour confirmer la commande."
     return
   }
   placing.value = true
@@ -98,7 +100,7 @@ async function placeOrder() {
       shippingAddressId: shippingId.value,
       ...(billing ? { billingAddressId: billing } : {}),
       acceptedTermsVersion: CURRENT_TERMS_VERSION,
-      ...(birthDateRequired.value ? { birthDate: birthDate.value } : {}),
+      ...(adultDeclarationRequired.value ? { adultDeclaration: true as const } : {}),
     })
     // The order consumes the cart server-side — clear the header badge.
     cartCount.value = 0
@@ -119,7 +121,10 @@ async function placeOrder() {
       return
     }
     const code = apiErrorCode(err)
-    if (code === "BirthDateRequired") birthDateRequired.value = true
+    if (code === "AdultDeclarationRequired") {
+      adultDeclarationRequired.value = true
+      requiredAge.value = apiErrorField<number>(err, "requiredAge") ?? ADULT_AGE
+    }
     placeError.value =
       ageRequirementMessage(code, apiErrorField<number>(err, "requiredAge")) ?? placeOrderErrorMessage(status, code)
     placing.value = false
@@ -197,9 +202,9 @@ async function placeOrder() {
               (version du {{ termsVersionLabel }}).
             </span>
           </label>
-          <label v-if="birthDateRequired" class="birth">
-            <span>Date de naissance</span>
-            <input v-model="birthDate" type="date" name="birthDate" autocomplete="bday" class="input" required />
+          <label v-if="adultDeclarationRequired" class="terms">
+            <input v-model="adultDeclared" type="checkbox" name="adultDeclaration" required />
+            <span>Je certifie avoir {{ requiredAge }} ans révolus.</span>
           </label>
           <!-- Wording required by art. L221-14 of the Code de la consommation: the
                button must say that ordering creates an obligation to pay. -->
@@ -333,12 +338,6 @@ async function placeOrder() {
 .hold-notice {
   margin: 0 0 1rem;
   color: var(--brass);
-}
-.birth {
-  display: grid;
-  gap: 0.35rem;
-  margin-top: 1rem;
-  font-size: var(--fs-sm);
 }
 .terms {
   display: flex;

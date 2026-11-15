@@ -5,7 +5,7 @@ import { quoteRequestStatus } from "~/utils/organisation"
 
 // Story 12.8c — the organisation's quote requests and where each stands.
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Mes demandes de devis — SCS Firearms" })
+useHead({ title: "Mes demandes de devis" })
 
 const access = useProAccess()
 const { listRequests } = useQuotes()

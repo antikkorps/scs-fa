@@ -1170,7 +1170,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
   - (a) case « Je certifie avoir 18 ans révolus » au moment de commander, enregistrée avec la commande (date, version du texte) — léger, déclaratif ;
   - (b) **date de naissance demandée une fois** (compte) + vérification ≥ 18 ans à la commande d'un article concerné, conservée avec la commande — plus solide, une donnée personnelle de plus (registre RGPD) — **proposé** ;
   - (c) pièce d'identité vérifiée comme pour B/C — le plus sûr, mais lourd pour un couteau.
-  À faire valider par le juriste (vente à distance d'armes blanches aux majeurs). ✅ _(Franck 2026-11-15 : **(b)**, date de naissance + vérification à la commande ; validation juridique à obtenir)_
+  À faire valider par le juriste (vente à distance d'armes blanches aux majeurs). ✅ _(Franck 2026-11-15 : **(b)**, date de naissance + vérification à la commande ; validation juridique à obtenir)_ ➜ **Remplacé le 2026-11-15 au soir (réponse de Fred) : (a), simple déclaration sur l'honneur cochée à la commande, enregistrée avec elle (`orders.adult_declared_at`), pas de date de naissance (migration 0051).** Prix des armes A/B dans les résultats Google : **oui** (Fred) — balisage inchangé.
 - [ ] **D3 — Catégorie légale des couteaux** : D ou « vente libre » selon les articles ; articles exclus du catalogue (types interdits à la vente) — liste à confirmer par Fred / juriste
 - [x] **D4 — Catégories en plus pour la chasse** : selon la liste des produits de Fred ✅ _(Franck 2026-11-15 : **pas de nouvelle catégorie, des tags** pour les sortes de produits de chasse ; un article hors des catégories actuelles — vêtement, appeau… — va dans « Autres accessoires » avec ses tags)_
 

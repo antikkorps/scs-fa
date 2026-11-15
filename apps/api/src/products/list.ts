@@ -37,7 +37,7 @@ const priceTtcSql = sql`round(${products.priceHt} * (1 + coalesce(${products.vat
  * The visitor's chosen order (UX audit 2026-11-01, I6). By default, search
  * results are ranked by relevance; otherwise featured first, then newest.
  */
-function catalogueOrder(sort: ProductSort, search: string | undefined): SQL[] {
+function primaryOrder(sort: ProductSort, search: string | undefined): SQL[] {
   if (sort === "price_asc") return [asc(priceTtcSql)]
   if (sort === "price_desc") return [desc(priceTtcSql)]
   if (sort === "newest") return [desc(products.createdAt)]
@@ -48,6 +48,15 @@ function catalogueOrder(sort: ProductSort, search: string | undefined): SQL[] {
     ]
   }
   return [desc(products.featured), desc(products.createdAt)]
+}
+
+/**
+ * The order of a catalogue page, made total by the id: with ties (same price,
+ * same creation time) the database may return them in any order, so a product
+ * could appear on two pages, or on none (review of the audit 2026-11-15 fixes).
+ */
+function catalogueOrder(sort: ProductSort, search: string | undefined): SQL[] {
+  return [...primaryOrder(sort, search), asc(products.id)]
 }
 
 /**

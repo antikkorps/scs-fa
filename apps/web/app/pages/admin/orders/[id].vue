@@ -240,6 +240,32 @@ function num(v: unknown): number | null {
         </dl>
         <NuxtLink to="/admin/devis" class="pro-order__link">Voir les devis</NuxtLink>
       </section>
+
+      <!-- Story 12.13c — what the customer committed to, as proof. -->
+      <section class="panel commitments">
+        <h2 class="panel__title">Engagements du client</h2>
+        <dl class="pro-order__meta">
+          <div>
+            <dt>CGV acceptées</dt>
+            <dd>
+              <template v-if="order.termsVersion">
+                version du {{ formatDate(order.termsVersion) }}
+                <template v-if="order.termsAcceptedAt">, le {{ formatDateTime(order.termsAcceptedAt) }}</template>
+              </template>
+              <template v-else>—</template>
+            </dd>
+          </div>
+          <div>
+            <dt>Majorité</dt>
+            <dd>
+              <template v-if="order.adultDeclaredAt">
+                A certifié avoir 18 ans révolus, le {{ formatDateTime(order.adultDeclaredAt) }}
+              </template>
+              <template v-else>Non demandée (aucun article réservé aux majeurs, ou compte pro)</template>
+            </dd>
+          </div>
+        </dl>
+      </section>
       <div class="grid">
         <section class="panel">
           <h2 class="panel__title">Articles</h2>

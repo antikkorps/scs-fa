@@ -1,3 +1,4 @@
+import { universePathForCategory, universePathForTag } from "#shared/utils/universes"
 import { absoluteImageUrl, buildSitemap, latest, type SitemapUrl } from "../utils/seo"
 
 interface Entry {
@@ -93,6 +94,8 @@ export default defineEventHandler(async (event) => {
     // (/collection/artiste is deliberately absent: a noindex router page.)
     { loc: `${siteUrl}/blog`, lastmod: latest(d.blogPosts.map(dated)), changefreq: "weekly", priority: 0.7 },
     { loc: `${siteUrl}/contact`, changefreq: "yearly", priority: 0.4 },
+    // The pro signup page is indexable (nuxt.config): listed so it is found.
+    { loc: `${siteUrl}/pro/inscription`, changefreq: "yearly", priority: 0.4 },
     // Reference pages, once validated and complete (shared/utils/editorialPages.ts).
     ...legalPaths.map((path) => ({
       loc: `${siteUrl}${path}`,
@@ -101,15 +104,16 @@ export default defineEventHandler(async (event) => {
     })),
 
     // Armurerie: category pages, then products.
+    // A universe's category or tag is listed under its universe page (story 12.13).
     ...d.productCategories.map((c) => ({
-      loc: `${siteUrl}/boutique/categorie/${c.slug}`,
+      loc: `${siteUrl}${universePathForCategory(c.slug) ?? `/boutique/categorie/${c.slug}`}`,
       lastmod: c.updatedAt,
       changefreq: "weekly" as const,
       priority: 0.8,
     })),
     // Tag pages: only tags on at least one published product reach this list.
     ...d.tags.map((t) => ({
-      loc: `${siteUrl}/boutique/tag/${encodeURIComponent(t.slug)}`,
+      loc: `${siteUrl}${universePathForTag(t.slug) ?? `/boutique/tag/${encodeURIComponent(t.slug)}`}`,
       lastmod: t.updatedAt,
       changefreq: "weekly" as const,
       priority: 0.6,

@@ -111,6 +111,18 @@ describe("inviting an admin", () => {
     expect((await resetPassword(tokenOf(second.link))).statusCode).toBe(200)
   })
 
+  // Audit 2026-11-15, B3: the link sets the password; for an active admin it
+  // would let whoever got it act under that admin's name.
+  it("refuses to invite again an admin who has already enrolled their app", async () => {
+    const email = `active${EMAIL_SUFFIX}`
+    await inviteAdmin({ email, firstname: "Paul", lastname: "Actif" })
+    await db.update(users).set({ totpEnabledAt: new Date() }).where(eq(users.email, email))
+    vi.mocked(sendAdminInvitationEmail).mockClear()
+
+    await expect(inviteAdmin({ email, firstname: "Paul", lastname: "Actif" })).rejects.toThrow(/already active/)
+    expect(vi.mocked(sendAdminInvitationEmail)).not.toHaveBeenCalled()
+  })
+
   it("never turns an existing customer into an admin", async () => {
     const email = `client${EMAIL_SUFFIX}`
     await db.insert(users).values({

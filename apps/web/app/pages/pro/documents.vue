@@ -8,7 +8,7 @@ import { docTypeLabel, docVerificationStatus } from "~/utils/status"
 // authorisation, purchase order…): SCS judges them before a quote with
 // category A, B or C items can be accepted.
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Justificatifs de l'organisation — SCS Firearms" })
+useHead({ title: "Justificatifs de l'organisation" })
 
 const BASE = "/pro/documents"
 const access = useProAccess()

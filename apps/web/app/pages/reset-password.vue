@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { resetPasswordSchema } from "@armurier/shared"
 
-useHead({ title: "Réinitialiser le mot de passe — SCS Firearms" })
+useHead({ title: "Réinitialiser le mot de passe" })
 
 const { resetPassword } = useAuth()
 // Read from the link's fragment once mounted (story 12.9g): null until then.

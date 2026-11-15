@@ -160,6 +160,10 @@ export const adminOrderRoutes: FastifyPluginAsync = async (fastify) => {
         paymentDueAt: orders.paymentDueAt,
         chorusServiceCode: orders.chorusServiceCode,
         chorusCommitmentNumber: orders.chorusCommitmentNumber,
+        // The customer's commitments, proof SCS may need (CGV, story 12.13c).
+        termsVersion: orders.termsVersion,
+        termsAcceptedAt: orders.termsAcceptedAt,
+        adultDeclaredAt: orders.adultDeclaredAt,
         user: { id: users.id, email: users.email, firstname: users.firstname, lastname: users.lastname },
       })
       .from(orders)

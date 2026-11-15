@@ -24,6 +24,8 @@ const team = computed(() => data.value?.data ?? [])
 const REFUSALS: Record<string, string> = {
   ...REAUTH_REFUSALS,
   NotAnAdmin: "Cette adresse est déjà celle d'un compte client : une invitation ne change jamais un rôle.",
+  AdminAlreadyActive:
+    "Cet administrateur est déjà actif. S'il a perdu son téléphone, réinitialisez d'abord son application, puis réinvitez-le.",
   OwnAccount: "Votre propre accès se retire par un autre administrateur.",
   NotFound: "Ce compte n'est plus administrateur.",
 }

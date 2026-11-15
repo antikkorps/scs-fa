@@ -110,6 +110,18 @@ describe("the pro catalogue (story 12.8c)", () => {
       expect(slugs).toContain(product.vest?.slug)
     })
 
+    // Audit 2026-11-15, B4: sorting by price would give the price order away,
+    // the same reasoning that removed the price filters.
+    const orderOf = async (sort: string) =>
+      (await get(`/api/pro/products?limit=100&search=${TAG}&sort=${sort}`, pro.token))
+        .json()
+        .data.map((row: { slug: string }) => row.slug)
+        .filter((slug: string) => slug === product.public?.slug || slug === product.vest?.slug)
+
+    it("ignores a price sort while « afficher les prix » is off", async () => {
+      expect(await orderOf("price_asc")).toEqual(await orderOf("price_desc"))
+    })
+
     it("shows the pro's net prices once SCS opens them", async () => {
       await db
         .update(organisations)
@@ -122,6 +134,9 @@ describe("the pro catalogue (story 12.8c)", () => {
       // The variant's own delta (5 € HT) is discounted with the rest.
       expect(page.variants[0].netPriceHt).toBe(364.5)
       expect(page).not.toHaveProperty("priceHt")
+      // Prices shown: the sort follows them (one discount rate keeps the order).
+      expect(await orderOf("price_desc")).toEqual([product.vest?.slug, product.public?.slug])
+      expect(await orderOf("price_asc")).toEqual([product.public?.slug, product.vest?.slug])
     })
   })
 })

@@ -201,7 +201,7 @@ describe("VIP (story 3.4)", () => {
       method: "POST",
       url: "/api/orders",
       headers: headers(),
-      payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+      payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION, adultDeclaration: true },
     })
   }
   function setVip(active: boolean) {

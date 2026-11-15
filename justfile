@@ -19,7 +19,9 @@ default:
 # Check the whole .env for sample values, then build images and (re)start the whole stack
 deploy:
     {{ compose }} --profile env-check run --rm --build env-check
-    {{ compose }} up -d --build
+    {{ compose }} pull --ignore-buildable
+    {{ compose }} build --pull
+    {{ compose }} up -d
 
 # Create or update the least-privilege database roles (story 12.9f); safe to re-run
 db-roles:
@@ -54,13 +56,27 @@ admin-invite email firstname +lastname:
 seed-demo:
     {{ compose }} exec api node_modules/.bin/tsx src/db/seed-cli.ts --demo
 
-# Update flow: pull, check .env, migrate (rebuilt: new migrations ship), rebuild, prune dangling images
+# Update (audit 2026-11-15, M2 + M4): fast-forward only; keep the running images as :previous
+# (`just rollback`); refresh the base images and build BEFORE touching the database (a failed
+# build leaves it as it was); check .env; back the database up; migrate; restart.
 update:
-    git pull
-    {{ compose }} --profile env-check run --rm --build env-check
+    git pull --ff-only
+    -docker image tag scs-api:latest scs-api:previous
+    -docker image tag scs-web:latest scs-web:previous
+    {{ compose }} pull --ignore-buildable
+    {{ compose }} --profile migrate --profile env-check build --pull
+    {{ compose }} --profile env-check run --rm env-check
+    {{ compose }} run --rm backup backup.sh
     {{ compose }} --profile migrate run --rm --build migrate
-    {{ compose }} up -d --build
+    {{ compose }} up -d
     docker image prune -f
+
+# Back to the images of before the last `just update`. The database stays migrated: migrations
+# only add (columns, values), so the previous code runs on it; if not, restore the dump the update took.
+rollback:
+    docker image tag scs-api:previous scs-api:latest
+    docker image tag scs-web:previous scs-web:latest
+    {{ compose }} up -d --no-build
 
 # Check the whole .env, then start the stack (no rebuild)
 up:

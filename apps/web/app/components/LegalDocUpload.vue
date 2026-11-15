@@ -2,6 +2,7 @@
 import {
   ALLOWED_LEGAL_DOC_MIME_TYPES,
   type AnyLegalDocType,
+  latestSeasonalExpiry,
   MAX_LEGAL_DOC_SIZE_BYTES,
   parisToday,
   requiresValidityEnd,
@@ -33,6 +34,8 @@ const validityEndRequired = computed(() => requiresValidityEnd(chosenType.value)
 const ready = computed(() => Boolean(file.value) && (!validityEndRequired.value || Boolean(expiresAt.value)))
 // An already-expired document is refused by the API (story 12.9f).
 const minExpiry = parisToday()
+// Audit 2026-11-15, B2: a season licence cannot claim more than 18 months.
+const maxExpiry = computed(() => (validityEndRequired.value ? latestSeasonalExpiry(minExpiry) : undefined))
 
 function onFileChange(e: Event) {
   error.value = null
@@ -105,7 +108,14 @@ async function submit() {
       <label class="up__field">
         <span v-if="validityEndRequired">Fin de validité <em>(obligatoire : fin de la saison en cours)</em></span>
         <span v-else>Date d'expiration <em>(facultatif)</em></span>
-        <input v-model="expiresAt" class="input" type="date" :min="minExpiry" :required="validityEndRequired" />
+        <input
+          v-model="expiresAt"
+          class="input"
+          type="date"
+          :min="minExpiry"
+          :max="maxExpiry"
+          :required="validityEndRequired"
+        />
       </label>
     </div>
 

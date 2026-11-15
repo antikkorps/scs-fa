@@ -26,7 +26,7 @@ const loadError = ref(false)
 const cancelling = ref(false)
 const cancelError = ref("")
 
-useHead({ title: () => `Demande ${request.value?.number ?? ""} — SCS Firearms` })
+useHead({ title: () => `Demande ${request.value?.number ?? ""}` })
 
 onMounted(async () => {
   await access.load()

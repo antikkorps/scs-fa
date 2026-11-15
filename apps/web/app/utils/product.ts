@@ -1,3 +1,4 @@
+import { universePathForCategory, universePathForTag } from "#shared/utils/universes"
 import type { LegalCategoryCode } from "~/types/product"
 
 // Short badge label for a French prefectural legal category. `none` means the
@@ -46,12 +47,13 @@ export function conditionLabel(condition: string | null | undefined): string {
 
 /** The page of an armurerie category, or the whole catalogue for "" (story 9.6). */
 export function categoryPath(slug: string): string {
-  return slug ? `/boutique/categorie/${encodeURIComponent(slug)}` : "/boutique"
+  if (!slug) return "/boutique"
+  return universePathForCategory(slug) ?? `/boutique/categorie/${encodeURIComponent(slug)}`
 }
 
 /** The page of an armurerie tag: every published product carrying it. */
 export function tagPath(slug: string): string {
-  return `/boutique/tag/${encodeURIComponent(slug)}`
+  return universePathForTag(slug) ?? `/boutique/tag/${encodeURIComponent(slug)}`
 }
 
 const WHOLE_CATALOGUE_PATH = "/boutique"

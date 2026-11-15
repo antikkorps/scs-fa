@@ -47,3 +47,20 @@ const SEASONAL_DOC_TYPES: ReadonlySet<string> = new Set<LegalDocType>(["permis_c
 export function requiresValidityEnd(docType: string): boolean {
   return SEASONAL_DOC_TYPES.has(docType)
 }
+
+/**
+ * Audit 2026-11-15, B2: how far a season licence's declared end may lie. One
+ * season with its margin; beyond, a typo or a false date (2099) would keep an
+ * approved licence valid for ever, skipping the yearly check of category C.
+ */
+export const SEASON_LICENCE_MAX_MONTHS = 18
+
+/** The latest validity end a season licence may declare, from `today` ("YYYY-MM-DD"). */
+export function latestSeasonalExpiry(today: string): string {
+  const [year = 0, month = 1, day = 1] = today.split("-").map(Number)
+  // Day 0 of the following month = last day of the target month: 31 August
+  // + 18 months is 29 February, not 2 March.
+  const lastDay = new Date(Date.UTC(year, month + SEASON_LICENCE_MAX_MONTHS, 0)).getUTCDate()
+  const limit = new Date(Date.UTC(year, month - 1 + SEASON_LICENCE_MAX_MONTHS, Math.min(day, lastDay)))
+  return limit.toISOString().slice(0, 10)
+}

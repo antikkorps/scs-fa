@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BlogArticleDetail } from "~/types/blog"
-import { formatDate } from "~/utils/format"
+import { artworkImage, formatDate } from "~/utils/format"
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -18,6 +18,10 @@ if (error.value || !data.value?.data) {
 // Safe: we throw a fatal 404 above when data is missing, so this only renders with data.
 const article = computed(() => data.value?.data as BlogArticleDetail)
 const hero = computed(() => article.value.featuredImageUrl || undefined)
+// The article's main image, usually its largest element: every width the
+// upload produced, AVIF and WebP, instead of the full file on a phone (SEO
+// audit 2026-11-15, finding 14).
+const heroImage = computed(() => (hero.value ? artworkImage(hero.value, article.value.slug, 1200, 800) : null))
 
 const pageUrl = `${siteUrl}/blog/${slug}`
 const description = computed(
@@ -84,7 +88,16 @@ useHead({
       </header>
 
       <figure v-if="hero" class="post__media">
-        <img :src="hero" :alt="article.title" width="1200" height="800" fetchpriority="high" decoding="async" />
+        <ResponsiveImage
+          v-if="heroImage"
+          :image="heroImage"
+          :alt="article.title"
+          sizes="(min-width: 1240px) 1200px, 100vw"
+          width="1200"
+          height="800"
+          loading="eager"
+          fetchpriority="high"
+        />
       </figure>
 
       <!-- Body is admin-authored HTML served from the API (trusted content). -->
@@ -118,7 +131,7 @@ useHead({
   box-shadow: var(--shadow);
   aspect-ratio: 3 / 2;
 }
-.post__media img {
+.post__media :deep(img) {
   width: 100%;
   height: 100%;
   object-fit: cover;

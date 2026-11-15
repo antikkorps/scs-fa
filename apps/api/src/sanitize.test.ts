@@ -47,4 +47,14 @@ describe("sanitizeRichTextHtml", () => {
       expect(sanitizeRichTextHtml('<a href="javascript:alert(1)">x</a>')).toBe("<a>x</a>")
     })
   })
+
+  // SEO audit 2026-11-15, finding 14: images in an article body loaded eagerly,
+  // competing with the page's main image on mobile.
+  describe("images", () => {
+    it("loads an article's images lazily, off the main thread", () => {
+      expect(sanitizeRichTextHtml('<img src="/api/blog/images/x.webp" alt="Atelier">')).toBe(
+        '<img src="/api/blog/images/x.webp" alt="Atelier" loading="lazy" decoding="async" />',
+      )
+    })
+  })
 })

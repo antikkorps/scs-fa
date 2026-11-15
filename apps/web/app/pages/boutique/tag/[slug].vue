@@ -40,6 +40,7 @@ usePageSeo({
       category=""
       :tag="slug"
       :base-path="tagPath(slug)"
+      :noindex="(tag?.productCount ?? 0) === 0"
       :list-name="`${name} — Boutique armurerie SCS Firearms`"
     />
   </div>

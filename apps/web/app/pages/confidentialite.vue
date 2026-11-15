@@ -65,9 +65,7 @@ usePageSeo({
           <tr>
             <td>Gérer votre compte client</td>
             <td>
-              Nom, prénom, e-mail, téléphone, mot de passe (stocké haché, jamais en clair), adresses ; date de
-              naissance, demandée seulement à la commande d'un article réservé aux majeurs (couteaux…), pour vérifier
-              votre âge
+              Nom, prénom, e-mail, téléphone, mot de passe (stocké haché, jamais en clair), adresses
             </td>
             <td>Exécution du contrat</td>
           </tr>
@@ -75,7 +73,8 @@ usePageSeo({
             <td>Traiter vos commandes, les expédier et les facturer</td>
             <td>
               Articles commandés, adresses de livraison et de facturation, montant, mode de paiement, numéro de suivi
-              du colis
+              du colis ; pour un article réservé aux majeurs (couteaux…), la date à laquelle vous avez certifié avoir
+              18 ans révolus
             </td>
             <td>Exécution du contrat ; obligations comptables</td>
           </tr>

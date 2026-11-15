@@ -17,7 +17,7 @@ import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { loginChallenges, passwordResetTokens, refreshTokens, users } from "../db/schema.js"
 import { validationError } from "../http.js"
-import { inviteAdmin, NotAnAdminError } from "./admin-invite.js"
+import { AdminAlreadyActiveError, inviteAdmin, NotAnAdminError } from "./admin-invite.js"
 import { authenticate } from "./authenticate.js"
 import { reauthenticate, sendReauthRefusal } from "./reauth.js"
 import { requireRole } from "./require-role.js"
@@ -91,6 +91,12 @@ export const adminTeamRoutes: FastifyPluginAsync = async (fastify) => {
         return reply
           .code(409)
           .send({ error: "NotAnAdmin", message: "This e-mail belongs to an account that is not an admin" })
+      }
+      if (error instanceof AdminAlreadyActiveError) {
+        return reply.code(409).send({
+          error: "AdminAlreadyActive",
+          message: "This admin is already active; reset their authenticator app first if they lost access",
+        })
       }
       throw error
     }

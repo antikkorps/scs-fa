@@ -64,12 +64,17 @@ const OPTIONS: sanitizeHtml.IOptions = {
   ],
   allowedAttributes: {
     a: ["href", "target", "rel"],
-    img: ["src", "alt"],
+    img: ["src", "alt", "loading", "decoding"],
   },
   // Absolute links are http(s)/mailto; image src is also relative (/api/blog/images/…),
   // which sanitize-html permits by default.
   allowedSchemes: ["http", "https", "mailto"],
-  transformTags: { a: transformLink },
+  transformTags: {
+    a: transformLink,
+    // SEO audit 2026-11-15, finding 14: body images never compete with the
+    // page's main image; the values are set here, whatever the editor sent.
+    img: sanitizeHtml.simpleTransform("img", { loading: "lazy", decoding: "async" }),
+  },
 }
 
 export function sanitizeRichTextHtml(html: string): string {

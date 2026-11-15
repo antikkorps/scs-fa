@@ -12,9 +12,10 @@ import {
 } from "./constants.js"
 import { MAX_CROSS_SELLS_PER_PRODUCT } from "./cross-sell.js"
 import { LAUNCH_STAGES } from "./launch.js"
+import { parisToday } from "./legal-documents.js"
 import { NEWSLETTER_SEGMENTS, NEWSLETTER_SUBSCRIPTION_STATUS } from "./newsletter.js"
 import { ORDER_LEGAL_STATUSES, ORDER_PAYMENT_STATUSES, REFUND_CHANNELS } from "./orders.js"
-import { requiresValidityEnd } from "./required-docs.js"
+import { latestSeasonalExpiry, requiresValidityEnd } from "./required-docs.js"
 import {
   MAX_PARCELS_PER_ARTICLE,
   ORDER_SHIPPING_STATUSES,
@@ -216,11 +217,9 @@ export const createOrderSchema = z
     shippingAddressId: z.string().uuid(),
     billingAddressId: z.string().uuid().optional(),
     acceptedTermsVersion: z.string().min(1).max(32),
-    // Story 12.13c: given once, when the cart holds an article reserved to adults.
-    birthDate: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected an ISO date (YYYY-MM-DD)")
-      .optional(),
+    // Story 12.13c (Fred 2026-11-15): « Je certifie avoir 18 ans révolus »,
+    // ticked when the cart holds an article reserved to adults.
+    adultDeclaration: z.literal(true).optional(),
   })
   .strict()
 
@@ -247,6 +246,13 @@ function documentMetaSchema<T extends readonly [string, ...string[]]>(types: T) 
         message: "expiresAt is required for a document renewed every season",
         path: ["expiresAt"],
       })
+      .refine(
+        (d) =>
+          !requiresValidityEnd(d.docType) ||
+          d.expiresAt === undefined ||
+          d.expiresAt <= latestSeasonalExpiry(parisToday()),
+        { message: "a season licence cannot be valid more than 18 months ahead", path: ["expiresAt"] },
+      )
   )
 }
 

@@ -51,6 +51,17 @@ describe("categoryPath", () => {
     expect(categoryPath("arme-poing")).toBe("/boutique/categorie/arme-poing")
     expect(categoryPath("")).toBe("/boutique")
   })
+
+  it("leads the knife category to its universe page (story 12.13)", () => {
+    expect(categoryPath("coutellerie")).toBe("/coutellerie")
+  })
+})
+
+describe("tagPath", () => {
+  it("gives a tag its own page, and the hunting tag its universe page (story 12.13)", () => {
+    expect(tagPath("occasion")).toBe("/boutique/tag/occasion")
+    expect(tagPath("chasse")).toBe("/chasse")
+  })
 })
 
 describe("catalogueCanonical", () => {

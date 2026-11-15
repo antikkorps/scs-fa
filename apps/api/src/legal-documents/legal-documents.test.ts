@@ -16,6 +16,13 @@ const EMAIL_OTHER = "legaldoc-test-other@legaldoc-test.local"
 
 const PDF = Buffer.from("%PDF-1.4\n%fake pdf for tests\n")
 
+/** A season licence's end a few months ahead, so the test never reaches the 18-month cap. */
+function nextSeasonEnd(): string {
+  const date = new Date()
+  date.setMonth(date.getMonth() + 8)
+  return date.toISOString().slice(0, 10)
+}
+
 describe("legal documents (/api/legal-documents)", () => {
   let app: FastifyInstance
   let userId: string
@@ -199,7 +206,8 @@ describe("legal documents (/api/legal-documents)", () => {
   it("lists the user's documents, newest first and scoped to the owner", async () => {
     await upload({ fields: { docType: "cni" }, file: validPdf })
     // A licence renewed every season says until when it is valid (I7).
-    await upload({ fields: { docType: "permis_chasse", expiresAt: "2099-06-30" }, file: validPdf })
+    // Within the 18 months a season licence may claim (audit 2026-11-15, B2).
+    await upload({ fields: { docType: "permis_chasse", expiresAt: nextSeasonEnd() }, file: validPdf })
     await upload({ fields: { docType: "sia" }, file: validPdf, authToken: otherToken })
 
     const res = await app.inject({

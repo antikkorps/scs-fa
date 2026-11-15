@@ -1,3 +1,4 @@
+import { universePathForCategory } from "#shared/utils/universes"
 import { type LlmsStage, legalSection, salesNotice } from "./llmsStage"
 // Pure builders for the discoverability surfaces (sitemap, robots, llms.txt).
 // Kept side-effect-free so they can be unit-tested without a running server.
@@ -192,7 +193,9 @@ Points à connaître avant de conseiller un achat :
 
 - [Boutique](${siteUrl}/boutique): tout le catalogue, avec catégorie légale, prix TTC et stock.
 - [Armes de collection](${siteUrl}/armes-de-collection): armes anciennes et historiques, pièces uniques documentées (époque, fabricant, provenance, état).
-- Pages de catégorie : \`${siteUrl}/boutique/categorie/{slug}\` (liste des catégories dans l'API ci-dessous).
+- [Chasse](${siteUrl}/chasse): l'univers chasse, tous les articles marqués « chasse » quelle que soit leur catégorie (armes, munitions, optiques, couteaux, équipement).
+- [Coutellerie](${siteUrl}/coutellerie): couteaux pliants, à lame fixe et de chasse ; vente réservée aux personnes de 18 ans et plus.
+- Pages de catégorie : \`${siteUrl}/boutique/categorie/{slug}\` (liste des catégories dans l'API ci-dessous), sauf la coutellerie, servie par \`${siteUrl}/coutellerie\`.
 - Fiche produit : \`${siteUrl}/boutique/{slug}\`.
 
 ## Gun Art
@@ -272,7 +275,8 @@ export function buildLlmsFull(siteUrl: string, input: LlmsFullInput, stage: Llms
         .map((c) => {
           const inCategory = products.filter((p) => p.category.slug === c.slug)
           const intro = c.description ? `\n\n${c.description}` : ""
-          return `### [${c.name}](${siteUrl}/boutique/categorie/${c.slug})${intro}\n\n${list(inCategory, productLine, "aucun article publié")}`
+          const page = universePathForCategory(c.slug) ?? `/boutique/categorie/${c.slug}`
+          return `### [${c.name}](${siteUrl}${page})${intro}\n\n${list(inCategory, productLine, "aucun article publié")}`
         })
         .join("\n\n")
     : list(products, productLine, "aucun article publié")

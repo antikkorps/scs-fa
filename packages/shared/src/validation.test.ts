@@ -11,6 +11,7 @@ import {
   createOrderSchema,
   createRefundSchema,
   createSupplierSchema,
+  legalDocumentMetaSchema,
   loginSchema,
   newsletterSubscribeSchema,
   newsletterUnsubscribeSchema,
@@ -257,6 +258,13 @@ describe("createOrderSchema (story 12.1)", () => {
     expect(createOrderSchema.safeParse(withoutTerms).success).toBe(false)
     expect(createOrderSchema.safeParse({ ...base, acceptedTermsVersion: "" }).success).toBe(false)
   })
+
+  // Story 12.13c (Fred 2026-11-15): a ticked box, not a date of birth.
+  it("takes the adult declaration as a ticked box, and nothing else", () => {
+    expect(createOrderSchema.safeParse({ ...base, adultDeclaration: true }).success).toBe(true)
+    expect(createOrderSchema.safeParse({ ...base, adultDeclaration: false }).success).toBe(false)
+    expect(createOrderSchema.safeParse({ ...base, birthDate: "1980-05-17" }).success).toBe(false)
+  })
 })
 
 describe("supplier schemas (story 12.5)", () => {
@@ -389,5 +397,29 @@ describe("adminInvitationSchema", () => {
     expect(
       adminInvitationSchema.safeParse({ email: "pas-un-email", firstname: "Fred", lastname: "Martin" }).success,
     ).toBe(false)
+  })
+})
+
+// Audit 2026-11-15, B2: a season licence declared valid until 2099 would never
+// expire once approved, skipping the yearly check of category C.
+describe("legalDocumentMetaSchema — season licences", () => {
+  const inMonths = (months: number) => {
+    const date = new Date()
+    date.setMonth(date.getMonth() + months)
+    return date.toISOString().slice(0, 10)
+  }
+
+  it("accepts a hunting permit valid for the coming season", () => {
+    expect(legalDocumentMetaSchema.safeParse({ docType: "permis_chasse", expiresAt: inMonths(10) }).success).toBe(true)
+  })
+
+  it("refuses a validity end more than 18 months away", () => {
+    const res = legalDocumentMetaSchema.safeParse({ docType: "licence_tir", expiresAt: "2099-12-31" })
+    expect(res.success).toBe(false)
+    expect(legalDocumentMetaSchema.safeParse({ docType: "permis_chasse", expiresAt: inMonths(19) }).success).toBe(false)
+  })
+
+  it("leaves the documents without a season alone", () => {
+    expect(legalDocumentMetaSchema.safeParse({ docType: "cni", expiresAt: "2034-06-30" }).success).toBe(true)
   })
 })
