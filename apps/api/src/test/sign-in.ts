@@ -2,8 +2,9 @@
 // itself: the password, then the authenticator app when the account asks for
 // it (an admin enrols it on first login). Answers like the plain login call
 // did, so `res.json().accessToken` keeps working. A mailed code is left to the
-// caller: those suites check it themselves.
-import { eq } from "drizzle-orm"
+// caller: those suites check it themselves. The address counts as confirmed
+// (audit 2026-11-15, M1): confirming it is tested on its own, not by every suite.
+import { and, eq, isNull } from "drizzle-orm"
 import type { FastifyInstance, LightMyRequestResponse } from "fastify"
 import { base32Decode, decryptSecret, totpCode } from "../auth/totp.js"
 import { db } from "../db/client.js"
@@ -28,6 +29,10 @@ export async function signIn(
   app: FastifyInstance,
   payload: { email: string; password: string; deviceLabel?: string },
 ): Promise<LightMyRequestResponse> {
+  await db
+    .update(users)
+    .set({ emailVerifiedAt: new Date() })
+    .where(and(eq(users.email, payload.email.trim().toLowerCase()), isNull(users.emailVerifiedAt)))
   const first = await app.inject({ method: "POST", url: "/api/auth/login", payload })
   if (first.statusCode !== 200) return first
   const body = first.json()

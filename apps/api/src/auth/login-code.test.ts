@@ -86,6 +86,28 @@ describe("login by password + e-mailed code (story 12.8a)", () => {
     await db.delete(users).where(like(users.email, `%${EMAIL_SUFFIX}`))
   })
 
+  it("confirms the address with the first right code, and keeps that first date (audit 2026-11-15, M1)", async () => {
+    const verifiedAt = async () =>
+      (await db.select({ at: users.emailVerifiedAt }).from(users).where(eq(users.id, userId)))[0]?.at
+    expect(await verifiedAt()).toBeNull()
+
+    const first = await challenge()
+    expect((await verify(first.challengeToken, first.code)).statusCode).toBe(200)
+    const confirmed = await verifiedAt()
+    expect(confirmed).toBeInstanceOf(Date)
+
+    const again = await challenge()
+    expect((await verify(again.challengeToken, again.code)).statusCode).toBe(200)
+    expect(await verifiedAt()).toEqual(confirmed)
+  })
+
+  it("leaves the address unconfirmed after a wrong code", async () => {
+    const { challengeToken, code } = await challenge()
+    expect((await verify(challengeToken, wrong(code))).statusCode).toBe(401)
+    const [row] = await db.select({ at: users.emailVerifiedAt }).from(users).where(eq(users.id, userId))
+    expect(row?.at).toBeNull()
+  })
+
   it("answers the right password with a challenge and a mailed code, not a session", async () => {
     const res = await login()
 

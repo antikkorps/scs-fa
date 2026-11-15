@@ -15,6 +15,8 @@ const form = reactive({
   password: "",
   rgpdConsent: false,
 })
+// Audit 2026-11-15 (M1): the account exists, its address waits for the mailed code.
+const awaitingCode = ref(false)
 const fieldErrors = ref<Record<string, string>>({})
 const error = ref("")
 const loading = ref(false)
@@ -47,7 +49,12 @@ async function submit() {
 
   loading.value = true
   try {
-    await register(parsed.data)
+    const outcome = await register(parsed.data)
+    if (outcome.status === "code_required") {
+      awaitingCode.value = true
+      form.password = ""
+      return
+    }
     await navigateTo(redirectTo.value)
   } catch (err) {
     const status = authErrorStatus(err)
@@ -56,6 +63,16 @@ async function submit() {
   } finally {
     loading.value = false
   }
+}
+
+/** The code can no longer be used: the account exists, a login sends a new one. */
+function restart(message: string) {
+  awaitingCode.value = false
+  error.value = `${message} Votre compte est créé : connectez-vous pour recevoir un nouveau code.`
+}
+
+async function signedIn() {
+  await navigateTo(redirectTo.value)
 }
 </script>
 
@@ -66,6 +83,17 @@ async function submit() {
       <p class="eyebrow">Espace client</p>
       <h1 class="auth-card__title">Créer un compte</h1>
       <SalesClosedNotice what="La création de compte" />
+    </section>
+    <section v-else-if="awaitingCode" class="auth-card">
+      <p class="eyebrow">Espace client</p>
+      <h1 class="auth-card__title">Confirmez votre adresse</h1>
+      <LoginCodeStep
+        :email="form.email"
+        method="email_code"
+        purpose="signup"
+        @signed-in="signedIn"
+        @restart="restart"
+      />
     </section>
     <form v-else class="auth-card" novalidate @submit.prevent="submit">
       <p class="eyebrow">Espace client</p>

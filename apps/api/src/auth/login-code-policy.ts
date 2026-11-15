@@ -15,15 +15,17 @@ export type SecondFactor = "email_code" | "totp" | "totp_enrollment"
  * Story 12.8e — what a login waits for after the right password: the app's
  * code once enabled (it replaces the mailed code for a pro, decision
  * 2026-10-25); its enrolment for an admin without it (mandatory); the mailed
- * code for an organisation's member; nothing for anyone else.
+ * code for an organisation's member, and for anyone whose address was never
+ * confirmed (audit 2026-11-15, M1: the right code confirms it); nothing else.
  */
 export async function secondFactorFor(user: {
   role: string
   organisationId: string | null
   totpEnabledAt: Date | null
+  emailVerifiedAt: Date | null
 }): Promise<SecondFactor | null> {
   if (user.totpEnabledAt) return "totp"
   if (user.role === "admin") return "totp_enrollment"
-  if (await requiresLoginCode(user)) return "email_code"
+  if (!user.emailVerifiedAt || (await requiresLoginCode(user))) return "email_code"
   return null
 }

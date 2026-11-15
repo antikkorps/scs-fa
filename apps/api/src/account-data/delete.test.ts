@@ -318,6 +318,28 @@ describe("the deletion of an account by its holder (story 12.11)", () => {
       expect(await db.select().from(contactMessages).where(eq(contactMessages.email, account.email))).toEqual([])
     })
 
+    it("leaves the address's newsletter consent and messages alone while it is unconfirmed (audit 2026-11-15, M1)", async () => {
+      const account = await createAccount(app, EMAIL_SUFFIX, { emailVerified: false })
+      const [contact] = await db
+        .insert(newsletterContacts)
+        .values({ email: account.email, emailHash: createHash("sha256").update(account.email).digest("hex") })
+        .returning({ id: newsletterContacts.id })
+      contactIds.push(contact.id)
+      await db
+        .insert(newsletterSubscriptions)
+        .values({ contactId: contact.id, segment: "armurerie", status: "confirmed", confirmedAt: new Date() })
+      await db
+        .insert(contactMessages)
+        .values({ name: "Owner", email: account.email, subject: "other", message: "Bonjour" })
+
+      await deleteOk(account)
+
+      const [after] = await db.select().from(newsletterContacts).where(eq(newsletterContacts.id, contact.id))
+      expect(after.email).toBe(account.email)
+      expect(await db.select().from(contactMessages).where(eq(contactMessages.email, account.email))).toHaveLength(1)
+      await db.delete(contactMessages).where(eq(contactMessages.email, account.email))
+    })
+
     it("confirms by e-mail to the address it had, and journals the deletion", async () => {
       const account = await createAccount(app, EMAIL_SUFFIX)
 

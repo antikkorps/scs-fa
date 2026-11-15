@@ -34,6 +34,9 @@ export const WITHDRAWAL_PERIOD_DAYS = 14
 /** An account with neither a login nor an order for this long is warned, then anonymised. */
 export const INACTIVE_ACCOUNT_YEARS = 3
 
+/** An account whose address is still unconfirmed this long after signing up is anonymised (audit 2026-11-15, M1). */
+export const UNCONFIRMED_ACCOUNT_DAYS = 7
+
 /** Time between the inactivity warning and the anonymisation: a login in between keeps the account. */
 export const INACTIVITY_NOTICE_DAYS = 30
 

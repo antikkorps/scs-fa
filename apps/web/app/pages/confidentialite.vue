@@ -235,7 +235,8 @@ usePageSeo({
             <td>Compte client</td>
             <td>
               Tant que vous l'utilisez. Sans connexion ni commande pendant 3 ans, nous vous prévenons par e-mail, puis
-              le compte est supprimé 30 jours plus tard si vous ne vous êtes pas reconnecté
+              le compte est supprimé 30 jours plus tard si vous ne vous êtes pas reconnecté. Un compte dont l'adresse
+              n'a jamais été confirmée (code envoyé à l'inscription) est supprimé au bout de 7 jours
             </td>
           </tr>
           <tr>

@@ -5,6 +5,7 @@ import type { FastifyPluginAsync, FastifyReply } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { loginChallenges, passwordResetTokens, refreshTokens, users } from "../db/schema.js"
+import { markEmailVerified } from "./email-verification.js"
 import { hashPassword } from "./password.js"
 import { hashRefreshToken } from "./tokens.js"
 
@@ -88,9 +89,12 @@ export const resetPasswordRoute: FastifyPluginAsync = async (fastify) => {
             ),
           )
           .returning({ id: passwordResetTokens.id })
-        if (!claim) return false
+        if (!claim) return null
 
         await tx.update(users).set({ passwordHash }).where(eq(users.id, resetToken.userId))
+        // The link reached this mailbox: the address is confirmed (M1). It is
+        // also how the owner takes back an address someone signed up with.
+        const confirmed = await markEmailVerified(resetToken.userId, tx)
         await tx
           .update(passwordResetTokens)
           .set({ usedAt: new Date() })
@@ -100,7 +104,7 @@ export const resetPasswordRoute: FastifyPluginAsync = async (fastify) => {
           .set({ consumedAt: new Date() })
           .where(and(eq(loginChallenges.userId, resetToken.userId), isNull(loginChallenges.consumedAt)))
         await tx.delete(refreshTokens).where(eq(refreshTokens.userId, resetToken.userId))
-        return true
+        return { confirmed }
       })
 
       if (!claimed) {
@@ -118,6 +122,18 @@ export const resetPasswordRoute: FastifyPluginAsync = async (fastify) => {
         ipAddress: request.ip,
         userAgent: request.headers["user-agent"] ?? null,
       })
+      if (claimed.confirmed) {
+        await recordAuditEvent({
+          userId: resetToken.userId,
+          userRole: user?.role ?? null,
+          entityType: "user",
+          entityId: resetToken.userId,
+          action: "user.email_verified",
+          newValue: { by: "password_reset" },
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        })
+      }
 
       return reply.code(200).send({
         message: "Password has been reset. Please log in with your new password.",
