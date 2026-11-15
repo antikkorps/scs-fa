@@ -57,10 +57,7 @@ const sort = computed<ProductSort>(() => {
   const value = q("sort")
   return isProductSort(value) ? value : "relevance"
 })
-const page = computed(() => {
-  const n = Number.parseInt(q("page"), 10)
-  return Number.isFinite(n) && n > 0 ? n : 1
-})
+const page = computed(() => pageFromQuery(route.query.page))
 
 // Reference data for the filters (shared with the header mega-menu, one request).
 const { categories } = useProductCategories()
@@ -134,9 +131,24 @@ function navigate(overrides: Record<string, string | undefined>, resetPage = tru
   router.push({ query: filterQuery(overrides, resetPage) })
 }
 
-/** Switching category changes page, keeping the other filters (a tag page's own tag included). */
-function selectCategory(slug: string) {
-  router.push({ path: categoryPath(slug), query: filterQuery({ tags: appliedTags.value.join(",") || undefined }) })
+/**
+ * A category's page from its first page, keeping the visitor's filters. Not a
+ * tag page's own tag: it stays on its page, else every category link from it
+ * would be a crawlable filtered duplicate.
+ */
+function categoryLink(slug: string) {
+  return { path: categoryPath(slug), query: filterQuery({}) }
+}
+
+/** Page N of these results: the first one without `?page`. */
+function pageLink(n: number) {
+  return { query: filterQuery({ page: n > 1 ? String(n) : undefined }, false) }
+}
+
+// A page past the last one is not an empty page of the listing (SEO audit
+// 2026-11-15, finding 13: a soft 404 with a self-canonical).
+if (pagination.value && page.value > Math.max(pagination.value.totalPages, 1)) {
+  throw createError({ statusCode: 404, statusMessage: "Page introuvable", fatal: true })
 }
 
 // Debounce the free-text search; selects/prices commit immediately.
@@ -154,9 +166,6 @@ function setFilter(key: string, value: string) {
 }
 function setSort(value: string) {
   navigate({ sort: isProductSort(value) && value !== "relevance" ? value : "" })
-}
-function goToPage(n: number) {
-  navigate({ page: String(n) }, false)
 }
 function resetFilters() {
   term.value = ""
@@ -210,6 +219,7 @@ useHead({
 <template>
   <div class="catalogue">
     <section class="container">
+      <CategoryLinks :categories="categories" :current="tag ? null : category" :link-for="categoryLink" />
       <form class="filters" role="search" @submit.prevent>
         <div class="filters__field filters__search">
           <label class="sr-only" for="shop-search">Rechercher</label>
@@ -246,23 +256,6 @@ useHead({
 
         <div id="shop-filters" class="filters__panel" :class="{ 'is-open': filtersOpen }">
           <div class="filters__fields">
-            <div class="filters__field">
-              <label class="sr-only" for="shop-category">Catégorie</label>
-              <select
-                id="shop-category"
-                class="input"
-                @change="selectCategory(($event.target as HTMLSelectElement).value)"
-              >
-                <!-- `:selected` per option, not `:value` on the select: the latter is
-                     neither rendered server-side nor re-applied when the options
-                     arrive after it, so the page's own category showed as "all". -->
-                <option value="" :selected="!category">Toutes les catégories</option>
-                <option v-for="c in categories" :key="c.slug" :value="c.slug" :selected="c.slug === category">
-                  {{ c.name }}
-                </option>
-              </select>
-            </div>
-
             <div class="filters__field">
               <label class="sr-only" for="shop-legal">Catégorie légale</label>
               <select
@@ -325,18 +318,12 @@ useHead({
           </li>
         </ul>
 
-        <nav v-if="pagination && pagination.totalPages > 1" class="pager" aria-label="Pagination">
-          <button type="button" class="pager__btn" :disabled="page <= 1" @click="goToPage(page - 1)">Précédent</button>
-          <span class="pager__info">Page {{ page }} / {{ pagination.totalPages }}</span>
-          <button
-            type="button"
-            class="pager__btn"
-            :disabled="!pagination.hasMore"
-            @click="goToPage(page + 1)"
-          >
-            Suivant
-          </button>
-        </nav>
+        <CatalogPager
+          v-if="pagination && pagination.totalPages > 1"
+          :page="page"
+          :total-pages="pagination.totalPages"
+          :link-for="pageLink"
+        />
       </template>
     </section>
   </div>
@@ -450,35 +437,6 @@ select.input {
      search); 2 from 560px, 3 from 960px. */
   grid-template-columns: 1fr;
 }
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.25rem;
-  padding: 2rem 0 4rem;
-}
-.pager__btn {
-  padding: 0.6rem 1.1rem;
-  background: transparent;
-  color: var(--paper);
-  border: 1px solid var(--ink-line);
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-}
-.pager__btn:hover:not(:disabled) {
-  border-color: var(--brass);
-  color: var(--brass);
-}
-.pager__btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.pager__info {
-  font-size: var(--fs-sm);
-  color: var(--paper-dim);
-}
-
 @media (min-width: 560px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);

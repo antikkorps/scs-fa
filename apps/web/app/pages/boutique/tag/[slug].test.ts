@@ -24,7 +24,7 @@ mockNuxtImport("useFetch", () => (url: string) => {
   if (url.includes("/tags")) return { data: ref({ data: TAGS }), error: ref(null) }
   if (url.includes("/product-categories")) return { data: ref({ data: [] }), error: ref(null) }
   return {
-    data: ref({ data: [], pagination: { page: 1, limit: 24, total: 0, totalPages: 0, hasMore: false } }),
+    data: ref({ data: [], pagination: { page: 1, limit: 24, total: 60, totalPages: 3, hasMore: true } }),
     error: ref(null),
     pending: ref(false),
   }
@@ -48,6 +48,12 @@ describe("tag page", () => {
     expect(wrapper.text()).toContain("Révisées par notre atelier.")
     await headWritten()
     expect(robots()).toBeUndefined()
+  })
+
+  it("numbers the title of a later page of results (SEO audit 2026-11-15, finding 13)", async () => {
+    await mountSuspended(TagPage, { route: "/boutique/tag/occasion?page=2" })
+    await headWritten()
+    expect(document.title).toContain("Occasion — Boutique armurerie — page 2")
   })
 
   it("is a real 404 for a tag that does not exist", async () => {
