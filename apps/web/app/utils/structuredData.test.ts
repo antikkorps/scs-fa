@@ -16,6 +16,9 @@ const product: ProductLdInput = {
   pricesTtc: [720],
   used: false,
   makerName: null,
+  brand: null,
+  gtin: null,
+  salesOpen: true,
 }
 
 describe("productJsonLd", () => {
@@ -33,6 +36,40 @@ describe("productJsonLd", () => {
       seller: { "@type": "Organization", "@id": `${SITE}/#organization`, name: "SCS Firearms" },
     })
     expect(ld.additionalProperty).toEqual({ "@type": "PropertyValue", name: "Catégorie légale", value: "B" })
+  })
+
+  // SEO audit 2026-11-15, finding 3: in the showcase stage the page sells
+  // nothing, so an InStock offer would contradict it.
+  it("states no offer while the shop's sales are closed", () => {
+    const ld = productJsonLd({ ...product, salesOpen: false })
+    expect(ld).not.toHaveProperty("offers")
+    expect(ld.name).toBe("Glock 17")
+  })
+
+  // Finding 5: Google expects a brand and an identifier on a product snippet.
+  it("names the brand and the barcode when the product has them", () => {
+    const ld = productJsonLd({ ...product, brand: "Glock", gtin: "9120039381237" })
+    expect(ld.brand).toEqual({ "@type": "Brand", name: "Glock" })
+    expect(ld.gtin13).toBe("9120039381237")
+  })
+
+  it("files each barcode length under its own property, and drops one that is not a barcode", () => {
+    expect(productJsonLd({ ...product, gtin: "12345670" }).gtin8).toBe("12345670")
+    expect(productJsonLd({ ...product, gtin: "012345678905" }).gtin12).toBe("012345678905")
+    const invalid = productJsonLd({ ...product, gtin: "ABC-123" })
+    expect(Object.keys(invalid).some((key) => key.startsWith("gtin"))).toBe(false)
+  })
+
+  it("drops a mistyped barcode (wrong check digit) rather than hand Google an invalid GTIN", () => {
+    const mistyped = productJsonLd({ ...product, gtin: "9120039381234" })
+    expect(Object.keys(mistyped).some((key) => key.startsWith("gtin"))).toBe(false)
+    expect(productJsonLd({ ...product, gtin: "4 006381 333931" }).gtin13).toBe("4006381333931")
+  })
+
+  // Finding 8: the main visual first, the share card as an alternative.
+  it("passes every image it is given", () => {
+    const images = [`${SITE}/api/media/x/1400.webp`, `${SITE}/api/media/x/og.jpg`]
+    expect(productJsonLd({ ...product, image: images }).image).toEqual(images)
   })
 
   it("never emits an image it does not have — no placeholder, no object", () => {
@@ -69,6 +106,7 @@ describe("artworkJsonLd", () => {
     series: { title: "Âge d'or", slug: "age-d-or" },
     priceFromTtc: 216,
     availablePrints: 4,
+    salesOpen: true,
   }
 
   it("is both a work of art and a product while prints remain", () => {
@@ -77,6 +115,12 @@ describe("artworkJsonLd", () => {
     expect(ld.offers).toMatchObject({ "@type": "AggregateOffer", lowPrice: 216, offerCount: 4 })
     expect(ld.creator?.url).toBe(`${SITE}/collection/artiste/sylvain`)
     expect(ld.isPartOf?.url).toBe(`${SITE}/collection/serie/age-d-or`)
+  })
+
+  it("stays a work of art alone while the shop's sales are closed (SEO audit 2026-11-15, finding 3)", () => {
+    const ld = artworkJsonLd({ ...artwork, salesOpen: false })
+    expect(ld["@type"]).toBe("VisualArtwork")
+    expect(ld).not.toHaveProperty("offers")
   })
 
   it("stays a work of art alone once the edition is closed — a Product without an offer is invalid", () => {

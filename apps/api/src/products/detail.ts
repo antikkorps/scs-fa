@@ -28,6 +28,8 @@ export async function fetchPublishedProduct(match: SQL, visibility: SQL = public
       hasAccessoryRestrictions: products.hasAccessoryRestrictions,
       accessoryRestrictionNotes: products.accessoryRestrictionNotes,
       featuredImageUrl: products.featuredImageUrl,
+      brand: products.brand,
+      ean: products.ean,
       metaTitle: products.metaTitle,
       metaDescription: products.metaDescription,
       keywords: products.keywords,
@@ -133,6 +135,9 @@ export async function fetchPublishedProduct(match: SQL, visibility: SQL = public
     hasAccessoryRestrictions: row.hasAccessoryRestrictions,
     accessoryRestrictionNotes: row.accessoryRestrictionNotes,
     featuredImageUrl: row.featuredImageUrl,
+    // Brand and barcode, for the page's structured data (SEO audit 2026-11-15).
+    brand: row.brand,
+    ean: row.ean,
     audience: row.audience,
     seo: {
       metaTitle: row.metaTitle,

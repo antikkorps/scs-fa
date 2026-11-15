@@ -47,7 +47,7 @@ useHead({
           "@context": "https://schema.org",
           "@type": "BlogPosting",
           headline: article.value.title,
-          image: ogImageUrl(article.value.featuredImageUrl, siteUrl),
+          image: jsonLdImages(article.value.featuredImageUrl, siteUrl),
           description: description.value,
           url: pageUrl,
           mainEntityOfPage: pageUrl,

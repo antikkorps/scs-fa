@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import type { ArtworkDetail } from "~/types/artwork"
-import { artworkGeometry, artworkImage, availabilityLabel, formatEuros, IMAGE_SIZES, ogImageUrl } from "~/utils/format"
+import {
+  artworkGeometry,
+  artworkImage,
+  availabilityLabel,
+  formatEuros,
+  IMAGE_SIZES,
+  jsonLdImages,
+} from "~/utils/format"
 import { artworkJsonLd } from "~/utils/structuredData"
 
 const route = useRoute()
@@ -107,11 +114,12 @@ useHead({
             pageUrl,
             title: art.value.title,
             description: description.value,
-            image: ogImageUrl(art.value.featuredImageUrl, siteUrl),
+            image: jsonLdImages(art.value.featuredImageUrl, siteUrl),
             artist: artist.value,
             series: series.value,
             priceFromTtc: art.value.priceFromTtc,
             availablePrints: availablePrints.value.length,
+            salesOpen: salesOpen.value,
           }),
         ),
       ),
