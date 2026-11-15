@@ -141,6 +141,7 @@ export async function buildAccountExport(userId: string, now: Date) {
       firstName: user.firstname,
       lastName: user.lastname,
       phone: user.phone,
+      birthDate: user.birthDate,
       address: {
         street: user.addressStreet,
         postal: user.addressPostal,

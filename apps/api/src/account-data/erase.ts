@@ -210,6 +210,7 @@ export async function eraseAccount(
         firstname: null,
         lastname: null,
         phone: null,
+        birthDate: null,
         addressStreet: null,
         addressPostal: null,
         addressCity: null,

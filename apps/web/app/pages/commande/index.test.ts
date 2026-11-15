@@ -198,3 +198,40 @@ describe("commande/index.vue — what is being ordered", () => {
     expect(lines[1]).toContain(formatEuros(450))
   })
 })
+
+// Story 12.13c: articles reserved to adults ask for the date of birth once.
+describe("commande/index.vue — articles reserved to adults", () => {
+  async function confirm(wrapper: Awaited<ReturnType<typeof mountCheckout>>) {
+    await wrapper.find(".summary__cta").trigger("click")
+    await flushPromises()
+  }
+
+  it("asks for the date of birth when the API needs it, then sends it with the order", async () => {
+    createOrder
+      .mockRejectedValueOnce({ response: { status: 422 }, data: { error: "BirthDateRequired", requiredAge: 18 } })
+      .mockResolvedValueOnce({ id: "ord-2" })
+    const wrapper = await mountCheckout()
+    await wrapper.find('input[name="terms"]').setValue(true)
+    await confirm(wrapper)
+
+    expect(wrapper.text()).toContain("réservés aux personnes de 18 ans et plus")
+    const field = wrapper.find('input[name="birthDate"]')
+    expect(field.exists()).toBe(true)
+    await field.setValue("1980-05-17")
+    await confirm(wrapper)
+
+    expect(createOrder).toHaveBeenLastCalledWith(expect.objectContaining({ birthDate: "1980-05-17" }))
+    expect(push).toHaveBeenCalledWith("/commande/ord-2")
+  })
+
+  it("says plainly when the customer is under the age", async () => {
+    createOrder.mockRejectedValue({
+      response: { status: 403 },
+      data: { error: "AgeRequirementNotMet", requiredAge: 18 },
+    })
+    const wrapper = await mountCheckout()
+    await wrapper.find('input[name="terms"]').setValue(true)
+    await confirm(wrapper)
+    expect(wrapper.text()).toContain("Votre panier contient des articles réservés aux personnes de 18 ans et plus")
+  })
+})

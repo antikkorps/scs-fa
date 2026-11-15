@@ -44,7 +44,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Finalité | Créer et gérer les comptes clients ; comptes du personnel (administrateurs) |
 | Base légale | Exécution du contrat (clients) ; intérêt légitime (personnel) |
 | Personnes concernées | Clients, administrateurs |
-| Données | Nom, prénom, e-mail, téléphone, mot de passe haché (Argon2id, jamais en clair), adresses, rôle, date et version du consentement à la politique de confidentialité |
+| Données | Nom, prénom, e-mail, téléphone, mot de passe haché (Argon2id, jamais en clair), adresses, rôle, date et version du consentement à la politique de confidentialité ; **date de naissance**, demandée seulement à la commande d'un article réservé aux majeurs (couteaux, articles marqués 18 ans) pour vérifier l'âge (story 12.13c), conservée avec le compte, non modifiable par le client, incluse dans l'export et effacée avec le compte ; jamais demandée aux comptes d'organisation |
 | Destinataires | Personnel habilité de SCS Firearms ; IONOS |
 | Durée | Client : tant qu'il utilise son compte ; sans connexion ni commande pendant 3 ans, avertissement par e-mail puis anonymisation 30 jours plus tard (tâche quotidienne). Compte dont l'adresse n'a jamais été confirmée (code envoyé à l'inscription) : anonymisé au bout de 7 jours, sans e-mail (tâche quotidienne). Suppression immédiate à sa demande, depuis son compte (sauf commande ou devis en cours) : le compte est anonymisé, ses commandes restent (10 ans). Personnel et comptes d'organisation : fermés par SCS |
 
@@ -200,4 +200,5 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | 2026-10-19 | Mesure d'audience : conservation fixée à 25 mois, purge automatique ; cookie `__cf_bm` de Cloudflare déclaré |
 | 2026-11-01 | Droits d'accès, de portabilité et d'effacement en libre-service (story 12.11) ; durées fixées : compte (3 ans d'inactivité, puis anonymisation), pièces justificatives (10 ans si elles ont servi à une commande) |
 | 2026-11-15 | Adresse e-mail confirmée par code à l'inscription (audit 2026-11-15, M1) : l'export et l'effacement ne rattachent la newsletter et les messages de contact au compte qu'une fois l'adresse confirmée ; compte jamais confirmé anonymisé au bout de 7 jours |
+| 2026-11-15 | Date de naissance demandée à la commande d'un article réservé aux majeurs (couteaux, articles marqués 18 ans), pour vérifier l'âge ; conservée avec le compte, exportée, effacée avec lui (story 12.13c) |
 | 2026-11-01 | Formulaire de contact (traitement 13) : messages conservés 1 an après leur traitement ; identité de la boutique saisie au back-office |

@@ -11,6 +11,7 @@ import {
   legalDocuments,
   newsletterContacts,
   newsletterSubscriptions,
+  users,
 } from "../db/schema.js"
 import { ACCOUNT_PASSWORD, createAccount, createOrder, deleteAccounts } from "../test/account-fixtures.js"
 
@@ -88,6 +89,8 @@ describe("the export of an account's data (story 12.11)", () => {
 
   it("hands over everything the account holds, as a dated JSON file", async () => {
     const account = await createAccount(app, EMAIL_SUFFIX)
+    // Story 12.13c: the date given when ordering an article reserved to adults.
+    await db.update(users).set({ birthDate: "1980-05-17" }).where(eq(users.id, account.id))
     const someoneElse = await createAccount(app, EMAIL_SUFFIX)
     await db.insert(addresses).values({
       userId: account.id,
@@ -143,6 +146,7 @@ describe("the export of an account's data (story 12.11)", () => {
       firstName: "Jeanne",
       lastName: "Armand",
       phone: "+33612345678",
+      birthDate: "1980-05-17",
       address: { street: "12 rue des Lilas", postal: "75011", city: "Paris", country: "FR" },
       twoFactorEnabled: false,
     })

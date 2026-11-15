@@ -24,6 +24,7 @@ import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
 import { customerShipments } from "../shipments/service.js"
 import { requireShopOpen } from "../shop-settings/require-shop-open.js"
+import { checkOrderAge } from "./age-check.js"
 import { sendOrderConfirmation } from "./confirmation.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 import { ADDRESS_FIELDS, decrementVariantStock, insertPaymentBuckets, OrderError, toSnapshot } from "./placement.js"
@@ -62,7 +63,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) {
       return reply.code(400).send(validationError(parsed.error.issues))
     }
-    const { shippingAddressId, billingAddressId, acceptedTermsVersion } = parsed.data
+    const { shippingAddressId, billingAddressId, acceptedTermsVersion, birthDate } = parsed.data
 
     // The customer must have ticked the CGV in force (story 12.1). A stale
     // version means the text changed after their checkout page loaded: they
@@ -91,6 +92,17 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     const cart = await loadCart(userId)
     if (cart.summary.itemCount === 0) {
       return reply.code(400).send({ error: "EmptyCart", message: "Cart is empty" })
+    }
+
+    // Story 12.13c: articles reserved to adults.
+    const age = await checkOrderAge(
+      userId,
+      cart.items.map((line) => line.variantId),
+      birthDate,
+    )
+    if (!age.ok) {
+      const { status, ok: _ok, ...body } = age
+      return reply.code(status).send(body)
     }
 
     const [shipping] = await db
