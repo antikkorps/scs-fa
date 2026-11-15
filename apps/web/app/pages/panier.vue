@@ -4,7 +4,7 @@ import { variantDescription } from "~/utils/cart"
 import { formatEuros } from "~/utils/format"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Mon panier — SCS Firearms" })
+useHead({ title: "Mon panier" })
 
 const { fetchCart, updateItem, removeItem, removeArtworkItem } = useCart()
 

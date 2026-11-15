@@ -35,8 +35,8 @@ const periodFacets = computed(() => facets.value.filter((f) => f.facet === "epoq
 const apiQuery = computed(() => {
   const query: Record<string, string | number> = { limit: PAGE_SIZE, page: page.value }
   if (selectedTags.value.length > 0) query.tags = selectedTags.value.join(",")
-  // Sold pieces stay on display by default; the toggle narrows to what is
-  // still buyable.
+  // Only what is still buyable by default; `?vendues=1` shows the sold pieces
+  // too (the comment said the opposite — SEO audit 2026-11-15, finding 20).
   if (!showSold.value) query.available = "true"
   return query
 })

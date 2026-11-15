@@ -7,7 +7,7 @@ import { isRegulated, legalCategoryLabel } from "~/utils/product"
 // Story 12.8c — the pro catalogue: the armurerie and the products reserved for
 // pros, ordered by quote. Never a public price: the pro's net price at most.
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Catalogue professionnel — SCS Firearms" })
+useHead({ title: "Catalogue professionnel" })
 
 const PAGE_SIZE = 24
 

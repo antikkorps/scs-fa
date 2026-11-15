@@ -6,7 +6,7 @@ import type { Universe } from "#shared/utils/universes"
  * of what the universe gathers — products tagged with its tag, across
  * categories, or the products of its category.
  */
-const props = defineProps<{ universe: Universe; eyebrow: string }>()
+const props = defineProps<{ universe: Universe; eyebrow: string; noindex?: boolean }>()
 
 const catalogue = computed(() =>
   props.universe.source.kind === "tag"
@@ -30,6 +30,7 @@ const catalogue = computed(() =>
       :category="catalogue.category"
       :tag="catalogue.tag"
       :base-path="universe.path"
+      :noindex="noindex"
       :list-name="`${universe.name} — SCS Firearms`"
     />
   </div>

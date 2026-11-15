@@ -17,7 +17,7 @@ usePageSeo({
 </script>
 
 <template>
-  <UniverseLayout :universe="universe" eyebrow="Univers">
+  <UniverseLayout :universe="universe" eyebrow="Univers" :noindex="noindex">
     <p>Couteaux pliants, à lame fixe et de chasse : une sélection de lames pour l'usage comme pour la collection.</p>
     <p>
       Vente réservée aux personnes de 18 ans et plus : la date de naissance est demandée à la première commande.

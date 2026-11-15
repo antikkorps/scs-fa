@@ -236,3 +236,32 @@ describe("ShopCatalogue pagination (SEO audit 2026-11-15, findings 1 and 13)", (
     expect(useError().value).toMatchObject({ statusCode: 404 })
   })
 })
+
+// SEO audit 2026-11-15, finding 12: a page kept out of the indexes (an empty
+// tag, an empty universe) sent a canonical too — contradictory signals.
+describe("ShopCatalogue on a page kept out of the indexes", () => {
+  // A path no other test uses: the document outlives each mount.
+  const PATH = "/boutique/tag/noindex-check"
+  const canonicals = () =>
+    [...document.head.querySelectorAll('link[rel="canonical"]')].map((link) => link.getAttribute("href") ?? "")
+
+  it("states no canonical when the page is noindex", async () => {
+    await mountSuspended(ShopCatalogue, {
+      props: { category: "", tag: "noindex-check", basePath: PATH, listName: "x", noindex: true },
+      route: PATH,
+      global: { stubs: { ProductCard: true } },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(canonicals().filter((href) => href.endsWith(PATH))).toEqual([])
+  })
+
+  it("states it otherwise", async () => {
+    await mountSuspended(ShopCatalogue, {
+      props: { category: "", tag: "noindex-check", basePath: `${PATH}-on`, listName: "x" },
+      route: `${PATH}-on`,
+      global: { stubs: { ProductCard: true } },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(canonicals().some((href) => href.endsWith(`${PATH}-on`))).toBe(true)
+  })
+})

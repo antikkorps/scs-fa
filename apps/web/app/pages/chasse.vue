@@ -17,7 +17,7 @@ usePageSeo({
 </script>
 
 <template>
-  <UniverseLayout :universe="universe" eyebrow="Univers">
+  <UniverseLayout :universe="universe" eyebrow="Univers" :noindex="noindex">
     <p>
       Carabines et fusils de chasse, munitions, optiques, couteaux et équipement du chasseur : tout ce qu'il faut
       pour la saison, choisi par notre armurerie.

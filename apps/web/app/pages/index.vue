@@ -8,8 +8,12 @@ const siteUrl = config.public.siteUrl as string
 
 // Both universes feed the unified home: artworks (Gun Art gallery) and the
 // featured-first armurerie catalogue.
+// Only the first three are shown: trimmed on arrival, so the page payload does
+// not carry the whole Gun Art collection (SEO audit 2026-11-15, finding 16).
+const HOME_ARTWORKS = 3
 const { data: artworkData } = await useApiFetch<{ data: ArtworkListItem[] }>(`/artworks`, {
   key: "home-artworks",
+  transform: (res) => ({ data: res.data.slice(0, HOME_ARTWORKS) }),
 })
 const { data: productData } = await useApiFetch<ProductListResponse>(`/products`, {
   key: "home-products",
@@ -18,7 +22,7 @@ const { data: productData } = await useApiFetch<ProductListResponse>(`/products`
 
 const artworks = computed(() => artworkData.value?.data ?? [])
 const products = computed(() => productData.value?.data ?? [])
-const artSelection = computed(() => artworks.value.slice(0, 3))
+const artSelection = computed(() => artworks.value.slice(0, HOME_ARTWORKS))
 const featured = computed(() => artworks.value[0] ?? null)
 const heroImg = computed(() =>
   featured.value ? artworkImage(featured.value.featuredImageUrl, featured.value.slug, 1600, 1100) : null,

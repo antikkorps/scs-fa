@@ -7,7 +7,7 @@ import { legalCategoryLabel } from "~/utils/product"
 // Story 12.8c — the request being prepared: quantities, a message, and off to
 // SCS, who answers with a quote.
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Ma demande de devis — SCS Firearms" })
+useHead({ title: "Ma demande de devis" })
 
 const access = useProAccess()
 const quotes = useQuotes()

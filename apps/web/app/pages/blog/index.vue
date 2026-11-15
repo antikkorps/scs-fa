@@ -4,20 +4,38 @@ import type { BlogListResponse } from "~/types/blog"
 const config = useRuntimeConfig()
 const siteUrl = config.public.siteUrl as string
 
+const PAGE_SIZE = 24
+const route = useRoute()
+// Older articles stay linked from the journal itself, page after page (SEO
+// audit 2026-11-15, finding 15), as the catalogue does.
+const page = computed(() => pageFromQuery(route.query.page))
+
 const { data, error } = await useApiFetch<BlogListResponse>(`/blog`, {
   key: "blog-index",
-  query: { limit: 24 },
+  query: computed(() => ({ limit: PAGE_SIZE, page: page.value })),
 })
 const articles = computed(() => data.value?.data ?? [])
+const pagination = computed(() => data.value?.pagination)
+
+// A page past the last one is a 404, not an empty listing.
+if (pagination.value && page.value > Math.max(pagination.value.totalPages, 1)) {
+  throw createError({ statusCode: 404, statusMessage: "Page introuvable", fatal: true })
+}
+
+/** Page N of the journal: the first one without `?page`. */
+function pageLink(n: number) {
+  return { query: n > 1 ? { page: String(n) } : {} }
+}
 
 const pageUrl = `${siteUrl}/blog`
 const description =
   "Le journal SCS Firearms : histoire de l'armurerie de collection, regards d'artistes et coulisses des éditions Gun Art."
 
 usePageSeo({
-  title: "Le Journal",
+  title: () => pagedTitle("Le Journal", page.value),
   description,
-  path: "/blog",
+  // A later page is a page of its own: it canonicalises to itself.
+  path: () => (page.value > 1 ? `/blog?page=${page.value}` : "/blog"),
 })
 
 useHead({
@@ -37,7 +55,8 @@ useHead({
           "@context": "https://schema.org",
           "@type": "Blog",
           name: "Le Journal — SCS Firearms",
-          url: pageUrl,
+          // The page being described: a later page has its own address.
+          url: page.value > 1 ? `${pageUrl}?page=${page.value}` : pageUrl,
           blogPost: articles.value.map((a) => ({
             "@type": "BlogPosting",
             headline: a.title,
@@ -67,11 +86,19 @@ useHead({
       <p v-if="error" class="state">Le journal n'est pas disponible pour le moment. Revenez bientôt.</p>
       <p v-else-if="articles.length === 0" class="state">Aucun article publié pour l'instant.</p>
 
-      <ul v-else class="grid" role="list">
-        <li v-for="(article, i) in articles" :key="article.id">
-          <BlogCard :article="article" :priority="i < 2" />
-        </li>
-      </ul>
+      <template v-else>
+        <ul class="grid" role="list">
+          <li v-for="(article, i) in articles" :key="article.id">
+            <BlogCard :article="article" :priority="i < 2" />
+          </li>
+        </ul>
+        <CatalogPager
+          v-if="pagination && pagination.totalPages > 1"
+          :page="page"
+          :total-pages="pagination.totalPages"
+          :link-for="pageLink"
+        />
+      </template>
     </section>
   </div>
 </template>

@@ -2,7 +2,7 @@
 import { loginSchema } from "@armurier/shared"
 import type { LoginEnrolment, LoginMethod } from "~/composables/useAuth"
 
-useHead({ title: "Connexion — SCS Firearms" })
+useHead({ title: "Connexion" })
 
 const { login, isAuthenticated } = useAuth()
 const route = useRoute()

@@ -1,5 +1,5 @@
 import { computePriceTtc, productIdParamSchema } from "@armurier/shared"
-import { and, asc, eq, type SQL, sql } from "drizzle-orm"
+import { and, asc, eq, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { ancientWeapons, legalCategories, productCategories, products, productVariants } from "../db/schema.js"
@@ -213,7 +213,11 @@ export const getProductBySlugRoute: FastifyPluginAsync = async (fastify) => {
       return reply.code(400).send({ error: "ValidationError", message: "Invalid slug" })
     }
 
-    const product = await fetchPublishedProduct(eq(products.slug, slug))
+    // An artwork's product is reached through /collection, never as a shop page
+    // (SEO audit 2026-11-15, finding 10), as the list, search and sitemap already do.
+    // `and` of two conditions is never undefined; Drizzle's type allows it for an empty list.
+    const notAnArtwork = and(eq(products.slug, slug), ne(productCategories.category, "gun_art")) as SQL
+    const product = await fetchPublishedProduct(notAnArtwork)
     if (!product) {
       return reply.code(404).send({ error: "NotFound", message: "Product not found" })
     }

@@ -16,7 +16,7 @@ import {
 } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Détail de la commande — SCS Firearms" })
+useHead({ title: "Détail de la commande" })
 
 const route = useRoute()
 const orderId = route.params.id as string

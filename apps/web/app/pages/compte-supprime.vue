@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Story 12.11 — where a holder lands after deleting their account (no session left).
-useHead({ title: "Compte supprimé — SCS Firearms" })
+useHead({ title: "Compte supprimé" })
 </script>
 
 <template>
