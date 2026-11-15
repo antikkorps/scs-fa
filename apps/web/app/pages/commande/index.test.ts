@@ -211,17 +211,18 @@ describe("commande/index.vue — articles reserved to adults", () => {
     createOrder
       .mockRejectedValueOnce({
         response: { status: 422 },
-        data: { error: "AdultDeclarationRequired", requiredAge: 18 },
+        data: { error: "AdultDeclarationRequired", requiredAge: 21 },
       })
       .mockResolvedValueOnce({ id: "ord-2" })
     const wrapper = await mountCheckout()
     await wrapper.find('input[name="terms"]').setValue(true)
     await confirm(wrapper)
 
-    expect(wrapper.text()).toContain("réservés aux personnes de 18 ans et plus")
+    // The age the cart requires, in the message and in the box alike.
+    expect(wrapper.text()).toContain("réservés aux personnes de 21 ans et plus")
     const box = wrapper.find('input[name="adultDeclaration"]')
     expect(box.exists()).toBe(true)
-    expect(wrapper.text()).toContain("Je certifie avoir 18 ans révolus")
+    expect(wrapper.text()).toContain("Je certifie avoir 21 ans révolus")
 
     // Unticked: nothing is sent.
     await confirm(wrapper)

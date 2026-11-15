@@ -128,6 +128,26 @@ describe("admin order — born of a pro quote (story 12.8d)", () => {
   })
 })
 
+// Story 12.13c: SCS sees the customer's commitments without querying the database.
+describe("admin order — the customer's commitments", () => {
+  it("shows the terms accepted and the adult declaration with its time", async () => {
+    current = order({
+      termsVersion: "2026-11-15",
+      termsAcceptedAt: "2026-11-16T09:30:00.000Z",
+      adultDeclaredAt: "2026-11-16T09:30:00.000Z",
+    })
+    const panel = (await mounted()).find(".commitments")
+    expect(panel.text()).toContain("15 nov. 2026")
+    expect(panel.text()).toContain("A certifié avoir 18 ans révolus")
+    expect(panel.text()).toContain("16 nov. 2026")
+  })
+
+  it("says when no adult declaration was needed", async () => {
+    current = order({ termsVersion: "2026-11-15", termsAcceptedAt: "2026-11-16T09:30:00.000Z", adultDeclaredAt: null })
+    expect((await mounted()).find(".commitments").text()).toContain("Non demandée")
+  })
+})
+
 describe("admin order — Henrri invoicing (story 12.6)", () => {
   it("shows the invoice with its number and state", async () => {
     const wrapper = await mounted()
