@@ -1,6 +1,6 @@
-# Production stack — Postgres + API + Web + Caddy, on a single private network.
+# Production stack — Postgres + API + Web + Caddy, on segmented private networks (see `networks:`).
 # Only Caddy is published (80/443); everything else is reachable only by service
-# name on the internal network. Caddy terminates TLS and routes /api → api:8080,
+# name on its private network. Caddy terminates TLS and routes /api → api:8080,
 # everything else → web:3000 (see Caddyfile) — one public origin, no browser CORS.
 #
 # Setup:  cp .env.prod.example .env  &&  edit .env  (secrets + DOMAIN)
@@ -44,7 +44,7 @@ services:
       timeout: 5s
       retries: 10
     security_opt: ["no-new-privileges:true"]
-    networks: [internal]
+    networks: [data]
 
   # Least-privilege database roles (story 12.9f, infra/postgres/roles.sql):
   # scs_owner (migrations), scs_app (API), scs_backup (pg_dump). Run once
@@ -76,7 +76,7 @@ services:
         psql -q -v db="$$PGDATABASE" -v owner_password="$$DB_OWNER_PASSWORD"
         -v app_password="$$DB_APP_PASSWORD" -v backup_password="$$DB_BACKUP_PASSWORD"
         -f /roles.sql
-    networks: [internal]
+    networks: [data]
 
   # One-off schema migration (drizzle-kit lives in dev deps → use the build
   # stage, which has the full workspace and the `drizzle/` migration files).
@@ -103,7 +103,7 @@ services:
     # dependency). `just check-migrate` runs this path end to end.
     working_dir: /repo/apps/api
     command: ["node_modules/.bin/drizzle-kit", "migrate"]
-    networks: [internal]
+    networks: [data]
 
   # One-off check of the WHOLE .env (story 12.9b): the API only receives its own
   # variables, so the Postgres, backup and Umami secrets are checked here for the
@@ -214,7 +214,7 @@ services:
       clamav:
         condition: service_healthy
     security_opt: ["no-new-privileges:true"]
-    networks: [internal]
+    networks: [edge, data, scan]
 
   # ClamAV daemon (clamd) — antivirus for uploaded legal documents (Story 8.6).
   # The API streams each upload here over TCP (INSTREAM) and gates the document's
@@ -231,9 +231,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 6
-      start_period: 180s # initial DB download can take a couple of minutes
+      # The first virus-DB download is often throttled on hosting IP ranges:
+      # 10 minutes before `up -d` gives up on the API (audit 2026-11-15, B3).
+      start_period: 600s
     security_opt: ["no-new-privileges:true"]
-    networks: [internal]
+    networks: [scan]
 
   web:
     logging: *logging
@@ -263,7 +265,7 @@ services:
     depends_on:
       - api
     security_opt: ["no-new-privileges:true"]
-    networks: [internal]
+    networks: [edge]
 
   # Audience measurement (story 9.6): self-hosted Umami, in its own database on
   # the same Postgres (one-time setup: docs/DEPLOY.md § Umami). Visitors only
@@ -291,7 +293,7 @@ services:
       timeout: 5s
       retries: 5
     security_opt: ["no-new-privileges:true"]
-    networks: [internal]
+    networks: [edge, data]
 
   # Automated backups (story 8.4, hardened in 12.9f): a daily pg_dump, encrypted
   # to an age public key (the server cannot read it back), and a daily
@@ -336,7 +338,7 @@ services:
       postgres:
         condition: service_healthy
     security_opt: ["no-new-privileges:true"]
-    networks: [internal]
+    networks: [data, outbound]
 
   caddy:
     logging: *logging
@@ -369,7 +371,7 @@ services:
       - web
       - umami
     security_opt: ["no-new-privileges:true"]
-    networks: [internal]
+    networks: [edge]
 
 volumes:
   postgres_data:
@@ -377,6 +379,20 @@ volumes:
   caddy_config:
   clamav_data:
 
+# Audit 2026-11-15, M3 — four networks instead of one flat one:
+# - edge: what serves the site (caddy, web, api, umami), with internet access
+#   (Stripe, Henrri, Brevo, S3 for the API).
+# - data: Postgres and only what reads it; internal, no way out to the internet.
+# - scan: the API and ClamAV, which parses hostile files: it never reaches
+#   Postgres; freshclam needs the internet for the virus signatures.
+# - outbound: the backup's way out to S3, nothing else on it.
 networks:
-  internal:
+  edge:
+    driver: bridge
+  data:
+    driver: bridge
+    internal: true
+  scan:
+    driver: bridge
+  outbound:
     driver: bridge

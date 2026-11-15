@@ -22,7 +22,9 @@ trap cleanup EXIT
 # A throwaway self-signed pair stands in for the origin certificate: validate
 # loads the files, so they must exist and parse.
 mkdir -p "$WORK/certs"
-openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 1 \
+# Named-curve encoding: macOS's LibreSSL otherwise writes explicit curve
+# parameters, which Go (so Caddy) rejects as "invalid ECDSA parameters".
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -pkeyopt ec_param_enc:named_curve -nodes -days 1 \
   -subj "/CN=example.test" -keyout "$WORK/certs/origin-key.pem" \
   -out "$WORK/certs/origin.pem" >/dev/null 2>&1 ||
   { echo "openssl failed: it is needed to make a throwaway certificate"; exit 1; }

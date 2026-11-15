@@ -82,12 +82,22 @@ function recipe(justfile: string, name: string): string[] {
 }
 
 describe("justfile — the whole .env is checked before anything starts", () => {
-  for (const name of ["deploy", "update", "up"]) {
+  for (const name of ["deploy", "up"]) {
     it(`${name} runs env-check first`, () => {
       const commands = recipe(JUSTFILE, name).filter((line) => line.startsWith("{{ compose }}"))
       expect(commands[0]).toMatch(/--profile env-check run --rm (--build )?env-check$/)
     })
   }
+
+  // The update builds images first (nothing touched yet), then checks .env
+  // before the backup, the migration and the restart.
+  it("update runs env-check before anything touches the database or the running stack", () => {
+    const lines = recipe(JUSTFILE, "update")
+    const check = lines.findIndex((line) => line.includes("--profile env-check run --rm"))
+    const firstTouch = lines.findIndex((line) => /backup\.sh|--profile migrate run|up -d/.test(line))
+    expect(check).toBeGreaterThan(-1)
+    expect(check).toBeLessThan(firstTouch)
+  })
 })
 
 describe("justfile — migrations", () => {
@@ -95,5 +105,71 @@ describe("justfile — migrations", () => {
     const runs = JUSTFILE.split("\n").filter((line) => line.includes("--profile migrate run"))
     expect(runs.length).toBeGreaterThan(0)
     for (const line of runs) expect(line, line.trim()).toContain("--build")
+  })
+})
+
+// Audit 2026-11-15, M2 + M4: the update refreshed no base image (no security
+// fix ever reached Caddy, Postgres or Node), backed nothing up before migrating,
+// built after migrating, and left no way back.
+describe("justfile — the update procedure", () => {
+  const update = () => recipe(JUSTFILE, "update")
+  const position = (fragment: string) => update().findIndex((line) => line.includes(fragment))
+
+  it("only fast-forwards: a diverged server checkout stops the update", () => {
+    expect(update()[0]).toBe("git pull --ff-only")
+  })
+
+  it("keeps the running images as :previous, then refreshes the base images before anything else", () => {
+    expect(position("scs-api:latest scs-api:previous")).toBeGreaterThan(-1)
+    expect(position("scs-web:latest scs-web:previous")).toBeGreaterThan(-1)
+    expect(position("pull --ignore-buildable")).toBeGreaterThan(position("scs-api:previous"))
+    expect(position("build --pull")).toBeGreaterThan(position("scs-api:previous"))
+  })
+
+  it("builds before migrating, and backs the database up right before the migration", () => {
+    const migrate = position("--profile migrate run")
+    expect(position("build --pull")).toBeLessThan(migrate)
+    expect(position("backup.sh")).toBeGreaterThan(position("build --pull"))
+    expect(position("backup.sh")).toBeLessThan(migrate)
+  })
+
+  it("offers a way back to the previous images", () => {
+    const rollback = recipe(JUSTFILE, "rollback")
+    expect(rollback.join("\n")).toContain("scs-api:previous scs-api:latest")
+    expect(rollback.join("\n")).toContain("scs-web:previous scs-web:latest")
+  })
+})
+
+// Audit 2026-11-15, M3: one flat network let ClamAV — a C parser fed hostile
+// files — or the front reach Postgres, and gave every container the internet.
+describe("docker-compose.prod.yml — network segmentation", () => {
+  const networksOf = (service: string) => {
+    const line = serviceBlock(COMPOSE, service).find((l) => l.trim().startsWith("networks:")) ?? ""
+    return (line.match(/\[(.*)\]/)?.[1] ?? "")
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean)
+      .sort()
+  }
+
+  it("keeps Postgres on a network of its own, with no way out to the internet", () => {
+    expect(networksOf("postgres")).toEqual(["data"])
+    const data = COMPOSE.split("\n")
+    const start = data.indexOf("  data:")
+    expect(data.slice(start, start + 4).join("\n")).toContain("internal: true")
+  })
+
+  it("lets only what reads the database reach it", () => {
+    for (const service of ["api", "migrate", "db-roles", "umami", "backup"]) {
+      expect(networksOf(service), service).toContain("data")
+    }
+    for (const service of ["caddy", "web", "clamav"]) {
+      expect(networksOf(service), service).not.toContain("data")
+    }
+  })
+
+  it("isolates ClamAV with the API alone", () => {
+    expect(networksOf("clamav")).toEqual(["scan"])
+    expect(networksOf("api")).toContain("scan")
   })
 })

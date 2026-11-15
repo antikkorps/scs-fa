@@ -37,6 +37,17 @@ sudo sshd -T | grep -E '^(passwordauthentication|kbdinteractiveauthentication|pe
 # expected: passwordauthentication no · kbdinteractiveauthentication no · permitrootlogin no (or prohibit-password)
 ```
 
+**Security updates of the host** (audit 2026-11-15, B2): a CVE in the kernel,
+OpenSSH or Docker Engine must not wait for someone to think of `apt upgrade`.
+
+```bash
+sudo apt install unattended-upgrades && sudo dpkg-reconfigure -plow unattended-upgrades
+systemctl status unattended-upgrades          # active (running)
+# Docker Engine comes from Docker's repository: add it to the allowed origins in
+# /etc/apt/apt.conf.d/50unattended-upgrades ("Docker:${distro_codename}";), and
+# pick a reboot window there (Automatic-Reboot "true" + Automatic-Reboot-Time "04:30").
+```
+
 **Two accounts, two roles** (set up 2026-11-14):
 
 | Account | Role | Groups |
@@ -208,6 +219,7 @@ nano certs/origin-key.pem   # the private key
 chmod 600 certs/origin-key.pem
 
 cp .env.prod.example .env
+chmod 600 .env       # secrets: readable by `deploy` alone (audit 2026-11-15, B8)
 nano .env            # fill EVERY secret; set DOMAIN
                      # BACKUP_AGE_RECIPIENT: § 6 (the key pair is made off the server)
 
@@ -218,6 +230,11 @@ docker compose -f docker-compose.prod.yml --profile env-check run --rm --build e
 # --build: the migrate image must carry the migrations of the current checkout.
 docker compose -f docker-compose.prod.yml --profile db-roles run --rm db-roles
 docker compose -f docker-compose.prod.yml --profile migrate run --rm --build migrate
+
+# ClamAV first: its first virus-DB download can take minutes on a hosting IP
+# range, and the API waits for it (audit 2026-11-15, B3). Wait for "healthy".
+docker compose -f docker-compose.prod.yml up -d clamav
+docker compose -f docker-compose.prod.yml ps clamav
 
 # Build + start the stack.
 docker compose -f docker-compose.prod.yml up -d --build
@@ -280,7 +297,15 @@ applied — the CI applies them on the host, so this is the deploy path's check.
 cd /srv/scs-firearm && just update
 ```
 
-`just update` pulls, runs `env-check`, applies the new migrations and rebuilds.
+`just update` (audit 2026-11-15, M2 + M4): fast-forward pull only (a diverged
+checkout stops it); keeps the running images as `:previous`; pulls fresh base
+images (Caddy, Postgres, Umami, ClamAV) and builds ours with `--pull` **before**
+touching the database, so a failed build leaves it as it was; runs `env-check`;
+**dumps the database**; applies the new migrations; restarts. Something wrong
+after it? `just rollback` puts the `:previous` images back (migrations only add,
+so the previous code runs on the migrated schema; otherwise restore the dump the
+update just took, § 6). Run it even without code changes, monthly, to pick up
+the base images' security fixes.
 The migrate image is rebuilt every time (`--build`): without it, compose reuses
 the image of the first deploy, whose `drizzle/` folder predates every later
 migration — the new API would then start on the old schema.
@@ -448,6 +473,13 @@ back-office, so the DNS can move early.
 
 - [ ] VPS prepared (§ 1): `sshd -T` shows no password login, IONOS firewall
       policy = SSH/80/443 only, deploy key read-only.
+- [ ] **Security updates automatic** (§ 1): `systemctl status unattended-upgrades`
+      active, Docker's repository allowed, reboot window set.
+- [ ] **Origin locked to Cloudflare** (§ Cloudflare): 80/443 accepted only from the
+      Cloudflare ranges **v4 and v6**, checked from an outside machine — the
+      `curl -k --resolve` to the server's IP times out.
+- [ ] **journald installed** (§ Logs): `systemd-analyze cat-config systemd/journald.conf`
+      shows the scs-firearm file (14 days, daily files).
 - [ ] **Emergency access tested** (§ 1.1): SSH from another device with the
       Bitwarden key, and a login through the IONOS console.
 - [ ] Cloudflare in front (§ 2): nameservers switched, Full (strict), origin
@@ -542,11 +574,17 @@ back-office, so the DNS can move early.
   - ⚠️ Nuxt trusts `X-Forwarded-For` unconditionally. That is sound only because
     `web` publishes no port — Caddy is its sole client. Never publish it.
 - **Lock the origin to Cloudflare.** In the IONOS firewall policy, accept
-  80/443 **only from the Cloudflare IP ranges** (`https://www.cloudflare.com/ips`),
-  so no one can bypass the WAF by hitting the IP directly. Not with ufw: Docker's
-  published ports bypass it (§ 1). If the policy cannot hold the ~22 ranges,
-  the alternative is Cloudflare *Authenticated Origin Pulls* (Caddy then demands
-  Cloudflare's client certificate) — a Caddyfile change, not done yet.
+  80/443 **only from the Cloudflare IP ranges, IPv4 and IPv6**
+  (`https://www.cloudflare.com/ips-v4` and `/ips-v6`), so no one can bypass the
+  WAF by hitting the IP directly — origin certificates are indexed by Censys and
+  Shodan, which tells anyone the server's address. Not with ufw: Docker's
+  published ports bypass it (§ 1). **Check from outside** (a machine that is not
+  the server, IPv4 and, if the VPS has one, IPv6):
+  `curl -k --max-time 10 --resolve www.<DOMAIN>:443:<server IP> https://www.<DOMAIN>/health`
+  must time out. If the policy cannot hold the ~22 ranges, the alternative is
+  Cloudflare *Authenticated Origin Pulls* (Caddy then demands Cloudflare's client
+  certificate) — a Caddyfile change, not done yet: enable it in Cloudflare and in
+  Caddy together, or every request is refused.
 - Optional: WAF managed rules, a rate-limit rule on `/api/auth/*`, cache rules for
   static assets. Object storage stays on Scaleway (decision 2026-09-06).
 
@@ -578,8 +616,14 @@ One-time setup:
    login too; the tracker is not behind it (it goes through `www`).
 2. Database and role (Umami migrates its own schema on start):
    ```sh
-   docker compose -f docker-compose.prod.yml exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-     -c "CREATE ROLE umami LOGIN PASSWORD '<UMAMI_DB_PASSWORD>';" -c "CREATE DATABASE umami OWNER umami;"
+   # The password comes from .env through a psql variable: never typed on the
+   # command line, so it stays out of the shell history (audit 2026-11-15, B4).
+   set -a; . ./.env; set +a
+   docker compose -f docker-compose.prod.yml exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+     -v pw="$UMAMI_DB_PASSWORD" <<'SQL'
+   CREATE ROLE umami LOGIN PASSWORD :'pw';
+   CREATE DATABASE umami OWNER umami;
+   SQL
    docker compose -f docker-compose.prod.yml up -d umami
    ```
 3. DNS: `stats` record (proxied), like `www`. Log in at `https://stats.<DOMAIN>`
