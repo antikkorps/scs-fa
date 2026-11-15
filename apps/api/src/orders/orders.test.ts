@@ -31,6 +31,18 @@ vi.mock("../email.js", async (importOriginal) => ({
   sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
+// Bank details are optional (the shop may open before its RIB is known):
+// switch them off per test to exercise the refusal of a transfer order.
+const bank = vi.hoisted(() => ({ configured: true }))
+vi.mock("../payments/bank-details.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../payments/bank-details.js")>()
+  return {
+    ...original,
+    bankDetailsFrom: (environment: Parameters<typeof original.bankDetailsFrom>[0]) =>
+      bank.configured ? original.bankDetailsFrom(environment) : null,
+  }
+})
+
 const PREFIX = "TEST32-"
 const PASSWORD = "MotDePasseTresLong123!"
 const EMAIL = "cart-test32@order-test.local"
@@ -578,6 +590,37 @@ describe("orders (POST /api/orders)", () => {
     expect(variant.stockQty).toBe(4)
     const cart = await app.inject({ method: "GET", url: "/api/cart", headers: authHeaders(token) })
     expect(cart.json().data.summary.itemCount).toBe(0)
+  })
+
+  describe("before the bank details are configured", () => {
+    beforeEach(() => {
+      bank.configured = false
+    })
+    afterEach(() => {
+      bank.configured = true
+    })
+
+    it("refuses an order that needs a transfer, and leaves the cart and stock untouched", async () => {
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      const res = await createOrder()
+      expect(res.statusCode).toBe(503)
+      expect(res.json().error).toBe("BankTransferUnavailable")
+
+      const [variant] = await db
+        .select({ stockQty: productVariants.stockQty })
+        .from(productVariants)
+        .where(eq(productVariants.id, regulatedVariantId))
+      expect(variant.stockQty).toBe(5)
+      const cart = await app.inject({ method: "GET", url: "/api/cart", headers: authHeaders(token) })
+      expect(cart.json().data.summary.itemCount).toBe(1)
+    })
+
+    it("still takes card-only orders", async () => {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      const res = await createOrder()
+      expect(res.statusCode).toBe(201)
+      expect(res.json().data.paymentSplit.splitType).toBe("carte_only")
+    })
   })
 
   it("creates a carte-only order for accessories without legal verification", async () => {

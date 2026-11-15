@@ -98,6 +98,26 @@ export function paymentDeadlineNote(paymentDueAt: string | null | undefined, pay
 // anything else; saying so in the page spares the customer a failed order.
 export const UNDELIVERABLE_MESSAGE = "Nous livrons uniquement en France métropolitaine, Corse comprise."
 
+// The shop may open before its bank details are set: the API then refuses any
+// order that must be paid by transfer (regulated firearms, pro "on invoice").
+export const BANK_TRANSFER_UNAVAILABLE_MESSAGE =
+  "Le paiement par virement n'est pas encore ouvert : une commande à régler par virement ne peut pas être passée pour le moment. Contactez-nous pour en savoir plus."
+
+const PLACE_ORDER_MESSAGES: Record<string, string> = {
+  TermsOutdated:
+    "Nos conditions générales de vente ont changé depuis l'ouverture de cette page. Rechargez la page pour lire la nouvelle version.",
+  UndeliverableAddress: UNDELIVERABLE_MESSAGE,
+  BankTransferUnavailable: BANK_TRANSFER_UNAVAILABLE_MESSAGE,
+}
+
+/** Why the checkout could not place the order, from the API's status and error code. */
+export function placeOrderErrorMessage(status: number | null | undefined, code: string | null | undefined): string {
+  const known = code ? PLACE_ORDER_MESSAGES[code] : undefined
+  if (known) return known
+  if (status === 400) return "Votre panier est vide ou invalide."
+  return "Impossible de créer la commande."
+}
+
 /** One address of the book on one line: "Jeanne Armand — 3 quai du Stand, 69002 Lyon". */
 export function addressLine(a: {
   firstName: string

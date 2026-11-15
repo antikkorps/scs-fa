@@ -28,6 +28,17 @@ vi.mock("../orders/confirmation.js", async (importOriginal) => ({
   sendOrderConfirmation: vi.fn().mockResolvedValue(undefined),
 }))
 
+// Bank details are optional (the shop may open before its RIB is known).
+const bank = vi.hoisted(() => ({ configured: true }))
+vi.mock("../payments/bank-details.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../payments/bank-details.js")>()
+  return {
+    ...original,
+    bankDetailsFrom: (environment: Parameters<typeof original.bankDetailsFrom>[0]) =>
+      bank.configured ? original.bankDetailsFrom(environment) : null,
+  }
+})
+
 const TAG = "quoteaccept"
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -274,6 +285,20 @@ describe("accepting a quote (story 12.8d)", () => {
     expect((await requestOf(quote.id))?.status).toBe("sent")
     expect(await db.select().from(orders).where(eq(orders.quoteRequestId, quote.id))).toHaveLength(0)
     await db.update(productVariants).set({ stockQty: 10 }).where(eq(productVariants.id, rifle.variantId))
+  })
+
+  it("refuses a quote paid by transfer while the bank details are not set, and changes nothing", async () => {
+    const quote = await sentQuote()
+    bank.configured = false
+    try {
+      const res = await accept(quote.id)
+      expect(res.statusCode).toBe(503)
+      expect(res.json().error).toBe("BankTransferUnavailable")
+    } finally {
+      bank.configured = true
+    }
+    expect((await requestOf(quote.id))?.status).toBe("sent")
+    expect(await db.select().from(orders).where(eq(orders.quoteRequestId, quote.id))).toHaveLength(0)
   })
 
   it("refuses an address outside metropolitan France, someone else's address, and outdated terms", async () => {

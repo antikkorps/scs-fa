@@ -69,4 +69,8 @@ describe("quoteAcceptanceMessage", () => {
   it("says the shop is not open yet (story 12.10)", () => {
     expect(quoteAcceptanceMessage("ShopNotOpen")).toBe(SHOP_NOT_OPEN_MESSAGE)
   })
+
+  it("says transfer payments are not open yet", () => {
+    expect(quoteAcceptanceMessage("BankTransferUnavailable")).toContain("virement n'est pas encore ouvert")
+  })
 })

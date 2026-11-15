@@ -4,7 +4,7 @@ import type { CartChange, CartView } from "~/types/cart"
 import type { Address } from "~/types/checkout"
 import { cartChangeLabel, earliestHold, variantDescription } from "~/utils/cart"
 import { formatDate, formatEuros } from "~/utils/format"
-import { addressLine, UNDELIVERABLE_MESSAGE } from "~/utils/order"
+import { addressLine, placeOrderErrorMessage, UNDELIVERABLE_MESSAGE } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
 useHead({ title: "Commande — SCS Firearms" })
@@ -110,14 +110,7 @@ async function placeOrder() {
       placing.value = false
       return
     }
-    placeError.value =
-      status === 409 && apiErrorCode(err) === "TermsOutdated"
-        ? "Nos conditions générales de vente ont changé depuis l'ouverture de cette page. Rechargez la page pour lire la nouvelle version."
-        : status === 422 && apiErrorCode(err) === "UndeliverableAddress"
-          ? UNDELIVERABLE_MESSAGE
-          : status === 400
-            ? "Votre panier est vide ou invalide."
-            : "Impossible de créer la commande."
+    placeError.value = placeOrderErrorMessage(status, apiErrorCode(err))
     placing.value = false
   }
 }

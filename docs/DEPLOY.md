@@ -448,7 +448,9 @@ back-office, so the DNS can move early.
 - [ ] Cloudflare in front (§ 2): nameservers switched, Full (strict), origin
       certificate in `certs/` (§ 3); `curl -fsS https://www.<DOMAIN>/health` answers.
 - [ ] `.env` filled: every secret, `DOMAIN`, `S3_*`, Stripe **live**
-      keys, SMTP creds, the real `VIREMENT_*` account. No placeholder left — the
+      keys, SMTP creds, the real `VIREMENT_*` account (optional to boot, but
+      without it every order with a regulated firearm is refused — the API logs
+      a warning at startup; set it, then `just up` recreates the API). No placeholder left — the
       API refuses to start otherwise (story 12.9b): any secret still holding a
       `CHANGE-ME` / `replace-me` / `your-…` sample (Postgres, Umami and the admin
       seed included), the sample IBAN, the same value for both JWT secrets, or

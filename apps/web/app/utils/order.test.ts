@@ -5,6 +5,7 @@ import {
   parcelItemLabel,
   paymentDeadlineNote,
   paymentStatusLabel,
+  placeOrderErrorMessage,
   shipmentStatusLabel,
   shippingStatusLabel,
   statusTone,
@@ -87,5 +88,22 @@ describe("paymentDeadlineNote (story 12.9a)", () => {
 describe("customer-facing statuses when it is the customer's turn", () => {
   it("asks for the documents while some are missing", () => {
     expect(legalStatusLabel("pending")).toBe("Documents à fournir")
+  })
+})
+
+describe("placeOrderErrorMessage", () => {
+  it("explains that transfer orders wait for the shop's bank details", () => {
+    expect(placeOrderErrorMessage(503, "BankTransferUnavailable")).toBe(
+      "Le paiement par virement n'est pas encore ouvert : une commande à régler par virement ne peut pas être passée pour le moment. Contactez-nous pour en savoir plus.",
+    )
+  })
+
+  it("keeps the existing messages", () => {
+    expect(placeOrderErrorMessage(409, "TermsOutdated")).toContain("conditions générales de vente ont changé")
+    expect(placeOrderErrorMessage(422, "UndeliverableAddress")).toBe(
+      "Nous livrons uniquement en France métropolitaine, Corse comprise.",
+    )
+    expect(placeOrderErrorMessage(400, "EmptyCart")).toBe("Votre panier est vide ou invalide.")
+    expect(placeOrderErrorMessage(500, null)).toBe("Impossible de créer la commande.")
   })
 })

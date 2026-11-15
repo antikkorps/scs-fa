@@ -1,6 +1,7 @@
 import "dotenv/config"
 import { z } from "zod"
 import { sampleValueProblems } from "./env-guard.js"
+import { missingBankDetails } from "./payments/bank-details.js"
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -47,11 +48,12 @@ const envSchema = z.object({
   // Bank transfer (virement) — the SCS receiving account printed on the RIB we
   // hand the customer for regulated-firearm orders (Story 6.2). Snapshotted onto
   // each payment_virement row at order creation, so changing these later does
-  // not rewrite instructions already issued.
-  VIREMENT_IBAN: z.string().min(1),
-  VIREMENT_BIC: z.string().min(1),
-  VIREMENT_BANK_NAME: z.string().min(1),
-  VIREMENT_ACCOUNT_HOLDER: z.string().min(1),
+  // not rewrite instructions already issued. OPTIONAL, all four or none: until
+  // they are set, orders that need a transfer are refused (payments/bank-details.ts).
+  VIREMENT_IBAN: z.string().optional(),
+  VIREMENT_BIC: z.string().optional(),
+  VIREMENT_BANK_NAME: z.string().optional(),
+  VIREMENT_ACCOUNT_HOLDER: z.string().optional(),
 
   // Legal doc SLA breach scheduler — in-process check every N minutes (0 disables;
   // disabled in tests regardless). External cron can call the sla CLI instead.
@@ -179,6 +181,13 @@ const envSchema = z.object({
 })
 
 const parsed = envSchema.parse(process.env)
+
+const missingBank = missingBankDetails(parsed)
+if (missingBank.length > 0) {
+  throw new Error(
+    `The bank details are all-or-none. Set ${missingBank.join(", ")}, or leave all four VIREMENT_* empty.`,
+  )
+}
 
 // Story 12.9b — never run production on the sample values of the committed
 // examples (a "CHANGE-ME…" JWT secret passes the schema and forges admin tokens).

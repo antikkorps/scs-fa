@@ -33,10 +33,12 @@ const REAL_PRODUCTION = {
   VIREMENT_ACCOUNT_HOLDER: "SCS Firearms SAS",
 }
 
-function loadEnv(overrides: Record<string, string>) {
+function loadEnv(overrides: Record<string, string>, omitted: readonly string[] = []) {
+  const env: Record<string, string> = { PATH: process.env.PATH ?? "", ...REAL_PRODUCTION, ...overrides }
+  for (const name of omitted) delete env[name]
   const result = spawnSync(TSX, [ENV_MODULE], {
     cwd: emptyDir,
-    env: { PATH: process.env.PATH ?? "", ...REAL_PRODUCTION, ...overrides },
+    env,
     encoding: "utf8",
   })
   return { status: result.status, output: `${result.stdout}${result.stderr}` }
@@ -62,5 +64,25 @@ describe("production environment (story 12.9b)", () => {
 
   it("lets development run on the samples", () => {
     expect(loadEnv({ NODE_ENV: "development", JWT_SECRET: "CHANGE-ME-very-long-secret-min-32-chars" }).status).toBe(0)
+  }, 30_000)
+})
+
+describe("bank details (optional, all four or none)", () => {
+  const BANK_VARIABLES = ["VIREMENT_IBAN", "VIREMENT_BIC", "VIREMENT_BANK_NAME", "VIREMENT_ACCOUNT_HOLDER"]
+
+  it("starts production before the bank details are known", () => {
+    expect(loadEnv({}, BANK_VARIABLES).status).toBe(0)
+  }, 30_000)
+
+  it("treats the empty values of a fresh .env as not configured", () => {
+    const empty = Object.fromEntries(BANK_VARIABLES.map((name) => [name, ""]))
+    expect(loadEnv(empty).status).toBe(0)
+  }, 30_000)
+
+  it("refuses a half-filled RIB and names what is missing", () => {
+    const { status, output } = loadEnv({}, ["VIREMENT_BIC", "VIREMENT_ACCOUNT_HOLDER"])
+    expect(status).not.toBe(0)
+    expect(output).toContain("VIREMENT_BIC")
+    expect(output).toContain("VIREMENT_ACCOUNT_HOLDER")
   }, 30_000)
 })
