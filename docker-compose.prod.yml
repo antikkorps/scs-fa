@@ -257,6 +257,9 @@ services:
       # every SSR render shares one rate-limit budget (story 9.6).
       NUXT_API_INTERNAL_BASE: http://api:8080/api
       NUXT_INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?set INTERNAL_API_SECRET in .env}
+      # Read by the card form; must come from the same Stripe mode (test/live) as
+      # the API's STRIPE_SECRET_KEY, or every payment fails.
+      NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:?set STRIPE_PUBLISHABLE_KEY in .env}
       # Created in the Umami dashboard once (docs/DEPLOY.md § Umami). Empty = no
       # measurement; set, the tracker still waits for the visitor's consent.
       NUXT_PUBLIC_UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
