@@ -22,6 +22,8 @@ const props = defineProps<{
   basePath: string
   /** Name of the list in its ItemList structured data. */
   listName: string
+  /** The page is kept out of the indexes (an empty tag or universe): no canonical then (SEO audit 2026-11-15, 12). */
+  noindex?: boolean
 }>()
 
 const PAGE_SIZE = 24
@@ -192,13 +194,16 @@ const canonicalPath = computed(() =>
 )
 
 useHead({
-  link: [
-    {
-      key: "canonical",
-      rel: "canonical",
-      href: computed(() => catalogueCanonical(siteUrl, canonicalPath.value, page.value)),
-    },
-  ],
+  // noindex and a canonical together are contradictory signals: one or the other.
+  link: props.noindex
+    ? []
+    : [
+        {
+          key: "canonical",
+          rel: "canonical",
+          href: computed(() => catalogueCanonical(siteUrl, canonicalPath.value, page.value)),
+        },
+      ],
   script: [
     {
       type: "application/ld+json",

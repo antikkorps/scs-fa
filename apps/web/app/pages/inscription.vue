@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { registerSchema } from "@armurier/shared"
 
-useHead({ title: "Créer un compte — SCS Firearms" })
+useHead({ title: "Créer un compte" })
 
 const { register, isAuthenticated } = useAuth()
 const { salesOpen } = useLaunch()

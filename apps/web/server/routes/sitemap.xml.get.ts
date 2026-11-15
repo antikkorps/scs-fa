@@ -94,6 +94,8 @@ export default defineEventHandler(async (event) => {
     // (/collection/artiste is deliberately absent: a noindex router page.)
     { loc: `${siteUrl}/blog`, lastmod: latest(d.blogPosts.map(dated)), changefreq: "weekly", priority: 0.7 },
     { loc: `${siteUrl}/contact`, changefreq: "yearly", priority: 0.4 },
+    // The pro signup page is indexable (nuxt.config): listed so it is found.
+    { loc: `${siteUrl}/pro/inscription`, changefreq: "yearly", priority: 0.4 },
     // Reference pages, once validated and complete (shared/utils/editorialPages.ts).
     ...legalPaths.map((path) => ({
       loc: `${siteUrl}${path}`,

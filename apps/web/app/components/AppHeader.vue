@@ -131,12 +131,14 @@ async function signOut() {
               <div class="mega__col">
                 <p class="mega__label">Collection</p>
                 <NuxtLink to="/armes-de-collection" class="mega__link">Armes de collection &amp; historiques</NuxtLink>
-                <NuxtLink to="/boutique?tags=occasion" class="mega__link">Armes d'occasion</NuxtLink>
+                <!-- The tag's own page, not a filtered view of /boutique (SEO audit 2026-11-15, 11). -->
+                <NuxtLink :to="tagPath('occasion')" class="mega__link">Armes d'occasion</NuxtLink>
                 <p class="mega__label mega__label--spaced">Par catégorie légale</p>
                 <NuxtLink
                   v-for="l in LEGAL"
                   :key="l.code"
                   :to="`/boutique?legalCategory=${l.code}`"
+                  rel="nofollow"
                   class="mega__link"
                 >
                   {{ l.label }}

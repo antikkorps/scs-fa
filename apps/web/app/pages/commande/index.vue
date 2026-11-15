@@ -7,7 +7,7 @@ import { formatDate, formatEuros } from "~/utils/format"
 import { addressLine, ageRequirementMessage, placeOrderErrorMessage, UNDELIVERABLE_MESSAGE } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Commande — SCS Firearms" })
+useHead({ title: "Commande" })
 
 const { fetchCart, count: cartCount } = useCart()
 const { list: listAddresses } = useAddresses()

@@ -215,6 +215,22 @@ describe("GET /api/products/:id", () => {
     expect(res.statusCode).toBe(404)
   })
 
+  // SEO audit 2026-11-15, finding 10: every artwork has a product « art-… »;
+  // its own page is /collection/…, never a duplicate shop page.
+  it("returns 404 for the product behind a Gun Art piece", async () => {
+    await db.insert(products).values({
+      sku: `${SKU_PREFIX}art`,
+      slug: `${SKU_PREFIX}art`,
+      name: "Œuvre test",
+      categoryId: await categoryId("gun-art"),
+      priceHt: "300.00",
+      requiresLegalVerification: false,
+      published: true,
+    })
+    const res = await app.inject({ method: "GET", url: `/api/products/slug/${SKU_PREFIX}art` })
+    expect(res.statusCode).toBe(404)
+  })
+
   it("returns 404 for an unknown slug", async () => {
     const res = await app.inject({ method: "GET", url: "/api/products/slug/nope-does-not-exist" })
     expect(res.statusCode).toBe(404)

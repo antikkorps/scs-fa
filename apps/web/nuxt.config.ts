@@ -98,6 +98,7 @@ export default defineNuxtConfig({
         "/pro/demande",
         "/pro/demandes",
         "/pro/demandes/**",
+        "/pro/documents",
       ].map((path) => [path, { headers: NOINDEX }]),
     ),
   },

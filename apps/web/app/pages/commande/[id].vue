@@ -5,7 +5,7 @@ import { formatEuros, formatIban } from "~/utils/format"
 import { legalStatusLabel, paymentDeadlineNote, paymentStatusLabel, statusTone } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
-useHead({ title: "Votre commande — SCS Firearms" })
+useHead({ title: "Votre commande" })
 
 const route = useRoute()
 const orderId = route.params.id as string
