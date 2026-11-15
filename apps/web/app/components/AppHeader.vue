@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { UNIVERSES } from "#shared/utils/universes"
 import type { LegalCategoryCode } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/product"
 
@@ -148,6 +149,11 @@ async function signOut() {
             </div>
           </Transition>
         </div>
+
+        <!-- Story 12.13: the hunting and knife universes, a page each. -->
+        <NuxtLink v-for="universe in UNIVERSES" :key="universe.path" :to="universe.path" class="nav__link">
+          {{ universe.name }}
+        </NuxtLink>
 
         <!-- Gun Art universe → mega-menu -->
         <div
@@ -363,7 +369,18 @@ async function signOut() {
               </li>
 
               <!-- Gun Art accordion -->
-              <li class="mnav__item" :style="{ '--i': 1 }">
+              <li
+                v-for="(universe, index) in UNIVERSES"
+                :key="universe.path"
+                class="mnav__item"
+                :style="{ '--i': 1 + index }"
+              >
+                <NuxtLink :to="universe.path" class="mlink">
+                  <span>{{ universe.name }}</span><span class="mlink__chev" aria-hidden="true">›</span>
+                </NuxtLink>
+              </li>
+
+              <li class="mnav__item" :style="{ '--i': 3 }">
                 <button
                   type="button"
                   class="mlink mlink--toggle"
@@ -385,12 +402,12 @@ async function signOut() {
                 </div>
               </li>
 
-              <li class="mnav__item" :style="{ '--i': 2 }">
+              <li class="mnav__item" :style="{ '--i': 4 }">
                 <NuxtLink to="/blog" class="mlink">
                   <span>Journal</span><span class="mlink__chev" aria-hidden="true">›</span>
                 </NuxtLink>
               </li>
-              <li class="mnav__item" :style="{ '--i': 3 }">
+              <li class="mnav__item" :style="{ '--i': 5 }">
                 <a href="/#about" class="mlink" @click="closeAll">
                   <span>À propos</span><span class="mlink__chev" aria-hidden="true">›</span>
                 </a>

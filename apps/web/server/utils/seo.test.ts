@@ -116,6 +116,13 @@ describe("buildLlmsTxt", () => {
     expect(txt).toContain(`GET ${SITE}/api/ancient-weapons`)
   })
 
+  it("presents the hunting and knife universes, and that knives are for adults (story 12.13)", () => {
+    const txt = buildLlmsTxt(SITE, OPEN)
+    expect(txt).toContain(`[Chasse](${SITE}/chasse)`)
+    expect(txt).toContain(`[Coutellerie](${SITE}/coutellerie)`)
+    expect(txt).toContain("18 ans et plus")
+  })
+
   it("tells an agent the legal constraints before it recommends a purchase", () => {
     const txt = buildLlmsTxt(SITE, OPEN)
     expect(txt).toContain("catégories B et C")

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { UNIVERSES } from "#shared/utils/universes"
+
 const year = new Date().getFullYear()
 // Changing one's mind must be as easy as the first choice (story 9.6).
 const { reopen } = useConsent()
@@ -18,6 +20,7 @@ const { reopen } = useConsent()
       <nav class="ft__col" aria-label="Explorer">
         <h2 class="ft__h">Explorer</h2>
         <NuxtLink to="/boutique">Armurerie</NuxtLink>
+        <NuxtLink v-for="universe in UNIVERSES" :key="universe.path" :to="universe.path">{{ universe.name }}</NuxtLink>
         <NuxtLink to="/armes-de-collection">Armes de collection</NuxtLink>
         <NuxtLink to="/collection">Gun Art</NuxtLink>
         <NuxtLink to="/collection/artiste">L'artiste</NuxtLink>
