@@ -72,6 +72,17 @@ describe("docker-compose.prod.yml — the env-check service", () => {
   })
 })
 
+// The card form (StripeCardPayment.vue) reads runtimeConfig.public.stripePublishableKey:
+// without it in the web container, card payment silently never renders in production.
+describe("docker-compose.prod.yml — the front's Stripe publishable key", () => {
+  it("is required in .env and handed to the web container", () => {
+    expect(serviceBlock(COMPOSE, "web")).toContain(
+      "      NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:?set STRIPE_PUBLISHABLE_KEY in .env}",
+    )
+    expect(read("../../../.env.prod.example")).toMatch(/^STRIPE_PUBLISHABLE_KEY=pk_/m)
+  })
+})
+
 /** The command lines of one justfile recipe. */
 function recipe(justfile: string, name: string): string[] {
   const lines = justfile.split("\n")

@@ -500,8 +500,9 @@ back-office, so the DNS can move early.
       Bitwarden key, and a login through the IONOS console.
 - [ ] Cloudflare in front (§ 2): nameservers switched, Full (strict), origin
       certificate in `certs/` (§ 3); `curl -fsS https://www.<DOMAIN>/health` answers.
-- [ ] `.env` filled: every secret, `DOMAIN`, `S3_*`, Stripe **live**
-      keys, SMTP creds, the real `VIREMENT_*` account (optional to boot, but
+- [ ] `.env` filled: every secret, `DOMAIN`, `S3_*`, Stripe keys
+      (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PUBLISHABLE_KEY`, all
+      three from the same mode: test until sales open, then live), SMTP creds, the real `VIREMENT_*` account (optional to boot, but
       without it every order with a regulated firearm is refused — the API logs
       a warning at startup; set it, then `just up` recreates the API). No
       placeholder left (story 12.9b): `just deploy` / `just update` first run
@@ -532,7 +533,9 @@ back-office, so the DNS can move early.
       subscribed to exactly these five events: `payment_intent.succeeded`,
       `payment_intent.payment_failed`, `payment_intent.canceled`,
       `refund.created`, `refund.updated` → `STRIPE_WEBHOOK_SECRET` set.
-      Test one live-mode payment.
+      Swap all three keys together (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+      `STRIPE_PUBLISHABLE_KEY`): a `pk_test` left beside an `sk_live` fails every
+      payment. `just up` recreates both containers. Test one live-mode payment.
 - [ ] **Brevo delivery reports** (story 12.7c): generate a token
       (`openssl rand -hex 32`) → `BREVO_WEBHOOK_SECRET` in `.env`, then register
       the transactional webhook — with the account's API key:

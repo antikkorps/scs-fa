@@ -52,7 +52,8 @@ export default defineNuxtConfig({
       apiBase: process.env.API_BASE_URL ?? "http://localhost:8081/api",
       siteUrl: process.env.SITE_URL ?? "http://localhost:3000",
       // Stripe publishable key (public by design). Set via
-      // NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in apps/web/.env.
+      // NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: apps/web/.env in dev, the root .env's
+      // STRIPE_PUBLISHABLE_KEY in production (docker-compose.prod.yml).
       stripePublishableKey: "",
       // Umami website id (story 9.6), via NUXT_PUBLIC_UMAMI_WEBSITE_ID. Empty =
       // no measurement at all; set, the tracker still waits for consent.
