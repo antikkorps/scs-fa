@@ -162,6 +162,10 @@ export interface AdminOrderDetail {
   /** On invoice, past its due date, unpaid. */
   paymentLate?: boolean
   chorusServiceCode?: string | null
+  /** The customer's commitments (CGV accepted, adult declaration — story 12.13c). */
+  termsVersion?: string | null
+  termsAcceptedAt?: string | null
+  adultDeclaredAt?: string | null
   chorusCommitmentNumber?: string | null
 }
 

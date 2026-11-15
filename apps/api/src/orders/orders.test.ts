@@ -341,6 +341,33 @@ describe("orders (POST /api/orders)", () => {
       expect(await declaredAt(res.json().data.id)).toBeNull()
     })
 
+    // Review of #258: a pro request attaches the organisation at once, before
+    // SCS decides — a minor could file one to dodge the declaration.
+    for (const status of ["pending", "rejected"] as const) {
+      it(`still asks a member whose organisation is ${status}`, async () => {
+        const [organisation] = await db
+          .insert(organisations)
+          .values({
+            legalName: `Armurerie Test32 ${status}`,
+            siret: `8${String(Date.now()).slice(-9)}${String(Math.floor(Math.random() * 1e4)).padStart(4, "0")}`,
+            type: "armurier",
+            status,
+            registryCheck: "verified",
+          })
+          .returning({ id: organisations.id })
+        await db.update(users).set({ organisationId: organisation?.id }).where(eq(users.id, userId))
+        try {
+          await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+          const res = await order()
+          expect(res.statusCode).toBe(422)
+          expect(res.json().error).toBe("AdultDeclarationRequired")
+        } finally {
+          await db.update(users).set({ organisationId: null }).where(eq(users.id, userId))
+          await db.delete(organisations).where(eq(organisations.id, organisation?.id as string))
+        }
+      })
+    }
+
     it("exempts a member of an approved organisation: the buyer is a legal entity", async () => {
       const [organisation] = await db
         .insert(organisations)
