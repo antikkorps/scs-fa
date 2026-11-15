@@ -9,3 +9,14 @@ export function apiUpstream(event: H3Event): { base: string; headers: Record<str
   const userAgent = getRequestHeader(event, "user-agent")
   return { base, headers: upstreamHeaders(clientIp, config.internalApiSecret as string, userAgent) }
 }
+
+/**
+ * Base URL and headers for a call made in the server's own name: data shared by
+ * every visitor (shop status, cached agent files), so no visitor's IP or user
+ * agent is charged with it.
+ */
+export function serverUpstream(): { base: string; headers: Record<string, string> } {
+  const config = useRuntimeConfig()
+  const base = (config.apiInternalBase as string) || (config.public.apiBase as string)
+  return { base, headers: upstreamHeaders(undefined, config.internalApiSecret as string) }
+}

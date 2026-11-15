@@ -15,6 +15,9 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const api = apiUpstream(event)
   const siteUrl = config.public.siteUrl as string
+  // Before the opening the feed, like the pages, only says the site opens soon.
+  const comingSoon = await comingSoonAgentAnswer(event, siteUrl)
+  if (comingSoon !== null) return comingSoon
 
   let items: BlogListItem[] = []
   try {

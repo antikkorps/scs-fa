@@ -1,9 +1,8 @@
 import type { H3Event } from "h3"
-import { upstreamHeaders } from "#shared/utils/upstream"
 import { isAdminSession, type WhoAmIAnswer } from "./adminSession"
 import { readAccessCookie, readRefreshCookie, refreshSession } from "./auth-cookies"
 import { createShopStatusLoader, type ShopStatus } from "./shopStatus"
-import { apiUpstream } from "./upstream"
+import { apiUpstream, serverUpstream } from "./upstream"
 
 // Story 12.10 — the shop status is the same for every visitor: one call to the
 // API every few seconds, made in the server's own name (no visitor IP to forward).
@@ -12,12 +11,8 @@ const STATUS_TIMEOUT_MS = 3_000
 
 const loadShopStatus = createShopStatusLoader(
   async () => {
-    const config = useRuntimeConfig()
-    const base = (config.apiInternalBase as string) || (config.public.apiBase as string)
-    const res = await $fetch<{ data: ShopStatus }>(`${base}/shop-status`, {
-      headers: upstreamHeaders(undefined, config.internalApiSecret as string),
-      timeout: STATUS_TIMEOUT_MS,
-    })
+    const { base, headers } = serverUpstream()
+    const res = await $fetch<{ data: ShopStatus }>(`${base}/shop-status`, { headers, timeout: STATUS_TIMEOUT_MS })
     return res.data
   },
   { ttlMs: STATUS_TTL_MS },
