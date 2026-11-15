@@ -1,7 +1,8 @@
 # Deployment — IONOS VPS (Docker Compose)
 
 Production runs the whole stack from `docker-compose.prod.yml` on a single
-IONOS VPS: **Postgres + API + Web + Caddy** on one private Docker network.
+IONOS VPS: **Postgres + API + Web + Caddy** on segmented private Docker networks
+(`edge`, `data` without internet, `scan`, `outbound` — see `docker-compose.prod.yml`).
 Cloudflare proxies every public host (CDN, WAF, DDoS) and answers the browsers;
 Caddy is the only thing the VPS exposes (80/443). It serves a **Cloudflare
 Origin Certificate** (TLS mode *Full (strict)*) and routes everything on one
@@ -296,6 +297,21 @@ applied — the CI applies them on the host, so this is the deploy path's check.
 ```bash
 cd /srv/scs-firearm && just update
 ```
+
+> ⚠️ **First update after the network split (audit 2026-11-15), once only.**
+> `just` reads the justfile before the recipe's own `git pull`: the first run
+> would still execute the old steps, and Postgres moving from the old `internal`
+> network to `data` would cut the running containers off from it mid-update.
+> Do it in a quiet moment, in three commands:
+>
+> ```bash
+> git pull --ff-only   # the new justfile first
+> just down            # stops the stack and removes the old network (volumes kept)
+> just update          # backup, migration and start, all on the new networks
+> ```
+>
+> Should an update stop midway (backup or migration error), the stack may be
+> partly down: `just up` brings it back on the current images while you look.
 
 `just update` (audit 2026-11-15, M2 + M4): fast-forward pull only (a diverged
 checkout stops it); keeps the running images as `:previous`; pulls fresh base
@@ -729,7 +745,7 @@ docker compose -f docker-compose.prod.yml exec api node_modules/.bin/tsx src/med
 - The `migrate` service builds the API **build stage** (which has the full
   workspace incl. `drizzle-kit`); the runtime API image ships prod deps only.
 - Postgres is **not** published to the host — reach it via
-  `docker compose … exec postgres` or another service on the `internal` network.
+  `docker compose … exec postgres` or another service on the `data` network.
 - Stripe: register the live webhook endpoint at
   `https://www.<DOMAIN>/api/webhooks/stripe` with the five events listed in the
   checklist above, and put the resulting signing secret in `STRIPE_WEBHOOK_SECRET`.

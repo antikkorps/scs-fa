@@ -31,8 +31,11 @@ fi
 
 # Streamed from the bucket through age into pg_restore: the decrypted dump is
 # never written to disk, not even to the container's /tmp (audit 2026-11-15, B8).
+# One transaction: a stream cut midway (S3, age) rolls back instead of leaving
+# a half-restored database — `--clean` drops objects as the stream arrives.
 echo "[restore] restoring s3://${S3_BUCKET}/${BACKUP_S3_PREFIX}/${file} into ${PGDATABASE}@${PGHOST} (--clean --if-exists)"
 aws_s3 cp "s3://${S3_BUCKET}/${BACKUP_S3_PREFIX}/${file}" - \
   | age -d -i "${AGE_IDENTITY}" \
-  | pg_restore -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" --clean --if-exists --no-owner --no-privileges
+  | pg_restore -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" --clean --if-exists --no-owner --no-privileges \
+    --single-transaction
 echo "[restore] done"

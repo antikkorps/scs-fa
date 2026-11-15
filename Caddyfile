@@ -45,9 +45,9 @@ www.{$DOMAIN} {
 
 	# --- Security headers (applied to every response) ---
 	header {
-		# HSTS: force HTTPS for a year, including subdomains. The apex sends it too
-		# (audit 2026-11-15, B5); submit to the preload list only once no
-		# subdomain (mail autoconfig…) is checked to still need plain HTTP.
+		# HSTS: force HTTPS for a year, including subdomains (of www). The apex
+		# sends its own (audit 2026-11-15, B5); submit to the preload list only
+		# once no subdomain (mail autoconfig…) is checked to still need plain HTTP.
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
@@ -123,7 +123,9 @@ stats.{$DOMAIN} {
 # Apex → canonical www.
 {$DOMAIN} {
 	import origin_tls
-	# The apex must carry HSTS too: www's includeSubDomains only covers *.www.
-	header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+	# The apex carries HSTS too, but not includeSubDomains yet: from the apex it
+	# would cover every subdomain, mail autoconfig/autodiscover (OVH, not
+	# proxied) included. Add it — and preload — once those are checked.
+	header Strict-Transport-Security "max-age=31536000"
 	redir https://www.{$DOMAIN}{uri} permanent
 }
