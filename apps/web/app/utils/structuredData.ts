@@ -6,6 +6,7 @@
 // an object holding a `data:` placeholder, which no crawler can use — and the
 // blog passed a relative path where schema.org wants an absolute URL.
 
+import { normaliseEan } from "@armurier/shared"
 import type { AvailabilityState } from "./availability"
 import { availabilitySchemaUrl } from "./availability"
 
@@ -25,8 +26,8 @@ export interface ProductLdInput {
   name: string
   description: string
   sku: string
-  /** Absolute image URL, or undefined — never a placeholder. */
-  image: string | undefined
+  /** Absolute image URLs (jsonLdImages), or undefined — never a placeholder. */
+  image: string | string[] | undefined
   categoryName: string | null
   legalCategory: string | null
   state: AvailabilityState
@@ -35,6 +36,24 @@ export interface ProductLdInput {
   /** A collection weapon, or a product tagged second-hand. */
   used: boolean
   makerName: string | null
+  brand: string | null
+  /** The product's barcode (EAN/UPC), as imported; emitted only when it is one. */
+  gtin: string | null
+  /** False in the showcase stage: the page sells nothing, so no offer is stated. */
+  salesOpen: boolean
+}
+
+type GtinProperty = "gtin8" | "gtin12" | "gtin13" | "gtin14"
+const GTIN_PROPERTY: Record<number, GtinProperty> = { 8: "gtin8", 12: "gtin12", 13: "gtin13", 14: "gtin14" }
+
+/**
+ * `{ gtin13: "…" }` for a valid barcode, nothing otherwise. Supplier imports
+ * store the EAN unchecked: a wrong check digit is an invalid GTIN for Google.
+ */
+function gtinProperty(gtin: string | null): Partial<Record<GtinProperty, string>> {
+  const code = gtin ? normaliseEan(gtin) : null
+  const property = code ? GTIN_PROPERTY[code.length] : undefined
+  return code && property ? { [property]: code } : {}
 }
 
 /**
@@ -69,6 +88,8 @@ export function productJsonLd(p: ProductLdInput) {
     ...(p.image && { image: p.image }),
     ...(p.categoryName && { category: p.categoryName }),
     ...(p.makerName && { manufacturer: { "@type": "Organization", name: p.makerName } }),
+    ...(p.brand && { brand: { "@type": "Brand", name: p.brand } }),
+    ...gtinProperty(p.gtin),
     ...(p.legalCategory && {
       additionalProperty: {
         "@type": "PropertyValue",
@@ -76,7 +97,9 @@ export function productJsonLd(p: ProductLdInput) {
         value: p.legalCategory === "none" ? "Vente libre" : p.legalCategory,
       },
     }),
-    offers,
+    // Showcase stage: an offer would contradict a page that sells nothing.
+    // Without one the product earns no price snippet, which is the truth.
+    ...(p.salesOpen && { offers }),
   }
 }
 
@@ -85,12 +108,14 @@ export interface ArtworkLdInput {
   pageUrl: string
   title: string
   description: string
-  image: string | undefined
+  image: string | string[] | undefined
   artist: { name: string | null; slug: string } | null
   series: { title: string | null; slug: string } | null
   /** Lowest price of an available print, TTC, or null when none is left. */
   priceFromTtc: number | null
   availablePrints: number
+  /** False in the showcase stage: nothing is for sale yet. */
+  salesOpen: boolean
 }
 
 /**
@@ -101,7 +126,7 @@ export interface ArtworkLdInput {
  * `VisualArtwork` alone.
  */
 export function artworkJsonLd(a: ArtworkLdInput) {
-  const onSale = a.priceFromTtc !== null && a.availablePrints > 0
+  const onSale = a.salesOpen && a.priceFromTtc !== null && a.availablePrints > 0
   return {
     "@context": "https://schema.org",
     "@type": onSale ? ["VisualArtwork", "Product"] : "VisualArtwork",

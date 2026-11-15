@@ -11,6 +11,7 @@ import { type CatalogSheetRow, writeCatalogWorkbook } from "@armurier/shared/spr
 import { and, asc, eq, isNull, sql } from "drizzle-orm"
 import { db } from "../db/client.js"
 import { ancientWeapons, artworks, legalCategories, productCategories, products, suppliers } from "../db/schema.js"
+import { productTagsJson } from "../products/tag-filter.js"
 
 const EXCLUDED_CATEGORY_SLUG = "gun-art"
 
@@ -151,6 +152,8 @@ export async function exportCatalogWorkbook(
       published: sql<boolean>`coalesce(${products.published}, false)`,
       audience: products.audience,
       updatedAt: products.updatedAt,
+      // Story 12.13: written back so the round trip keeps them.
+      tags: productTagsJson,
     })
     .from(products)
     .innerJoin(suppliers, eq(suppliers.id, products.supplierId))
@@ -192,6 +195,8 @@ export async function exportCatalogWorkbook(
     longDescription: r.longDescription,
     sourceUrl: r.sourceUrl,
     sku: r.sku,
+    // Slugs, not names: a name may hold a separator and split on re-import.
+    tags: r.tags.map((tag) => tag.slug).join(", ") || null,
     duplicates: duplicates.get(r.id) ?? null,
     version: r.updatedAt?.toISOString() ?? null,
   }))

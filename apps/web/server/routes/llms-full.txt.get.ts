@@ -3,6 +3,7 @@ import {
   type LlmsArticle,
   type LlmsArtwork,
   type LlmsCategory,
+  type LlmsFullInput,
   type LlmsProduct,
   type LlmsSeries,
 } from "../utils/seo"
@@ -26,22 +27,38 @@ async function fetchAll<T>(url: string, headers: Record<string, string>): Promis
   return rows
 }
 
+const EMPTY_CATALOGUE: LlmsFullInput = { artworks: [], articles: [], series: [], products: [], categories: [] }
+
+/**
+ * The whole catalogue, read from the API at most every ten minutes (SEO audit
+ * 2026-11-15, finding 6): up to a hundred API calls per file otherwise. Any
+ * failed read throws — Nitro caches no error, so an outage never replaces the
+ * last good catalogue with an empty one.
+ */
+const cachedCatalogue = defineCachedFunction(
+  async (): Promise<LlmsFullInput> => {
+    const { base, headers } = serverUpstream()
+    const get = <T>(path: string) => $fetch<T>(`${base}${path}`, { headers })
+    const [artworks, articles, series, products, categories] = await Promise.all([
+      get<{ data: LlmsArtwork[] }>("/artworks").then((r) => r.data),
+      fetchAll<LlmsArticle>(`${base}/blog`, headers),
+      get<{ data: LlmsSeries[] }>("/artworks/series").then((r) => r.data),
+      fetchAll<LlmsProduct>(`${base}/products`, headers),
+      get<{ data: LlmsCategory[] }>("/product-categories").then((r) => r.data),
+    ])
+    return { artworks, articles, series, products, categories }
+  },
+  { ...AGENT_FILE_CACHE, name: "llms-full-catalogue", getKey: () => "all" },
+)
+
 export default defineEventHandler(async (event) => {
-  const config = useRuntimeConfig(event)
-  const { base, headers } = apiUpstream(event)
-  const get = <T>(path: string) => $fetch<T>(`${base}${path}`, { headers })
-  const siteUrl = config.public.siteUrl as string
+  const siteUrl = useRuntimeConfig(event).public.siteUrl as string
+  const comingSoon = await comingSoonAgentAnswer(event, siteUrl)
+  if (comingSoon !== null) return comingSoon
 
-  const none = <T>() => [] as T[]
-  const [artworks, articles, series, products, categories] = await Promise.all([
-    get<{ data: LlmsArtwork[] }>("/artworks").then((r) => r.data, none<LlmsArtwork>),
-    fetchAll<LlmsArticle>(`${base}/blog`, headers).catch(none<LlmsArticle>),
-    get<{ data: LlmsSeries[] }>("/artworks/series").then((r) => r.data, none<LlmsSeries>),
-    fetchAll<LlmsProduct>(`${base}/products`, headers).catch(none<LlmsProduct>),
-    get<{ data: LlmsCategory[] }>("/product-categories").then((r) => r.data, none<LlmsCategory>),
-  ])
-
+  // An unreachable API with nothing cached yet degrades to the bare file, never stored as the real one.
+  const catalogue = await cachedCatalogue().catch(() => null)
   setHeader(event, "content-type", "text/plain; charset=utf-8")
-  setHeader(event, "cache-control", "public, max-age=3600")
-  return buildLlmsFull(siteUrl, { artworks, articles, series, products, categories })
+  setHeader(event, "cache-control", catalogue ? "public, max-age=600" : "no-store")
+  return buildLlmsFull(siteUrl, catalogue ?? EMPTY_CATALOGUE, await llmsStage())
 })

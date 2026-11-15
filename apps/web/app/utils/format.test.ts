@@ -11,6 +11,7 @@ import {
   formatIban,
   formatNumber,
   formatPercent,
+  jsonLdImages,
   ogImageSize,
   ogImageUrl,
   plural,
@@ -179,5 +180,22 @@ describe("formatIban", () => {
 
   it("regroups an IBAN stored with its own spacing", () => {
     expect(formatIban(" fr76 3000 6000 0112 3456 7890 189 ")).toBe("FR76 3000 6000 0112 3456 7890 189")
+  })
+})
+
+describe("jsonLdImages (SEO audit 2026-11-15, finding 8)", () => {
+  const SITE = "https://www.scs-firearms.com"
+  const ID = "0b7d1f3e-1111-4222-8333-444455556666"
+
+  it("gives the main visual at full width first, then its share card", () => {
+    expect(jsonLdImages(`/api/media/${ID}/1400.webp`, SITE)).toEqual([
+      `${SITE}/api/media/${ID}/1400.webp`,
+      `${SITE}/api/media/${ID}/og.jpg`,
+    ])
+  })
+
+  it("keeps a legacy upload as it is, and has nothing for no image", () => {
+    expect(jsonLdImages("/api/artworks/images/x.webp", SITE)).toEqual([`${SITE}/api/artworks/images/x.webp`])
+    expect(jsonLdImages(null, SITE)).toBeUndefined()
   })
 })

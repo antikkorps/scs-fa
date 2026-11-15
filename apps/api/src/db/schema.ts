@@ -178,6 +178,8 @@ export const productCategoryEnum = pgEnum("product_category", [
   "aide_visee",
   "accessoire_autre",
   "gun_art",
+  // Story 12.13 — the knife universe: a product type of its own.
+  "coutellerie",
 ])
 
 // ============================================================================
@@ -241,6 +243,9 @@ export const users = pgTable(
     // mailed login code, a password-reset link or an admin invite. Until then a
     // login asks for the code, and nothing is matched to the account by address.
     emailVerifiedAt: timestamp("email_verified_at"),
+    // Story 12.13c — given when ordering an article reserved to adults, once
+    // (not editable by the customer, or a minor would just change it).
+    birthDate: date("birth_date", { mode: "string" }),
     deletedAt: timestamp("deleted_at"), // Soft delete RGPD
     // Story 12.11 — when the "unused for 3 years" warning left; anonymised 30 days
     // later unless a login came in between.
@@ -723,7 +728,8 @@ export const productCategoriesRelations = relations(productCategories, ({ many }
 // filtre à facettes. Les facettes sont structurelles (peu nombreuses, stables,
 // elles pilotent la requête) et vivent donc dans un enum ; les tags sont
 // éditoriaux (nombreux, renommables depuis le backoffice sans migration).
-export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique"])
+// Story 12.13 — "usage": what a product is for (chasse), across categories.
+export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique", "usage"])
 
 export const tags = pgTable(
   "tags",

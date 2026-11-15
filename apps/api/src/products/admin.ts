@@ -6,7 +6,7 @@ import {
   updateProductSchema,
   uuidParamSchema,
 } from "@armurier/shared"
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, asc, desc, eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { authenticate } from "../auth/authenticate.js"
@@ -30,6 +30,7 @@ import { deleteMediaForOwner } from "../media/service.js"
 import { beneficiaryOfProduct } from "../payouts/index.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
 import { adminProductCrossSellRoutes } from "./cross-sell.js"
+import { replaceProductTagsBySlug } from "./product-tags.js"
 
 type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db
 
@@ -59,17 +60,6 @@ export async function orderedVariantIds(variantIds: string[], tx: DbExecutor = d
  */
 const GENERIC_ONLY = sql`not exists (select 1 from ${artworks} where ${artworks.productId} = ${products.id})
   and not exists (select 1 from ${ancientWeapons} where ${ancientWeapons.productId} = ${products.id})`
-
-async function attachTags(productId: string, tagSlugs: string[], tx: DbExecutor = db) {
-  await tx.delete(productTags).where(eq(productTags.productId, productId))
-  if (tagSlugs.length === 0) return
-  const rows = await tx.select({ id: tags.id }).from(tags).where(inArray(tags.slug, tagSlugs))
-  if (rows.length === 0) return
-  await tx
-    .insert(productTags)
-    .values(rows.map((t) => ({ productId, tagId: t.id })))
-    .onConflictDoNothing()
-}
 
 /**
  * Reconcile the variant list sent by the form with what is in the database.
@@ -324,7 +314,7 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
       if (!product) throw new Error("Product insert returned no row")
 
       if (variants.length > 0) await syncVariants(product.id, variants, tx)
-      await attachTags(product.id, tagSlugs, tx)
+      await replaceProductTagsBySlug(product.id, tagSlugs, tx)
       return product.id
     })
 
@@ -404,7 +394,7 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
 
         await tx.update(products).set(patch).where(eq(products.id, params.data.id))
         if (variants !== undefined) await syncVariants(params.data.id, variants, tx)
-        if (tagSlugs !== undefined) await attachTags(params.data.id, tagSlugs, tx)
+        if (tagSlugs !== undefined) await replaceProductTagsBySlug(params.data.id, tagSlugs, tx)
       })
     } catch (err) {
       if (err instanceof VariantInUseError) {

@@ -1,5 +1,3 @@
-import { EMPTY_SHOP_IDENTITY, type ShopIdentity } from "@armurier/shared"
-import { publishableEditorialPaths } from "#shared/utils/editorialPages"
 import { absoluteImageUrl, buildSitemap, latest, type SitemapUrl } from "../utils/seo"
 
 interface Entry {
@@ -31,9 +29,22 @@ const EMPTY: SitemapPayload = {
   blogPosts: [],
 }
 
+/**
+ * The sitemap's data, read from the API at most every ten minutes (SEO audit
+ * 2026-11-15, finding 6). A failed read throws, and Nitro caches no error: an
+ * outage is never served for ten minutes as if it were the real sitemap.
+ */
+const cachedSitemapData = defineCachedFunction(
+  async (): Promise<SitemapPayload> => {
+    const { base, headers } = serverUpstream()
+    const res = await $fetch<{ data: SitemapPayload }>(`${base}/seo/sitemap`, { headers })
+    return res.data
+  },
+  { ...AGENT_FILE_CACHE, name: "sitemap-data", getKey: () => "all" },
+)
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
-  const api = apiUpstream(event)
   const siteUrl = config.public.siteUrl as string
   setHeader(event, "content-type", "application/xml; charset=utf-8")
 
@@ -46,14 +57,10 @@ export default defineEventHandler(async (event) => {
 
   // An unreachable API degrades to the static pages rather than failing the
   // whole sitemap — but it is not cached as if it were the real one.
-  const payload = await $fetch<{ data: SitemapPayload }>(`${api.base}/seo/sitemap`, { headers: api.headers })
-    .then((r) => r.data)
-    .catch(() => null)
+  const payload = await cachedSitemapData().catch(() => null)
   const d = payload ?? EMPTY
   // A legal page waits for every fact about the seller (shop_identity) too.
-  const identity = await $fetch<{ data: ShopIdentity }>(`${api.base}/shop-identity`, { headers: api.headers })
-    .then((r) => r.data)
-    .catch(() => EMPTY_SHOP_IDENTITY)
+  const legalPaths = await publishableLegalPaths()
 
   const images = (e: Entry) => {
     const img = absoluteImageUrl(e.imageUrl, siteUrl)
@@ -87,7 +94,7 @@ export default defineEventHandler(async (event) => {
     { loc: `${siteUrl}/blog`, lastmod: latest(d.blogPosts.map(dated)), changefreq: "weekly", priority: 0.7 },
     { loc: `${siteUrl}/contact`, changefreq: "yearly", priority: 0.4 },
     // Reference pages, once validated and complete (shared/utils/editorialPages.ts).
-    ...publishableEditorialPaths(identity).map((path) => ({
+    ...legalPaths.map((path) => ({
       loc: `${siteUrl}${path}`,
       changefreq: "yearly" as const,
       priority: 0.3,

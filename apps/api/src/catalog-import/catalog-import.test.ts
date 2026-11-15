@@ -15,7 +15,9 @@ import {
   legalCategories,
   media,
   products,
+  productTags,
   suppliers,
+  tags,
   users,
 } from "../db/schema.js"
 import { SafeFetchError } from "../net/safe-fetch.js"
@@ -270,6 +272,44 @@ describe("admin catalogue import (story 12.2)", () => {
       costPrice: "300.00",
     })
     expect(after?.legal).toBe("none")
+  })
+
+  // Story 12.13: a supplier's whole catalogue lands in a universe (« Chasse »)
+  // through its tags, rather than product by product in the back-office.
+  describe("tags", () => {
+    const tagsOf = async (ref: string) => {
+      const product = await productByRef(ref)
+      const rows = await db
+        .select({ slug: tags.slug })
+        .from(productTags)
+        .innerJoin(tags, eq(tags.id, productTags.tagId))
+        .where(eq(productTags.productId, product?.product.id as string))
+      return rows.map((r) => r.slug).sort()
+    }
+
+    it("tags a new product by name or slug, whatever the case", async () => {
+      await importFile(
+        sheet([row({ supplierSku: "TAG-1", name: "Testcatimp Tag Un", imageUrls: "", tags: "OCCASION" })]),
+      )
+      expect(await tagsOf("TAG-1")).toEqual(["occasion"])
+    })
+
+    it("replaces the tags when the cell lists some, and keeps them when it is blank", async () => {
+      await importFile(sheet([row({ supplierSku: "TAG-1", name: "Testcatimp Tag Un", imageUrls: "", tags: "" })]))
+      expect(await tagsOf("TAG-1")).toEqual(["occasion"])
+      await importFile(
+        sheet([row({ supplierSku: "TAG-1", name: "Testcatimp Tag Un", imageUrls: "", tags: "arme-ancienne" })]),
+      )
+      expect(await tagsOf("TAG-1")).toEqual(["arme-ancienne"])
+    })
+
+    it("refuses a tag that does not exist: tags are created in the back-office, never by an import", async () => {
+      const { preview } = await importFile(
+        sheet([row({ supplierSku: "TAG-2", name: "Testcatimp Tag Deux", imageUrls: "", tags: "Occasion, Inventé" })]),
+      )
+      expect(preview.rows[0].action).toBe("invalid")
+      expect(preview.rows[0].errors.join()).toMatch(/Tag inconnu : « Inventé »/)
+    })
   })
 
   it("overwrites everything when asked to", async () => {
@@ -544,6 +584,37 @@ describe("admin catalogue import (story 12.2)", () => {
       expect(line[col("version")]).toMatch(/^\d{4}-\d\d-\d\dT/)
       expect(line[col("duplicates")]).toBe(`${RT_B} B-77 (inactif)`)
       expect(table.find((r) => r[col("supplierSku")] === "RT-2")?.[col("duplicates")] ?? "").toBe("")
+    })
+
+    it("exports the tags by slug, so a round trip keeps them whatever their names (story 12.13)", async () => {
+      await importFile(
+        sheet([rt({ supplierSku: "RT-2", name: "Testcatimp Rt Bipied", tags: "occasion, arme-ancienne" })]),
+      )
+      const { table, col } = await exportTable()
+      const line = table.find((r) => r[col("supplierSku")] === "RT-2") as string[]
+      // A slug never holds a separator; a name such as « Chasse, gros gibier » would split on re-import.
+      expect(line[col("tags")]?.split(", ").sort()).toEqual(["arme-ancienne", "occasion"])
+      expect(table.find((r) => r[col("supplierSku")] === "RT-1")?.[col("tags")] ?? "").toBe("")
+    })
+
+    it("leaves the tags alone when the sheet predates an edit made in the back-office", async () => {
+      const { table, col } = await exportTable()
+      const line = table.find((r) => r[col("supplierSku")] === "RT-2") as string[]
+      const product = await productByRef("RT-2")
+      // An admin edits the product after the export.
+      await db
+        .update(products)
+        .set({ updatedAt: new Date(Date.now() + 60_000) })
+        .where(eq(products.id, product?.product.id as string))
+      line[col("tags")] = "occasion"
+      const { preview } = await importFile(csvOf([table[0] as string[], line]))
+      expect(preview.rows[0].warnings.join()).toMatch(/Tags conservés/)
+      const rows = await db
+        .select({ slug: tags.slug })
+        .from(productTags)
+        .innerJoin(tags, eq(tags.id, productTags.tagId))
+        .where(eq(productTags.productId, product?.product.id as string))
+      expect(rows.map((r) => r.slug).sort()).toEqual(["arme-ancienne", "occasion"])
     })
 
     it("exports one supplier's part, still flagging duplicates held by the others", async () => {

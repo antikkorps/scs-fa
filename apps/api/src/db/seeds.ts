@@ -167,12 +167,20 @@ export async function seedReferenceData() {
       displayOrder: 9,
       description: "Accessoires divers et inclassables",
     },
+    // Story 12.13 — the knife universe (sale reserved to adults, 12.13c).
+    {
+      slug: "coutellerie",
+      name: "Coutellerie",
+      category: "coutellerie" as const,
+      displayOrder: 10,
+      description: "Couteaux pliants, à lame fixe et de chasse",
+    },
     // Gun Art
     {
       slug: "gun-art",
       name: "Gun Art",
       category: "gun_art" as const,
-      displayOrder: 10,
+      displayOrder: 11,
       description: "Tableaux, photos et tirages d'art",
     },
   ]
@@ -253,6 +261,14 @@ async function seedTags() {
       facet: "epoque" as const,
       displayOrder: 2,
       description: "Arme de guerre à valeur historique, pièce unique",
+    },
+    // Story 12.13 — the hunting universe gathers every product carrying it.
+    {
+      slug: "chasse",
+      name: "Chasse",
+      facet: "usage" as const,
+      displayOrder: 1,
+      description: "Armes, munitions, optiques, couteaux et équipement pour la chasse",
     },
   ]
 

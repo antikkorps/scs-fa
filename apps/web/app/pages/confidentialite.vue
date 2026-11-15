@@ -64,7 +64,11 @@ usePageSeo({
         <tbody>
           <tr>
             <td>Gérer votre compte client</td>
-            <td>Nom, prénom, e-mail, téléphone, mot de passe (stocké haché, jamais en clair), adresses</td>
+            <td>
+              Nom, prénom, e-mail, téléphone, mot de passe (stocké haché, jamais en clair), adresses ; date de
+              naissance, demandée seulement à la commande d'un article réservé aux majeurs (couteaux…), pour vérifier
+              votre âge
+            </td>
             <td>Exécution du contrat</td>
           </tr>
           <tr>

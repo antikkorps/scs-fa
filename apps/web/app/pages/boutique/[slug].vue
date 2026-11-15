@@ -2,7 +2,7 @@
 import { parseRequiredDocEntries, requiredDocEntryKey, requiredDocEntryLabel } from "@armurier/shared"
 import type { ProductDetail, ProductVariant } from "~/types/product"
 import { availabilityLongLabel, availabilityState, isPurchasable } from "~/utils/availability"
-import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES, ogImageUrl } from "~/utils/format"
+import { artworkImage, CARD_GEOMETRY, formatEuros, IMAGE_SIZES, jsonLdImages } from "~/utils/format"
 import { conditionLabel, legalCategoryLabel, stockLabel } from "~/utils/product"
 import { productJsonLd } from "~/utils/structuredData"
 
@@ -149,7 +149,7 @@ const structuredProduct = computed(() =>
     name: product.value.name,
     description: description.value,
     sku: product.value.sku,
-    image: ogImageUrl(product.value.featuredImageUrl, siteUrl),
+    image: jsonLdImages(product.value.featuredImageUrl, siteUrl),
     categoryName: product.value.category.name,
     legalCategory: legal.value?.category ?? null,
     state: productState.value,
@@ -160,6 +160,9 @@ const structuredProduct = computed(() =>
     ],
     used: Boolean(product.value.ancientWeapon) || product.value.tags.some((t) => t.slug === "occasion"),
     makerName: product.value.ancientWeapon?.makerName ?? null,
+    brand: product.value.brand ?? null,
+    gtin: product.value.ean ?? null,
+    salesOpen: salesOpen.value,
   }),
 )
 

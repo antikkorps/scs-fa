@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { buildComingSoonAgentText } from "./llmsStage.js"
 import { absoluteImageUrl, buildLlmsFull, buildLlmsTxt, buildRobots, buildSitemap, escapeXml, latest } from "./seo.js"
 
 const SITE = "https://www.scs-firearms.com"
@@ -85,9 +86,11 @@ describe("buildRobots", () => {
   })
 })
 
+const OPEN = { salesOpen: true, legalPaths: [] }
+
 describe("buildLlmsTxt", () => {
   it("produces an H1, a summary blockquote and the key links", () => {
-    const txt = buildLlmsTxt(SITE)
+    const txt = buildLlmsTxt(SITE, OPEN)
     expect(txt.startsWith("# SCS Firearms")).toBe(true)
     expect(txt).toContain("> SCS Firearms")
     expect(txt).toContain(`[Collection](${SITE}/collection)`)
@@ -96,14 +99,14 @@ describe("buildLlmsTxt", () => {
   })
 
   it("points agents at the editorial routes added by story 11.6", () => {
-    const txt = buildLlmsTxt(SITE)
+    const txt = buildLlmsTxt(SITE, OPEN)
     expect(txt).toContain(`GET ${SITE}/api/artworks/series`)
     expect(txt).toContain(`GET ${SITE}/api/artworks/themes`)
     expect(txt).toContain(`GET ${SITE}/api/artists/{slug}`)
   })
 
   it("presents the armurerie as a live universe, not a future one (story 9.6)", () => {
-    const txt = buildLlmsTxt(SITE)
+    const txt = buildLlmsTxt(SITE, OPEN)
     expect(txt).not.toContain("à terme")
     expect(txt).toContain("## Armurerie")
     expect(txt).toContain(`[Boutique](${SITE}/boutique)`)
@@ -114,9 +117,35 @@ describe("buildLlmsTxt", () => {
   })
 
   it("tells an agent the legal constraints before it recommends a purchase", () => {
-    const txt = buildLlmsTxt(SITE)
+    const txt = buildLlmsTxt(SITE, OPEN)
     expect(txt).toContain("catégories B et C")
     expect(txt).toContain("pièce unique")
+  })
+})
+
+// SEO audit 2026-11-15, finding 7: what an agent reads must match how far the shop is open.
+describe("buildLlmsTxt and the launch stage", () => {
+  it("warns that nothing can be ordered yet in the showcase stage", () => {
+    expect(buildLlmsTxt(SITE, { ...OPEN, salesOpen: false })).toContain("Les ventes ne sont pas encore ouvertes")
+    expect(buildLlmsTxt(SITE, OPEN)).not.toContain("pas encore ouvertes")
+  })
+
+  it("lists the legal pages that may be published, and none when there is none yet", () => {
+    const txt = buildLlmsTxt(SITE, { ...OPEN, legalPaths: ["/cgv", "/reglementation"] })
+    expect(txt).toContain("## Informations légales")
+    expect(txt).toContain(`[Conditions générales de vente](${SITE}/cgv)`)
+    expect(txt).toContain(`[Réglementation des armes](${SITE}/reglementation)`)
+    expect(buildLlmsTxt(SITE, OPEN)).not.toContain("## Informations légales")
+  })
+})
+
+describe("buildComingSoonAgentText", () => {
+  it("says the shop opens soon, and exposes no catalogue", () => {
+    const txt = buildComingSoonAgentText(SITE)
+    expect(txt.startsWith("# SCS Firearms")).toBe(true)
+    expect(txt).toContain("ouvre prochainement")
+    expect(txt).not.toContain("/boutique")
+    expect(txt).not.toContain("/api/")
   })
 })
 
@@ -124,20 +153,24 @@ const EMPTY = { artworks: [], articles: [], series: [], products: [], categories
 
 describe("buildLlmsFull", () => {
   it("appends a catalogue of works and articles", () => {
-    const txt = buildLlmsFull(SITE, {
-      ...EMPTY,
-      artworks: [
-        {
-          slug: "eclat",
-          title: "Éclat",
-          artistName: "Camille",
-          description: "Une œuvre.",
-          priceFromTtc: 216,
-          availableCount: 3,
-        },
-      ],
-      articles: [{ slug: "histoire", title: "Histoire", excerpt: "Un extrait.", authorName: "Admin" }],
-    })
+    const txt = buildLlmsFull(
+      SITE,
+      {
+        ...EMPTY,
+        artworks: [
+          {
+            slug: "eclat",
+            title: "Éclat",
+            artistName: "Camille",
+            description: "Une œuvre.",
+            priceFromTtc: 216,
+            availableCount: 3,
+          },
+        ],
+        articles: [{ slug: "histoire", title: "Histoire", excerpt: "Un extrait.", authorName: "Admin" }],
+      },
+      OPEN,
+    )
     expect(txt).toContain("## Gun Art — œuvres")
     expect(txt).toContain(`[Éclat](${SITE}/collection/eclat)`)
     expect(txt).toContain("à partir de 216,00 € TTC")
@@ -146,20 +179,24 @@ describe("buildLlmsFull", () => {
   })
 
   it("lists the series with their theme, reference and artist", () => {
-    const txt = buildLlmsFull(SITE, {
-      ...EMPTY,
-      series: [
-        {
-          slug: "age-d-or",
-          title: "Âge d'or",
-          intro: "Une série sur l'avant-guerre.",
-          reference: "Le cinéma d'espionnage",
-          theme: { name: "Cinéma" },
-          artist: { name: "Camille" },
-          artworkCount: 2,
-        },
-      ],
-    })
+    const txt = buildLlmsFull(
+      SITE,
+      {
+        ...EMPTY,
+        series: [
+          {
+            slug: "age-d-or",
+            title: "Âge d'or",
+            intro: "Une série sur l'avant-guerre.",
+            reference: "Le cinéma d'espionnage",
+            theme: { name: "Cinéma" },
+            artist: { name: "Camille" },
+            artworkCount: 2,
+          },
+        ],
+      },
+      OPEN,
+    )
     expect(txt).toContain("## Gun Art — séries")
     expect(txt).toContain(`[Âge d'or](${SITE}/collection/serie/age-d-or)`)
     expect(txt).toContain("thème : Cinéma")
@@ -175,26 +212,30 @@ describe("buildLlmsFull", () => {
       legalCategory: "B",
       category: { slug: "arme-poing", name: "Armes de poing" },
     }
-    const txt = buildLlmsFull(SITE, {
-      ...EMPTY,
-      categories: [
-        { slug: "arme-poing", name: "Armes de poing", description: "Pistolets et revolvers" },
-        { slug: "munition", name: "Munitions", description: null },
-      ],
-      products: [
-        { ...product, slug: "glock-17", name: "Glock 17", priceTtc: 720 },
-        { ...product, slug: "luger-p08-daté-1917", name: "Luger P08", priceTtc: 19.8 },
-        {
-          ...product,
-          slug: "lefaucheux-1854",
-          name: "Lefaucheux 1854",
-          priceTtc: 2880,
-          stockQty: 0,
-          isUnique: true,
-          legalCategory: "D",
-        },
-      ],
-    })
+    const txt = buildLlmsFull(
+      SITE,
+      {
+        ...EMPTY,
+        categories: [
+          { slug: "arme-poing", name: "Armes de poing", description: "Pistolets et revolvers" },
+          { slug: "munition", name: "Munitions", description: null },
+        ],
+        products: [
+          { ...product, slug: "glock-17", name: "Glock 17", priceTtc: 720 },
+          { ...product, slug: "luger-p08-daté-1917", name: "Luger P08", priceTtc: 19.8 },
+          {
+            ...product,
+            slug: "lefaucheux-1854",
+            name: "Lefaucheux 1854",
+            priceTtc: 2880,
+            stockQty: 0,
+            isUnique: true,
+            legalCategory: "D",
+          },
+        ],
+      },
+      OPEN,
+    )
     expect(txt).toContain("## Catalogue de l'armurerie")
     expect(txt).toContain(`### [Armes de poing](${SITE}/boutique/categorie/arme-poing)`)
     expect(txt).toContain("Pistolets et revolvers")
@@ -209,7 +250,7 @@ describe("buildLlmsFull", () => {
   })
 
   it("degrades gracefully with no content", () => {
-    const txt = buildLlmsFull(SITE, EMPTY)
+    const txt = buildLlmsFull(SITE, EMPTY, OPEN)
     expect(txt).toContain("(aucune œuvre publiée)")
     expect(txt).toContain("(aucun article publié)")
     expect(txt).toContain("(aucune série publiée)")
