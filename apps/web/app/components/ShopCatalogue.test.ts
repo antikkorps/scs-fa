@@ -102,9 +102,13 @@ describe("ShopCatalogue (story 9.6)", () => {
       expect(push).toHaveBeenCalledWith({ path: "/boutique", query: { legalCategory: "B" } })
     })
 
-    it("keeps the tag when moving to a category", async () => {
+    it("links the categories and the whole catalogue cleanly, none of them as the current page", async () => {
+      // The page's own tag stays on its page: carrying it would make filtered
+      // duplicates crawlable (review of the SEO audit fix).
       const wrapper = await mountSuspended(ShopCatalogue, { props: tagPage, route: "/boutique/tag/occasion" })
-      expect(categoryHref(wrapper, "Munitions")).toBe("/boutique/categorie/munition?tags=occasion")
+      expect(categoryHref(wrapper, "Munitions")).toBe("/boutique/categorie/munition")
+      expect(categoryHref(wrapper, "Tout le catalogue")).toBe("/boutique")
+      expect(wrapper.find('.catlinks [aria-current="page"]').exists()).toBe(false)
     })
   })
 

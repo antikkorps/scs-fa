@@ -131,9 +131,13 @@ function navigate(overrides: Record<string, string | undefined>, resetPage = tru
   router.push({ query: filterQuery(overrides, resetPage) })
 }
 
-/** A category's page, keeping the other filters (a tag page's own tag included), from its first page. */
+/**
+ * A category's page from its first page, keeping the visitor's filters. Not a
+ * tag page's own tag: it stays on its page, else every category link from it
+ * would be a crawlable filtered duplicate.
+ */
 function categoryLink(slug: string) {
-  return { path: categoryPath(slug), query: filterQuery({ tags: appliedTags.value.join(",") || undefined }) }
+  return { path: categoryPath(slug), query: filterQuery({}) }
 }
 
 /** Page N of these results: the first one without `?page`. */
@@ -215,7 +219,7 @@ useHead({
 <template>
   <div class="catalogue">
     <section class="container">
-      <CategoryLinks :categories="categories" :current="category" :link-for="categoryLink" />
+      <CategoryLinks :categories="categories" :current="tag ? null : category" :link-for="categoryLink" />
       <form class="filters" role="search" @submit.prevent>
         <div class="filters__field filters__search">
           <label class="sr-only" for="shop-search">Rechercher</label>

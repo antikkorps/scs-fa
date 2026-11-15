@@ -8,8 +8,8 @@ import type { RouteLocationRaw } from "vue-router"
  */
 defineProps<{
   categories: { slug: string; name: string }[]
-  /** The page's own category, or "" for the whole catalogue. */
-  current: string
+  /** The page's own category, "" for the whole catalogue, null on a page that is neither (a tag's). */
+  current: string | null
   /** Where a category lives ("" = the whole catalogue), with the filters that travel along. */
   linkFor: (slug: string) => RouteLocationRaw
 }>()
@@ -41,7 +41,8 @@ defineProps<{
   display: flex;
   gap: 0.5rem;
   margin: 0 0 1.25rem;
-  padding: 0 0 0.25rem;
+  /* Room for the focus ring, which the scrolling row would otherwise clip. */
+  padding: 0.25rem 0.25rem 0.5rem;
   list-style: none;
   /* One scrollable row on a phone rather than a wall of chips above the products. */
   overflow-x: auto;
