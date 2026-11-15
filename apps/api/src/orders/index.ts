@@ -24,7 +24,7 @@ import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
 import { customerShipments } from "../shipments/service.js"
 import { requireShopOpen } from "../shop-settings/require-shop-open.js"
-import { checkOrderAge } from "./age-check.js"
+import { checkOrderAge, recordBirthDate } from "./age-check.js"
 import { sendOrderConfirmation } from "./confirmation.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 import { ADDRESS_FIELDS, decrementVariantStock, insertPaymentBuckets, OrderError, toSnapshot } from "./placement.js"
@@ -196,6 +196,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     let orderId: string
     try {
       orderId = await db.transaction(async (tx) => {
+        if (age.birthDateToStore) await recordBirthDate(tx, userId, age.birthDateToStore)
         const [order] = await tx
           .insert(orders)
           .values({
