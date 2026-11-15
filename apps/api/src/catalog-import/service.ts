@@ -33,7 +33,9 @@ import {
   products,
   suppliers,
 } from "../db/schema.js"
+import { replaceProductTags } from "../products/product-tags.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
+import { resolveImportTags } from "./tags.js"
 
 export class ImportFileError extends Error {}
 
@@ -89,6 +91,8 @@ export interface ImportPlanRow {
   categoryId: string | null
   categorySlug: string | null
   existing: ExistingProduct | null
+  /** Story 12.13: the tags the row sets, or null when its « Tags » cell is blank (left as they are). */
+  tagIds: string[] | null
 }
 
 export interface ImportPlan {
@@ -141,6 +145,7 @@ export async function planCatalogImport(
     categoryId: null,
     categorySlug: null,
     existing: null,
+    tagIds: null,
   }))
   const active = () => rows.filter((r) => r.data && r.action !== "invalid")
   const invalidate = (row: ImportPlanRow, message: string) => {
@@ -167,6 +172,8 @@ export async function planCatalogImport(
       row.categorySlug = cat.slug
     }
   }
+
+  await resolveImportTags(active(), invalidate)
 
   // Suppliers: only those declared in the back office (story 12.5). The import
   // used to create any unknown name, and a typo ("BGM Winfeld") made a twin.
@@ -235,6 +242,12 @@ export async function planCatalogImport(
         continue
       }
       row.warnings.push(`Fiche modifiée dans l'administration le ${when}, après cet export`)
+      // Tags are replaced whatever the overwrite option: from a stale sheet
+      // that would undo a tag edit made in the back-office.
+      if (row.tagIds) {
+        row.tagIds = null
+        row.warnings.push("Tags conservés : la fiche a changé depuis l'export")
+      }
     }
     row.action = "update"
     row.existing = existing
@@ -439,6 +452,7 @@ export async function commitCatalogImport(
           .returning({ id: products.id })
         if (!product) throw new Error("Product insert returned no row")
         created++
+        if (row.tagIds) await replaceProductTags(product.id, row.tagIds, tx)
         if (row.images > 0) queue.push({ productId: product.id, urls: data.imageUrls })
       } else if (row.action === "update" && row.existing) {
         const ex = row.existing
@@ -478,6 +492,7 @@ export async function commitCatalogImport(
           })
           .where(eq(products.id, ex.id))
         updated++
+        if (row.tagIds) await replaceProductTags(ex.id, row.tagIds, tx)
         if (row.images > 0) queue.push({ productId: ex.id, urls: data.imageUrls })
       }
     }

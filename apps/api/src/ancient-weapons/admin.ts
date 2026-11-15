@@ -1,5 +1,5 @@
 import { createAncientWeaponSchema, updateAncientWeaponSchema, uuidParamSchema } from "@armurier/shared"
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, asc, desc, eq, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
@@ -15,6 +15,7 @@ import {
 } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { deleteMediaForOwner } from "../media/service.js"
+import { replaceProductTagsBySlug } from "../products/product-tags.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
 
 /**
@@ -26,19 +27,6 @@ import { sanitizeRichTextHtml } from "../sanitize.js"
  */
 const uniqueVariantSku = (sku: string) => `${sku}-PU`
 const UNIQUE_VARIANT_LABEL = "Pièce unique"
-
-type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db
-
-async function attachTags(productId: string, tagSlugs: string[], tx: DbExecutor = db) {
-  await tx.delete(productTags).where(eq(productTags.productId, productId))
-  if (tagSlugs.length === 0) return
-  const rows = await tx.select({ id: tags.id }).from(tags).where(inArray(tags.slug, tagSlugs))
-  if (rows.length === 0) return
-  await tx
-    .insert(productTags)
-    .values(rows.map((t) => ({ productId, tagId: t.id })))
-    .onConflictDoNothing()
-}
 
 async function loadAdminWeapon(productId: string) {
   const [row] = await db
@@ -215,7 +203,7 @@ export const adminAncientWeaponRoutes: FastifyPluginAsync = async (fastify) => {
         priceDeltaHt: "0",
       })
 
-      await attachTags(product.id, tagSlugs, tx)
+      await replaceProductTagsBySlug(product.id, tagSlugs, tx)
       return product.id
     })
 
@@ -282,7 +270,7 @@ export const adminAncientWeaponRoutes: FastifyPluginAsync = async (fastify) => {
         await tx.update(ancientWeapons).set(weaponPatch).where(eq(ancientWeapons.productId, params.data.id))
       }
 
-      if (tagSlugs) await attachTags(params.data.id, tagSlugs, tx)
+      if (tagSlugs) await replaceProductTagsBySlug(params.data.id, tagSlugs, tx)
     })
 
     return reply.code(200).send({ data: await loadAdminWeapon(params.data.id) })
