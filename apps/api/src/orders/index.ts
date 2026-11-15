@@ -24,7 +24,7 @@ import { validationError } from "../http.js"
 import { createPayoutsForOrder } from "../payouts/service.js"
 import { customerShipments } from "../shipments/service.js"
 import { requireShopOpen } from "../shop-settings/require-shop-open.js"
-import { checkOrderAge, recordBirthDate } from "./age-check.js"
+import { checkOrderAge } from "./age-check.js"
 import { sendOrderConfirmation } from "./confirmation.js"
 import { buildRequiredDocsView, loadUserDocs, recomputeOrderLegalStatus, requiredDocTypesFor } from "./legal-status.js"
 import { ADDRESS_FIELDS, decrementVariantStock, insertPaymentBuckets, OrderError, toSnapshot } from "./placement.js"
@@ -63,7 +63,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) {
       return reply.code(400).send(validationError(parsed.error.issues))
     }
-    const { shippingAddressId, billingAddressId, acceptedTermsVersion, birthDate } = parsed.data
+    const { shippingAddressId, billingAddressId, acceptedTermsVersion, adultDeclaration } = parsed.data
 
     // The customer must have ticked the CGV in force (story 12.1). A stale
     // version means the text changed after their checkout page loaded: they
@@ -98,7 +98,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     const age = await checkOrderAge(
       userId,
       cart.items.map((line) => line.variantId),
-      birthDate,
+      adultDeclaration === true,
     )
     if (!age.ok) {
       const { status, ok: _ok, ...body } = age
@@ -196,7 +196,6 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
     let orderId: string
     try {
       orderId = await db.transaction(async (tx) => {
-        if (age.birthDateToStore) await recordBirthDate(tx, userId, age.birthDateToStore)
         const [order] = await tx
           .insert(orders)
           .values({
@@ -205,6 +204,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify) => {
             paymentStatus: "pending",
             termsVersion: acceptedTermsVersion,
             termsAcceptedAt: new Date(),
+            adultDeclaredAt: age.declared ? new Date() : null,
             itemsJson,
             subtotalHt: cart.summary.subtotalHt.toFixed(2),
             vatAmount: cart.summary.vatAmount.toFixed(2),

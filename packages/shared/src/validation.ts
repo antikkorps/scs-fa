@@ -217,11 +217,9 @@ export const createOrderSchema = z
     shippingAddressId: z.string().uuid(),
     billingAddressId: z.string().uuid().optional(),
     acceptedTermsVersion: z.string().min(1).max(32),
-    // Story 12.13c: given once, when the cart holds an article reserved to adults.
-    birthDate: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected an ISO date (YYYY-MM-DD)")
-      .optional(),
+    // Story 12.13c (Fred 2026-11-15): « Je certifie avoir 18 ans révolus »,
+    // ticked when the cart holds an article reserved to adults.
+    adultDeclaration: z.literal(true).optional(),
   })
   .strict()
 

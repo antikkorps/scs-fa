@@ -181,7 +181,6 @@ describe("the deletion of an account by its holder (story 12.11)", () => {
   describe("what a deletion does", () => {
     it("anonymises the account and closes every session", async () => {
       const account = await createAccount(app, EMAIL_SUFFIX)
-      await db.update(users).set({ birthDate: "1980-05-17" }).where(eq(users.id, account.id))
       const login = await app.inject({
         method: "POST",
         url: "/api/auth/login",
@@ -205,8 +204,6 @@ describe("the deletion of an account by its holder (story 12.11)", () => {
         addressCity: null,
         totpSecretEncrypted: null,
         totpEnabledAt: null,
-        // Story 12.13c.
-        birthDate: null,
       })
       expect(await db.select().from(refreshTokens).where(eq(refreshTokens.userId, account.id))).toEqual([])
 

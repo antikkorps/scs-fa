@@ -99,6 +99,8 @@ export async function buildAccountExport(userId: string, now: Date) {
         legalVerificationStatus: orders.legalVerificationStatus,
         termsVersion: orders.termsVersion,
         termsAcceptedAt: orders.termsAcceptedAt,
+        // Story 12.13c: the customer's declaration of being of age, when one was asked.
+        adultDeclaredAt: orders.adultDeclaredAt,
       })
       .from(orders)
       .where(eq(orders.userId, userId))
@@ -141,7 +143,6 @@ export async function buildAccountExport(userId: string, now: Date) {
       firstName: user.firstname,
       lastName: user.lastname,
       phone: user.phone,
-      birthDate: user.birthDate,
       address: {
         street: user.addressStreet,
         postal: user.addressPostal,
