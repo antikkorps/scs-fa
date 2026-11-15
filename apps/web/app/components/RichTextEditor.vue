@@ -20,6 +20,8 @@ const editor = useEditor({
     // Keep the markup aligned with the server-side sanitiser allowlist:
     // h2/h3 only, no code blocks / horizontal rules.
     StarterKit.configure({ heading: { levels: [2, 3] }, codeBlock: false, horizontalRule: false }),
+    // rel/target here only shape the editing view: on save the API decides
+    // (sanitize.ts) — internal links followed, external ones hardened.
     Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: "noopener noreferrer nofollow" } }),
     Image,
   ],
