@@ -260,6 +260,9 @@ export const CATALOG_IMPORT_COLUMNS = [
   { key: "brand", header: "Marque", required: false },
   { key: "category", header: "Catégorie", required: true },
   { key: "legalCategory", header: "Catégorie légale", required: true },
+  // Story 12.13: tags by name or slug ("Chasse, Occasion"). Blank leaves an
+  // existing product's tags as they are; a listed set replaces them.
+  { key: "tags", header: "Tags", required: false },
   // Informational only: the import ignores it.
   { key: "supplierLegalClass", header: "Classement fournisseur", required: false },
   { key: "costPriceHt", header: "Prix d'achat HT", required: false },
@@ -328,6 +331,8 @@ export interface CatalogImportRow {
   description: string | null
   longDescription: string | null
   imageUrls: string[]
+  /** Tags by name or slug, resolved by the API; null when the cell is blank (an existing product keeps its tags). */
+  tags: string[] | null
   sourceCategory: string | null
   sourceUrl: string | null
   sku: string
@@ -345,6 +350,21 @@ export interface ParsedImportRow {
 }
 
 export const MAX_IMPORT_IMAGES_PER_ROW = 20
+export const MAX_IMPORT_TAGS_PER_ROW = 20
+
+/** The tags a cell lists, in order, each once (case-insensitive); separated by , ; or |. */
+export function parseImportTags(cell: string): string[] {
+  const seen = new Set<string>()
+  const tags: string[] = []
+  for (const raw of cell.split(/[,;|]/)) {
+    const tag = raw.trim()
+    const key = tag.toLowerCase()
+    if (!tag || seen.has(key)) continue
+    seen.add(key)
+    tags.push(tag)
+  }
+  return tags
+}
 
 /** Upload cap of a triage file: ~20 000 rows of text fit well under it. */
 export const MAX_CATALOG_IMPORT_FILE_BYTES = 15 * 1024 * 1024
@@ -469,6 +489,9 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
   for (const url of imageUrls) if (!isHttpUrl(url)) errors.push(`URL d'image invalide : « ${url} »`)
   if (imageUrls.length > MAX_IMPORT_IMAGES_PER_ROW) errors.push(`${MAX_IMPORT_IMAGES_PER_ROW} images au plus`)
 
+  const tags = get("tags") ? parseImportTags(get("tags")) : null
+  if (tags && tags.length > MAX_IMPORT_TAGS_PER_ROW) errors.push(`${MAX_IMPORT_TAGS_PER_ROW} tags au plus`)
+
   const sku = text("sku", "SKU", false) ?? (supplier && supplierSku ? deriveImportSku(supplier, supplierSku) : "")
   const slug = slugify([brand, name, supplierSku].filter(Boolean).join(" "))
   if (name && supplierSku && (!slug || RESERVED_PRODUCT_SLUGS.includes(slug))) {
@@ -501,6 +524,7 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
       description,
       longDescription,
       imageUrls,
+      tags,
       sourceCategory,
       sourceUrl,
       sku,

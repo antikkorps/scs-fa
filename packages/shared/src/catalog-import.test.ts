@@ -235,6 +235,20 @@ describe("parseCatalogImportTable", () => {
     expect(parse({ proOnly: "pros" })?.errors.join()).toMatch(/« Réservé pro » doit valoir/)
   })
 
+  // Story 12.13: the hunting universe gathers the products tagged « Chasse »,
+  // and whole supplier catalogues arrive through the import.
+  it("reads « Tags » as a list, or unchanged when blank", () => {
+    expect(CATALOG_IMPORT_COLUMNS.map((column) => column.header)).toContain("Tags")
+    expect(parse({ tags: "Chasse, Occasion" })?.data?.tags).toEqual(["Chasse", "Occasion"])
+    expect(parse({ tags: " chasse ; occasion | Chasse " })?.data?.tags).toEqual(["chasse", "occasion"])
+    expect(parse({})?.data?.tags).toBeNull()
+  })
+
+  it("caps the tags of one row", () => {
+    const many = Array.from({ length: 21 }, (_, i) => `tag-${i}`).join(",")
+    expect(parse({ tags: many })?.errors.join()).toMatch(/20 tags au plus/)
+  })
+
   it("reads « Actif » as on / off / unchanged, and the export's « Version »", () => {
     expect(parse({ active: "oui" })?.data?.active).toBe(true)
     expect(parse({ active: "Non" })?.data?.active).toBe(false)
