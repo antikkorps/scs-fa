@@ -1149,6 +1149,43 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] I9 back-office : tiroir de vérification d'une pièce sans la commande ni l'arme, ni aperçu ; codes bruts (« clean ») ; recherche de commande par référence — le tiroir liste les commandes en cours du client qui attendent ce type de pièce (référence cliquable, date, statut, armes concernées et leur catégorie ; pièce d'un compte pro : « elle sert à accepter ses devis ») ; **aperçu des photos dans le tiroir, PDF dans un nouvel onglet** (décision Franck 2026-11-04 : pas d'élargissement de la CSP pour une pièce d'identité) ; aucun lien tant que l'antivirus n'est pas passé (« Fichier consultable après l'analyse antivirus ») ; antivirus en clair (« Sain », « Analyse en cours », « Infecté ») ; la recherche des commandes accepte la référence (`0B7D1F3E`, `#0B7D1F3E`, minuscules) en plus de l'e-mail
 - [x] Retours de Franck sur l'admin (PR #209) : dates sur une ligne et e-mails coupés dans les listes, actions en icônes avec infobulle, champs du simulateur alignés
 
+**Story 12.13** — Univers Chasse et Coutellerie — 📝 **CADRÉE** (décisions de Franck le 2026-11-15) _(demande de Fred, transmise par Franck le 2026-11-15)_
+
+> Besoin : deux nouvelles zones du site, une **zone chasse** et une **zone couteaux**. Réponses de Fred (via Franck, 2026-11-15) : comme le reste, plusieurs produits de plusieurs fournisseurs ; **d'autres fournisseurs et d'autres imports** que l'armurerie actuelle ; **couteaux réservés aux plus de 18 ans** ; deux entrées de menu de premier niveau avec une page d'accueil éditoriale chacune ; **à prévoir dès maintenant** (avant l'ouverture).
+>
+> Constats dans le code (2026-11-15) :
+> - Les catégories de la boutique sont une liste fermée en base (`product_category`, 8 valeurs) : en ajouter une demande une migration.
+> - Les tags transverses existent déjà (story 11.1) avec leurs pages indexables (`/boutique/tag/{slug}`), rangés par facette (`etat`, `epoque`, `caracteristique`).
+> - L'import gère déjà plusieurs fournisseurs : un adaptateur par fournisseur dans `tools/catalog-collect`, un classeur de tri commun, fournisseurs gérés au back-office (12.5). Un nouveau fournisseur = un nouvel adaptateur, pas un nouveau système.
+> - ⚠️ **Aucun contrôle d'âge n'est appliqué à la commande aujourd'hui** : `products.age_min_required` et `legal_categories.min_age` sont seulement affichés. Pour les catégories B et C, l'âge est couvert indirectement par la vérification de la pièce d'identité ; pour un article sans pièce exigée (un couteau, un accessoire marqué 18 ans), rien n'empêche un mineur de commander.
+
+**Proposition de structure (à valider par Franck)**
+- **Chasse = un univers, pas une catégorie** : une carabine de chasse reste une « arme longue », des cartouches de chasse des « munitions », une lunette une « aide à la visée ». Page `/chasse` (introduction éditoriale + sélection), entrée de menu de premier niveau ; la sélection = les produits portant le tag `chasse`, toutes catégories confondues. Nouvelle facette de tag `usage` (migration), qui pourra servir plus tard au tir sportif. Si Fred vend des articles qui ne rentrent dans aucune catégorie actuelle (vêtements, appeaux, chiens, sacs à gibier…), une ou deux catégories en plus (ex. « Équipement du chasseur ») — selon sa liste.
+- **Coutellerie = une nouvelle catégorie** (valeur `coutellerie`, migration), avec les sortes en tags (pliant, lame fixe, couteau de chasse…). Page `/coutellerie` (introduction éditoriale + la catégorie) et entrée de menu de premier niveau.
+- **Menu** : Armurerie · Chasse · Coutellerie · Armes de collection · Gun Art ; pied de page, sitemap, `llms.txt` et données structurées à jour.
+
+**Décisions à prendre**
+- [x] **D1 — Facette `usage`** pour le tag `chasse` (proposé) ou réemploi de la facette `caracteristique` (pas de migration, mais mélange « ce que c'est » et « à quoi ça sert ») ✅ _(Franck 2026-11-15 : facette `usage`)_
+- [ ] **D2 — Contrôle d'âge 18 ans** (couteaux, et du même coup tout article marqué 18 ans sans pièce exigée) :
+  - (a) case « Je certifie avoir 18 ans révolus » au moment de commander, enregistrée avec la commande (date, version du texte) — léger, déclaratif ;
+  - (b) **date de naissance demandée une fois** (compte) + vérification ≥ 18 ans à la commande d'un article concerné, conservée avec la commande — plus solide, une donnée personnelle de plus (registre RGPD) — **proposé** ;
+  - (c) pièce d'identité vérifiée comme pour B/C — le plus sûr, mais lourd pour un couteau.
+  À faire valider par le juriste (vente à distance d'armes blanches aux majeurs). ✅ _(Franck 2026-11-15 : **(b)**, date de naissance + vérification à la commande ; validation juridique à obtenir)_
+- [ ] **D3 — Catégorie légale des couteaux** : D ou « vente libre » selon les articles ; articles exclus du catalogue (types interdits à la vente) — liste à confirmer par Fred / juriste
+- [x] **D4 — Catégories en plus pour la chasse** : selon la liste des produits de Fred ✅ _(Franck 2026-11-15 : **pas de nouvelle catégorie, des tags** pour les sortes de produits de chasse ; un article hors des catégories actuelles — vêtement, appeau… — va dans « Autres accessoires » avec ses tags)_
+
+**Découpage proposé (une PR par lot)**
+- [ ] 12.13a — Schéma et catalogue : catégorie `coutellerie`, facette `usage` + tag `chasse`, référentiels ; colonnes du classeur d'import (catégorie, tags) qui les acceptent
+- [ ] 12.13b — Pages `/chasse` et `/coutellerie`, menu, pied de page, sitemap, `llms.txt`, SEO
+- [ ] 12.13c — Contrôle d'âge 18 ans à la commande (selon D2), mention dans les CGV et la FAQ réglementaire
+- [ ] 12.13d — Adaptateurs des nouveaux fournisseurs, au fur et à mesure des fichiers reçus
+
+**Questions pour Fred**
+- [ ] Liste des familles de produits chasse (hors armes et munitions déjà au catalogue) et des sortes de couteaux, avec les marques principales
+- [ ] Un fichier de tarifs par nouveau fournisseur (pour écrire les adaptateurs)
+- [ ] Textes d'introduction des deux pages (ou premier jet rédigé de notre côté, à relire)
+- [ ] Articles de coutellerie à exclure, et catégorie légale de chaque sorte (D3)
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
