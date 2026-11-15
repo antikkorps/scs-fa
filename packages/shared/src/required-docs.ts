@@ -58,6 +58,9 @@ export const SEASON_LICENCE_MAX_MONTHS = 18
 /** The latest validity end a season licence may declare, from `today` ("YYYY-MM-DD"). */
 export function latestSeasonalExpiry(today: string): string {
   const [year = 0, month = 1, day = 1] = today.split("-").map(Number)
-  const limit = new Date(Date.UTC(year, month - 1 + SEASON_LICENCE_MAX_MONTHS, day))
+  // Day 0 of the following month = last day of the target month: 31 August
+  // + 18 months is 29 February, not 2 March.
+  const lastDay = new Date(Date.UTC(year, month + SEASON_LICENCE_MAX_MONTHS, 0)).getUTCDate()
+  const limit = new Date(Date.UTC(year, month - 1 + SEASON_LICENCE_MAX_MONTHS, Math.min(day, lastDay)))
   return limit.toISOString().slice(0, 10)
 }

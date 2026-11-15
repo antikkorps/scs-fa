@@ -10,7 +10,7 @@ import { db } from "../db/client.js"
 import { users } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { authenticate } from "./authenticate.js"
-import { clearFailedLogins, countFailedLogin, lockoutRemainingSeconds } from "./lockout.js"
+import { countFailedLogin, lockoutRemainingSeconds } from "./lockout.js"
 import { reauthenticate, sendReauthRefusal } from "./reauth.js"
 import {
   beginEnrollment,
@@ -101,7 +101,8 @@ export const totpRoutes: FastifyPluginAsync = async (fastify) => {
         const { locked } = await countFailedLogin(user.id)
         return locked ? sendReauthRefusal(reply, "AccountLocked") : reply.code(400).send(INVALID_CODE)
       }
-      await clearFailedLogins(user.id)
+      // No reset on success, as a re-entry does not either: clearFailedLogins
+      // also records a login, which the inactivity purge reads.
       const recoveryCodes = await regenerateRecoveryCodes(user.id)
       await journal(request, user, "user.recovery_codes_regenerated")
       return reply.send({ data: { recoveryCodes } })

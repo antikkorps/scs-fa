@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { LEGAL_DOC_LABELS, LEGAL_DOC_TYPES } from "./constants.js"
 import {
   docTypesOf,
+  latestSeasonalExpiry,
   parseRequiredDocEntries,
   requiredDocEntryKey,
   requiredDocEntryLabel,
@@ -69,5 +70,13 @@ describe("documents renewed every season (I7)", () => {
     expect(legalDocumentMetaSchema.safeParse({ docType: "licence_tir" }).success).toBe(false)
     expect(legalDocumentMetaSchema.safeParse({ docType: "permis_chasse", expiresAt: "2027-06-30" }).success).toBe(true)
     expect(legalDocumentMetaSchema.safeParse({ docType: "cni" }).success).toBe(true)
+  })
+})
+
+describe("latestSeasonalExpiry (audit 2026-11-15, B2)", () => {
+  it("lies 18 months ahead, kept within the target month", () => {
+    expect(latestSeasonalExpiry("2026-11-15")).toBe("2028-05-15")
+    expect(latestSeasonalExpiry("2026-08-31")).toBe("2028-02-29")
+    expect(latestSeasonalExpiry("2027-08-31")).toBe("2029-02-28")
   })
 })
