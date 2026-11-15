@@ -30,7 +30,7 @@ describe("login with the authenticator app (story 12.8e)", () => {
   const verify = (challengeToken: string, code: string) =>
     app.inject({ method: "POST", url: "/api/auth/login/verify", payload: { challengeToken, code } })
 
-  async function account(options: { role?: "customer" | "admin"; pro?: boolean } = {}) {
+  async function account(options: { role?: "customer" | "admin"; pro?: boolean; verified?: boolean } = {}) {
     let organisationId: string | null = null
     if (options.pro) {
       const [organisation] = await db
@@ -54,6 +54,8 @@ describe("login with the authenticator app (story 12.8e)", () => {
         firstname: "Jeanne",
         lastname: "Armand",
         organisationId,
+        // Confirmed unless the test is about an address never confirmed (M1).
+        emailVerifiedAt: options.verified === false ? null : new Date(),
         rgpdConsentAt: new Date(),
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
@@ -202,6 +204,14 @@ describe("login with the authenticator app (story 12.8e)", () => {
     const user = await account()
     const res = await login(user.email)
     expect(res.json().accessToken).toEqual(expect.any(String))
+  })
+
+  it("mails the code to a customer whose address was never confirmed (audit 2026-11-15, M1)", async () => {
+    const user = await account({ verified: false })
+    const first = (await login(user.email)).json()
+    expect(first).toMatchObject({ codeRequired: true, method: "email_code" })
+    expect(first.accessToken).toBeUndefined()
+    expect(sendLoginCodeEmail).toHaveBeenCalledOnce()
   })
 
   it("still mails the code to a pro without the app", async () => {

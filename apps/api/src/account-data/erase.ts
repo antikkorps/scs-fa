@@ -106,15 +106,49 @@ export interface ErasedAccount {
  * when it may not go now — checked here, under the account's row lock, so the
  * check and the erasure see the same orders.
  */
+
+/**
+ * What only the account's address links to: its newsletter consent and the
+ * messages sent from it. Erased only once the address is confirmed (audit
+ * 2026-11-15, M1): whoever signed up with someone else's address must not wipe
+ * their data. True when a newsletter address was erased (Brevo follows).
+ */
+async function eraseAddressLinkedData(
+  tx: Tx,
+  user: { email: string; emailVerifiedAt: Date | null },
+  now: Date,
+): Promise<boolean> {
+  if (!user.emailVerifiedAt) return false
+  const newsletterErased = await eraseNewsletterAddress(tx, user.email, now)
+  // What the person wrote through the contact form, from this address.
+  await tx.delete(contactMessages).where(eq(contactMessages.email, user.email))
+  return newsletterErased
+}
+
 export async function eraseAccount(
   userId: string,
   now: Date,
+  // The unconfirmed-account purge (M1): re-checked under the row lock, so an
+  // address confirmed after the sweep listed it is spared.
+  { onlyIfUnconfirmed = false }: { onlyIfUnconfirmed?: boolean } = {},
 ): Promise<ErasedAccount | { blocker: AccountDeletionBlocker } | null> {
   return db.transaction(async (tx) => {
     const [user] = await tx
-      .select({ id: users.id, email: users.email, role: users.role, organisationId: users.organisationId })
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        organisationId: users.organisationId,
+        emailVerifiedAt: users.emailVerifiedAt,
+      })
       .from(users)
-      .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+      .where(
+        and(
+          eq(users.id, userId),
+          isNull(users.deletedAt),
+          onlyIfUnconfirmed ? and(isNull(users.emailVerifiedAt), isNull(users.lastLoginAt)) : undefined,
+        ),
+      )
       .for("update")
     if (!user) return null
     const blocker = await deletionBlocker(user, now, tx)
@@ -152,9 +186,7 @@ export async function eraseAccount(
     await tx.delete(loginChallenges).where(eq(loginChallenges.userId, userId))
     await tx.delete(recoveryCodes).where(eq(recoveryCodes.userId, userId))
 
-    const newsletterErased = await eraseNewsletterAddress(tx, user.email, now)
-    // What the person wrote through the contact form, from this address.
-    await tx.delete(contactMessages).where(eq(contactMessages.email, user.email))
+    const newsletterErased = await eraseAddressLinkedData(tx, user, now)
 
     // The account's own journal lines keep their dates and actions (security
     // history, 1 year) but no longer what they said: names, phone, addresses.

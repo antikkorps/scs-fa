@@ -40,7 +40,14 @@ export interface TestAccount {
 export async function createAccount(
   app: FastifyInstance,
   emailSuffix: string,
-  options: { role?: "customer" | "admin"; withApp?: boolean; lastLoginAt?: Date; createdAt?: Date } = {},
+  options: {
+    role?: "customer" | "admin"
+    withApp?: boolean
+    lastLoginAt?: Date
+    createdAt?: Date
+    /** Confirmed unless the test is about an address never confirmed (M1). */
+    emailVerified?: boolean
+  } = {},
 ): Promise<TestAccount> {
   const role = options.role ?? "customer"
   const secret = options.withApp ? generateTotpSecret() : null
@@ -59,6 +66,7 @@ export async function createAccount(
       addressCountry: "FR",
       rgpdConsentAt: new Date("2026-01-15T10:00:00Z"),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
+      emailVerifiedAt: options.emailVerified === false ? null : new Date(),
       ...(secret && { totpSecretEncrypted: encryptSecret(secret, env.TOTP_ENCRYPTION_KEY), totpEnabledAt: new Date() }),
       ...(options.lastLoginAt && { lastLoginAt: options.lastLoginAt }),
       ...(options.createdAt && { createdAt: options.createdAt }),

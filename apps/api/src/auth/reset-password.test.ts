@@ -1,6 +1,6 @@
 import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { hash } from "@node-rs/argon2"
-import { eq, inArray, like } from "drizzle-orm"
+import { and, eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
@@ -11,12 +11,14 @@ import { generateRefreshToken, hashRefreshToken } from "./tokens.js"
 
 vi.mock("../email.js", () => ({
   sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
+  sendLoginCodeEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
 const TEST_EMAIL_SUFFIX = "@reset-test.local"
 const PLAINTEXT_PASSWORD = "MotDePasseTresLong123!"
 
-async function seedUser(email: string) {
+/** A customer whose address is already confirmed, unless the test is about that (M1). */
+async function seedUser(email: string, { verified = true } = {}) {
   const passwordHash = await hash(PLAINTEXT_PASSWORD, {
     memoryCost: 19_456,
     timeCost: 2,
@@ -30,6 +32,7 @@ async function seedUser(email: string) {
       firstname: "Jean",
       lastname: "Dupont",
       role: "customer",
+      emailVerifiedAt: verified ? new Date() : null,
       rgpdConsentAt: new Date(),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
     })
@@ -170,6 +173,41 @@ describe("forgot-password + reset-password", () => {
       // Audit log exists
       const audits = await db.select().from(auditLogs).where(eq(auditLogs.action, "user.password_reset"))
       expect(audits.some((a) => a.userId === userId)).toBe(true)
+    })
+
+    it("confirms the address: the link proves the mailbox, so the next login needs no code (M1)", async () => {
+      const email = `reset-verify-${Date.now()}${TEST_EMAIL_SUFFIX}`
+      const userId = await seedUser(email, { verified: false })
+      const token = await seedResetToken(userId)
+      const newPassword = "NewSecurePassword456!"
+
+      const before = await app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { email, password: PLAINTEXT_PASSWORD },
+      })
+      expect(before.json().codeRequired).toBe(true)
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/auth/reset-password",
+        payload: { token, password: newPassword },
+      })
+      expect(res.statusCode).toBe(200)
+
+      const [row] = await db.select({ at: users.emailVerifiedAt }).from(users).where(eq(users.id, userId))
+      expect(row?.at).toBeInstanceOf(Date)
+      const confirmations = await db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.userId, userId), eq(auditLogs.action, "user.email_verified")))
+      expect(confirmations.map((event) => event.newValue)).toEqual([{ by: "password_reset" }])
+      const after = await app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { email, password: newPassword },
+      })
+      expect(after.json().accessToken).toEqual(expect.any(String))
     })
 
     it("revokes all refresh tokens on password reset", async () => {

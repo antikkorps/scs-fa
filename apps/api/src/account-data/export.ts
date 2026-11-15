@@ -16,11 +16,50 @@ import {
 } from "../db/schema.js"
 import { newsletterEmailHash } from "../newsletter/contact.js"
 
+/**
+ * What only the account's address links to: newsletter consents and contact
+ * messages. Nothing while that address is unconfirmed (audit 2026-11-15, M1):
+ * whoever signed up with someone else's address must not read their data.
+ */
+async function addressLinkedData(user: { email: string; emailVerifiedAt: Date | null }) {
+  if (!user.emailVerifiedAt) return { newsletterRows: [], contactRows: [] }
+  const [newsletterRows, contactRows] = await Promise.all([
+    db
+      .select({
+        segment: newsletterSubscriptions.segment,
+        status: newsletterSubscriptions.status,
+        requestedAt: newsletterSubscriptions.requestedAt,
+        confirmedAt: newsletterSubscriptions.confirmedAt,
+        unsubscribedAt: newsletterSubscriptions.unsubscribedAt,
+        consentSource: newsletterSubscriptions.consentSource,
+        consentIp: newsletterSubscriptions.consentIp,
+        consentUserAgent: newsletterSubscriptions.consentUserAgent,
+      })
+      .from(newsletterSubscriptions)
+      .innerJoin(newsletterContacts, eq(newsletterContacts.id, newsletterSubscriptions.contactId))
+      .where(eq(newsletterContacts.emailHash, newsletterEmailHash(user.email)))
+      .orderBy(asc(newsletterSubscriptions.segment)),
+    // Messages sent from the account's address through the contact form.
+    db
+      .select({
+        subject: contactMessages.subject,
+        orderReference: contactMessages.orderReference,
+        message: contactMessages.message,
+        phone: contactMessages.phone,
+        createdAt: contactMessages.createdAt,
+      })
+      .from(contactMessages)
+      .where(eq(contactMessages.email, user.email))
+      .orderBy(desc(contactMessages.createdAt)),
+  ])
+  return { newsletterRows, contactRows }
+}
+
 export async function buildAccountExport(userId: string, now: Date) {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
   if (!user) return null
 
-  const [addressRows, orderRows, quoteRows, documentRows, newsletterRows, contactRows] = await Promise.all([
+  const [addressRows, orderRows, quoteRows, documentRows, { newsletterRows, contactRows }] = await Promise.all([
     db
       .select({
         label: addresses.label,
@@ -92,33 +131,7 @@ export async function buildAccountExport(userId: string, now: Date) {
       .from(legalDocuments)
       .where(eq(legalDocuments.userId, userId))
       .orderBy(desc(legalDocuments.uploadedAt)),
-    db
-      .select({
-        segment: newsletterSubscriptions.segment,
-        status: newsletterSubscriptions.status,
-        requestedAt: newsletterSubscriptions.requestedAt,
-        confirmedAt: newsletterSubscriptions.confirmedAt,
-        unsubscribedAt: newsletterSubscriptions.unsubscribedAt,
-        consentSource: newsletterSubscriptions.consentSource,
-        consentIp: newsletterSubscriptions.consentIp,
-        consentUserAgent: newsletterSubscriptions.consentUserAgent,
-      })
-      .from(newsletterSubscriptions)
-      .innerJoin(newsletterContacts, eq(newsletterContacts.id, newsletterSubscriptions.contactId))
-      .where(eq(newsletterContacts.emailHash, newsletterEmailHash(user.email)))
-      .orderBy(asc(newsletterSubscriptions.segment)),
-    // Messages sent from the account's address through the contact form.
-    db
-      .select({
-        subject: contactMessages.subject,
-        orderReference: contactMessages.orderReference,
-        message: contactMessages.message,
-        phone: contactMessages.phone,
-        createdAt: contactMessages.createdAt,
-      })
-      .from(contactMessages)
-      .where(eq(contactMessages.email, user.email))
-      .orderBy(desc(contactMessages.createdAt)),
+    addressLinkedData(user),
   ])
 
   return {

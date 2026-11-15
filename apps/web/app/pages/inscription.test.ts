@@ -42,7 +42,7 @@ describe("inscription.vue", () => {
   })
 
   it("registers and redirects when the form is valid", async () => {
-    register.mockResolvedValue({ role: "customer" })
+    register.mockResolvedValue({ status: "signed_in", user: { role: "customer" } })
     const wrapper = await mountSuspended(Inscription)
     await fillValidForm(wrapper)
     await wrapper.find('input[type="checkbox"]').setValue(true)
@@ -65,6 +65,20 @@ describe("inscription.vue", () => {
     expect(navigateToMock).not.toHaveBeenCalled()
   })
 
+  it("asks for the code mailed to confirm the address, instead of signing in (audit 2026-11-15, M1)", async () => {
+    register.mockResolvedValue({ status: "code_required", method: "email_code", expiresIn: 600 })
+    const wrapper = await mountSuspended(Inscription)
+    await fillValidForm(wrapper)
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+
+    expect(navigateToMock).not.toHaveBeenCalled()
+    expect(wrapper.find('input[autocomplete="one-time-code"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain("Pour confirmer votre adresse")
+    expect(wrapper.text()).toContain("buyer@example.com")
+  })
+
   it("points professionals to their own signup", async () => {
     const wrapper = await mountSuspended(Inscription)
     expect(wrapper.find('a[href="/pro/inscription"]').exists()).toBe(true)
@@ -85,7 +99,7 @@ describe("inscription.vue — coming from the cart", () => {
   const FROM_CART = "/inscription?redirect=%2Fboutique%2Ffusil-x%3Fajouter%3Dv2&motif=panier"
 
   it("goes back to the product, with the item to add, once the account is created", async () => {
-    register.mockResolvedValue({ role: "customer" })
+    register.mockResolvedValue({ status: "signed_in", user: { role: "customer" } })
     const wrapper = await mountSuspended(Inscription, { route: FROM_CART })
     await fillValidForm(wrapper)
     await wrapper.find('input[type="checkbox"]').setValue(true)

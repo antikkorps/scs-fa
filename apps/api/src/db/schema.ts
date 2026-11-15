@@ -237,6 +237,10 @@ export const users = pgTable(
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     lastLoginAt: timestamp("last_login_at"),
+    // Audit 2026-11-15 (M1) — when the owner proved the mailbox is theirs: the
+    // mailed login code, a password-reset link or an admin invite. Until then a
+    // login asks for the code, and nothing is matched to the account by address.
+    emailVerifiedAt: timestamp("email_verified_at"),
     deletedAt: timestamp("deleted_at"), // Soft delete RGPD
     // Story 12.11 — when the "unused for 3 years" warning left; anonymised 30 days
     // later unless a login came in between.

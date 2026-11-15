@@ -169,6 +169,29 @@ describe("the export of an account's data (story 12.11)", () => {
     expect(raw).not.toContain(someoneElse.id)
   })
 
+  it("leaves out what only the address links to while it is unconfirmed (audit 2026-11-15, M1)", async () => {
+    // Someone signed up with an address that is not theirs: the newsletter
+    // consent and the messages sent from it belong to its real owner.
+    const account = await createAccount(app, EMAIL_SUFFIX, { emailVerified: false })
+    const [contact] = await db
+      .insert(newsletterContacts)
+      .values({ email: account.email, emailHash: createHash("sha256").update(account.email).digest("hex") })
+      .returning({ id: newsletterContacts.id })
+    contactIds.push(contact.id)
+    await db
+      .insert(newsletterSubscriptions)
+      .values({ contactId: contact.id, segment: "armurerie", status: "confirmed" })
+    await db
+      .insert(contactMessages)
+      .values({ name: "Owner", email: account.email, subject: "other", message: "Mon numéro : 06 12 34 56 78" })
+
+    const data = (await exportFor(account.token, { password: ACCOUNT_PASSWORD })).json()
+
+    expect(data.account.email).toBe(account.email)
+    expect(data.newsletter).toEqual([])
+    expect(data.contactMessages).toEqual([])
+  })
+
   it("is journaled on the account", async () => {
     const account = await createAccount(app, EMAIL_SUFFIX)
     await exportFor(account.token, { password: ACCOUNT_PASSWORD })

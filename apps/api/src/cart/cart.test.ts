@@ -94,6 +94,7 @@ describe("cart (/api/cart)", () => {
         email: TEST_EMAIL,
         passwordHash,
         role: "customer",
+        emailVerifiedAt: new Date(),
         rgpdConsentAt: new Date(),
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })

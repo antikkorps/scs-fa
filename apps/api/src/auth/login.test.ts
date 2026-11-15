@@ -26,6 +26,7 @@ async function seedUser(email: string) {
       firstname: "Jean",
       lastname: "Dupont",
       role: "customer",
+      emailVerifiedAt: new Date(),
       rgpdConsentAt: new Date(),
       rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
     })

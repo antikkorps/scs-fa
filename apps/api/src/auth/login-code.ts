@@ -17,6 +17,7 @@ import { db } from "../db/client.js"
 import { loginChallenges, users } from "../db/schema.js"
 import { sendLoginCodeEmail } from "../email.js"
 import { env } from "../env.js"
+import { markEmailVerified } from "./email-verification.js"
 import { clearFailedLogins, countFailedLogin, lockoutRemainingSeconds, MAX_FAILED_ATTEMPTS } from "./lockout.js"
 import type { SecondFactor } from "./login-code-policy.js"
 import {
@@ -236,6 +237,10 @@ export const loginCodeRoutes: FastifyPluginAsync = async (fastify) => {
       if (!spent) return invalidChallenge(reply)
 
       await clearFailedLogins(user.id)
+      // The mailed code proves the mailbox: the address is now the owner's (M1).
+      if (answer.method === "email_code" && (await markEmailVerified(user.id))) {
+        await journal(request, user, "user.email_verified", { by: "login_code" })
+      }
       const tokens = await issueTokens(fastify, user, challenge.deviceLabel)
       if (answer.recoveryCodes) await journal(request, user, "user.totp_enabled", { at: "login" })
       const method = answer.method === "totp_enrollment" ? "totp" : answer.method

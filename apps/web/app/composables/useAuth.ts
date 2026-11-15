@@ -20,6 +20,11 @@ export type LoginOutcome =
   | { status: "signed_in"; user: AuthUser }
   | { status: "code_required"; method: LoginMethod; expiresIn: number; enrollment?: LoginEnrolment }
 
+/** What the BFF answers a login or a sign-up: a session, or the second step to ask for. */
+type LoginAnswer =
+  | { user: AuthUser }
+  | { codeRequired: true; method: LoginMethod; expiresIn: number; enrollment?: LoginEnrolment }
+
 /** The second step's answer: the session's user, and the recovery codes when the app just enrolled. */
 export interface CodeOutcome {
   user: AuthUser
@@ -32,15 +37,16 @@ export function useAuth() {
   // Story 12.8a: for some accounts the right password is not enough — the BFF
   // keeps the challenge in an httpOnly cookie and the mailed code finishes it.
   // Story 12.8e: or the authenticator app's code, or its enrolment.
-  async function login(email: string, password: string): Promise<LoginOutcome> {
-    const res = await $fetch<
-      { user: AuthUser } | { codeRequired: true; method: LoginMethod; expiresIn: number; enrollment?: LoginEnrolment }
-    >("/bff/auth/login", { method: "POST", body: { email, password } })
+  function toOutcome(res: LoginAnswer): LoginOutcome {
     if ("codeRequired" in res) {
       return { status: "code_required", method: res.method, expiresIn: res.expiresIn, enrollment: res.enrollment }
     }
     user.value = res.user
     return { status: "signed_in", user: res.user }
+  }
+
+  async function login(email: string, password: string): Promise<LoginOutcome> {
+    return toOutcome(await $fetch<LoginAnswer>("/bff/auth/login", { method: "POST", body: { email, password } }))
   }
 
   async function verifyLoginCode(code: string): Promise<CodeOutcome> {
@@ -53,10 +59,10 @@ export function useAuth() {
     await $fetch("/bff/auth/login/resend", { method: "POST" })
   }
 
-  async function register(input: RegisterInput): Promise<AuthUser> {
-    const res = await $fetch<{ user: AuthUser }>("/bff/auth/register", { method: "POST", body: input })
-    user.value = res.user
-    return res.user
+  // Audit 2026-11-15 (M1): a new address is confirmed by the mailed code
+  // before the first session, so a sign-up answers like a login.
+  async function register(input: RegisterInput): Promise<LoginOutcome> {
+    return toOutcome(await $fetch<LoginAnswer>("/bff/auth/register", { method: "POST", body: input }))
   }
 
   async function logout(): Promise<void> {
