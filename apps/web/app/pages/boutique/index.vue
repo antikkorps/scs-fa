@@ -17,7 +17,8 @@ const description =
   "La boutique armurerie SCS Firearms : armes de chasse et de tir, munitions, optiques et accessoires. Catégories légales, prix TTC et stock en temps réel."
 
 usePageSeo({
-  title: "Boutique armurerie",
+  // A later page of results gets its own title (SEO audit 2026-11-15, finding 13).
+  title: () => pagedTitle("Boutique armurerie", pageFromQuery(route.query.page)),
   description,
   path: "/boutique",
   // ShopCatalogue states the canonical: it knows the page of results.

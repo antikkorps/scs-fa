@@ -1,10 +1,17 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import type { DOMWrapper } from "@vue/test-utils"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ref, toValue } from "vue"
 import ShopCatalogue from "./ShopCatalogue.vue"
 
-const { productQueries } = vi.hoisted(() => ({ productQueries: [] as unknown[] }))
+const { productQueries, pageAnswer } = vi.hoisted(() => ({
+  productQueries: [] as unknown[],
+  pageAnswer: {
+    value: { page: 1, limit: 24, total: 0, totalPages: 0, hasMore: false },
+    products: [] as unknown[],
+  },
+}))
 
 mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
   if (typeof url === "string" && url.includes("/product-categories")) {
@@ -31,7 +38,7 @@ mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
   }
   productQueries.push(toValue(opts?.query))
   return {
-    data: ref({ data: [], pagination: { page: 1, limit: 24, total: 0, totalPages: 0, hasMore: false } }),
+    data: ref({ data: pageAnswer.products, pagination: pageAnswer.value }),
     error: ref(null),
     pending: ref(false),
   }
@@ -44,35 +51,34 @@ describe("ShopCatalogue (story 9.6)", () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    pageAnswer.value = { page: 1, limit: 24, total: 0, totalPages: 0, hasMore: false }
   })
 
-  it("shows the page's own category as the selected one", async () => {
+  // SEO audit 2026-11-15, finding 2: the categories were only in a <select>
+  // and a hover menu, so the server-rendered page linked to none of them.
+  const categoryHref = (wrapper: { findAll: (selector: string) => DOMWrapper<Element>[] }, name: string) =>
+    wrapper
+      .findAll(".catlinks a")
+      .find((link) => link.text() === name)
+      ?.attributes("href")
+
+  it("links every category as a plain link, and marks the page's own", async () => {
     const wrapper = await mountSuspended(ShopCatalogue, {
       props: { category: "arme-poing", basePath: "/boutique/categorie/arme-poing", listName: "x" },
       route: "/boutique/categorie/arme-poing",
     })
-    const selected = wrapper.findAll("#shop-category option").filter((o) => (o.element as HTMLOptionElement).selected)
-    expect(selected.map((o) => o.text())).toEqual(["Armes de poing"])
+    expect(categoryHref(wrapper, "Munitions")).toBe("/boutique/categorie/munition")
+    expect(categoryHref(wrapper, "Tout le catalogue")).toBe("/boutique")
+    expect(wrapper.find('.catlinks [aria-current="page"]').text()).toBe("Armes de poing")
   })
 
-  it("moves to the category's own page on change, keeping the other filters", async () => {
+  it("keeps the other filters in a category's link, but not the page of results", async () => {
+    pageAnswer.value = { page: 3, limit: 24, total: 100, totalPages: 5, hasMore: true }
     const wrapper = await mountSuspended(ShopCatalogue, {
       props: { category: "", basePath: "/boutique", listName: "x" },
       route: "/boutique?legalCategory=B&page=3",
     })
-    const push = spyPush()
-    await wrapper.find("#shop-category").setValue("munition")
-    expect(push).toHaveBeenCalledWith({ path: "/boutique/categorie/munition", query: { legalCategory: "B" } })
-  })
-
-  it("goes back to the whole catalogue when 'all categories' is chosen", async () => {
-    const wrapper = await mountSuspended(ShopCatalogue, {
-      props: { category: "munition", basePath: "/boutique/categorie/munition", listName: "x" },
-      route: "/boutique/categorie/munition",
-    })
-    const push = spyPush()
-    await wrapper.find("#shop-category").setValue("")
-    expect(push).toHaveBeenCalledWith({ path: "/boutique", query: {} })
+    expect(categoryHref(wrapper, "Munitions")).toBe("/boutique/categorie/munition?legalCategory=B")
   })
 
   describe("on a tag page", () => {
@@ -98,9 +104,7 @@ describe("ShopCatalogue (story 9.6)", () => {
 
     it("keeps the tag when moving to a category", async () => {
       const wrapper = await mountSuspended(ShopCatalogue, { props: tagPage, route: "/boutique/tag/occasion" })
-      const push = spyPush()
-      await wrapper.find("#shop-category").setValue("munition")
-      expect(push).toHaveBeenCalledWith({ path: "/boutique/categorie/munition", query: { tags: "occasion" } })
+      expect(categoryHref(wrapper, "Munitions")).toBe("/boutique/categorie/munition?tags=occasion")
     })
   })
 
@@ -118,6 +122,7 @@ describe("ShopCatalogue (story 9.6)", () => {
     })
 
     it("sorts from the first page, keeping the filters", async () => {
+      pageAnswer.value = { page: 3, limit: 24, total: 100, totalPages: 5, hasMore: true }
       const wrapper = await mountSuspended(ShopCatalogue, {
         props: { category: "", basePath: "/boutique", listName: "x" },
         route: "/boutique?legalCategory=B&page=3",
@@ -166,17 +171,18 @@ describe("ShopCatalogue (story 9.6)", () => {
       expect(panel.classes()).toContain("is-open")
     })
 
-    it("holds the category, legal category, price and tag filters, not the search", async () => {
+    it("holds the legal category, price and tag filters, not the search nor the categories", async () => {
       const wrapper = await mountSuspended(ShopCatalogue, {
         props: { category: "", basePath: "/boutique", listName: "x" },
         route: "/boutique",
       })
       const panel = wrapper.find("#shop-filters")
       expect(wrapper.find("button.filters__toggle").text()).toBe("Filtres")
-      for (const selector of ["#shop-category", "#shop-legal", "#shop-min", "#shop-max", ".tagf"]) {
+      for (const selector of ["#shop-legal", "#shop-min", "#shop-max", ".tagf"]) {
         expect(panel.find(selector).exists()).toBe(true)
       }
       expect(panel.find("#shop-search").exists()).toBe(false)
+      expect(panel.find(".catlinks").exists()).toBe(false)
     })
   })
 
@@ -189,5 +195,40 @@ describe("ShopCatalogue (story 9.6)", () => {
     expect(wrapper.find("label[for='shop-max']").text()).toBe("Prix maximum TTC")
     expect(wrapper.find("#shop-min").attributes("placeholder")).toBe("Min € TTC")
     expect(wrapper.find("#shop-max").attributes("placeholder")).toBe("Max € TTC")
+  })
+})
+
+describe("ShopCatalogue pagination (SEO audit 2026-11-15, findings 1 and 13)", () => {
+  // A page of results; the cards themselves are ProductCard's own business.
+  const stubs = { global: { stubs: { ProductCard: true } } }
+  beforeEach(() => {
+    pageAnswer.products = [{ id: "p1", slug: "carabine", name: "Carabine" }]
+  })
+  afterEach(async () => {
+    await clearError()
+    pageAnswer.products = []
+    pageAnswer.value = { page: 1, limit: 24, total: 0, totalPages: 0, hasMore: false }
+  })
+
+  it("links the next page with a real href, keeping the filters", async () => {
+    pageAnswer.value = { page: 1, limit: 24, total: 60, totalPages: 3, hasMore: true }
+    const wrapper = await mountSuspended(ShopCatalogue, {
+      props: { category: "", basePath: "/boutique", listName: "x" },
+      route: "/boutique?legalCategory=B",
+      ...stubs,
+    })
+    expect(wrapper.find('a[rel="next"]').attributes("href")).toBe("/boutique?legalCategory=B&page=2")
+  })
+
+  it("answers 404 to a page past the last one, instead of an empty page", async () => {
+    pageAnswer.value = { page: 9, limit: 24, total: 60, totalPages: 3, hasMore: false }
+    // The test renderer still renders after a fatal error, which the browser
+    // never does: only the error Nuxt records matters here.
+    await mountSuspended(ShopCatalogue, {
+      props: { category: "", basePath: "/boutique", listName: "x" },
+      route: "/boutique?page=9",
+      global: { stubs: { ProductCard: true }, config: { errorHandler: () => undefined } },
+    }).catch(() => undefined)
+    expect(useError().value).toMatchObject({ statusCode: 404 })
   })
 })

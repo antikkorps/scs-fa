@@ -18,7 +18,7 @@ const pageUrl = computed(() => `${siteUrl}${categoryPath(slug.value)}`)
 const description = computed(() => categoryMetaDescription(name.value, category.value?.description))
 
 usePageSeo({
-  title: () => `${name.value} — Boutique armurerie`,
+  title: () => pagedTitle(`${name.value} — Boutique armurerie`, pageFromQuery(route.query.page)),
   socialTitle: () => `${name.value} — SCS Firearms`,
   description,
   path: () => categoryPath(slug.value),
