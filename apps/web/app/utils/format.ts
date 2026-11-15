@@ -123,6 +123,19 @@ export function ogImageUrl(featuredImageUrl: string | null | undefined, siteUrl:
   return image.startsWith("http") ? image : `${siteUrl}${image}`
 }
 
+/**
+ * The images a page's structured data names (SEO audit 2026-11-15, finding 8):
+ * the stored URL is the widest rendition, so it goes first, at full
+ * resolution; the letterboxed share card follows as a landscape alternative.
+ * Absolute, and nothing rather than a placeholder.
+ */
+export function jsonLdImages(featuredImageUrl: string | null | undefined, siteUrl: string): string[] | undefined {
+  if (!featuredImageUrl) return undefined
+  const absolute = (url: string) => (url.startsWith("http") ? url : `${siteUrl}${url}`)
+  const card = mediaOgImage(featuredImageUrl)
+  return card ? [absolute(featuredImageUrl), absolute(card)] : [absolute(featuredImageUrl)]
+}
+
 /** The `og:image` size when it is known — a share card's; stating a wrong one is worse than none. */
 export function ogImageSize(url: string | undefined): { width: number; height: number } | undefined {
   return isMediaOgUrl(url) ? { ...MEDIA_OG_SIZE } : undefined

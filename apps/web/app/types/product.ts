@@ -167,6 +167,9 @@ export interface ProductDetail {
   hasAccessoryRestrictions: boolean | null
   accessoryRestrictionNotes: string | null
   featuredImageUrl: string | null
+  /** Brand and barcode, for the structured data (SEO audit 2026-11-15). */
+  brand: string | null
+  ean: string | null
   seo: { metaTitle: string | null; metaDescription: string | null; keywords: string | null }
   category: { slug: string | null; name: string | null }
   crossSells: ProductCrossSellItem[]

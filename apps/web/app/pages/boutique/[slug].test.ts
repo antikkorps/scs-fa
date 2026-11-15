@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { computed, ref } from "vue"
 import ProductPage from "./[slug].vue"
 
-const { product, addVariantMock, navigateToMock, auth } = vi.hoisted(() => ({
+const { product, addVariantMock, navigateToMock, auth, launch } = vi.hoisted(() => ({
+  launch: { salesOpen: true },
   product: {
     id: "p1",
     sku: "RIFLE-1",
@@ -18,6 +19,8 @@ const { product, addVariantMock, navigateToMock, auth } = vi.hoisted(() => ({
     priceTtc: 600,
     stockQty: 4,
     featuredImageUrl: null,
+    brand: "CZ",
+    ean: "8594003181234",
     category: { slug: "carabines", name: "Carabines" },
     tags: [],
     legalCategory: {
@@ -48,7 +51,7 @@ const { product, addVariantMock, navigateToMock, auth } = vi.hoisted(() => ({
 mockNuxtImport("useApiFetch", () => () => ({ data: ref(product), error: ref(null) }))
 mockNuxtImport("useCart", () => () => ({ addVariant: addVariantMock }))
 mockNuxtImport("useAuth", () => () => ({ isAuthenticated: ref(auth.authenticated), isAdmin: ref(false) }))
-mockNuxtImport("useLaunch", () => () => ({ salesOpen: ref(true), recheckAdmin: vi.fn() }))
+mockNuxtImport("useLaunch", () => () => ({ salesOpen: ref(launch.salesOpen), recheckAdmin: vi.fn() }))
 mockNuxtImport("useProAccess", () => () => ({ isApprovedPro: computed(() => false), load: vi.fn() }))
 mockNuxtImport("navigateTo", () => navigateToMock)
 
@@ -62,6 +65,7 @@ const variantButton = (wrapper: Awaited<ReturnType<typeof mounted>>, label: stri
   wrapper.findAll("button.variants__opt").find((button) => button.text() === label)
 
 beforeEach(() => {
+  launch.salesOpen = true
   addVariantMock.mockReset().mockResolvedValue({ summary: { itemCount: 1 } })
   navigateToMock.mockReset()
   auth.authenticated = true
@@ -139,5 +143,29 @@ describe("product page — the documents a category C weapon asks", () => {
       "Pièce d'identité (carte d'identité ou passeport)",
       "Permis de chasser validé ou licence de tir sportif",
     ])
+  })
+})
+
+describe("boutique/[slug].vue — structured data (SEO audit 2026-11-15)", () => {
+  // The head is written to the document after the render, not during it.
+  const productLd = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    const scripts = [...document.head.querySelectorAll('script[type="application/ld+json"]')]
+    // The document outlives each mount: the current page's script is the last one.
+    return scripts.map((script) => JSON.parse(script.textContent ?? "{}")).findLast((ld) => ld["@type"] === "Product")
+  }
+
+  it("names the brand and the barcode, and states the offer while the shop sells", async () => {
+    await mounted()
+    const ld = await productLd()
+    expect(ld.brand).toEqual({ "@type": "Brand", name: "CZ" })
+    expect(ld.gtin13).toBe("8594003181234")
+    expect(ld.offers).toMatchObject({ availability: "https://schema.org/InStock" })
+  })
+
+  it("states no offer in the showcase stage, when the page sells nothing", async () => {
+    launch.salesOpen = false
+    await mounted()
+    expect(await productLd()).not.toHaveProperty("offers")
   })
 })

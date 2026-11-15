@@ -59,6 +59,8 @@ describe("GET /api/products/:id", () => {
           ageMinRequired: 18,
           requiresLegalVerification: true,
           published: true,
+          brand: "Glock",
+          ean: "9120039381234",
         },
         {
           sku: `${SKU_PREFIX}gamma`,
@@ -134,6 +136,8 @@ describe("GET /api/products/:id", () => {
     })
     expect(body.category).toMatchObject({ slug: "arme-poing", name: "Armes de poing" })
     expect(body.seo).toBeDefined()
+    // For the structured data (SEO audit 2026-11-15, finding 5).
+    expect(body).toMatchObject({ brand: "Glock", ean: "9120039381234" })
     // A dead column nothing ever wrote to: not part of the contract.
     expect(body).not.toHaveProperty("imagesCount")
   })
