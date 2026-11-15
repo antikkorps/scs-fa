@@ -110,6 +110,21 @@ const PLACE_ORDER_MESSAGES: Record<string, string> = {
   BankTransferUnavailable: BANK_TRANSFER_UNAVAILABLE_MESSAGE,
 }
 
+/**
+ * Story 12.13c: the refusals tied to articles reserved to adults, worded with
+ * the age the cart requires; null for any other refusal.
+ */
+export function ageRequirementMessage(code: string | null | undefined, requiredAge = 18): string | null {
+  if (code === "BirthDateRequired") {
+    return `Votre panier contient des articles réservés aux personnes de ${requiredAge} ans et plus : indiquez votre date de naissance pour confirmer la commande. Elle est demandée une seule fois.`
+  }
+  if (code === "AgeRequirementNotMet") {
+    return `Votre panier contient des articles réservés aux personnes de ${requiredAge} ans et plus : retirez-les pour commander le reste.`
+  }
+  if (code === "InvalidBirthDate") return "Cette date de naissance n'est pas valide."
+  return null
+}
+
 /** Why the checkout could not place the order, from the API's status and error code. */
 export function placeOrderErrorMessage(status: number | null | undefined, code: string | null | undefined): string {
   const known = code ? PLACE_ORDER_MESSAGES[code] : undefined

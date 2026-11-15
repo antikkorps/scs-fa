@@ -243,6 +243,9 @@ export const users = pgTable(
     // mailed login code, a password-reset link or an admin invite. Until then a
     // login asks for the code, and nothing is matched to the account by address.
     emailVerifiedAt: timestamp("email_verified_at"),
+    // Story 12.13c — given when ordering an article reserved to adults, once
+    // (not editable by the customer, or a minor would just change it).
+    birthDate: date("birth_date", { mode: "string" }),
     deletedAt: timestamp("deleted_at"), // Soft delete RGPD
     // Story 12.11 — when the "unused for 3 years" warning left; anonymised 30 days
     // later unless a login came in between.

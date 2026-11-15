@@ -14,6 +14,7 @@ import {
   cartItems,
   legalCategories,
   orders,
+  organisations,
   productCategories,
   products,
   productVariants,
@@ -42,6 +43,8 @@ vi.mock("../payments/bank-details.js", async (importOriginal) => {
       bank.configured ? original.bankDetailsFrom(environment) : null,
   }
 })
+
+const ADULT_BIRTH_DATE = "1980-05-17"
 
 const PREFIX = "TEST32-"
 const PASSWORD = "MotDePasseTresLong123!"
@@ -129,6 +132,8 @@ describe("orders (POST /api/orders)", () => {
         email: EMAIL,
         passwordHash,
         role: "customer",
+        // An adult: most orders below carry a regulated firearm (story 12.13c).
+        birthDate: ADULT_BIRTH_DATE,
         rgpdConsentAt: new Date(),
         rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
       })
@@ -293,6 +298,130 @@ describe("orders (POST /api/orders)", () => {
   ) {
     return app.inject({ method: "POST", url: "/api/orders", headers: authHeaders(token), payload })
   }
+
+  // Story 12.13c (decisions Franck 2026-11-15): an article reserved to adults
+  // asks for the date of birth once, at the order, and refuses a minor.
+  describe("articles reserved to adults", () => {
+    const birthDateOf = async () =>
+      (await db.select({ birthDate: users.birthDate }).from(users).where(eq(users.id, userId)))[0]?.birthDate
+    const order = (birthDate?: string) =>
+      createOrder({
+        shippingAddressId,
+        acceptedTermsVersion: CURRENT_TERMS_VERSION,
+        ...(birthDate && { birthDate }),
+      })
+    const yearsAgo = (years: number, days = 0) => {
+      const date = new Date()
+      date.setFullYear(date.getFullYear() - years)
+      date.setDate(date.getDate() + days)
+      return date.toISOString().slice(0, 10)
+    }
+
+    beforeEach(async () => {
+      await db.update(users).set({ birthDate: null }).where(eq(users.id, userId))
+    })
+    afterEach(async () => {
+      await db.update(users).set({ birthDate: ADULT_BIRTH_DATE }).where(eq(users.id, userId))
+    })
+
+    it("asks for the date of birth before a regulated firearm, and keeps the cart", async () => {
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      const res = await order()
+      expect(res.statusCode).toBe(422)
+      expect(res.json()).toMatchObject({ error: "BirthDateRequired", requiredAge: 18 })
+      const cart = await app.inject({ method: "GET", url: "/api/cart", headers: authHeaders(token) })
+      expect(cart.json().data.summary.itemCount).toBe(1)
+    })
+
+    it("takes the date with the order, and keeps it on the account", async () => {
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      expect((await order(ADULT_BIRTH_DATE)).statusCode).toBe(201)
+      expect(await birthDateOf()).toBe(ADULT_BIRTH_DATE)
+    })
+
+    it("refuses a customer under the age, and keeps nothing of the date", async () => {
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      const res = await order(yearsAgo(18, 1))
+      expect(res.statusCode).toBe(403)
+      expect(res.json()).toMatchObject({ error: "AgeRequirementNotMet", requiredAge: 18 })
+      expect(await birthDateOf()).toBeNull()
+    })
+
+    it("never lets an order replace a date already on the account", async () => {
+      await db
+        .update(users)
+        .set({ birthDate: yearsAgo(16) })
+        .where(eq(users.id, userId))
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      const res = await order(ADULT_BIRTH_DATE)
+      expect(res.statusCode).toBe(403)
+      expect(await birthDateOf()).toBe(yearsAgo(16))
+    })
+
+    it("keeps the date only with an order: a checkout failing later stores nothing", async () => {
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      const res = await createOrder({
+        shippingAddressId: otherUserAddressId,
+        acceptedTermsVersion: CURRENT_TERMS_VERSION,
+        birthDate: ADULT_BIRTH_DATE,
+      })
+      expect(res.statusCode).toBe(404)
+      expect(await birthDateOf()).toBeNull()
+    })
+
+    it("refuses a date that cannot be a birth date", async () => {
+      await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+      expect((await order("2099-01-01")).statusCode).toBe(400)
+    })
+
+    /** The suite's customer as a member of an organisation in `status`, for the length of `run`. */
+    async function asMemberOf(status: "approved" | "pending" | "rejected", run: () => Promise<void>) {
+      const [organisation] = await db
+        .insert(organisations)
+        .values({
+          legalName: `Armurerie Test32 ${status}`,
+          siret: `8${String(Date.now()).slice(-9)}${String(Math.floor(Math.random() * 1e4)).padStart(4, "0")}`,
+          type: "armurier",
+          status,
+          registryCheck: "verified",
+        })
+        .returning({ id: organisations.id })
+      await db.update(users).set({ organisationId: organisation?.id }).where(eq(users.id, userId))
+      try {
+        await run()
+      } finally {
+        await db.update(users).set({ organisationId: null }).where(eq(users.id, userId))
+        await db.delete(organisations).where(eq(organisations.id, organisation?.id as string))
+      }
+    }
+
+    it("exempts a member of an approved organisation: the buyer is a legal entity", async () => {
+      await asMemberOf("approved", async () => {
+        await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+        expect((await order()).statusCode).toBe(201)
+        expect(await birthDateOf()).toBeNull()
+      })
+    })
+
+    // Review of #258: a pro request attaches the organisation at once, before
+    // SCS decides — a minor could file one to dodge the check.
+    for (const status of ["pending", "rejected"] as const) {
+      it(`still asks a member whose organisation is ${status}`, async () => {
+        await asMemberOf(status, async () => {
+          await addToCart(token, { variantId: regulatedVariantId, qty: 1 })
+          const res = await order()
+          expect(res.statusCode).toBe(422)
+          expect(res.json().error).toBe("BirthDateRequired")
+        })
+      })
+    }
+
+    it("asks nothing for articles free of any age", async () => {
+      await addToCart(token, { variantId: accessoryVariantId, qty: 1 })
+      expect((await order()).statusCode).toBe(201)
+      expect(await birthDateOf()).toBeNull()
+    })
+  })
 
   describe("cart re-checked at checkout (story 12.9d)", () => {
     // What a back-office edit may have changed since the line entered the cart.

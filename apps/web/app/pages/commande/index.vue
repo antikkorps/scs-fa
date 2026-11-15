@@ -4,7 +4,7 @@ import type { CartChange, CartView } from "~/types/cart"
 import type { Address } from "~/types/checkout"
 import { cartChangeLabel, earliestHold, variantDescription } from "~/utils/cart"
 import { formatDate, formatEuros } from "~/utils/format"
-import { addressLine, placeOrderErrorMessage, UNDELIVERABLE_MESSAGE } from "~/utils/order"
+import { addressLine, ageRequirementMessage, placeOrderErrorMessage, UNDELIVERABLE_MESSAGE } from "~/utils/order"
 
 definePageMeta({ middleware: "auth" })
 useHead({ title: "Commande — SCS Firearms" })
@@ -30,6 +30,9 @@ const termsVersionLabel = formatDate(CURRENT_TERMS_VERSION)
 
 const placing = ref(false)
 const placeError = ref("")
+// Story 12.13c: asked once the API says the cart holds articles reserved to adults.
+const birthDateRequired = ref(false)
+const birthDate = ref("")
 const cartChanges = ref<string[]>([])
 
 // Story 12.9a — held items go back on sale when their time runs out, checkout or not.
@@ -84,6 +87,10 @@ async function placeOrder() {
     placeError.value = "Acceptez les conditions générales de vente pour commander."
     return
   }
+  if (birthDateRequired.value && !birthDate.value) {
+    placeError.value = "Indiquez votre date de naissance pour confirmer la commande."
+    return
+  }
   placing.value = true
   try {
     const billing = billingDifferent.value && billingId.value ? billingId.value : undefined
@@ -91,6 +98,7 @@ async function placeOrder() {
       shippingAddressId: shippingId.value,
       ...(billing ? { billingAddressId: billing } : {}),
       acceptedTermsVersion: CURRENT_TERMS_VERSION,
+      ...(birthDateRequired.value ? { birthDate: birthDate.value } : {}),
     })
     // The order consumes the cart server-side — clear the header badge.
     cartCount.value = 0
@@ -110,7 +118,10 @@ async function placeOrder() {
       placing.value = false
       return
     }
-    placeError.value = placeOrderErrorMessage(status, apiErrorCode(err))
+    const code = apiErrorCode(err)
+    if (code === "BirthDateRequired") birthDateRequired.value = true
+    placeError.value =
+      ageRequirementMessage(code, apiErrorField<number>(err, "requiredAge")) ?? placeOrderErrorMessage(status, code)
     placing.value = false
   }
 }
@@ -185,6 +196,10 @@ async function placeOrder() {
               <NuxtLink to="/cgv" target="_blank" rel="noopener" class="link">conditions générales de vente</NuxtLink>
               (version du {{ termsVersionLabel }}).
             </span>
+          </label>
+          <label v-if="birthDateRequired" class="birth">
+            <span>Date de naissance</span>
+            <input v-model="birthDate" type="date" name="birthDate" autocomplete="bday" class="input" required />
           </label>
           <!-- Wording required by art. L221-14 of the Code de la consommation: the
                button must say that ordering creates an obligation to pay. -->
@@ -318,6 +333,12 @@ async function placeOrder() {
 .hold-notice {
   margin: 0 0 1rem;
   color: var(--brass);
+}
+.birth {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  font-size: var(--fs-sm);
 }
 .terms {
   display: flex;
