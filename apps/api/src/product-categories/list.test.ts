@@ -32,6 +32,8 @@ describe("GET /api/product-categories", () => {
     const slugs = body.data.map((c) => c.slug)
     expect(slugs).toContain("arme-poing")
     expect(slugs).toContain("munition")
+    // Story 12.13: the knife universe is a category of its own.
+    expect(body.data).toContainEqual(expect.objectContaining({ slug: "coutellerie", name: "Coutellerie" }))
 
     const orders = body.data.map((c) => c.displayOrder ?? 0)
     const sorted = [...orders].sort((a, b) => a - b)

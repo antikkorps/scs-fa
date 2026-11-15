@@ -178,6 +178,8 @@ export const productCategoryEnum = pgEnum("product_category", [
   "aide_visee",
   "accessoire_autre",
   "gun_art",
+  // Story 12.13 — the knife universe: a product type of its own.
+  "coutellerie",
 ])
 
 // ============================================================================
@@ -723,7 +725,8 @@ export const productCategoriesRelations = relations(productCategories, ({ many }
 // filtre à facettes. Les facettes sont structurelles (peu nombreuses, stables,
 // elles pilotent la requête) et vivent donc dans un enum ; les tags sont
 // éditoriaux (nombreux, renommables depuis le backoffice sans migration).
-export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique"])
+// Story 12.13 — "usage": what a product is for (chasse), across categories.
+export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique", "usage"])
 
 export const tags = pgTable(
   "tags",
