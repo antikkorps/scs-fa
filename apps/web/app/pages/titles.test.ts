@@ -20,8 +20,11 @@ function vueFiles(dir: string): string[] {
 describe("page titles", () => {
   it("never repeat the brand the title template adds", () => {
     const offenders = vueFiles(PAGES).filter((file) =>
-      // useHead({ title }) and usePageSeo's top-level title; not a link's title attribute (RSS).
-      /useHead\(\{\s*title:\s*["'`][^"'`]*SCS Firearms|^ {2}title:.*SCS Firearms/m.test(readFileSync(file, "utf8")),
+      // useHead / useSeoMeta / usePageSeo titles, a plain string or a getter;
+      // not a link's title attribute (the RSS link sits deeper, in `link: [...]`).
+      /(?:useHead|useSeoMeta)\(\{\s*title:[^\n]*SCS Firearms|^ {2}title:.*SCS Firearms/m.test(
+        readFileSync(file, "utf8"),
+      ),
     )
     expect(offenders.map((file) => file.slice(PAGES.length))).toEqual([])
   })

@@ -55,7 +55,8 @@ useHead({
           "@context": "https://schema.org",
           "@type": "Blog",
           name: "Le Journal — SCS Firearms",
-          url: pageUrl,
+          // The page being described: a later page has its own address.
+          url: page.value > 1 ? `${pageUrl}?page=${page.value}` : pageUrl,
           blogPost: articles.value.map((a) => ({
             "@type": "BlogPosting",
             headline: a.title,

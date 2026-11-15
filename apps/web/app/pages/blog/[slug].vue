@@ -92,7 +92,7 @@ useHead({
           v-if="heroImage"
           :image="heroImage"
           :alt="article.title"
-          sizes="(min-width: 800px) 760px, 100vw"
+          sizes="(min-width: 1240px) 1200px, 100vw"
           width="1200"
           height="800"
           loading="eager"
