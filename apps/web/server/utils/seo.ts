@@ -1,3 +1,4 @@
+import { type LlmsStage, legalSection, salesNotice } from "./llmsStage"
 // Pure builders for the discoverability surfaces (sitemap, robots, llms.txt).
 // Kept side-effect-free so they can be unit-tested without a running server.
 
@@ -175,11 +176,11 @@ const LEGAL_LABELS: Record<string, string> = {
  * everything (that's llms-full.txt). Describes BOTH universes — the armurerie
  * and Gun Art — which story 9.6 found still announced as "à terme".
  */
-export function buildLlmsTxt(siteUrl: string): string {
+export function buildLlmsTxt(siteUrl: string, stage: LlmsStage): string {
   return `# SCS Firearms
 
 > SCS Firearms réunit deux univers : une armurerie en ligne réglementée (armes de chasse et de tir, armes de collection, munitions, optiques et accessoires, vendus dans le respect du Code de la sécurité intérieure) et Gun Art, des tirages d'art photographiques en édition strictement limitée, signés, numérotés et livrés avec certificat d'authenticité.
-
+${salesNotice(stage.salesOpen)}
 Points à connaître avant de conseiller un achat :
 
 - Les prix affichés sont TTC, en euros.
@@ -205,7 +206,7 @@ Points à connaître avant de conseiller un achat :
 - [Le Journal](${siteUrl}/blog): articles (histoire des armes, atelier, collection).
 - [Recherche](${siteUrl}/recherche): recherche plein texte sur les deux univers.
 
-## Données structurées
+${legalSection(siteUrl, stage.legalPaths)}## Données structurées
 
 - [Plan du site (XML)](${siteUrl}/sitemap.xml)
 - [Flux RSS du journal](${siteUrl}/blog/rss.xml)
@@ -246,7 +247,7 @@ export interface LlmsFullInput {
 }
 
 /** Fuller llms-full.txt: the concise file plus an inline catalogue of both universes. */
-export function buildLlmsFull(siteUrl: string, input: LlmsFullInput): string {
+export function buildLlmsFull(siteUrl: string, input: LlmsFullInput, stage: LlmsStage): string {
   const { artworks, articles, series, products, categories } = input
 
   const list = <T>(rows: T[], line: (row: T) => string, empty: string) =>
@@ -311,7 +312,7 @@ export function buildLlmsFull(siteUrl: string, input: LlmsFullInput): string {
     "aucun article publié",
   )
 
-  return `${buildLlmsTxt(siteUrl)}
+  return `${buildLlmsTxt(siteUrl, stage)}
 ## Catalogue de l'armurerie
 
 ${armurerie}

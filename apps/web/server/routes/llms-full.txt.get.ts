@@ -1,8 +1,10 @@
+import type { H3Event } from "h3"
 import {
   buildLlmsFull,
   type LlmsArticle,
   type LlmsArtwork,
   type LlmsCategory,
+  type LlmsFullInput,
   type LlmsProduct,
   type LlmsSeries,
 } from "../utils/seo"
@@ -26,22 +28,33 @@ async function fetchAll<T>(url: string, headers: Record<string, string>): Promis
   return rows
 }
 
-export default defineEventHandler(async (event) => {
-  const config = useRuntimeConfig(event)
-  const { base, headers } = apiUpstream(event)
-  const get = <T>(path: string) => $fetch<T>(`${base}${path}`, { headers })
-  const siteUrl = config.public.siteUrl as string
+/**
+ * The whole catalogue, read from the API at most every ten minutes (SEO audit
+ * 2026-11-15, finding 6): up to a hundred API calls per file otherwise.
+ */
+const cachedCatalogue = defineCachedFunction(
+  async (event: H3Event): Promise<LlmsFullInput> => {
+    const { base, headers } = apiUpstream(event)
+    const get = <T>(path: string) => $fetch<T>(`${base}${path}`, { headers })
+    const none = <T>() => [] as T[]
+    const [artworks, articles, series, products, categories] = await Promise.all([
+      get<{ data: LlmsArtwork[] }>("/artworks").then((r) => r.data, none<LlmsArtwork>),
+      fetchAll<LlmsArticle>(`${base}/blog`, headers).catch(none<LlmsArticle>),
+      get<{ data: LlmsSeries[] }>("/artworks/series").then((r) => r.data, none<LlmsSeries>),
+      fetchAll<LlmsProduct>(`${base}/products`, headers).catch(none<LlmsProduct>),
+      get<{ data: LlmsCategory[] }>("/product-categories").then((r) => r.data, none<LlmsCategory>),
+    ])
+    return { artworks, articles, series, products, categories }
+  },
+  { ...AGENT_FILE_CACHE, name: "llms-full-catalogue", getKey: () => "all" },
+)
 
-  const none = <T>() => [] as T[]
-  const [artworks, articles, series, products, categories] = await Promise.all([
-    get<{ data: LlmsArtwork[] }>("/artworks").then((r) => r.data, none<LlmsArtwork>),
-    fetchAll<LlmsArticle>(`${base}/blog`, headers).catch(none<LlmsArticle>),
-    get<{ data: LlmsSeries[] }>("/artworks/series").then((r) => r.data, none<LlmsSeries>),
-    fetchAll<LlmsProduct>(`${base}/products`, headers).catch(none<LlmsProduct>),
-    get<{ data: LlmsCategory[] }>("/product-categories").then((r) => r.data, none<LlmsCategory>),
-  ])
+export default defineEventHandler(async (event) => {
+  const siteUrl = useRuntimeConfig(event).public.siteUrl as string
+  const comingSoon = await comingSoonAgentAnswer(event, siteUrl)
+  if (comingSoon !== null) return comingSoon
 
   setHeader(event, "content-type", "text/plain; charset=utf-8")
   setHeader(event, "cache-control", "public, max-age=3600")
-  return buildLlmsFull(siteUrl, { artworks, articles, series, products, categories })
+  return buildLlmsFull(siteUrl, await cachedCatalogue(event), await llmsStage(event))
 })
