@@ -195,7 +195,8 @@ export async function exportCatalogWorkbook(
     longDescription: r.longDescription,
     sourceUrl: r.sourceUrl,
     sku: r.sku,
-    tags: r.tags.map((tag) => tag.name).join(", ") || null,
+    // Slugs, not names: a name may hold a separator and split on re-import.
+    tags: r.tags.map((tag) => tag.slug).join(", ") || null,
     duplicates: duplicates.get(r.id) ?? null,
     version: r.updatedAt?.toISOString() ?? null,
   }))

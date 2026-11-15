@@ -242,6 +242,8 @@ describe("parseCatalogImportTable", () => {
     expect(parse({ tags: "Chasse, Occasion" })?.data?.tags).toEqual(["Chasse", "Occasion"])
     expect(parse({ tags: " chasse ; occasion | Chasse " })?.data?.tags).toEqual(["chasse", "occasion"])
     expect(parse({})?.data?.tags).toBeNull()
+    // Separators alone are a blank cell, not "remove every tag".
+    expect(parse({ tags: " , ; " })?.data?.tags).toBeNull()
   })
 
   it("caps the tags of one row", () => {

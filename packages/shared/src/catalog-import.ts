@@ -489,7 +489,9 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
   for (const url of imageUrls) if (!isHttpUrl(url)) errors.push(`URL d'image invalide : « ${url} »`)
   if (imageUrls.length > MAX_IMPORT_IMAGES_PER_ROW) errors.push(`${MAX_IMPORT_IMAGES_PER_ROW} images au plus`)
 
-  const tags = get("tags") ? parseImportTags(get("tags")) : null
+  // A cell of separators alone is blank, not "remove every tag".
+  const listedTags = parseImportTags(get("tags"))
+  const tags = listedTags.length > 0 ? listedTags : null
   if (tags && tags.length > MAX_IMPORT_TAGS_PER_ROW) errors.push(`${MAX_IMPORT_TAGS_PER_ROW} tags au plus`)
 
   const sku = text("sku", "SKU", false) ?? (supplier && supplierSku ? deriveImportSku(supplier, supplierSku) : "")

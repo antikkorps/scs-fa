@@ -33,8 +33,9 @@ import {
   products,
   suppliers,
 } from "../db/schema.js"
+import { replaceProductTags } from "../products/product-tags.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
-import { replaceProductTags, resolveImportTags } from "./tags.js"
+import { resolveImportTags } from "./tags.js"
 
 export class ImportFileError extends Error {}
 
@@ -241,6 +242,12 @@ export async function planCatalogImport(
         continue
       }
       row.warnings.push(`Fiche modifiée dans l'administration le ${when}, après cet export`)
+      // Tags are replaced whatever the overwrite option: from a stale sheet
+      // that would undo a tag edit made in the back-office.
+      if (row.tagIds) {
+        row.tagIds = null
+        row.warnings.push("Tags conservés : la fiche a changé depuis l'export")
+      }
     }
     row.action = "update"
     row.existing = existing
@@ -445,7 +452,7 @@ export async function commitCatalogImport(
           .returning({ id: products.id })
         if (!product) throw new Error("Product insert returned no row")
         created++
-        if (row.tagIds) await replaceProductTags(tx, product.id, row.tagIds)
+        if (row.tagIds) await replaceProductTags(product.id, row.tagIds, tx)
         if (row.images > 0) queue.push({ productId: product.id, urls: data.imageUrls })
       } else if (row.action === "update" && row.existing) {
         const ex = row.existing
@@ -485,7 +492,7 @@ export async function commitCatalogImport(
           })
           .where(eq(products.id, ex.id))
         updated++
-        if (row.tagIds) await replaceProductTags(tx, ex.id, row.tagIds)
+        if (row.tagIds) await replaceProductTags(ex.id, row.tagIds, tx)
         if (row.images > 0) queue.push({ productId: ex.id, urls: data.imageUrls })
       }
     }

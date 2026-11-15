@@ -586,14 +586,35 @@ describe("admin catalogue import (story 12.2)", () => {
       expect(table.find((r) => r[col("supplierSku")] === "RT-2")?.[col("duplicates")] ?? "").toBe("")
     })
 
-    it("exports the tags by name, so a round trip keeps them (story 12.13)", async () => {
+    it("exports the tags by slug, so a round trip keeps them whatever their names (story 12.13)", async () => {
       await importFile(
         sheet([rt({ supplierSku: "RT-2", name: "Testcatimp Rt Bipied", tags: "occasion, arme-ancienne" })]),
       )
       const { table, col } = await exportTable()
       const line = table.find((r) => r[col("supplierSku")] === "RT-2") as string[]
-      expect(line[col("tags")]?.split(", ").sort()).toEqual(["Arme ancienne (avant 1900)", "Occasion"])
+      // A slug never holds a separator; a name such as « Chasse, gros gibier » would split on re-import.
+      expect(line[col("tags")]?.split(", ").sort()).toEqual(["arme-ancienne", "occasion"])
       expect(table.find((r) => r[col("supplierSku")] === "RT-1")?.[col("tags")] ?? "").toBe("")
+    })
+
+    it("leaves the tags alone when the sheet predates an edit made in the back-office", async () => {
+      const { table, col } = await exportTable()
+      const line = table.find((r) => r[col("supplierSku")] === "RT-2") as string[]
+      const product = await productByRef("RT-2")
+      // An admin edits the product after the export.
+      await db
+        .update(products)
+        .set({ updatedAt: new Date(Date.now() + 60_000) })
+        .where(eq(products.id, product?.product.id as string))
+      line[col("tags")] = "occasion"
+      const { preview } = await importFile(csvOf([table[0] as string[], line]))
+      expect(preview.rows[0].warnings.join()).toMatch(/Tags conservés/)
+      const rows = await db
+        .select({ slug: tags.slug })
+        .from(productTags)
+        .innerJoin(tags, eq(tags.id, productTags.tagId))
+        .where(eq(productTags.productId, product?.product.id as string))
+      expect(rows.map((r) => r.slug).sort()).toEqual(["arme-ancienne", "occasion"])
     })
 
     it("exports one supplier's part, still flagging duplicates held by the others", async () => {

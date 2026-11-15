@@ -3,10 +3,8 @@
 // the back-office. Tags are curated there, never created by an import.
 
 import { normaliseHeader } from "@armurier/shared"
-import { eq } from "drizzle-orm"
-import type { DbExecutor } from "../artworks/reservation.js"
 import { db } from "../db/client.js"
-import { productTags, tags } from "../db/schema.js"
+import { tags } from "../db/schema.js"
 
 interface TaggableRow {
   data: { tags: string[] | null } | null
@@ -41,10 +39,4 @@ export async function resolveImportTags<Row extends TaggableRow>(
     const ids = names.map((name) => idByKey.get(name.toLowerCase()) ?? idByKey.get(normaliseHeader(name)) ?? "")
     row.tagIds = [...new Set(ids)]
   }
-}
-
-/** The product's tags become exactly `tagIds`. */
-export async function replaceProductTags(tx: DbExecutor, productId: string, tagIds: string[]): Promise<void> {
-  await tx.delete(productTags).where(eq(productTags.productId, productId))
-  if (tagIds.length > 0) await tx.insert(productTags).values(tagIds.map((tagId) => ({ productId, tagId })))
 }
