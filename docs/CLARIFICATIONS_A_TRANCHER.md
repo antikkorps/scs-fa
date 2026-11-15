@@ -256,8 +256,10 @@
 
 - [x] **J1 Registrar & DNS** : `scs-firearms.com` est chez **OVH** (expire le
       2027-02-05). Le site actuel est une coquille vide : pas de migration ni de
-      fenêtre de retour arrière. Aucun MX aujourd'hui ; SPF/DKIM/DMARC à créer
-      avec Brevo. Le site Safety Case Solutions (même hébergement OVH, domaine et
+      fenêtre de retour arrière. **Les boîtes mail du client sont chez OVH** (MX
+      `mx1/2/3.mail.ovh.net`, autodiscover/autoconfig, SPF `include:mx.ovh.com`) :
+      à recopier dans Cloudflare, et **DNSSEC à désactiver chez OVH 24 h avant**
+      de changer les serveurs DNS. DKIM/DMARC Brevo à ajouter ensuite. Le site Safety Case Solutions (même hébergement OVH, domaine et
       DNS chez IONOS) n'est pas concerné ; on garde l'hébergement OVH pour lui.
 - [x] **J2 Cloudflare** : tout est **proxifié** ; TLS = **certificat d'origine
       Cloudflare** sur Caddy, mode **Full (strict)**. Serveur chez **IONOS** (pas
