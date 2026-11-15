@@ -111,18 +111,13 @@ const PLACE_ORDER_MESSAGES: Record<string, string> = {
 }
 
 /**
- * Story 12.13c: the refusals tied to articles reserved to adults, worded with
- * the age the cart requires; null for any other refusal.
+ * Story 12.13c (Franck and Fred, 2026-11-15): the API asks the customer to
+ * certify they are of age before articles reserved to adults; null for any
+ * other refusal.
  */
 export function ageRequirementMessage(code: string | null | undefined, requiredAge = 18): string | null {
-  if (code === "BirthDateRequired") {
-    return `Votre panier contient des articles réservés aux personnes de ${requiredAge} ans et plus : indiquez votre date de naissance pour confirmer la commande. Elle est demandée une seule fois.`
-  }
-  if (code === "AgeRequirementNotMet") {
-    return `Votre panier contient des articles réservés aux personnes de ${requiredAge} ans et plus : retirez-les pour commander le reste.`
-  }
-  if (code === "InvalidBirthDate") return "Cette date de naissance n'est pas valide."
-  return null
+  if (code !== "AdultDeclarationRequired") return null
+  return `Votre panier contient des articles réservés aux personnes de ${requiredAge} ans et plus : cochez la déclaration ci-dessous pour confirmer la commande.`
 }
 
 /** Why the checkout could not place the order, from the API's status and error code. */

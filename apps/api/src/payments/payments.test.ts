@@ -323,7 +323,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
         method: "POST",
         url: "/api/orders",
         headers: { authorization: `Bearer ${token}` },
-        payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+        payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION, adultDeclaration: true },
       })
       expect(res.statusCode).toBe(201)
       const { data } = res.json()
@@ -841,7 +841,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
           method: "POST",
           url: "/api/orders",
           headers: { authorization: `Bearer ${token}` },
-          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION, adultDeclaration: true },
         })
         expect(res.statusCode).toBe(201)
         const { data } = res.json()
@@ -875,7 +875,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
           method: "POST",
           url: "/api/orders",
           headers: { authorization: `Bearer ${token}` },
-          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION, adultDeclaration: true },
         })
         expect(firstRes.statusCode).toBe(201)
         const first = firstRes.json().data
@@ -894,7 +894,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
           method: "POST",
           url: "/api/orders",
           headers: { authorization: `Bearer ${token}` },
-          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+          payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION, adultDeclaration: true },
         })
         const second = secondRes.json().data
         const [v2] = await db.select().from(paymentVirement).where(eq(paymentVirement.orderId, second.id))
@@ -1478,7 +1478,7 @@ describe("payments — Stripe card (Story 6.1)", () => {
             method: "POST",
             url: "/api/orders",
             headers: adminAuth(token),
-            payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION },
+            payload: { shippingAddressId, acceptedTermsVersion: CURRENT_TERMS_VERSION, adultDeclaration: true },
           })
         ).json().data
         const [afterOrder] = await db

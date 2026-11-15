@@ -3,8 +3,7 @@
 // it (an admin enrols it on first login). Answers like the plain login call
 // did, so `res.json().accessToken` keeps working. A mailed code is left to the
 // caller: those suites check it themselves. The address counts as confirmed
-// (audit 2026-11-15, M1) and the account holder as an adult (story 12.13c):
-// both are tested on their own, not by every suite that places an order.
+// (audit 2026-11-15, M1): that is tested on its own, not by every suite.
 import { and, eq, isNull } from "drizzle-orm"
 import type { FastifyInstance, LightMyRequestResponse } from "fastify"
 import { base32Decode, decryptSecret, totpCode } from "../auth/totp.js"
@@ -13,7 +12,6 @@ import { users } from "../db/schema.js"
 import { env } from "../env.js"
 
 const STEP_MS = 30_000
-const ADULT_BIRTH_DATE = "1980-05-17"
 
 /** The app's next usable code: never a step already spent (a code serves once). */
 async function appCode(email: string): Promise<string> {
@@ -36,10 +34,6 @@ export async function signIn(
     .update(users)
     .set({ emailVerifiedAt: new Date() })
     .where(and(eq(users.email, email), isNull(users.emailVerifiedAt)))
-  await db
-    .update(users)
-    .set({ birthDate: ADULT_BIRTH_DATE })
-    .where(and(eq(users.email, email), isNull(users.birthDate)))
   const first = await app.inject({ method: "POST", url: "/api/auth/login", payload })
   if (first.statusCode !== 200) return first
   const body = first.json()

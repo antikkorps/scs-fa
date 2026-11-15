@@ -75,7 +75,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     title: "2. Qui peut acheter",
     blocks: [
       p(
-        "Il faut être une personne physique majeure et disposer d'un compte client. Toute commande comportant une arme, un élément d'arme ou des munitions suppose d'avoir 18 ans révolus, quelle que soit la catégorie : une pièce d'identité est demandée pour le vérifier. Les couteaux, et tout article signalé comme réservé aux majeurs, ne sont vendus qu'aux personnes de 18 ans révolus : la date de naissance est demandée à la première commande de l'un de ces articles, et la commande est refusée en dessous de cet âge.",
+        "Il faut être une personne physique majeure et disposer d'un compte client. Toute commande comportant une arme, un élément d'arme ou des munitions suppose d'avoir 18 ans révolus, quelle que soit la catégorie : une pièce d'identité est demandée pour le vérifier. Les couteaux, et tout article signalé comme réservé aux majeurs, ne sont vendus qu'aux personnes de 18 ans révolus : le client le certifie sur l'honneur en cochant une déclaration à la commande, enregistrée avec elle.",
       ),
       p(
         "Les ventes sont réservées aux livraisons en ",

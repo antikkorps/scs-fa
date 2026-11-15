@@ -199,39 +199,37 @@ describe("commande/index.vue — what is being ordered", () => {
   })
 })
 
-// Story 12.13c: articles reserved to adults ask for the date of birth once.
+// Story 12.13c (Franck and Fred, 2026-11-15): articles reserved to adults ask
+// the customer to certify they are of age — a ticked box, no date of birth.
 describe("commande/index.vue — articles reserved to adults", () => {
   async function confirm(wrapper: Awaited<ReturnType<typeof mountCheckout>>) {
     await wrapper.find(".summary__cta").trigger("click")
     await flushPromises()
   }
 
-  it("asks for the date of birth when the API needs it, then sends it with the order", async () => {
+  it("asks for the declaration when the API needs it, then sends it with the order", async () => {
     createOrder
-      .mockRejectedValueOnce({ response: { status: 422 }, data: { error: "BirthDateRequired", requiredAge: 18 } })
+      .mockRejectedValueOnce({
+        response: { status: 422 },
+        data: { error: "AdultDeclarationRequired", requiredAge: 18 },
+      })
       .mockResolvedValueOnce({ id: "ord-2" })
     const wrapper = await mountCheckout()
     await wrapper.find('input[name="terms"]').setValue(true)
     await confirm(wrapper)
 
     expect(wrapper.text()).toContain("réservés aux personnes de 18 ans et plus")
-    const field = wrapper.find('input[name="birthDate"]')
-    expect(field.exists()).toBe(true)
-    await field.setValue("1980-05-17")
-    await confirm(wrapper)
+    const box = wrapper.find('input[name="adultDeclaration"]')
+    expect(box.exists()).toBe(true)
+    expect(wrapper.text()).toContain("Je certifie avoir 18 ans révolus")
 
-    expect(createOrder).toHaveBeenLastCalledWith(expect.objectContaining({ birthDate: "1980-05-17" }))
+    // Unticked: nothing is sent.
+    await confirm(wrapper)
+    expect(createOrder).toHaveBeenCalledTimes(1)
+
+    await box.setValue(true)
+    await confirm(wrapper)
+    expect(createOrder).toHaveBeenLastCalledWith(expect.objectContaining({ adultDeclaration: true }))
     expect(push).toHaveBeenCalledWith("/commande/ord-2")
-  })
-
-  it("says plainly when the customer is under the age", async () => {
-    createOrder.mockRejectedValue({
-      response: { status: 403 },
-      data: { error: "AgeRequirementNotMet", requiredAge: 18 },
-    })
-    const wrapper = await mountCheckout()
-    await wrapper.find('input[name="terms"]').setValue(true)
-    await confirm(wrapper)
-    expect(wrapper.text()).toContain("Votre panier contient des articles réservés aux personnes de 18 ans et plus")
   })
 })

@@ -257,6 +257,13 @@ describe("createOrderSchema (story 12.1)", () => {
     expect(createOrderSchema.safeParse(withoutTerms).success).toBe(false)
     expect(createOrderSchema.safeParse({ ...base, acceptedTermsVersion: "" }).success).toBe(false)
   })
+
+  // Story 12.13c (Fred 2026-11-15): a ticked box, not a date of birth.
+  it("takes the adult declaration as a ticked box, and nothing else", () => {
+    expect(createOrderSchema.safeParse({ ...base, adultDeclaration: true }).success).toBe(true)
+    expect(createOrderSchema.safeParse({ ...base, adultDeclaration: false }).success).toBe(false)
+    expect(createOrderSchema.safeParse({ ...base, birthDate: "1980-05-17" }).success).toBe(false)
+  })
 })
 
 describe("supplier schemas (story 12.5)", () => {

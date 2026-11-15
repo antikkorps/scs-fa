@@ -243,9 +243,6 @@ export const users = pgTable(
     // mailed login code, a password-reset link or an admin invite. Until then a
     // login asks for the code, and nothing is matched to the account by address.
     emailVerifiedAt: timestamp("email_verified_at"),
-    // Story 12.13c — given when ordering an article reserved to adults, once
-    // (not editable by the customer, or a minor would just change it).
-    birthDate: date("birth_date", { mode: "string" }),
     deletedAt: timestamp("deleted_at"), // Soft delete RGPD
     // Story 12.11 — when the "unused for 3 years" warning left; anonymised 30 days
     // later unless a login came in between.
@@ -1754,6 +1751,10 @@ export const orders = pgTable(
     // Nulles sur les commandes antérieures à la story, jamais réécrites ensuite.
     termsVersion: varchar("terms_version", { length: 32 }),
     termsAcceptedAt: timestamp("terms_accepted_at"),
+    // Story 12.13c (Franck and Fred, 2026-11-15): when the customer certified on
+    // their honour being of age, for an order holding an article reserved to
+    // adults; null when none did.
+    adultDeclaredAt: timestamp("adult_declared_at"),
     // Confirmation de commande envoyée (L221-13). Posée AVANT l'envoi (réclamation)
     // et remise à null en cas d'échec : la relance reprend les commandes restées nulles.
     confirmationSentAt: timestamp("confirmation_sent_at"),
