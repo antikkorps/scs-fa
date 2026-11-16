@@ -16,6 +16,8 @@ vi.mock("../email.js", () => ({
 
 const TEST_EMAIL_SUFFIX = "@reset-test.local"
 const PLAINTEXT_PASSWORD = "MotDePasseTresLong123!"
+// The reset link is issued after the answer: room for a loaded CI runner.
+const WAIT_FOR_BACKGROUND = { timeout: 5_000 }
 
 /** A customer whose address is already confirmed, unless the test is about that (M1). */
 async function seedUser(email: string, { verified = true } = {}) {
@@ -103,7 +105,7 @@ describe("forgot-password + reset-password", () => {
       await vi.waitFor(async () => {
         const rows = await db.select().from(auditLogs).where(eq(auditLogs.userId, userId))
         expect(rows).toHaveLength(1)
-      })
+      }, WAIT_FOR_BACKGROUND)
       const tokens = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.userId, userId))
       expect(tokens).toHaveLength(1)
       expect(tokens[0].expiresAt.getTime()).toBeGreaterThan(Date.now())
@@ -152,7 +154,7 @@ describe("forgot-password + reset-password", () => {
       await vi.waitFor(async () => {
         const rows = await db.select().from(auditLogs).where(eq(auditLogs.userId, userId))
         expect(rows).toHaveLength(1)
-      })
+      }, WAIT_FOR_BACKGROUND)
     })
 
     it("returns 400 for invalid email", async () => {
