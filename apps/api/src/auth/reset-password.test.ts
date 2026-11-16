@@ -98,6 +98,12 @@ describe("forgot-password + reset-password", () => {
       expect(res.statusCode).toBe(200)
       expect(res.json().message).toMatch(/reset link/i)
 
+      // The link is issued after the answer (timing parity, below): its last
+      // step is the audit line, so wait for that.
+      await vi.waitFor(async () => {
+        const rows = await db.select().from(auditLogs).where(eq(auditLogs.userId, userId))
+        expect(rows).toHaveLength(1)
+      })
       const tokens = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.userId, userId))
       expect(tokens).toHaveLength(1)
       expect(tokens[0].expiresAt.getTime()).toBeGreaterThan(Date.now())
@@ -119,6 +125,34 @@ describe("forgot-password + reset-password", () => {
 
       expect(res.statusCode).toBe(200)
       expect(res.json().message).toMatch(/reset link/i)
+    })
+
+    // Before the opening only administrators have an account: an answer that
+    // waited for the e-mail would tell, by its delay, which addresses are admins.
+    it("answers without waiting for the e-mail of an existing account", async () => {
+      const email = `timing-${Date.now()}${TEST_EMAIL_SUFFIX}`
+      const userId = await seedUser(email)
+      let deliver = () => {}
+      vi.mocked(sendPasswordResetEmail).mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            deliver = resolve
+          }),
+      )
+
+      const answer = app.inject({ method: "POST", url: "/api/auth/forgot-password", payload: { email } })
+      const stalled = new Promise<"stalled">((resolve) => setTimeout(() => resolve("stalled"), 1_000))
+      const first = await Promise.race([answer, stalled])
+
+      expect(first).not.toBe("stalled")
+      // Release the e-mail once it is being sent, then let the background work
+      // finish before afterEach deletes the account.
+      await vi.waitFor(() => expect(sendPasswordResetEmail).toHaveBeenCalledWith(email, expect.any(String), { userId }))
+      deliver()
+      await vi.waitFor(async () => {
+        const rows = await db.select().from(auditLogs).where(eq(auditLogs.userId, userId))
+        expect(rows).toHaveLength(1)
+      })
     })
 
     it("returns 400 for invalid email", async () => {
