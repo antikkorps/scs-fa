@@ -33,6 +33,17 @@ describe("useLaunch (story 12.10)", () => {
     expect(launch.waitingPageFor("/boutique")).toBe(false)
   })
 
+  // Before the opening only administrators can sign in, and /connexion is behind
+  // the waiting page: the password pages send them to the back-office login.
+  it("points the sign-in links at the back-office login while the shop is closed", () => {
+    expect(useLaunch().loginPath.value).toBe("/admin/login")
+  })
+
+  it("points the sign-in links at the customer login once the catalogue shows", () => {
+    setState({ launchStage: "showcase", indexingEnabled: false, adminPreview: false })
+    expect(useLaunch().loginPath.value).toBe("/connexion")
+  })
+
   it("opens everything in the open stage", () => {
     setState({ launchStage: "open", indexingEnabled: true, adminPreview: false })
     expect(useLaunch().salesOpen.value).toBe(true)
