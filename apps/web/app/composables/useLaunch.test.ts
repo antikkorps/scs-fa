@@ -39,6 +39,11 @@ describe("useLaunch (story 12.10)", () => {
     expect(useLaunch().loginPath.value).toBe("/admin/login")
   })
 
+  it("points the sign-in links at the customer login for an administrator previewing the closed shop", () => {
+    setState({ launchStage: "coming_soon", indexingEnabled: false, adminPreview: true })
+    expect(useLaunch().loginPath.value).toBe("/connexion")
+  })
+
   it("points the sign-in links at the customer login once the catalogue shows", () => {
     setState({ launchStage: "showcase", indexingEnabled: false, adminPreview: false })
     expect(useLaunch().loginPath.value).toBe("/connexion")

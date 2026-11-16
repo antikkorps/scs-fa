@@ -44,6 +44,8 @@ useSeoMeta({
    ~460px tall), stacked and tightened below. svh, not vh: a phone's address bar
    would otherwise push the bottom of the page out of view. */
 .soon {
+  /* Fallback for browsers without svh (Safari < 15.4). */
+  min-height: 100vh;
   min-height: 100svh;
   display: grid;
   place-items: center;
