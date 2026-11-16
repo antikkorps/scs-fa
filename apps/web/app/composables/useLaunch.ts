@@ -28,6 +28,10 @@ export function useLaunch() {
     return showsWaitingPage({ stage: status.value.launchStage, adminPreview: status.value.adminPreview, path })
   }
 
+  // Customers cannot sign in before the opening: /connexion sits behind the
+  // waiting page, so the password pages send administrators to their own login.
+  const loginPath = computed(() => (waitingPageFor("/connexion") ? "/admin/login" : "/connexion"))
+
   async function refresh(): Promise<void> {
     try {
       state.value = await $fetch<LaunchState>("/bff/launch-status")
@@ -47,5 +51,5 @@ export function useLaunch() {
     await refresh()
   }
 
-  return { status, salesOpen, waitingPageFor, refresh, recheckAdmin }
+  return { status, salesOpen, waitingPageFor, loginPath, refresh, recheckAdmin }
 }

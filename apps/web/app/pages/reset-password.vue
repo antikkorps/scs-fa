@@ -4,6 +4,7 @@ import { resetPasswordSchema } from "@armurier/shared"
 useHead({ title: "Réinitialiser le mot de passe" })
 
 const { resetPassword } = useAuth()
+const { loginPath } = useLaunch()
 // Read from the link's fragment once mounted (story 12.9g): null until then.
 const token = useLinkToken()
 
@@ -55,7 +56,7 @@ async function submit() {
           Votre mot de passe a été réinitialisé. Vous pouvez vous connecter.
         </p>
         <p class="auth-alt">
-          <NuxtLink to="/connexion">Se connecter</NuxtLink>
+          <NuxtLink :to="loginPath">Se connecter</NuxtLink>
         </p>
       </template>
 

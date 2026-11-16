@@ -23,6 +23,12 @@ describe("showsWaitingPage", () => {
     expect(showsWaitingPage({ ...closed, path })).toBe(false)
   })
 
+  // An administrator invited before the opening chooses a password through the
+  // mailed /reset-password link; one who forgot it asks for a new link.
+  it.each(["/reset-password", "/mot-de-passe-oublie"])("lets %s through: the password links", (path) => {
+    expect(showsWaitingPage({ ...closed, path })).toBe(false)
+  })
+
   it("does not mistake a lookalike path for an allowed one", () => {
     expect(showsWaitingPage({ ...closed, path: "/administration" })).toBe(true)
     expect(showsWaitingPage({ ...closed, path: "/mentions-legales-bis" })).toBe(true)
