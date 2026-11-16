@@ -25,6 +25,12 @@ describe("mot-de-passe-oublie.vue", () => {
     expect(wrapper.text()).toContain("Si un compte est associé à cette adresse")
   })
 
+  it("leads back to the back-office login while the shop is closed", async () => {
+    const wrapper = await mountSuspended(ForgotPassword)
+    expect(wrapper.find('a[href="/admin/login"]').text()).toBe("Retour à la connexion")
+    expect(wrapper.find('a[href="/connexion"]').exists()).toBe(false)
+  })
+
   it("validates the email before calling the API", async () => {
     const wrapper = await mountSuspended(ForgotPassword)
     await wrapper.find('input[type="email"]').setValue("nope")

@@ -4,6 +4,7 @@ import { forgotPasswordSchema } from "@armurier/shared"
 useHead({ title: "Mot de passe oublié" })
 
 const { forgotPassword } = useAuth()
+const { loginPath } = useLaunch()
 
 const email = ref("")
 const fieldErrors = ref<Record<string, string>>({})
@@ -47,7 +48,7 @@ async function submit() {
           réinitialisation.
         </p>
         <p class="auth-alt">
-          <NuxtLink to="/connexion">Retour à la connexion</NuxtLink>
+          <NuxtLink :to="loginPath">Retour à la connexion</NuxtLink>
         </p>
       </template>
 
@@ -67,7 +68,7 @@ async function submit() {
         </button>
 
         <p class="auth-alt">
-          <NuxtLink to="/connexion">Retour à la connexion</NuxtLink>
+          <NuxtLink :to="loginPath">Retour à la connexion</NuxtLink>
         </p>
       </template>
     </form>
