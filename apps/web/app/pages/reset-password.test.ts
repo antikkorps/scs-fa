@@ -67,6 +67,20 @@ describe("reset-password.vue", () => {
     expect(wrapper.text()).toContain("Votre mot de passe a été réinitialisé.")
   })
 
+  // Before the opening the shop is closed (no launch state = closed): only an
+  // invited administrator gets here, and /connexion is behind the waiting page.
+  it("sends to the back-office login while the shop is closed", async () => {
+    resetPassword.mockResolvedValue({})
+    const wrapper = await mountSuspended(ResetPassword, withToken)
+    const { password, confirm } = passwordInputs(wrapper)
+    await password.setValue("longenoughpassword")
+    await confirm.setValue("longenoughpassword")
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+
+    expect(wrapper.find('a[href="/admin/login"]').text()).toBe("Se connecter")
+  })
+
   it("shows an invalid-link message on a 400", async () => {
     resetPassword.mockRejectedValue({ response: { status: 400 } })
     const wrapper = await mountSuspended(ResetPassword, withToken)

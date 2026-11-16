@@ -2,8 +2,16 @@ import type { LaunchStage } from "@armurier/shared"
 
 // Story 12.10 — before the opening, every public page answers with the waiting
 // page. These stay reachable: the back-office (and its login), the two legal
-// pages the waiting page links to, and the newsletter's confirm/unsubscribe links.
-const EXACT_PATHS = new Set(["/admin", "/mentions-legales", "/confidentialite"])
+// pages the waiting page links to, the newsletter's confirm/unsubscribe links,
+// and the password pages — an administrator invited before the opening chooses
+// a password through the mailed /reset-password link.
+const EXACT_PATHS = new Set([
+  "/admin",
+  "/mentions-legales",
+  "/confidentialite",
+  "/reset-password",
+  "/mot-de-passe-oublie",
+])
 const PATH_PREFIXES = ["/admin/", "/newsletter/"]
 
 // Requests that never render a page: the BFF, the API, Nuxt's own assets and
