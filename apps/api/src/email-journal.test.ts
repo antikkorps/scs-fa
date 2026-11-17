@@ -17,6 +17,13 @@ const {
 
 const EMAIL_PREFIX = "email-journal-"
 const RECIPIENT = `${EMAIL_PREFIX}jean@example.fr`
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/** The tracking id the n-th e-mail carried, whichever header the provider reads it from. */
+function trackingIdSent(call = 0): string | undefined {
+  const [mail] = sendMail.mock.calls[call]
+  return Object.values(mail.headers ?? {}).find((value): value is string => UUID.test(String(value)))
+}
 
 describe("e-mail journal (story 12.7c)", () => {
   let userId: string
@@ -83,9 +90,11 @@ describe("e-mail journal (story 12.7c)", () => {
 
   afterAll(cleanup)
 
-  it("records an order e-mail in the order's history, with its recipient and SMTP message id", async () => {
+  it("records an order e-mail in the order's history, with its recipient and our tracking id", async () => {
     await confirmation()
 
+    const trackingId = trackingIdSent()
+    expect(trackingId).toMatch(UUID)
     expect(await journal()).toEqual([
       expect.objectContaining({
         action: "email.order_confirmation.sent",
@@ -94,7 +103,7 @@ describe("e-mail journal (story 12.7c)", () => {
         entityId: orderId,
         userRole: "system",
         result: "success",
-        messageId: "<abc-123@scs-firearms.fr>",
+        messageId: trackingId,
         newValue: { recipient: RECIPIENT },
       }),
     ])
@@ -171,9 +180,20 @@ describe("e-mail journal (story 12.7c)", () => {
     expect(await journal()).toEqual([])
   })
 
-  it("finds the journal line by its message id", async () => {
+  it("gives every e-mail its own tracking id, whatever id the relay returns", async () => {
     await confirmation()
-    const [event] = await db.select().from(auditLogs).where(eq(auditLogs.messageId, "<abc-123@scs-firearms.fr>"))
+    await confirmation()
+    const ids = (await journal()).map((event) => event.messageId)
+    expect(new Set(ids).size).toBe(2)
+    expect(ids).not.toContain("<abc-123@scs-firearms.fr>")
+  })
+
+  it("finds the journal line by its tracking id", async () => {
+    await confirmation()
+    const [event] = await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.messageId, trackingIdSent() ?? ""))
     expect(event?.orderId).toBe(orderId)
   })
 })

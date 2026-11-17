@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { EDITORIAL_PAGES, isEditorialPagePublishable } from "#shared/utils/editorialPages"
+import { EMAIL_SERVICE_NAME } from "~/utils/emailService"
 
 /**
  * Privacy policy (story 9.6). Written from what the code actually does
@@ -207,7 +208,7 @@ usePageSeo({
         et adresse de facturation, le détail de la commande et son règlement ;
       </li>
       <li>
-        <strong>Brevo</strong> — envoi des e-mails de service (confirmation de commande, réinitialisation du mot de
+        <strong>{{ EMAIL_SERVICE_NAME }}</strong> — envoi des e-mails de service (confirmation de commande, réinitialisation du mot de
         passe, suivi de commande, facture disponible) et de la lettre d'information si vous y êtes abonné ; nous
         indique si un e-mail a bien été remis ou refusé par votre messagerie ;
       </li>

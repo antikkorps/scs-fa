@@ -136,7 +136,7 @@ describe("Newsletter — double opt-in, segments and GDPR purge (story 11.4)", (
       .from(newsletterSubscriptions)
       .where(eq(newsletterSubscriptions.contactId, contact?.id ?? ""))
     expect(subs.every((s) => s.status === "confirmed" && s.confirmedAt !== null)).toBe(true)
-    // The in-memory driver stands in for Brevo: a successful sync stamps the row.
+    // The in-memory driver stands in for the provider: a successful sync stamps the row.
     expect(subs.every((s) => s.providerSyncedAt !== null)).toBe(true)
   })
 

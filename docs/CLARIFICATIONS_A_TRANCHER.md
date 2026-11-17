@@ -259,7 +259,7 @@
       fenêtre de retour arrière. **Les boîtes mail du client sont chez OVH** (MX
       `mx1/2/3.mail.ovh.net`, autodiscover/autoconfig, SPF `include:mx.ovh.com`) :
       à recopier dans Cloudflare, et **DNSSEC à désactiver chez OVH 24 h avant**
-      de changer les serveurs DNS. DKIM/DMARC Brevo à ajouter ensuite. Le site Safety Case Solutions (même hébergement OVH, domaine et
+      de changer les serveurs DNS. DKIM/DMARC Mailjet à ajouter ensuite. Le site Safety Case Solutions (même hébergement OVH, domaine et
       DNS chez IONOS) n'est pas concerné ; on garde l'hébergement OVH pour lui.
 - [x] **J2 Cloudflare** : tout est **proxifié** ; TLS = **certificat d'origine
       Cloudflare** sur Caddy, mode **Full (strict)**. Serveur chez **IONOS** (pas
@@ -268,7 +268,7 @@
 - [x] **J3 IP client réelle** : fait en story 9.6 (`trusted_proxies` Caddy +
       un seul saut privé côté Fastify).
 - [x] **J4 Stockage objet** : Scaleway (décision 2026-09-06), pas R2.
-- [x] **J5 Emails** : relais SMTP Brevo (décision 2026-09-06).
+- [x] **J5 Emails** : relais SMTP Brevo (décision 2026-09-06), **remplacé par Mailjet** (décision 2026-11-17).
 
 ---
 

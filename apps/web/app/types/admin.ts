@@ -442,7 +442,7 @@ export interface AdminUserRow {
   createdAt: string
 }
 
-// Back-office newsletter subscribers (read-only: letters are sent from Brevo).
+// Back-office newsletter subscribers (read-only: letters are sent from the e-mail service).
 export interface AdminNewsletterSubscription {
   segment: NewsletterSegment
   status: NewsletterSubscriptionStatus
@@ -451,7 +451,7 @@ export interface AdminNewsletterSubscription {
   unsubscribedAt: string | null
   consentSource: string | null
   consentIp: string | null
-  /** Mirrored to Brevo; a confirmed subscription that is not will not receive letters yet. */
+  /** Mirrored to the e-mail service; a confirmed subscription that is not will not receive letters yet. */
   synced: boolean
 }
 
@@ -466,6 +466,6 @@ export interface AdminNewsletterSummary {
   segments: Record<NewsletterSegment, Record<NewsletterSubscriptionStatus, number>>
   /** Contacts that still hold an address (anonymised traces excluded). */
   contacts: number
-  /** Confirmed subscriptions not mirrored to Brevo yet. */
+  /** Confirmed subscriptions not mirrored to the e-mail service yet. */
   awaitingSync: number
 }

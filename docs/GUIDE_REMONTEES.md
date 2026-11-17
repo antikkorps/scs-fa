@@ -21,7 +21,7 @@ Chercher la ligne **E-mail de … envoyé à …** :
 | **envoyé à** une adresse avec une faute | Le client s'est trompé d'adresse | Corriger l'adresse du compte avec lui |
 | **envoyé**, puis **remis à la boîte de …** | L'e-mail est arrivé chez son fournisseur de messagerie | Lui demander de regarder ses indésirables / « Promotions » |
 | **refusé par la boîte de …** | Adresse inexistante ou boîte fermée | Lui demander une autre adresse |
-| **bloqué par Brevo** | Brevo n'écrit plus à cette adresse (anciens rejets ou signalement spam) | Le signaler à Franck, qui peut la débloquer chez Brevo |
+| **bloqué par le service d'envoi** | Mailjet n'écrit plus à cette adresse (anciens rejets ou signalement spam) | Le signaler à Franck, qui peut la débloquer chez Mailjet |
 | **signalé comme spam** | Le client a lui-même classé un de nos e-mails en spam | Lui demander de le retirer des spams |
 | **non envoyé** | Le site n'a pas réussi à le confier au serveur d'envoi | Le signaler à Franck avec la référence de commande |
 | Aucune ligne d'e-mail | L'e-mail n'est jamais parti (ou la commande date d'avant la story 12.7) | Le signaler à Franck |
@@ -81,7 +81,7 @@ sont gardés **14 jours**.
 just journal 0b7d1f3e            # tout ce qui concerne une commande (référence en minuscules)
 just journal <reqId>             # une requête précise : l'identifiant gris de l'historique
 just journal "Browser error"     # erreurs vues dans le navigateur (panier, tunnel, paiement)
-just journal "Brevo report"      # retours Brevo reçus, et ceux qu'on n'a pas su rattacher
+just journal "Delivery report"   # retours de remise reçus, et ceux qu'on n'a pas su rattacher
 journalctl -t scs-firearm-api-1 -p warning --since today   # avertissements et erreurs du jour
 ```
 
@@ -89,10 +89,11 @@ journalctl -t scs-firearm-api-1 -p warning --since today   # avertissements et e
   erreur et par page, avec le chemin, le message (adresses e-mail et numéros
   masqués), la pile d'appels et le navigateur du client. Seuls `/panier` et
   `/commande…` sont surveillés.
-- **Rapports Brevo** (story 12.7c) : « Brevo report for an e-mail we did not
-  journal » veut dire qu'un retour Brevo ne correspond à aucun envoi journalisé
-  (e-mail antérieur à la 12.7c, ou `Message-ID` non transmis par Brevo — voir la
-  vérification dans `docs/DEPLOY.md`).
+- **Retours de remise** (story 12.7c) : « Delivery report for an e-mail we did not
+  journal » veut dire qu'un retour de Mailjet porte un identifiant de suivi qui ne
+  correspond à aucun envoi journalisé (e-mail antérieur à la 12.7c, ou journal non
+  écrit — voir la vérification dans `docs/DEPLOY.md`). Les retours des lettres
+  envoyées depuis l'éditeur de Mailjet n'ont pas d'identifiant et sont ignorés sans bruit.
 - **Henrri, Stripe, colis** (story 12.7a) : une ligne par document émis ou
   bloqué, par événement Stripe reçu, par colis livré, toujours avec l'`orderId`.
 - **Base de données** : l'historique est la table `audit_logs` (`order_id`,

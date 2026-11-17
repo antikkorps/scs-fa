@@ -212,7 +212,8 @@ One contact carries N subscriptions, each with its own timestamped consent.
 | POST   | `/api/newsletter/unsubscribe`    | Per segment, or all; the last one purges the address            |
 
 - **Double opt-in is ours, not the provider's**: consent (when, from which page, which IP/user-agent) is recorded and timestamped in our own database, so it stays provable if the sending provider ever changes.
-- **`NewsletterService`** (`apps/api/src/newsletter/`) is the provider-agnostic seam, mirroring `StorageService`. `brevo` speaks the REST API v3 over plain `fetch`; `memory` is the in-process driver used by tests, CI and local dev. Set `NEWSLETTER_DRIVER` plus the `BREVO_*` list ids — nothing Brevo-specific exists outside that folder.
+- **`NewsletterService`** (`apps/api/src/newsletter/`) is the provider-agnostic seam, mirroring `StorageService`. `mailjet` speaks the REST API over plain `fetch`; `memory` is the in-process driver used by tests, CI and local dev. Set `NEWSLETTER_DRIVER`, the `NEWSLETTER_LIST_ID_*` ids and the `MAILJET_*` keys — nothing Mailjet-specific exists outside that folder.
+- **Delivery reports** (`apps/api/src/email-delivery/`) follow the same rule: each e-mail carries our own tracking id, the provider's adapter (chosen by `EMAIL_PROVIDER`) adds the header that makes the provider echo it and turns its webhook payloads into neutral outcomes (`POST /api/webhooks/email`). Changing provider = one adapter + the `.env`.
 - **GDPR**: a full unsubscribe **erases the address**; the row survives anonymised (email hash + consent/withdrawal timestamps) so a past consent stays provable without keeping personal data. Consent, confirmation and withdrawal are also written to `audit_logs`.
 - Our database is the source of truth: a provider outage never blocks a confirmation, it only leaves `provider_synced_at` null.
 

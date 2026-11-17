@@ -2,17 +2,19 @@ import { CURRENT_RGPD_CONSENT_VERSION } from "@armurier/shared"
 import { and, eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
-import { buildApp } from "./app.js"
-import { recordAuditEvent } from "./audit/record.js"
-import { db } from "./db/client.js"
-import { auditLogs, orders, users } from "./db/schema.js"
+import { buildApp } from "../app.js"
+import { recordAuditEvent } from "../audit/record.js"
+import { db } from "../db/client.js"
+import { auditLogs, orders, users } from "../db/schema.js"
 
-const EMAIL_PREFIX = "brevo-webhook-"
+const EMAIL_PREFIX = "delivery-webhook-"
 const RECIPIENT = `${EMAIL_PREFIX}jean@example.fr`
-const SECRET = process.env.BREVO_WEBHOOK_SECRET ?? ""
-const MESSAGE_ID = "<order-confirmation-1@scs-firearms.fr>"
+const SECRET = process.env.EMAIL_WEBHOOK_SECRET ?? ""
+const MESSAGE_ID = "0b6f3a2e-4d1c-4f7a-9e2b-8c5d1a7f3e90"
 
-describe("Brevo delivery reports (story 12.7c)", () => {
+// Runs with EMAIL_PROVIDER=mailjet (vitest.config.ts): the payloads are Mailjet's,
+// everything this test asserts on is ours.
+describe("e-mail delivery reports (story 12.7c)", () => {
   let app: FastifyInstance
   let userId: string
   let orderId: string
@@ -27,22 +29,32 @@ describe("Brevo delivery reports (story 12.7c)", () => {
     await db.delete(users).where(like(users.email, `${EMAIL_PREFIX}%`))
   }
 
-  const report = (payload: unknown, token: string | null = SECRET) =>
+  const report = (payload: unknown, secret: string | null = SECRET) =>
     app.inject({
       method: "POST",
-      url: "/api/webhooks/brevo",
-      headers: token === null ? {} : { authorization: `Bearer ${token}` },
+      url: "/api/webhooks/email",
+      headers: secret === null ? {} : { authorization: `Basic ${Buffer.from(`mailjet:${secret}`).toString("base64")}` },
       payload: payload as Record<string, unknown>,
     })
 
-  const brevoEvent = (event: string, messageId = MESSAGE_ID) => ({
-    event,
+  // Each outcome as Mailjet's Event API reports it.
+  const MAILJET_EVENTS: Record<string, Record<string, unknown>> = {
+    delivered: { event: "sent", smtp_reply: "250 2.0.0 OK" },
+    hard_bounce: { event: "bounce", hard_bounce: true, error_related_to: "recipient", error: "user unknown" },
+    blocked: { event: "blocked", error_related_to: "recipient", error: "preblocked" },
+    spam: { event: "spam", source: "JMRPP" },
+    soft_bounce: { event: "bounce", hard_bounce: false },
+    opened: { event: "open" },
+    clicked: { event: "click" },
+  }
+
+  const providerEvent = (outcome: string, trackingId = MESSAGE_ID) => ({
+    ...MAILJET_EVENTS[outcome],
+    time: 1_760_788_800,
+    MessageID: 1234567890,
     email: RECIPIENT,
-    id: 42,
-    date: "2026-10-18 12:00:00",
-    "message-id": messageId,
-    reason: "550 5.1.1 jean@example.fr: user unknown",
-    subject: "Votre commande",
+    CustomID: trackingId,
+    Payload: "",
   })
 
   const reportsOf = (messageId = MESSAGE_ID) =>
@@ -93,8 +105,8 @@ describe("Brevo delivery reports (story 12.7c)", () => {
     await app.close()
   })
 
-  it("adds a hard bounce to the order's history, as a failure with Brevo's event as code", async () => {
-    const res = await report(brevoEvent("hard_bounce"))
+  it("adds a hard bounce to the order's history, as a failure with a neutral code", async () => {
+    const res = await report(providerEvent("hard_bounce"))
     expect(res.statusCode).toBe(200)
 
     const [, bounce] = await reportsOf()
@@ -105,52 +117,50 @@ describe("Brevo delivery reports (story 12.7c)", () => {
       entityId: orderId,
       userRole: "system",
       result: "failure",
-      error: "brevo.hard_bounce",
+      error: "delivery.hard_bounce",
       newValue: { recipient: RECIPIENT },
     })
   })
 
   it("records a delivery as a success", async () => {
-    await report(brevoEvent("delivered"))
+    await report(providerEvent("delivered"))
     const [, delivered] = await reportsOf()
     expect(delivered).toMatchObject({ action: "email.order_confirmation.delivered", result: "success", error: null })
   })
 
-  it("records spam complaints, blocks, invalid addresses and errors", async () => {
-    for (const event of ["spam", "blocked", "invalid_email", "error"]) await report(brevoEvent(event))
+  it("records spam complaints and blocks", async () => {
+    for (const outcome of ["spam", "blocked"]) await report(providerEvent(outcome))
     expect((await reportsOf()).map((row) => row.action)).toEqual([
       "email.order_confirmation.sent",
       "email.order_confirmation.spam",
       "email.order_confirmation.blocked",
-      "email.order_confirmation.invalid_email",
-      "email.order_confirmation.error",
     ])
   })
 
-  it("is idempotent: a report Brevo sends again is recorded once", async () => {
-    await report(brevoEvent("hard_bounce"))
-    await report(brevoEvent("hard_bounce"))
+  it("is idempotent: a report the provider sends again is recorded once", async () => {
+    await report(providerEvent("hard_bounce"))
+    await report(providerEvent("hard_bounce"))
     expect(await reportsOf()).toHaveLength(2)
   })
 
   it("accepts a batch of reports", async () => {
-    const res = await report([brevoEvent("delivered"), brevoEvent("spam")])
+    const res = await report([providerEvent("delivered"), providerEvent("spam")])
     expect(res.statusCode).toBe(200)
     expect(await reportsOf()).toHaveLength(3)
   })
 
   it("ignores passing and engagement events, and e-mails it never sent", async () => {
-    for (const event of ["request", "soft_bounce", "deferred", "opened", "click"]) {
-      expect((await report(brevoEvent(event))).statusCode).toBe(200)
+    for (const outcome of ["soft_bounce", "opened", "clicked"]) {
+      expect((await report(providerEvent(outcome))).statusCode).toBe(200)
     }
-    expect((await report(brevoEvent("hard_bounce", "<unknown@elsewhere>"))).statusCode).toBe(200)
+    expect((await report(providerEvent("hard_bounce", "not-one-of-ours"))).statusCode).toBe(200)
     expect(await reportsOf()).toHaveLength(1)
-    expect(await reportsOf("<unknown@elsewhere>")).toEqual([])
+    expect(await reportsOf("not-one-of-ours")).toEqual([])
   })
 
-  it("refuses a caller without the shared token, before reading anything", async () => {
-    expect((await report(brevoEvent("hard_bounce"), null)).statusCode).toBe(401)
-    expect((await report(brevoEvent("hard_bounce"), "wrong-token")).statusCode).toBe(401)
+  it("refuses a caller without the shared secret, before reading anything", async () => {
+    expect((await report(providerEvent("hard_bounce"), null)).statusCode).toBe(401)
+    expect((await report(providerEvent("hard_bounce"), "wrong-secret")).statusCode).toBe(401)
     expect(await reportsOf()).toHaveLength(1)
   })
 

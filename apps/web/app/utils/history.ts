@@ -70,7 +70,7 @@ function henrriLabel(kind: string, step: string, number: unknown): string | null
   return `${numbered} ${words[kind]}`
 }
 
-// Story 12.7c — customer e-mails, and what Brevo reported about them.
+// Story 12.7c — customer e-mails, and what the e-mail service reported about them.
 const EMAIL_NAMES: Record<string, string> = {
   order_confirmation: "de confirmation de commande",
   invoice_available: "de facture disponible",
@@ -89,10 +89,8 @@ const EMAIL_OUTCOMES: Record<string, { said: string; before: string }> = {
   failed: { said: "non envoyé", before: "à" },
   delivered: { said: "remis à la boîte", before: "de" },
   hard_bounce: { said: "refusé par la boîte", before: "de" },
-  blocked: { said: "bloqué par Brevo", before: "pour" },
-  invalid_email: { said: "non distribué, adresse invalide", before: "pour" },
+  blocked: { said: "bloqué par le service d'envoi", before: "pour" },
   spam: { said: "signalé comme spam", before: "par" },
-  error: { said: "en erreur chez Brevo", before: "pour" },
 }
 
 function emailLabel(type: string, outcome: string, recipient: unknown): string | null {
@@ -174,12 +172,10 @@ const SMTP_ERRORS: Record<string, string> = {
   EAUTH: "Le serveur d'envoi refuse nos identifiants",
 }
 
-const BREVO_ERRORS: Record<string, string> = {
+const DELIVERY_ERRORS: Record<string, string> = {
   hard_bounce: "Adresse inexistante ou boîte fermée : rejet définitif",
-  blocked: "Brevo bloque cette adresse après des rejets ou un signalement",
+  blocked: "Le service d'envoi bloque cette adresse après des rejets ou un signalement",
   spam: "Le destinataire a signalé l'e-mail comme spam",
-  invalid_email: "Adresse e-mail mal formée",
-  error: "Erreur d'envoi chez Brevo",
 }
 
 /** Why an event failed, in plain French; the raw code when it is not one we know. */
@@ -188,7 +184,7 @@ export function historyErrorLabel(error: string | null): string {
   const [source, ...rest] = error.split(".")
   const code = rest.join(".")
   if (source === "smtp" && code) return `${SMTP_ERRORS[code] ?? "Échec de l'envoi"} (${code})`
-  if (source === "brevo" && code) return BREVO_ERRORS[code] ?? `Brevo : ${code}`
+  if (source === "delivery" && code) return DELIVERY_ERRORS[code] ?? `Service d'envoi : ${code}`
   if (source === "stripe" && code) return `Stripe : ${STRIPE_ERRORS[code] ?? code}`
   if (source === "henrri" && code) return HENRRI_CODES_ONLY[code] ?? henrriBlockReason(code)
   if (source === "order" && ORDER_ERRORS[code]) return ORDER_ERRORS[code]
