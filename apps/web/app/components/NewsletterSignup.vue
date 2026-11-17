@@ -37,6 +37,13 @@ const selected = ref<NewsletterSegment[]>([...props.defaultSegments])
 const status = ref<"idle" | "loading" | "sent">("idle")
 const error = ref("")
 const fieldErrors = ref<Record<string, string>>({})
+// The robot traps (shared with the contact form): a field only scripts fill,
+// and the time from the form showing to its sending. The API decides.
+const website = ref("")
+const shownAt = ref(Date.now())
+onMounted(() => {
+  shownAt.value = Date.now()
+})
 
 const segments = NEWSLETTER_SEGMENTS.map((segment) => ({ segment, label: NEWSLETTER_SEGMENT_LABELS[segment] }))
 
@@ -75,6 +82,8 @@ async function submit() {
         segments: selected.value,
         consent: true,
         ...(props.source ? { source: props.source } : {}),
+        website: website.value,
+        filledInMs: Date.now() - shownAt.value,
       },
     })
     // Deliberately the same message whatever the address' history: the form must
@@ -141,6 +150,11 @@ async function submit() {
         </span>
       </label>
       <p v-if="fieldErrors.consent" class="nl__err">{{ fieldErrors.consent }}</p>
+
+      <!-- The robot trap: invisible, skipped by the keyboard and screen readers. -->
+      <div class="trap" aria-hidden="true">
+        <label>Site web <input v-model="website" name="website" tabindex="-1" autocomplete="off" /></label>
+      </div>
 
       <button class="nl__submit" type="submit" :disabled="status === 'loading'">
         {{ status === "loading" ? "Envoi…" : "Je m'inscris" }}
@@ -247,6 +261,14 @@ async function submit() {
   margin: 0;
   font-size: var(--fs-sm);
   line-height: var(--lh-normal);
+}
+/* The robot trap: off-screen, never shown to people. */
+.trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }
 /* Errors carry their own words, never colour alone. */
 .nl__err {

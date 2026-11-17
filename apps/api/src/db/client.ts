@@ -11,3 +11,5 @@ export const pool = new Pool({
 
 export const db = drizzle(pool, { schema })
 export type Database = typeof db
+/** The database, or a transaction opened on it: what a query helper runs on. */
+export type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db

@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest"
+import { looksAutomated, MIN_FORM_FILL_MS } from "./bot-guard.js"
 import {
   CONTACT_MESSAGE_RETENTION_YEARS,
-  CONTACT_MIN_FILL_MS,
   CONTACT_SUBJECT_LABELS,
   CONTACT_SUBJECTS,
   contactMessageSchema,
   contactStatusSchema,
-  looksAutomated,
 } from "./contact.js"
 
 const message = {
@@ -47,7 +46,7 @@ describe("the contact form (audit 2026-11-01, I8b)", () => {
   it("spots a robot: the hidden field filled, or the form sent too fast to have been read", () => {
     expect(looksAutomated(contactMessageSchema.parse(message))).toBe(false)
     expect(looksAutomated(contactMessageSchema.parse({ ...message, website: "http://spam.example" }))).toBe(true)
-    expect(looksAutomated(contactMessageSchema.parse({ ...message, filledInMs: CONTACT_MIN_FILL_MS - 1 }))).toBe(true)
+    expect(looksAutomated(contactMessageSchema.parse({ ...message, filledInMs: MIN_FORM_FILL_MS - 1 }))).toBe(true)
   })
 
   it("keeps a message one year after it was handled", () => {

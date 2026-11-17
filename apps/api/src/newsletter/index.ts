@@ -1,6 +1,6 @@
 import {
+  looksAutomated,
   NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS,
-  NEWSLETTER_SEGMENT_LABELS,
   type NewsletterSegment,
   newsletterConfirmSchema,
   newsletterSubscribeSchema,
@@ -8,7 +8,7 @@ import {
   newsletterUnsubscribeSchema,
 } from "@armurier/shared"
 import { and, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm"
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
+import type { FastifyBaseLogger, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify"
 // Opaque single-use link tokens: same construction as the password-reset ones
 // (32 random bytes, stored as a SHA-256 hash), reused rather than re-invented.
 import { recordAuditEvent } from "../audit/record.js"
@@ -16,8 +16,8 @@ import { generateRefreshToken as generateLinkToken, hashRefreshToken as hashLink
 import { db } from "../db/client.js"
 import { newsletterContacts, newsletterSubscriptions, newsletterTokens } from "../db/schema.js"
 import { sendNewsletterConfirmationEmail } from "../email.js"
-import { newsletterEmailHash } from "./contact.js"
 import { newsletterProvider } from "./service.js"
+import { type ConfirmationMail, recordSubscription, withdrawConfirmLink } from "./subscribe.js"
 
 const CONFIRM_TOKEN_TTL_MS = NEWSLETTER_CONFIRM_TOKEN_TTL_HOURS * 60 * 60 * 1000
 
@@ -87,6 +87,23 @@ async function issueUnsubscribeToken(contactId: string): Promise<string> {
   return token
 }
 
+/**
+ * Not awaited: answering only once the provider has replied would let the
+ * response time tell whether an address is new, pending or confirmed.
+ */
+function sendConfirmation(email: string, contactId: string, mail: ConfirmationMail, log: FastifyBaseLogger): void {
+  sendNewsletterConfirmationEmail(email, mail, { contactId }).catch(async (err: unknown) => {
+    log.error({ err }, "newsletter: failed to send the confirmation email")
+    await withdrawConfirmLink(mail.confirmToken).catch((cleanupErr: unknown) => {
+      log.error({ err: cleanupErr }, "newsletter: failed to withdraw an unsent confirmation link")
+    })
+  })
+}
+
+/** The one answer to a sign-up, whoever asks: it says nothing of the address' history. */
+const SUBSCRIBE_ACCEPTED =
+  "Vérifiez votre boîte mail : votre inscription doit être confirmée par le lien que nous venons d'envoyer."
+
 export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /api/newsletter/subscribe — capture an address (double opt-in step 1).
@@ -102,96 +119,35 @@ export const newsletterRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const parsed = newsletterSubscribeSchema.safeParse(request.body)
       if (!parsed.success) return validationError(reply, parsed.error.issues)
+      // A robot is told it worked: nothing stored, nothing sent, no hint of the trap.
+      if (looksAutomated(parsed.data)) return reply.code(202).send({ message: SUBSCRIBE_ACCEPTED })
 
       const email = parsed.data.email.trim().toLowerCase()
-      const emailHash = newsletterEmailHash(email)
-      const now = new Date()
-
-      // Re-subscribing after a purge finds the consent proof by its hash and
-      // puts the address back on it, instead of forking a second contact.
-      const [contact] = await db
-        .insert(newsletterContacts)
-        .values({ email, emailHash })
-        .onConflictDoUpdate({
-          target: newsletterContacts.emailHash,
-          set: { email, updatedAt: now, unsubscribedAt: null },
-        })
-        .returning({ id: newsletterContacts.id })
-      if (!contact) throw new Error("newsletter: contact upsert returned no row")
-
-      await db
-        .insert(newsletterSubscriptions)
-        .values(
-          parsed.data.segments.map((segment) => ({
-            contactId: contact.id,
-            segment,
-            status: "pending" as const,
-            requestedAt: now,
-            consentSource: parsed.data.source ?? null,
-            consentIp: request.ip,
-            consentUserAgent: request.headers["user-agent"] ?? null,
-          })),
-        )
-        .onConflictDoUpdate({
-          target: [newsletterSubscriptions.contactId, newsletterSubscriptions.segment],
-          // An already-confirmed segment keeps its confirmation (and its original
-          // proof of consent): re-submitting the form must not silently demote a
-          // subscriber back to pending and stop their mails.
-          set: {
-            status: sql`case when ${newsletterSubscriptions.status} = 'confirmed' then 'confirmed'::newsletter_subscription_status else 'pending'::newsletter_subscription_status end`,
-            requestedAt: sql`case when ${newsletterSubscriptions.status} = 'confirmed' then ${newsletterSubscriptions.requestedAt} else ${now} end`,
-            consentSource: sql`case when ${newsletterSubscriptions.status} = 'confirmed' then ${newsletterSubscriptions.consentSource} else ${parsed.data.source ?? null} end`,
-            unsubscribedAt: null,
-          },
-        })
-
-      const pending = await db
-        .select({ segment: newsletterSubscriptions.segment })
-        .from(newsletterSubscriptions)
-        .where(
-          and(
-            eq(newsletterSubscriptions.contactId, contact.id),
-            eq(newsletterSubscriptions.status, "pending"),
-            inArray(newsletterSubscriptions.segment, parsed.data.segments),
-          ),
-        )
-
-      if (pending.length > 0) {
-        const confirmToken = generateLinkToken()
-        await db.insert(newsletterTokens).values({
-          contactId: contact.id,
-          tokenHash: hashLinkToken(confirmToken),
-          purpose: "confirm",
-          expiresAt: new Date(now.getTime() + CONFIRM_TOKEN_TTL_MS),
-        })
-        const unsubscribeToken = await issueUnsubscribeToken(contact.id)
-
-        await sendNewsletterConfirmationEmail(
+      const recorded = await recordSubscription(
+        {
           email,
-          {
-            confirmToken,
-            unsubscribeToken,
-            segmentLabels: pending.map((p) => NEWSLETTER_SEGMENT_LABELS[p.segment]),
-          },
-          { contactId: contact.id },
-        ).catch((err) => {
-          request.log.error({ err }, "newsletter: failed to send the confirmation email")
+          segments: parsed.data.segments,
+          source: parsed.data.source ?? null,
+          ip: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+          confirmTtlMs: CONFIRM_TOKEN_TTL_MS,
+        },
+        new Date(),
+      )
+      // Held back (a fresh link is pending): nothing changed, nothing to record.
+      if (recorded) {
+        if (recorded.mail) sendConfirmation(email, recorded.contactId, recorded.mail, request.log)
+        await recordAuditEvent({
+          entityType: "newsletter_contact",
+          entityId: recorded.contactId,
+          action: "newsletter.subscribe_requested",
+          newValue: { segments: parsed.data.segments, source: parsed.data.source ?? null },
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
         })
       }
 
-      await recordAuditEvent({
-        entityType: "newsletter_contact",
-        entityId: contact.id,
-        action: "newsletter.subscribe_requested",
-        newValue: { segments: parsed.data.segments, source: parsed.data.source ?? null },
-        ipAddress: request.ip,
-        userAgent: request.headers["user-agent"] ?? null,
-      })
-
-      return reply.code(202).send({
-        message:
-          "Vérifiez votre boîte mail : votre inscription doit être confirmée par le lien que nous venons d'envoyer.",
-      })
+      return reply.code(202).send({ message: SUBSCRIBE_ACCEPTED })
     },
   )
 

@@ -1,4 +1,5 @@
 import { ARTWORK_ORIENTATIONS } from "./artwork.js"
+import { botTrapFields } from "./bot-guard.js"
 import {
   ADDRESS_TYPES,
   LEGAL_CATEGORIES,
@@ -723,6 +724,7 @@ export const newsletterSubscribeSchema = z
       .max(255)
       .regex(/^\/[A-Za-z0-9/_-]*$/, "Source must be a site path")
       .optional(),
+    ...botTrapFields,
   })
   .strict()
 

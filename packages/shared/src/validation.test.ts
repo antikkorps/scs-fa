@@ -163,10 +163,16 @@ describe("blogQuerySchema", () => {
 })
 
 describe("newsletterSubscribeSchema", () => {
-  const base = { email: "client@example.test", segments: ["armurerie"], consent: true }
+  const base = { email: "client@example.test", segments: ["armurerie"], consent: true, filledInMs: 8000 }
 
   it("accepts an opt-in on one universe", () => {
     expect(newsletterSubscribeSchema.safeParse(base).success).toBe(true)
+  })
+
+  it("carries the robot traps: the hidden field, and the fill time it requires", () => {
+    expect(newsletterSubscribeSchema.safeParse({ ...base, website: "" }).success).toBe(true)
+    expect(newsletterSubscribeSchema.safeParse({ ...base, filledInMs: undefined }).success).toBe(false)
+    expect(newsletterSubscribeSchema.safeParse({ ...base, filledInMs: -1 }).success).toBe(false)
   })
 
   it("refuses an unticked consent box — no coercion of a 'no' into a 'yes'", () => {
