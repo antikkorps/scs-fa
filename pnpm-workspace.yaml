@@ -64,3 +64,7 @@ auditConfig:
   ignoreGhsas:
     # braces <=3.0.3, stack exhaustion on nested patterns — via globby/micromatch (build-time file globbing).
     - GHSA-vfj7-8cjw-p6xm
+    # picomatch <=4.0.7 (and 2.x), ReDoS on repeated extglobs — advisory of 2026-11, the announced
+    # 4.0.8 is not published. Only Nuxt's build tooling (vite, rollup, unplugin, @parcel/watcher)
+    # loads it; the production server bundle does not ship it.
+    - GHSA-fc5q-39xc-vjpf
