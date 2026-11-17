@@ -93,6 +93,9 @@ describe("historyEventLabel (story 12.7b)", () => {
     expect(historyEventLabel(event("email.order_confirmation.spam"))).toBe(
       "E-mail de confirmation de commande signalé comme spam",
     )
+    expect(historyEventLabel(event("email.order_confirmation.blocked", { newValue: recipient }))).toBe(
+      "E-mail de confirmation de commande bloqué par le service d'envoi pour jean@example.fr",
+    )
   })
 
   it("shows an unknown action as it is, rather than hiding it", () => {
@@ -118,8 +121,12 @@ describe("historyErrorLabel", () => {
   it("explains e-mail failures", () => {
     expect(historyErrorLabel("smtp.EENVELOPE")).toBe("Le serveur d'envoi a refusé l'adresse (EENVELOPE)")
     expect(historyErrorLabel("smtp.ECONNECTION")).toBe("Serveur d'envoi injoignable (ECONNECTION)")
-    expect(historyErrorLabel("brevo.hard_bounce")).toBe("Adresse inexistante ou boîte fermée : rejet définitif")
-    expect(historyErrorLabel("brevo.blocked")).toBe("Brevo bloque cette adresse après des rejets ou un signalement")
+    expect(historyErrorLabel("delivery.hard_bounce")).toBe("Adresse inexistante ou boîte fermée : rejet définitif")
+    expect(historyErrorLabel("delivery.blocked")).toBe(
+      "Le service d'envoi bloque cette adresse après des rejets ou un signalement",
+    )
+    expect(historyErrorLabel("delivery.spam")).toBe("Le destinataire a signalé l'e-mail comme spam")
+    expect(historyErrorLabel("delivery.unheard_of")).toBe("Service d'envoi : unheard_of")
   })
 
   it("is empty without an error, and shows any other code as it is", () => {

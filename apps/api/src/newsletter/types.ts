@@ -1,7 +1,7 @@
 import type { NewsletterSegment } from "@armurier/shared"
 
 // Provider-agnostic newsletter abstraction, mirroring StorageService: nothing
-// Brevo-specific may leak past this file. Swapping the sending provider (or
+// provider-specific may leak past its driver. Swapping the sending provider (or
 // running the in-memory driver in tests) must not touch a single call site.
 //
 // The application database — not the provider — is the source of truth for

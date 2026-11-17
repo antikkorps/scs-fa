@@ -29,7 +29,7 @@
 | Scaleway | Stockage des fichiers (pièces justificatives chiffrées, images) et des sauvegardes | Pièces justificatives, sauvegardes de la base | France (UE) |
 | Stripe | Paiement par carte bancaire | Données de carte (saisies chez Stripe), montant, e-mail | UE et États-Unis — transferts encadrés [À vérifier] |
 | Henrri (groupe Rivalis) | Établissement et conservation des factures et avoirs | Nom, adresse de facturation, détail et règlement de la commande (pas l'e-mail) | France (UE) [À vérifier] |
-| Brevo | Envoi des e-mails de service et de la lettre d'information ; rapports de remise | E-mail, contenu des e-mails, contacts abonnés confirmés | UE [À vérifier : lieu d'hébergement dans le contrat] |
+| Mailjet | Envoi des e-mails de service et de la lettre d'information ; rapports de remise | E-mail, contenu des e-mails, contacts abonnés confirmés | UE [À vérifier : lieu d'hébergement dans le contrat] |
 | La Poste (Colissimo), Mondial Relay | Livraison des colis | Nom, adresse de livraison, numéro de suivi | France (UE) |
 
 Pour chaque prestataire : contrat ou conditions de sous-traitance (article 28)
@@ -56,7 +56,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Base légale | Exécution du contrat ; obligation légale (comptabilité) |
 | Personnes concernées | Clients |
 | Données | Articles commandés, montants, adresses de livraison et de facturation, version des CGV acceptée, colis et numéros de suivi, remboursements ; pour un article réservé aux majeurs (couteaux, articles marqués 18 ans), la date de la déclaration sur l'honneur d'avoir 18 ans révolus (story 12.13c) |
-| Destinataires | Personnel habilité ; Henrri (factures, avoirs) ; La Poste, Mondial Relay ; Brevo (e-mails de confirmation, d'expédition, de facture) |
+| Destinataires | Personnel habilité ; Henrri (factures, avoirs) ; La Poste, Mondial Relay ; Mailjet (e-mails de confirmation, d'expédition, de facture) |
 | Durée | 10 ans (article L123-22 du Code de commerce) |
 
 ### 3. Encaissement des paiements
@@ -90,7 +90,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Base légale | Consentement (double confirmation), retirable à tout moment |
 | Personnes concernées | Abonnés |
 | Données | E-mail, thèmes choisis, preuve du consentement (date, adresse IP et navigateur à l'inscription et à la confirmation) |
-| Destinataires | Brevo (uniquement les contacts dont l'inscription est confirmée) |
+| Destinataires | Mailjet (uniquement les contacts dont l'inscription est confirmée) |
 | Durée | Jusqu'à la désinscription ; l'adresse est alors effacée. La preuve du consentement est gardée **5 ans après la désinscription** (prescription civile), puis effacée par la purge quotidienne : empreinte SHA-256 de l'adresse, dates de consentement et de désinscription, adresse IP et navigateur. C'est une donnée **pseudonymisée**, pas anonyme : hacher une adresse connue la retrouve (audit 2026-11-01 B7, décision 2026-11-04). Inscription non confirmée : lien valable 72 heures, puis la demande et l'adresse sont effacées (purge quotidienne) |
 
 ### 6. E-mails de service et suivi de leur remise
@@ -100,8 +100,8 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Finalité | Envoyer les e-mails liés au compte et aux commandes, et pouvoir répondre « l'e-mail est-il bien parti, et arrivé ? » |
 | Base légale | Exécution du contrat ; intérêt légitime (preuve et assistance) |
 | Personnes concernées | Clients, abonnés en cours d'inscription |
-| Données | Adresse du destinataire, type d'e-mail, identifiant SMTP du message, issue (envoyé, refusé, remis, rejeté, signalé comme spam) |
-| Destinataires | Brevo ; personnel habilité (onglet « Historique » des commandes) |
+| Données | Adresse du destinataire, type d'e-mail, identifiant de suivi généré par le site, issue (envoyé, refusé, remis, rejeté, signalé comme spam) |
+| Destinataires | Mailjet ; personnel habilité (onglet « Historique » des commandes) |
 | Durée | Avec l'historique de la commande (10 ans) ; 1 an pour les e-mails sans commande |
 
 ### 7. Journal des opérations sensibles
@@ -167,7 +167,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Base légale | Mesures précontractuelles prises à la demande de la personne ; intérêt légitime (vérifier qu'un compte pro correspond à un établissement réel) |
 | Personnes concernées | Représentants des organisations professionnelles |
 | Données | Nom, prénom, e-mail du représentant ; raison sociale, SIRET, type d'organisation, réponse du registre des entreprises au moment de la demande ; décision de SCS et son motif ; conditions commerciales ; articles et quantités demandés, message libre |
-| Destinataires | Personnel habilité de SCS Firearms ; IONOS ; Brevo (e-mails de suivi). Le SIRET est vérifié auprès de l'API publique Recherche d'entreprises de l'État, qui ne reçoit que ce numéro |
+| Destinataires | Personnel habilité de SCS Firearms ; IONOS ; Mailjet (e-mails de suivi). Le SIRET est vérifié auprès de l'API publique Recherche d'entreprises de l'État, qui ne reçoit que ce numéro |
 | Durée | Demande de devis jamais convertie en commande : 3 ans après sa dernière activité (purge quotidienne). Demande convertie : conservée avec la commande (10 ans). Organisation : tant que le compte existe |
 
 ### 13. Formulaire de contact
@@ -178,7 +178,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 | Base légale | Intérêt légitime : répondre à la demande de la personne |
 | Personnes concernées | Toute personne qui écrit depuis la page Contact |
 | Données | Nom, e-mail, téléphone (facultatif), sujet, référence de commande (facultative), message ; date de réception, statut « à traiter / traité » et administrateur qui l'a traité. Aucune adresse IP n'est conservée avec le message |
-| Destinataires | Personnel habilité de SCS Firearms (écran « Messages » du back-office) ; IONOS ; Brevo (e-mail d'alerte à l'adresse de contact de la boutique) |
+| Destinataires | Personnel habilité de SCS Firearms (écran « Messages » du back-office) ; IONOS ; Mailjet (e-mail d'alerte à l'adresse de contact de la boutique) |
 | Durée | 1 an après le traitement du message, ou 1 an après sa réception s'il n'a pas été traité (purge quotidienne). Supprimés aussi à la suppression du compte de la même adresse, et inclus dans l'export de ses données |
 | Mesures particulières | Anti-spam sans prestataire tiers (champ piège, durée minimale de saisie, limites d'envoi par réseau et par adresse) |
 
@@ -188,7 +188,7 @@ signés au nom du client **[À compléter : date et référence de chaque contra
 - Mots de passe hachés (Argon2id) ; sessions portées par des cookies inaccessibles aux scripts ; jetons de session jamais exposés au navigateur.
 - Fichiers déposés chiffrés au repos ; pièces justificatives analysées par un antivirus.
 - Accès au back-office réservé aux administrateurs ; actions sensibles tracées (traitement 7).
-- Secrets (clés Stripe, Henrri, Brevo) hors du code, dans la configuration du serveur ; jamais écrits dans les journaux.
+- Secrets (clés Stripe, Henrri, Mailjet) hors du code, dans la configuration du serveur ; jamais écrits dans les journaux.
 - Sauvegardes quotidiennes et chiffrées (base et fichiers) ; une restauration complète est à tester avant la mise en production (checklist de `docs/DEPLOY.md`).
 - Accès à la base par des rôles distincts au strict nécessaire : le site lit et écrit les données sans pouvoir modifier la structure, les sauvegardes lisent sans pouvoir écrire.
 

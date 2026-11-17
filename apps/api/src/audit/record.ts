@@ -18,7 +18,7 @@ export interface AuditEvent {
   result?: "success" | "failure"
   /** A short code (`henrri.Timeout`), never a message: messages can carry personal data. */
   error?: string | null
-  /** The SMTP message id of an e-mail (story 12.7c): Brevo's reports name it. */
+  /** Our tracking id of an e-mail (story 12.7c): the provider's delivery reports echo it. */
   messageId?: string | null
   /** Kept only outside an order — an order's history is kept 10 years without them. */
   ipAddress?: string | null

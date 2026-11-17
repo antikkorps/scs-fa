@@ -180,8 +180,8 @@ shell, nothing to migrate.
    (+ `AAAA` if the VPS has IPv6.) **The client's mailboxes are at OVH (MX
    Plan)**: keep, unproxied (grey cloud), the three `MX` (`mx1`/`mx2`/`mx3.mail.ovh.net`,
    priorities 1/5/100), the `autodiscover` and `autoconfig` CNAMEs to
-   `mailconfig.ovh.net`, and the SPF TXT (`include:mx.ovh.com`), which Brevo's
-   `include:` joins later in the same record. Compare with the OVH zone (DNS
+   `mailconfig.ovh.net`, and the SPF TXT (`include:mx.ovh.com`), which Mailjet's
+   `include:spf.mailjet.com` joins later in the same record. Compare with the OVH zone (DNS
    zone › text mode) before switching: a missing MX loses incoming mail.
    Query the domain's real servers (`dig MX <domain> @dns200.anycast.me`), not a
    resolver or an old OVH server, which may answer an empty zone.
@@ -536,22 +536,40 @@ back-office, so the DNS can move early.
       Swap all three keys together (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
       `STRIPE_PUBLISHABLE_KEY`): a `pk_test` left beside an `sk_live` fails every
       payment. `just up` recreates both containers. Test one live-mode payment.
-- [ ] **Brevo delivery reports** (story 12.7c): generate a token
-      (`openssl rand -hex 32`) → `BREVO_WEBHOOK_SECRET` in `.env`, then register
-      the transactional webhook — with the account's API key:
+- [ ] **Mailjet account** (client's name): sender domain added and validated
+      (SPF `include:spf.mailjet.com` in the existing SPF record, the DKIM TXT
+      `mailjet._domainkey` Mailjet gives, then a DMARC record); the three
+      newsletter lists created → their ids in `NEWSLETTER_LIST_ID_*`; API key
+      pair → `MAILJET_API_KEY` / `MAILJET_SECRET_KEY` and `SMTP_USER` / `SMTP_PASS`
+      (`SMTP_HOST=in-v3.mailjet.com`); `EMAIL_PROVIDER=mailjet`,
+      `NEWSLETTER_DRIVER=mailjet`.
+- [ ] **Delivery reports** (story 12.7c): generate a secret
+      (`openssl rand -hex 32`) → `EMAIL_WEBHOOK_SECRET` in `.env`, then register
+      one callback per event (`sent`, `bounce`, `blocked`, `spam`); Mailjet sends
+      the URL's credentials as Basic auth, which is how the API checks the secret:
       ```bash
-      curl -X POST https://api.brevo.com/v3/webhooks \
-        -H "api-key: $BREVO_API_KEY" -H "content-type: application/json" \
-        -d '{"type":"transactional","url":"https://www.<DOMAIN>/api/webhooks/brevo",
-             "events":["delivered","hardBounce","blocked","spam","invalid","error"],
-             "auth":{"type":"bearer","token":"<BREVO_WEBHOOK_SECRET>"}}'
+      for event in sent bounce blocked spam; do
+        curl -s -X POST https://api.mailjet.com/v3/REST/eventcallbackurl \
+          --user "$MAILJET_API_KEY:$MAILJET_SECRET_KEY" -H "content-type: application/json" \
+          -d "{\"EventType\":\"$event\",\"Url\":\"https://mailjet:<EMAIL_WEBHOOK_SECRET>@www.<DOMAIN>/api/webhooks/email\"}"
+      done
       ```
       Check end to end: send a password reset to a non-existent address of a
       domain you own; the admin history (or `audit_logs`) must show
       `email.password_reset.hard_bounce` under the same `message_id` as the
-      `…sent` line. If it never arrives, Brevo is not reporting our SMTP
-      Message-ID: look at the webhook payload in the logs (`Brevo report for an
-      e-mail we did not journal`).
+      `…sent` line, then `delivered` for a real address. If nothing arrives,
+      look for `Delivery webhook secret rejected` in the logs (wrong secret in
+      the registered URL) or `Delivery report for an e-mail we did not journal`
+      (an id Mailjet echoed that matches no journal line). Events without our
+      `X-MJ-CustomID` — letters sent from Mailjet's own editor — are dropped
+      silently.
+- [ ] **Mailjet newsletter driver, first run on the real lists**: subscribe and
+      confirm a test address → it appears in its list; withdraw every segment →
+      the contact is gone from Mailjet. (Checked against the account on
+      2026-11-17 with a test list: `managecontact` addforce/unsub, lookup by
+      address, GDPR deletion through `/v4/contacts` run by the driver itself, and
+      an SMTP send whose `X-MJ-CustomID` Mailjet kept. Only the webhook payloads
+      remain unverified: the end-to-end check above settles them.)
 - [ ] **Henrri production** API key in `.env` (`HENRRI_BASE_URL=https://api.henrri.io`,
       `HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`) → `pnpm henrri:check` green. See the
       Henrri section below.

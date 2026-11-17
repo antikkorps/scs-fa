@@ -141,20 +141,26 @@ const envSchema = z.object({
   // setting, like the commission rate above.
   DEFAULT_CHARGES_PCT: z.coerce.number().min(0).max(100).default(0),
 
+  // The e-mail provider behind SMTP_HOST (story 12.7c): picks the adapter that
+  // tags each e-mail with our tracking id and reads its delivery reports
+  // (src/email-delivery/). Unset = no tracking header, the webhook answers 503.
+  EMAIL_PROVIDER: z.enum(["mailjet"]).optional(),
+  // The shared secret the provider presents on POST /api/webhooks/email.
+  EMAIL_WEBHOOK_SECRET: z.string().min(24).optional(),
+
   // Newsletter (Story 11.4). The provider is spoken to through NewsletterService;
   // "memory" is an in-process driver for tests/CI/local (default outside
-  // production). Segments map onto Brevo lists purely through these ids, so a
-  // list can be repointed without a code deploy. The keys are optional at the
-  // schema level and validated by the Brevo driver at startup, so a laptop with
-  // no Brevo account still boots.
-  NEWSLETTER_DRIVER: z.enum(["brevo", "memory"]).optional(),
-  BREVO_API_KEY: z.string().optional(),
-  BREVO_LIST_ID_ARMURERIE: z.coerce.number().int().positive().optional(),
-  BREVO_LIST_ID_COLLECTION: z.coerce.number().int().positive().optional(),
-  BREVO_LIST_ID_GUN_ART: z.coerce.number().int().positive().optional(),
-  // Brevo delivery reports (story 12.7c): the token Brevo sends as
-  // `Authorization: Bearer …`. Unset = the webhook answers 503.
-  BREVO_WEBHOOK_SECRET: z.string().min(24).optional(),
+  // production). Segments map onto the provider's lists purely through these ids,
+  // so a list can be repointed without a code deploy. Keys and ids are optional
+  // at the schema level and checked by the driver at startup, so a laptop with
+  // no provider account still boots.
+  NEWSLETTER_DRIVER: z.enum(["mailjet", "memory"]).optional(),
+  NEWSLETTER_LIST_ID_ARMURERIE: z.coerce.number().int().positive().optional(),
+  NEWSLETTER_LIST_ID_COLLECTION: z.coerce.number().int().positive().optional(),
+  NEWSLETTER_LIST_ID_GUN_ART: z.coerce.number().int().positive().optional(),
+  // Mailjet REST API keys (newsletter lists, GDPR erasure).
+  MAILJET_API_KEY: z.string().optional(),
+  MAILJET_SECRET_KEY: z.string().optional(),
 
   // Gun Art image protection (Story 11.5). The watermark is burnt in server-side
   // — the only measure that survives a screenshot — and the HD original is never
@@ -187,6 +193,13 @@ if (missingBank.length > 0) {
   throw new Error(
     `The bank details are all-or-none. Set ${missingBank.join(", ")}, or leave all four VIREMENT_* empty.`,
   )
+}
+
+// Story 12.7c — production e-mails must be traceable: without the provider no
+// tracking id travels with them, without the secret their reports are refused.
+if (parsed.NODE_ENV === "production") {
+  const missing = (["EMAIL_PROVIDER", "EMAIL_WEBHOOK_SECRET"] as const).filter((name) => !parsed[name])
+  if (missing.length > 0) throw new Error(`Production needs its e-mail delivery reports. Set ${missing.join(", ")}.`)
 }
 
 // Story 12.9b — never run production on the sample values of the committed

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import {
   type AnyLegalDocType,
   CONTACT_SUBJECT_LABELS,
@@ -18,6 +19,7 @@ import {
 } from "@armurier/shared"
 import { createTransport, type SendMailOptions } from "nodemailer"
 import { type AuditEvent, recordAuditEvent } from "./audit/record.js"
+import { deliveryProvider } from "./email-delivery/provider.js"
 import { env } from "./env.js"
 import { loadShopIdentity } from "./shop-identity/service.js"
 
@@ -78,13 +80,17 @@ function smtpErrorCode(error: unknown): string {
   return `smtp.${typeof code === "string" ? code : "unknown"}`
 }
 
+/** A customer e-mail; headers as an object, so the provider's tracking header merges into them. */
+type CustomerMail = Omit<SendMailOptions, "headers"> & { headers?: Record<string, string> }
+
 /**
- * Send a customer e-mail and journal it: sent with its SMTP message id, or
- * failed with the SMTP code. A failure still reaches the caller. A journal
- * line that cannot be written only raises a warning: the e-mail has left,
- * and failing here would make the caller send it again.
+ * Send a customer e-mail and journal it: sent with our tracking id (the
+ * provider echoes it in its delivery reports), or failed with the SMTP code.
+ * A failure still reaches the caller. A journal line that cannot be written
+ * only raises a warning: the e-mail has left, and failing here would make the
+ * caller send it again.
  */
-async function deliver(type: EmailType, about: EmailAbout, mail: SendMailOptions): Promise<void> {
+async function deliver(type: EmailType, about: EmailAbout, mail: CustomerMail): Promise<void> {
   const journal = (event: Pick<AuditEvent, "result" | "error" | "messageId">) =>
     recordAuditEvent({
       ...journalEntity(about),
@@ -97,14 +103,16 @@ async function deliver(type: EmailType, about: EmailAbout, mail: SendMailOptions
       process.emitWarning(`E-mail journal line not written (${type}): ${String(error)}`)
     })
 
-  let info: { messageId?: string } | undefined
+  // Ours rather than the relay's Message-ID: no provider has to echo the latter.
+  const trackingId = randomUUID()
+  const headers = { ...mail.headers, ...deliveryProvider?.trackingHeaders(trackingId) }
   try {
-    info = await transporter.sendMail(mail)
+    await transporter.sendMail({ ...mail, headers })
   } catch (error) {
     await journal({ result: "failure", error: smtpErrorCode(error) })
     throw error
   }
-  await journal({ result: "success", messageId: info?.messageId ?? null })
+  await journal({ result: "success", messageId: trackingId })
 }
 
 export async function sendPasswordResetEmail(to: string, token: string, about: EmailAbout = {}): Promise<void> {

@@ -2,11 +2,12 @@
 import { NEWSLETTER_SEGMENTS, type NewsletterSegment } from "@armurier/shared"
 import type { AdminNewsletterContact, AdminNewsletterSubscription, AdminNewsletterSummary } from "~/types/admin"
 import type { Pagination } from "~/types/pagination"
+import { EMAIL_SERVICE_NAME } from "~/utils/emailService"
 import { formatDate, formatNumber, plural } from "~/utils/format"
 import { NEWSLETTER_STATUS_OPTIONS, newsletterStatus } from "~/utils/status"
 
 // Who is subscribed to which segment, with the proof of each consent. Read-only:
-// letters are written and sent from Brevo, and a subscriber leaves through the
+// letters are written and sent from the e-mail service, and a subscriber leaves through the
 // unsubscribe link of every letter.
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Newsletter — Administration SCS" })
@@ -82,8 +83,8 @@ function statusDate(subscription: AdminNewsletterSubscription): string {
 
 function syncWarning(awaiting: number): string {
   return awaiting > 1
-    ? `${formatNumber(awaiting)} abonnements confirmés ne sont pas encore transmis à Brevo : ils ne recevront pas les lettres tant que la synchronisation n'a pas abouti.`
-    : "1 abonnement confirmé n'est pas encore transmis à Brevo : il ne recevra pas les lettres tant que la synchronisation n'a pas abouti."
+    ? `${formatNumber(awaiting)} abonnements confirmés ne sont pas encore transmis à ${EMAIL_SERVICE_NAME} : ils ne recevront pas les lettres tant que la synchronisation n'a pas abouti.`
+    : `1 abonnement confirmé n'est pas encore transmis à ${EMAIL_SERVICE_NAME} : il ne recevra pas les lettres tant que la synchronisation n'a pas abouti.`
 }
 
 function consentProof(subscription: AdminNewsletterSubscription): string {
@@ -98,7 +99,7 @@ function consentProof(subscription: AdminNewsletterSubscription): string {
       <h1>Newsletter</h1>
       <p class="intro">
         Abonnés par univers, avec la preuve de chaque consentement. Seuls les abonnements confirmés reçoivent les
-        lettres, qui se rédigent et s'envoient depuis Brevo ; un abonné se désinscrit par le lien présent dans chaque
+        lettres, qui se rédigent et s'envoient depuis {{ EMAIL_SERVICE_NAME }} ; un abonné se désinscrit par le lien présent dans chaque
         envoi.
       </p>
     </header>
@@ -169,7 +170,7 @@ function consentProof(subscription: AdminNewsletterSubscription): string {
                   />
                   <span class="sub">{{ statusDate(subscription) }}</span>
                   <span v-if="subscription.status === 'confirmed' && !subscription.synced" class="not-synced">
-                    pas encore chez Brevo
+                    pas encore chez {{ EMAIL_SERVICE_NAME }}
                   </span>
                   <span v-if="consentProof(subscription)" class="sub proof">
                     Consentement : {{ consentProof(subscription) }}

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { clearNuxtData } from "#imports"
 import type { AdminNewsletterContact, AdminNewsletterSummary } from "~/types/admin"
 import type { Pagination } from "~/types/pagination"
+import { EMAIL_SERVICE_NAME } from "~/utils/emailService"
 import Newsletter from "./newsletter.vue"
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }))
@@ -83,10 +84,12 @@ describe("admin/newsletter.vue — who is subscribed to what", () => {
     expect(wrapper.find(".sync-warning").exists()).toBe(false)
   })
 
-  it("warns when confirmations have not reached Brevo yet", async () => {
+  it("warns when confirmations have not reached the e-mail service yet, naming it", async () => {
     respond({ ...SUMMARY, awaitingSync: 2 }, [JEANNE])
     const wrapper = await mountPage()
-    expect(plainText(wrapper.find(".sync-warning").text())).toContain("2 abonnements confirmés ne sont pas")
+    expect(plainText(wrapper.find(".sync-warning").text())).toContain(
+      `2 abonnements confirmés ne sont pas encore transmis à ${EMAIL_SERVICE_NAME}`,
+    )
   })
 
   it("agrees the counts with a single subscriber", async () => {
@@ -110,7 +113,7 @@ describe("admin/newsletter.vue — who is subscribed to what", () => {
     expect(row).toContain("Désabonné")
   })
 
-  it("flags a confirmed subscription that Brevo does not have yet", async () => {
+  it("flags a confirmed subscription that the e-mail service does not have yet", async () => {
     const wrapper = await mountPage()
     expect(wrapper.findAll(".not-synced")).toHaveLength(1)
   })

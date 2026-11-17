@@ -165,12 +165,14 @@ services:
       SMTP_USER:
       SMTP_PASS:
       SMTP_FROM:
+      EMAIL_PROVIDER:
+      EMAIL_WEBHOOK_SECRET:
       NEWSLETTER_DRIVER:
-      BREVO_API_KEY:
-      BREVO_LIST_ID_ARMURERIE:
-      BREVO_LIST_ID_COLLECTION:
-      BREVO_LIST_ID_GUN_ART:
-      BREVO_WEBHOOK_SECRET:
+      NEWSLETTER_LIST_ID_ARMURERIE:
+      NEWSLETTER_LIST_ID_COLLECTION:
+      NEWSLETTER_LIST_ID_GUN_ART:
+      MAILJET_API_KEY:
+      MAILJET_SECRET_KEY:
       # Payments and invoicing
       STRIPE_SECRET_KEY:
       STRIPE_WEBHOOK_SECRET:
@@ -384,7 +386,7 @@ volumes:
 
 # Audit 2026-11-15, M3 — four networks instead of one flat one:
 # - edge: what serves the site (caddy, web, api, umami), with internet access
-#   (Stripe, Henrri, Brevo, S3 for the API).
+#   (Stripe, Henrri, Mailjet, S3 for the API).
 # - data: Postgres and only what reads it; internal, no way out to the internet.
 # - scan: the API and ClamAV, which parses hostile files: it never reaches
 #   Postgres; freshclam needs the internet for the virus signatures.

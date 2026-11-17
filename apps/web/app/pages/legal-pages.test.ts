@@ -3,6 +3,7 @@
 import { CURRENT_TERMS_VERSION, SITE_HOST } from "@armurier/shared"
 import { mountSuspended } from "@nuxt/test-utils/runtime"
 import { describe, expect, it } from "vitest"
+import { EMAIL_SERVICE_NAME } from "~/utils/emailService"
 import { formatDate } from "~/utils/format"
 import Cgv from "./cgv.vue"
 import Confidentialite from "./confidentialite.vue"
@@ -42,10 +43,11 @@ describe("legal pages (story 12.1)", () => {
     expect(processors.find((item) => item.startsWith("Henrri"))).not.toMatch(/e-mail/)
   })
 
-  it("names Brevo as the sender of the service e-mails and the newsletter", async () => {
+  it("names the e-mail service as the sender of the service e-mails and the newsletter", async () => {
     const wrapper = await mountSuspended(Confidentialite)
     const processors = wrapper.findAll("li").map((item) => item.text())
-    expect(processors).toContainEqual(expect.stringMatching(/^Brevo .*e-mails de service.*lettre d'information/))
+    const sender = processors.find((item) => item.startsWith(`${EMAIL_SERVICE_NAME} `))
+    expect(sender).toMatch(/e-mails de service.*lettre d'information/)
     expect(processors.some((item) => item.includes("prestataire d'envoi des e-mails"))).toBe(false)
   })
 
