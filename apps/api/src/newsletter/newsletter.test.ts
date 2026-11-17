@@ -27,8 +27,9 @@ const email = (name: string) => `${EMAIL_PREFIX}-${name}@example.test`
 
 let app: FastifyInstance
 
+// A person's fill time: the robot traps are covered in abuse.test.ts.
 async function subscribe(body: Record<string, unknown>) {
-  return app.inject({ method: "POST", url: "/api/newsletter/subscribe", payload: body })
+  return app.inject({ method: "POST", url: "/api/newsletter/subscribe", payload: { filledInMs: 8000, ...body } })
 }
 
 /** Subscribe and hand back the tokens from the confirmation mail. */

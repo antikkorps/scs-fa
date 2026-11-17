@@ -18,7 +18,14 @@ async function fill(wrapper: Awaited<ReturnType<typeof mountSuspended>>, email: 
   if (consent) await wrapper.find(".nl__consent input").setValue(true)
 }
 
-function body(): { email: string; segments: string[]; consent: boolean; source?: string } {
+function body(): {
+  email: string
+  segments: string[]
+  consent: boolean
+  source?: string
+  website?: string
+  filledInMs?: number
+} {
   const [, options] = (apiMock.mock.calls[0] ?? []) as [string, { body: never }]
   return options.body
 }
@@ -45,6 +52,29 @@ describe("NewsletterSignup", () => {
     expect(body().segments.sort()).toEqual(["armurerie", "collection"])
     expect(body().source).toBe("/armes-de-collection")
     expect(body().consent).toBe(true)
+  })
+
+  it("sends the robot traps: the hidden field, and how long the form took to fill", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    try {
+      const wrapper = await mountSuspended(NewsletterSignup)
+      vi.setSystemTime(Date.now() + 7000)
+      await fill(wrapper, "client@example.test")
+      await wrapper.find("form").trigger("submit")
+      await flushPromises()
+
+      expect(body().website).toBe("")
+      expect(body().filledInMs).toBeGreaterThanOrEqual(7000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("hides its trap from people: off-screen, out of the tab order, silent to screen readers", async () => {
+    const wrapper = await mountSuspended(NewsletterSignup)
+    const trap = wrapper.find(".trap")
+    expect(trap.attributes("aria-hidden")).toBe("true")
+    expect(trap.find("input[name=website]").attributes("tabindex")).toBe("-1")
   })
 
   it("refuses to submit without an explicit consent tick", async () => {

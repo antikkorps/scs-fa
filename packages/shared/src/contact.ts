@@ -1,7 +1,9 @@
 // Audit 2026-11-01 (I8b) — the contact form, decided with Franck: what a
 // visitor sends, how a robot is told apart, how long a message is kept.
-import { z } from "zod"
+
+import { botTrapFields } from "./bot-guard.js"
 import { emailSchema, phoneSchema } from "./validation.js"
+import { z } from "./zod.js"
 
 export const CONTACT_SUBJECTS = ["order", "product", "gun_art", "pro_account", "other"] as const
 export type ContactSubject = (typeof CONTACT_SUBJECTS)[number]
@@ -16,9 +18,6 @@ export const CONTACT_SUBJECT_LABELS: Record<ContactSubject, string> = {
 
 export const CONTACT_STATUSES = ["new", "handled"] as const
 export type ContactStatus = (typeof CONTACT_STATUSES)[number]
-
-/** Below this, the form was filled by a script, not read and typed by a person. */
-export const CONTACT_MIN_FILL_MS = 3000
 
 /** A message goes this long after it was handled (or after receipt, if never handled). */
 export const CONTACT_MESSAGE_RETENTION_YEARS = 1
@@ -36,18 +35,10 @@ export const contactMessageSchema = z
     subject: z.enum(CONTACT_SUBJECTS),
     orderReference: blankToNull.pipe(z.string().max(40).nullable()),
     message: z.string().trim().min(1).max(5000),
-    // Hidden from people, filled by robots (the "honeypot").
-    website: z.string().max(500).optional(),
-    /** Time between the form showing and its sending, measured by the page. */
-    filledInMs: z.number().int().nonnegative().max(86_400_000),
+    ...botTrapFields,
   })
   .strict()
 
 export type ContactMessageInput = z.infer<typeof contactMessageSchema>
-
-/** A robot gives itself away: the hidden field filled, or no time to read the form. */
-export function looksAutomated(input: ContactMessageInput): boolean {
-  return Boolean(input.website?.trim()) || input.filledInMs < CONTACT_MIN_FILL_MS
-}
 
 export const contactStatusSchema = z.object({ status: z.enum(CONTACT_STATUSES) }).strict()
