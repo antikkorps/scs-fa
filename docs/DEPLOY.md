@@ -563,10 +563,13 @@ back-office, so the DNS can move early.
       (an id Mailjet echoed that matches no journal line). Events without our
       `X-MJ-CustomID` — letters sent from Mailjet's own editor — are dropped
       silently.
-- [ ] **Mailjet newsletter driver, first real run**: subscribe and confirm a
-      test address → it appears in its list in Mailjet; withdraw every segment
-      → the contact is gone from Mailjet (GDPR deletion). Both calls were written
-      from the API docs and only tested against stubs until then.
+- [ ] **Mailjet newsletter driver, first run on the real lists**: subscribe and
+      confirm a test address → it appears in its list; withdraw every segment →
+      the contact is gone from Mailjet. (Checked against the account on
+      2026-11-17 with a test list: `managecontact` addforce/unsub, lookup by
+      address, GDPR deletion through `/v4/contacts` run by the driver itself, and
+      an SMTP send whose `X-MJ-CustomID` Mailjet kept. Only the webhook payloads
+      remain unverified: the end-to-end check above settles them.)
 - [ ] **Henrri production** API key in `.env` (`HENRRI_BASE_URL=https://api.henrri.io`,
       `HENRRI_CLIENT_ID`, `HENRRI_CLIENT_SECRET`) → `pnpm henrri:check` green. See the
       Henrri section below.
