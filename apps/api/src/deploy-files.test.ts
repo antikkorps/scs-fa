@@ -111,6 +111,15 @@ describe("justfile — the whole .env is checked before anything starts", () => 
   })
 })
 
+describe("justfile — psql-ro, a shell for looking only", () => {
+  it("opens the same database as psql, with every transaction read-only", () => {
+    const [psql] = recipe(JUSTFILE, "psql")
+    const [readOnly] = recipe(JUSTFILE, "psql-ro")
+    expect(readOnly).toContain('PGOPTIONS="-c default_transaction_read_only=on"')
+    expect(readOnly).toContain(psql?.slice(psql.indexOf("postgres psql")))
+  })
+})
+
 describe("justfile — migrations", () => {
   it("rebuilds the migrate image before applying, or new migrations never ship", () => {
     const runs = JUSTFILE.split("\n").filter((line) => line.includes("--profile migrate run"))

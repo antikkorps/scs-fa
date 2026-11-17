@@ -107,6 +107,12 @@ restart service="caddy":
 psql:
     {{ compose }} exec postgres psql -U ${POSTGRES_USER:-armurier} -d ${POSTGRES_DB:-armurier_prod}
 
+# A safety net against a slip, not a security barrier: `SET default_transaction_read_only = off`
+# lifts it. For looking, not editing.
+# Open a read-only psql shell on the database: every transaction refuses to write
+psql-ro:
+    {{ compose }} exec -e PGOPTIONS="-c default_transaction_read_only=on" postgres psql -U ${POSTGRES_USER:-armurier} -d ${POSTGRES_DB:-armurier_prod}
+
 # On-demand backup (same path the cron uses): the encrypted dump, then the objects
 backup:
     {{ compose }} run --rm backup backup.sh
