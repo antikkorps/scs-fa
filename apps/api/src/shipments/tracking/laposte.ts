@@ -8,7 +8,7 @@ const REQUEST_TIMEOUT_MS = 10_000
 
 /**
  * La Poste "Suivi v2", spoken over plain `fetch` — one endpoint does not justify
- * a dependency to quarantine and upgrade forever (same call as the Brevo driver).
+ * a dependency to quarantine and upgrade forever (same call as the newsletter driver).
  *
  * One key covers THREE of our carriers: the v2 service harmonises tracked mail,
  * Colissimo and Chronopost behind a single tracking number.

@@ -2369,7 +2369,7 @@ export const auditLogs = pgTable(
     reqId: varchar("req_id", { length: 200 }),
     result: auditResultEnum("result").notNull().default("success"),
     error: varchar("error", { length: 100 }),
-    // Story 12.7c : l'identifiant SMTP d'un e-mail, pour rattacher les retours Brevo à son envoi.
+    // Story 12.7c : notre identifiant de suivi d'un e-mail, pour rattacher les retours du service d'envoi à son envoi.
     messageId: varchar("message_id", { length: 255 }),
 
     // clock_timestamp(), pas now() : les événements d'une même transaction
@@ -2562,7 +2562,7 @@ export const newsletterSubscriptions = pgTable(
     consentIp: varchar("consent_ip", { length: 45 }),
     consentUserAgent: text("consent_user_agent"),
     // Dernière synchronisation réussie vers le fournisseur d'envoi. Notre base
-    // reste la source de vérité : un échec Brevo ne bloque pas le consentement.
+    // reste la source de vérité : un échec du fournisseur ne bloque pas le consentement.
     providerSyncedAt: timestamp("provider_synced_at"),
   },
   (t) => [

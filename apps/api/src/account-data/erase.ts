@@ -111,7 +111,7 @@ export interface ErasedAccount {
  * What only the account's address links to: its newsletter consent and the
  * messages sent from it. Erased only once the address is confirmed (audit
  * 2026-11-15, M1): whoever signed up with someone else's address must not wipe
- * their data. True when a newsletter address was erased (Brevo follows).
+ * their data. True when a newsletter address was erased (the provider follows).
  */
 async function eraseAddressLinkedData(
   tx: Tx,

@@ -31,6 +31,8 @@ const REAL_PRODUCTION = {
   VIREMENT_BIC: "AGRIFRPP",
   VIREMENT_BANK_NAME: "Banque",
   VIREMENT_ACCOUNT_HOLDER: "SCS Firearms SAS",
+  EMAIL_PROVIDER: "mailjet",
+  EMAIL_WEBHOOK_SECRET: "4c1d8e7f2a9b3c6d5e0f1a2b3c4d5e6f",
 }
 
 function loadEnv(overrides: Record<string, string>, omitted: readonly string[] = []) {
@@ -45,6 +47,16 @@ function loadEnv(overrides: Record<string, string>, omitted: readonly string[] =
 }
 
 afterAll(() => rmSync(emptyDir, { recursive: true, force: true }))
+
+describe("production e-mail delivery reports (story 12.7c)", () => {
+  it("refuses to start without the provider or its webhook secret: e-mails would leave untracked", () => {
+    for (const missing of ["EMAIL_PROVIDER", "EMAIL_WEBHOOK_SECRET"]) {
+      const { status, output } = loadEnv({}, [missing])
+      expect(status, missing).not.toBe(0)
+      expect(output).toContain(missing)
+    }
+  }, 30_000)
+})
 
 describe("production environment (story 12.9b)", () => {
   it("starts with real values", () => {

@@ -18,7 +18,7 @@ describe("isSampleValue (story 12.9b)", () => {
       "replace-me-with-a-very-long-secret-key-min-32-chars",
       "sk_live_your-stripe-secret-key",
       "whsec_your-webhook-signing-secret",
-      "xkeysib-your-brevo-api-key",
+      "your-mailjet-api-key",
     ]) {
       expect(isSampleValue(value), value).toBe(true)
     }
@@ -39,14 +39,14 @@ describe("sampleValueProblems (story 12.9b)", () => {
     const problems = sampleValueProblems({
       ...REAL,
       JWT_SECRET: "CHANGE-ME-very-long-secret-min-32-chars",
-      BREVO_WEBHOOK_SECRET: "change-me-openssl-rand-hex-32",
+      EMAIL_WEBHOOK_SECRET: "change-me-openssl-rand-hex-32",
       UMAMI_APP_SECRET: "CHANGE-ME-openssl-rand-hex-32",
       ADMIN_SEED_PASSWORD: "CHANGE-ME-strong-admin-password",
       S3_SECRET_KEY: "your-scw-secret-key",
     })
     expect(problems).toEqual([
       "JWT_SECRET",
-      "BREVO_WEBHOOK_SECRET",
+      "EMAIL_WEBHOOK_SECRET",
       "UMAMI_APP_SECRET",
       "ADMIN_SEED_PASSWORD",
       "S3_SECRET_KEY",
