@@ -1150,7 +1150,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] I9 back-office : tiroir de vérification d'une pièce sans la commande ni l'arme, ni aperçu ; codes bruts (« clean ») ; recherche de commande par référence — le tiroir liste les commandes en cours du client qui attendent ce type de pièce (référence cliquable, date, statut, armes concernées et leur catégorie ; pièce d'un compte pro : « elle sert à accepter ses devis ») ; **aperçu des photos dans le tiroir, PDF dans un nouvel onglet** (décision Franck 2026-11-04 : pas d'élargissement de la CSP pour une pièce d'identité) ; aucun lien tant que l'antivirus n'est pas passé (« Fichier consultable après l'analyse antivirus ») ; antivirus en clair (« Sain », « Analyse en cours », « Infecté ») ; la recherche des commandes accepte la référence (`0B7D1F3E`, `#0B7D1F3E`, minuscules) en plus de l'e-mail
 - [x] Retours de Franck sur l'admin (PR #209) : dates sur une ligne et e-mails coupés dans les listes, actions en icônes avec infobulle, champs du simulateur alignés
 
-**Story 12.13** — Univers Chasse et Coutellerie — 📝 **CADRÉE** (décisions de Franck le 2026-11-15) _(demande de Fred, transmise par Franck le 2026-11-15)_
+**Story 12.13** — Univers Chasse et Coutellerie — ✅ **LIVRÉE** sauf 12.13d (#259, #261, 2026-11-15) — 📝 cadrée (décisions de Franck le 2026-11-15) _(demande de Fred, transmise par Franck le 2026-11-15)_
 
 > Besoin : deux nouvelles zones du site, une **zone chasse** et une **zone couteaux**. Réponses de Fred (via Franck, 2026-11-15) : comme le reste, plusieurs produits de plusieurs fournisseurs ; **d'autres fournisseurs et d'autres imports** que l'armurerie actuelle ; **couteaux réservés aux plus de 18 ans** ; deux entrées de menu de premier niveau avec une page d'accueil éditoriale chacune ; **à prévoir dès maintenant** (avant l'ouverture).
 >
@@ -1167,7 +1167,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 
 **Décisions à prendre**
 - [x] **D1 — Facette `usage`** pour le tag `chasse` (proposé) ou réemploi de la facette `caracteristique` (pas de migration, mais mélange « ce que c'est » et « à quoi ça sert ») ✅ _(Franck 2026-11-15 : facette `usage`)_
-- [ ] **D2 — Contrôle d'âge 18 ans** (couteaux, et du même coup tout article marqué 18 ans sans pièce exigée) :
+- [x] **D2 — Contrôle d'âge 18 ans** (couteaux, et du même coup tout article marqué 18 ans sans pièce exigée) :
   - (a) case « Je certifie avoir 18 ans révolus » au moment de commander, enregistrée avec la commande (date, version du texte) — léger, déclaratif ;
   - (b) **date de naissance demandée une fois** (compte) + vérification ≥ 18 ans à la commande d'un article concerné, conservée avec la commande — plus solide, une donnée personnelle de plus (registre RGPD) — **proposé** ;
   - (c) pièce d'identité vérifiée comme pour B/C — le plus sûr, mais lourd pour un couteau.
@@ -1176,9 +1176,9 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **D4 — Catégories en plus pour la chasse** : selon la liste des produits de Fred ✅ _(Franck 2026-11-15 : **pas de nouvelle catégorie, des tags** pour les sortes de produits de chasse ; un article hors des catégories actuelles — vêtement, appeau… — va dans « Autres accessoires » avec ses tags)_
 
 **Découpage proposé (une PR par lot)**
-- [ ] 12.13a — Schéma et catalogue : catégorie `coutellerie`, facette `usage` + tag `chasse`, référentiels ; colonnes du classeur d'import (catégorie, tags) qui les acceptent
-- [ ] 12.13b — Pages `/chasse` et `/coutellerie`, menu, pied de page, sitemap, `llms.txt`, SEO
-- [ ] 12.13c — Contrôle d'âge 18 ans à la commande (selon D2), mention dans les CGV et la FAQ réglementaire
+- [x] 12.13a — Schéma et catalogue : catégorie `coutellerie`, facette `usage` + tag `chasse`, référentiels ; colonnes du classeur d'import (catégorie, tags) qui les acceptent
+- [x] 12.13b — Pages `/chasse` et `/coutellerie`, menu, pied de page, sitemap, `llms.txt`, SEO
+- [x] 12.13c — Contrôle d'âge 18 ans à la commande (selon D2), mention dans les CGV et la FAQ réglementaire
 - [ ] 12.13d — Adaptateurs des nouveaux fournisseurs, au fur et à mesure des fichiers reçus
 
 **Questions pour Fred**
