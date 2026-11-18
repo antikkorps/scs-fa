@@ -16,6 +16,8 @@ const {
   sendNewsletterConfirmationEmail,
   sendPasswordResetEmail,
   sendOrderConfirmationEmail,
+  sendSignupAddressTakenEmail,
+  sendSignupWelcomeEmail,
   sendTransferReminderEmail,
   sendUnpaidOrderCancelledEmail,
 } = await import("./email.js")
@@ -163,6 +165,36 @@ describe("sendLoginCodeEmail (story 12.8a)", () => {
     expect(mail.text).toContain("changez-le")
     // Mail filters open links on their own: a link would be spent before the agent reads it.
     expect(mail.html).not.toMatch(/<a\s/i)
+  })
+})
+
+describe("sign-up e-mails (story 12.14)", () => {
+  type Mail = { to: string; subject: string; text: string }
+  const lastMail = () => sendMail.mock.calls.at(-1)?.[0] as Mail
+
+  it("welcomes a new account and sends it to the login, where the code confirms the address", async () => {
+    await sendSignupWelcomeEmail("jean@example.fr")
+    const mail = lastMail()
+
+    expect(mail.to).toBe("jean@example.fr")
+    expect(mail.text).toMatch(/\/connexion\b/)
+    expect(mail.text).toContain("première connexion")
+  })
+
+  it("tells the owner of a taken address that nothing was created, with the login and the reset", async () => {
+    await sendSignupAddressTakenEmail("jean@example.fr")
+    const mail = lastMail()
+
+    expect(mail.text).toContain("nous n'en avons pas créé d'autre")
+    expect(mail.text).toMatch(/\/connexion\b/)
+    expect(mail.text).toContain("/mot-de-passe-oublie")
+    expect(mail.text).not.toContain("professionnel")
+  })
+
+  it("says a pro request was not filed when the taken address came with one", async () => {
+    await sendSignupAddressTakenEmail("jean@example.fr", {}, { pro: true })
+
+    expect(lastMail().text).toContain("votre demande de compte professionnel n'a pas été enregistrée")
   })
 })
 

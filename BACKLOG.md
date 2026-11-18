@@ -1150,7 +1150,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] I9 back-office : tiroir de vérification d'une pièce sans la commande ni l'arme, ni aperçu ; codes bruts (« clean ») ; recherche de commande par référence — le tiroir liste les commandes en cours du client qui attendent ce type de pièce (référence cliquable, date, statut, armes concernées et leur catégorie ; pièce d'un compte pro : « elle sert à accepter ses devis ») ; **aperçu des photos dans le tiroir, PDF dans un nouvel onglet** (décision Franck 2026-11-04 : pas d'élargissement de la CSP pour une pièce d'identité) ; aucun lien tant que l'antivirus n'est pas passé (« Fichier consultable après l'analyse antivirus ») ; antivirus en clair (« Sain », « Analyse en cours », « Infecté ») ; la recherche des commandes accepte la référence (`0B7D1F3E`, `#0B7D1F3E`, minuscules) en plus de l'e-mail
 - [x] Retours de Franck sur l'admin (PR #209) : dates sur une ligne et e-mails coupés dans les listes, actions en icônes avec infobulle, champs du simulateur alignés
 
-**Story 12.13** — Univers Chasse et Coutellerie — 📝 **CADRÉE** (décisions de Franck le 2026-11-15) _(demande de Fred, transmise par Franck le 2026-11-15)_
+**Story 12.13** — Univers Chasse et Coutellerie — ✅ **LIVRÉE** sauf 12.13d (#259, #261, 2026-11-15) — 📝 cadrée (décisions de Franck le 2026-11-15) _(demande de Fred, transmise par Franck le 2026-11-15)_
 
 > Besoin : deux nouvelles zones du site, une **zone chasse** et une **zone couteaux**. Réponses de Fred (via Franck, 2026-11-15) : comme le reste, plusieurs produits de plusieurs fournisseurs ; **d'autres fournisseurs et d'autres imports** que l'armurerie actuelle ; **couteaux réservés aux plus de 18 ans** ; deux entrées de menu de premier niveau avec une page d'accueil éditoriale chacune ; **à prévoir dès maintenant** (avant l'ouverture).
 >
@@ -1167,7 +1167,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 
 **Décisions à prendre**
 - [x] **D1 — Facette `usage`** pour le tag `chasse` (proposé) ou réemploi de la facette `caracteristique` (pas de migration, mais mélange « ce que c'est » et « à quoi ça sert ») ✅ _(Franck 2026-11-15 : facette `usage`)_
-- [ ] **D2 — Contrôle d'âge 18 ans** (couteaux, et du même coup tout article marqué 18 ans sans pièce exigée) :
+- [x] **D2 — Contrôle d'âge 18 ans** (couteaux, et du même coup tout article marqué 18 ans sans pièce exigée) :
   - (a) case « Je certifie avoir 18 ans révolus » au moment de commander, enregistrée avec la commande (date, version du texte) — léger, déclaratif ;
   - (b) **date de naissance demandée une fois** (compte) + vérification ≥ 18 ans à la commande d'un article concerné, conservée avec la commande — plus solide, une donnée personnelle de plus (registre RGPD) — **proposé** ;
   - (c) pièce d'identité vérifiée comme pour B/C — le plus sûr, mais lourd pour un couteau.
@@ -1176,9 +1176,9 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] **D4 — Catégories en plus pour la chasse** : selon la liste des produits de Fred ✅ _(Franck 2026-11-15 : **pas de nouvelle catégorie, des tags** pour les sortes de produits de chasse ; un article hors des catégories actuelles — vêtement, appeau… — va dans « Autres accessoires » avec ses tags)_
 
 **Découpage proposé (une PR par lot)**
-- [ ] 12.13a — Schéma et catalogue : catégorie `coutellerie`, facette `usage` + tag `chasse`, référentiels ; colonnes du classeur d'import (catégorie, tags) qui les acceptent
-- [ ] 12.13b — Pages `/chasse` et `/coutellerie`, menu, pied de page, sitemap, `llms.txt`, SEO
-- [ ] 12.13c — Contrôle d'âge 18 ans à la commande (selon D2), mention dans les CGV et la FAQ réglementaire
+- [x] 12.13a — Schéma et catalogue : catégorie `coutellerie`, facette `usage` + tag `chasse`, référentiels ; colonnes du classeur d'import (catégorie, tags) qui les acceptent
+- [x] 12.13b — Pages `/chasse` et `/coutellerie`, menu, pied de page, sitemap, `llms.txt`, SEO
+- [x] 12.13c — Contrôle d'âge 18 ans à la commande (selon D2), mention dans les CGV et la FAQ réglementaire
 - [ ] 12.13d — Adaptateurs des nouveaux fournisseurs, au fur et à mesure des fichiers reçus
 
 **Questions pour Fred**
@@ -1186,6 +1186,23 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [ ] Un fichier de tarifs par nouveau fournisseur (pour écrire les adaptateurs)
 - [ ] Textes d'introduction des deux pages (ou premier jet rédigé de notre côté, à relire)
 - [ ] Articles de coutellerie à exclure, et catégorie légale de chaque sorte (D3)
+
+**Story 12.14** — Inscription sans énumération — ✅ **CODÉE** (2026-11-18) _(relevée par la revue de #268, design validé par Franck le 2026-11-16)_
+
+> Avant : `POST /auth/register` répondait **409** quand l'adresse avait déjà un compte, et le BFF enchaînait une connexion automatique : deux façons de savoir si une adresse est cliente (avant l'ouverture : si elle est administrateur). Pas urgent tant que `/register` est derrière `requireShopOpen`, à corriger avant l'ouverture.
+
+- [x] Réponse **toujours identique** : `202 { message }`, adresse libre ou prise ; **plus de connexion automatique** après l'inscription (la page dit « Vérifiez votre boîte mail » et renvoie vers la connexion, en gardant le retour vers le panier)
+- [x] Adresse libre → compte créé + mail « bienvenue, connectez-vous » ; le code de la première connexion confirme l'adresse (M1, inchangé)
+- [x] Adresse prise → **rien n'est créé**, mail « quelqu'un a voulu créer un compte avec votre adresse » (liens connexion et mot de passe oublié) + ligne de journal `user.signup_on_taken_address`
+- [x] Inscription pro : même traitement pour l'e-mail ; un **SIRET déjà détenu** reste signalé (409), le registre étant public ; le reçu de la demande et l'alerte à SCS partent après la réponse
+- [x] Parité de temps : hash argon2 dans les deux cas, mails et journal **après** la réponse (comme #268) ; une course entre deux inscriptions simultanées retombe sur le cas « adresse prise »
+- [ ] **Reste ouvert, DIFFÉRÉ (Franck, 2026-11-18) : la connexion trahit encore l'existence** (relevé par la revue) : un attaquant inscrit `victime@x` avec un mot de passe à lui, puis se connecte avec. Si l'adresse était libre, le compte existe désormais avec ce mot de passe et la connexion répond « code envoyé » (200) ; si elle était prise, elle répond 401. Corriger demande de toucher `/login` (par ex. répondre « code envoyé » même à un mauvais mot de passe sur un compte existant). **Inexploitable avant l'ouverture** (`/register` fermé par `requireShopOpen`) ; à faire **avant l'ouverture**, une fois Fred et Stéphane installés sur leurs comptes, pour ne pas casser leur connexion pendant la saisie.
+- [ ] Reste ouvert, faible : écart de temps résiduel. Une adresse libre attend l'insertion du compte (et, en pro, toute la transaction) avant la réponse ; une adresse prise, un seul SELECT. Quelques millisecondes, noyées dans la gigue d'argon2 sur une requête, mais mesurables en moyenne ; **plus marqué en pro** (une transaction d'environ 8 allers-retours contre 2 lectures, audit de #275). Piste : créer le compte après la réponse.
+- [x] **Audit de #275** : un caractère NUL (refusé par Postgres) faisait échouer l'insertion d'une adresse libre seulement → 500 contre 202, un oracle exact. Désormais **toute** erreur inattendue du chemin « adresse libre » est journalisée et la réponse reste 202 (seul le SIRET détenu répond autrement) ; inscription particulier en transaction (compte + journal) ; course testée sur les deux routes ; contenu des deux mails testé
+- [ ] Faible, hors story : un NUL ou un caractère de contrôle dans un champ texte (nom, raison sociale…) donne encore un 500 ailleurs (profil, adresses…). Piste : un `plainText()` partagé dans `packages/shared` qui les refuse en 400.
+- [ ] Faible, DRY : la normalisation de l'e-mail (`.trim().toLowerCase()`) est recopiée dans register, pro signup, login et forgot-password ; la faire dans `emailSchema` (packages/shared).
+- [x] Test de la route BFF `register.post.ts` (premier test de route serveur : les auto-imports de Nitro sont fournis en globals)
+- [ ] Reste ouvert : rien ne limite le nombre de mails « adresse prise » envoyés à une même adresse (seule la limite de 5 inscriptions par minute et par IP s'applique). À reprendre si un abus apparaît.
 
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 

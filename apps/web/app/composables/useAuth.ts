@@ -20,7 +20,7 @@ export type LoginOutcome =
   | { status: "signed_in"; user: AuthUser }
   | { status: "code_required"; method: LoginMethod; expiresIn: number; enrollment?: LoginEnrolment }
 
-/** What the BFF answers a login or a sign-up: a session, or the second step to ask for. */
+/** What the BFF answers a login: a session, or the second step to ask for. */
 type LoginAnswer =
   | { user: AuthUser }
   | { codeRequired: true; method: LoginMethod; expiresIn: number; enrollment?: LoginEnrolment }
@@ -59,10 +59,10 @@ export function useAuth() {
     await $fetch("/bff/auth/login/resend", { method: "POST" })
   }
 
-  // Audit 2026-11-15 (M1): a new address is confirmed by the mailed code
-  // before the first session, so a sign-up answers like a login.
-  async function register(input: RegisterInput): Promise<LoginOutcome> {
-    return toOutcome(await $fetch<LoginAnswer>("/bff/auth/register", { method: "POST", body: input }))
+  // No session after a sign-up (no enumeration): the first login sends the
+  // code that confirms the address (audit 2026-11-15, M1).
+  async function register(input: RegisterInput): Promise<void> {
+    await $fetch("/bff/auth/register", { method: "POST", body: input })
   }
 
   async function logout(): Promise<void> {
