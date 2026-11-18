@@ -1187,6 +1187,20 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [ ] Textes d'introduction des deux pages (ou premier jet rédigé de notre côté, à relire)
 - [ ] Articles de coutellerie à exclure, et catégorie légale de chaque sorte (D3)
 
+**Story 12.14** — Inscription sans énumération — ✅ **CODÉE** (2026-11-18) _(relevée par la revue de #268, design validé par Franck le 2026-11-16)_
+
+> Avant : `POST /auth/register` répondait **409** quand l'adresse avait déjà un compte, et le BFF enchaînait une connexion automatique : deux façons de savoir si une adresse est cliente (avant l'ouverture : si elle est administrateur). Pas urgent tant que `/register` est derrière `requireShopOpen`, à corriger avant l'ouverture.
+
+- [x] Réponse **toujours identique** : `202 { message }`, adresse libre ou prise ; **plus de connexion automatique** après l'inscription (la page dit « Vérifiez votre boîte mail » et renvoie vers la connexion, en gardant le retour vers le panier)
+- [x] Adresse libre → compte créé + mail « bienvenue, connectez-vous » ; le code de la première connexion confirme l'adresse (M1, inchangé)
+- [x] Adresse prise → **rien n'est créé**, mail « quelqu'un a voulu créer un compte avec votre adresse » (liens connexion et mot de passe oublié) + ligne de journal `user.signup_on_taken_address`
+- [x] Inscription pro : même traitement pour l'e-mail ; un **SIRET déjà détenu** reste signalé (409), le registre étant public ; le reçu de la demande et l'alerte à SCS partent après la réponse
+- [x] Parité de temps : hash argon2 dans les deux cas, mails et journal **après** la réponse (comme #268) ; une course entre deux inscriptions simultanées retombe sur le cas « adresse prise »
+- [ ] **Reste ouvert, à décider avec Franck : la connexion trahit encore l'existence** (relevé par la revue) : un attaquant inscrit `victime@x` avec un mot de passe à lui, puis se connecte avec. Si l'adresse était libre, le compte existe désormais avec ce mot de passe et la connexion répond « code envoyé » (200) ; si elle était prise, elle répond 401. Corriger demande de toucher `/login` (par ex. répondre « code envoyé » même à un mauvais mot de passe sur un compte existant).
+- [ ] Reste ouvert, faible : écart de temps résiduel. Une adresse libre attend l'insertion du compte (et, en pro, toute la transaction) avant la réponse ; une adresse prise, un seul SELECT. Quelques millisecondes, noyées dans la gigue d'argon2 sur une requête, mais mesurables en moyenne. Piste : créer le compte après la réponse.
+- [ ] Pas de test de la route BFF `register.post.ts` (aucun test de route serveur dans le projet aujourd'hui).
+- [ ] Reste ouvert : rien ne limite le nombre de mails « adresse prise » envoyés à une même adresse (seule la limite de 5 inscriptions par minute et par IP s'applique). À reprendre si un abus apparaît.
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).

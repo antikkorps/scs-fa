@@ -1,11 +1,26 @@
 import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
 import { auditLogs, users } from "../db/schema.js"
+import { sendSignupAddressTakenEmail, sendSignupWelcomeEmail } from "../email.js"
+import { hashPassword } from "./password.js"
+
+vi.mock("./password.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./password.js")>()
+  return { ...original, hashPassword: vi.fn(original.hashPassword) }
+})
+vi.mock("../email.js", () => ({
+  sendSignupWelcomeEmail: vi.fn().mockResolvedValue(undefined),
+  sendSignupAddressTakenEmail: vi.fn().mockResolvedValue(undefined),
+}))
 
 const TEST_EMAIL_SUFFIX = "@register-test.local"
+
+const CHECK_INBOX = { message: "Check your inbox to continue." }
+// The e-mails leave after the answer: room for a loaded CI runner.
+const WAIT = { timeout: 5_000 }
 
 const validPayload = (email: string) => ({
   email,
@@ -24,6 +39,7 @@ describe("POST /api/auth/register", () => {
   })
 
   afterEach(async () => {
+    vi.clearAllMocks()
     const stale = await db
       .select({ id: users.id })
       .from(users)
@@ -39,60 +55,90 @@ describe("POST /api/auth/register", () => {
     await app.close()
   })
 
-  it("creates a user and returns 201 with the public profile", async () => {
-    const email = `success-${Date.now()}${TEST_EMAIL_SUFFIX}`
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/auth/register",
-      payload: validPayload(email),
-    })
+  const register = (email: string) =>
+    app.inject({ method: "POST", url: "/api/auth/register", payload: validPayload(email) })
 
-    expect(res.statusCode).toBe(201)
-    const body = res.json()
-    expect(body).toMatchObject({
-      email,
-      firstName: "Jean",
-      lastName: "Dupont",
-      role: "customer",
-    })
-    expect(body.id).toMatch(/^[0-9a-f-]{36}$/)
-    expect(body.passwordHash).toBeUndefined()
+  // Story "sign-up without enumeration": a free address and a taken one get
+  // the same answer; only the mailbox learns which case it was.
+  it("creates the account, answers 202 without the profile, and welcomes the address", async () => {
+    const email = `success-${Date.now()}${TEST_EMAIL_SUFFIX}`
+    const res = await register(email)
+
+    expect(res.statusCode).toBe(202)
+    expect(res.json()).toEqual(CHECK_INBOX)
 
     const [row] = await db.select().from(users).where(eq(users.email, email))
     expect(row.passwordHash).not.toBe("MotDePasseTresLong123!")
     expect(row.passwordHash.startsWith("$argon2id$")).toBe(true)
     expect(row.rgpdConsentAt).toBeInstanceOf(Date)
     expect(row.rgpdConsentVersion).toBe("1.0")
+    await vi.waitFor(() => expect(sendSignupWelcomeEmail).toHaveBeenCalledWith(email, { userId: row.id }), WAIT)
+    expect(sendSignupAddressTakenEmail).not.toHaveBeenCalled()
   })
 
   it("normalizes email to lowercase", async () => {
     const email = `MixedCase-${Date.now()}${TEST_EMAIL_SUFFIX}`
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/auth/register",
-      payload: validPayload(email),
-    })
+    expect((await register(email)).statusCode).toBe(202)
 
-    expect(res.statusCode).toBe(201)
-    expect(res.json().email).toBe(email.toLowerCase())
+    const [row] = await db.select({ id: users.id }).from(users).where(eq(users.email, email.toLowerCase()))
+    expect(row).toBeDefined()
   })
 
-  it("returns 409 on duplicate email", async () => {
+  it("answers a taken address exactly like a free one, creates nothing and warns its owner", async () => {
     const email = `dup-${Date.now()}${TEST_EMAIL_SUFFIX}`
-    const first = await app.inject({
-      method: "POST",
-      url: "/api/auth/register",
-      payload: validPayload(email),
-    })
-    expect(first.statusCode).toBe(201)
+    await register(email)
+    const [owner] = await db.select().from(users).where(eq(users.email, email))
+    vi.mocked(sendSignupWelcomeEmail).mockClear()
 
-    const second = await app.inject({
-      method: "POST",
-      url: "/api/auth/register",
-      payload: validPayload(email),
-    })
-    expect(second.statusCode).toBe(409)
-    expect(second.json().error).toBe("EmailAlreadyRegistered")
+    const second = await register(email.toUpperCase())
+
+    expect(second.statusCode).toBe(202)
+    expect(second.json()).toEqual(CHECK_INBOX)
+    const rows = await db.select().from(users).where(eq(users.email, email))
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.passwordHash).toBe(owner?.passwordHash)
+    await vi.waitFor(
+      () => expect(sendSignupAddressTakenEmail).toHaveBeenCalledWith(email, { userId: owner?.id }, {}),
+      WAIT,
+    )
+    expect(sendSignupWelcomeEmail).not.toHaveBeenCalled()
+    await vi.waitFor(async () => {
+      const events = await db
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.userId, owner?.id ?? ""))
+      expect(events.map((event) => event.action)).toContain("user.signup_on_taken_address")
+    }, WAIT)
+  })
+
+  it("does not wait for the e-mail: a slow relay cannot tell a taken address by the delay", async () => {
+    const email = `slow-${Date.now()}${TEST_EMAIL_SUFFIX}`
+    await register(email)
+    const never = new Promise<void>(() => {})
+    vi.mocked(sendSignupAddressTakenEmail).mockImplementationOnce(() => never)
+
+    const res = await register(email)
+
+    expect(res.statusCode).toBe(202)
+  })
+
+  it("does not wait for the welcome e-mail either", async () => {
+    const never = new Promise<void>(() => {})
+    vi.mocked(sendSignupWelcomeEmail).mockImplementationOnce(() => never)
+
+    const res = await register(`slow-welcome-${Date.now()}${TEST_EMAIL_SUFFIX}`)
+
+    expect(res.statusCode).toBe(202)
+  })
+
+  it("hashes the password for a taken address too, so both answers cost the same", async () => {
+    const email = `cost-${Date.now()}${TEST_EMAIL_SUFFIX}`
+    await register(email)
+    vi.mocked(hashPassword).mockClear()
+
+    await register(email)
+
+    expect(hashPassword).toHaveBeenCalledOnce()
   })
 
   it("returns 400 on weak password", async () => {

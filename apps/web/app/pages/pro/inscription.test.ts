@@ -37,7 +37,7 @@ async function fillValidForm(wrapper: Awaited<ReturnType<typeof mountSuspended>>
 
 describe("pro/inscription.vue (story 12.8b)", () => {
   it("files the request and says what happens next, without logging in", async () => {
-    signup.mockResolvedValue({ data: { id: "u1" } })
+    signup.mockResolvedValue({ message: "Check your inbox to continue." })
     const wrapper = await mountSuspended(ProInscription)
     await fillValidForm(wrapper)
 
@@ -48,6 +48,8 @@ describe("pro/inscription.vue (story 12.8b)", () => {
       expect.objectContaining({ siret: "73282932000074", organisationType: "armurier", email: "jeanne@armurerie.fr" }),
     )
     expect(wrapper.text()).toContain("Demande envoyée")
+    // Sign-up without enumeration: the same words whether the address had an account or not.
+    expect(wrapper.text()).toContain("Vérifiez votre boîte mail")
     expect(wrapper.find('a[href="/connexion"]').exists()).toBe(true)
     expect(navigateToMock).not.toHaveBeenCalled()
   })
@@ -71,17 +73,6 @@ describe("pro/inscription.vue (story 12.8b)", () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain("Ce SIRET appartient déjà à un compte professionnel validé")
-  })
-
-  it("explains a taken e-mail and points to the request from an account", async () => {
-    signup.mockRejectedValue({ response: { status: 409 }, data: { error: "EmailAlreadyRegistered" } })
-    const wrapper = await mountSuspended(ProInscription)
-    await fillValidForm(wrapper)
-
-    await wrapper.find("form").trigger("submit")
-    await flushPromises()
-
-    expect(wrapper.text()).toContain("Un compte existe déjà avec cette adresse")
   })
 
   it("sends a signed-in visitor to their account, where the request lives", async () => {

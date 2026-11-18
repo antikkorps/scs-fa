@@ -93,6 +93,16 @@ export interface RequestContext {
   userAgent: string | null
 }
 
+/** Throws `SiretHeldError` when a validated organisation holds the SIRET. Public knowledge: the registry says who it is. */
+export async function assertSiretFree(executor: DbExecutor, siret: string): Promise<void> {
+  const [holder] = await executor
+    .select({ id: organisations.id })
+    .from(organisations)
+    .where(and(eq(organisations.siret, siret), inArray(organisations.status, SIRET_HOLDING_STATUSES)))
+    .limit(1)
+  if (holder) throw new SiretHeldError()
+}
+
 /** Insert the pending organisation and journal it; the caller attaches it to the account in the same transaction. */
 export async function openOrganisation(
   tx: DbExecutor,
@@ -100,12 +110,7 @@ export async function openOrganisation(
   lookup: RegistryLookup,
   context: RequestContext,
 ) {
-  const [holder] = await tx
-    .select({ id: organisations.id })
-    .from(organisations)
-    .where(and(eq(organisations.siret, input.siret), inArray(organisations.status, SIRET_HOLDING_STATUSES)))
-    .limit(1)
-  if (holder) throw new SiretHeldError()
+  await assertSiretFree(tx, input.siret)
 
   const verdict = registryVerdict(lookup)
   const [organisation] = await tx

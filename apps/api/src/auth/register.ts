@@ -1,11 +1,42 @@
-import { CURRENT_RGPD_CONSENT_VERSION, registerSchema } from "@armurier/shared"
-import type { FastifyPluginAsync } from "fastify"
+import { CURRENT_RGPD_CONSENT_VERSION, type RegisterInput, registerSchema } from "@armurier/shared"
+import type { FastifyPluginAsync, FastifyRequest } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
 import { db } from "../db/client.js"
 import { isUniqueViolation } from "../db/errors.js"
 import { users } from "../db/schema.js"
+import { sendSignupWelcomeEmail } from "../email.js"
 import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import { hashPassword } from "./password.js"
+import { CHECK_INBOX, warnIfTaken } from "./signup-address.js"
+
+/** Inserts the customer and journals it; throws a unique violation when the address is taken. */
+async function createCustomer(input: RegisterInput, email: string, passwordHash: string, request: FastifyRequest) {
+  const [created] = await db
+    .insert(users)
+    .values({
+      email,
+      passwordHash,
+      firstname: input.firstName,
+      lastname: input.lastName,
+      phone: input.phone ?? null,
+      role: "customer",
+      rgpdConsentAt: new Date(),
+      rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
+    })
+    .returning({ id: users.id, role: users.role })
+  if (!created) throw new Error("user insert returned no row")
+
+  await recordAuditEvent({
+    userId: created.id,
+    userRole: created.role,
+    entityType: "user",
+    entityId: created.id,
+    action: "user.registered",
+    ipAddress: request.ip,
+    userAgent: request.headers["user-agent"] ?? null,
+  })
+  return created
+}
 
 export const registerRoute: FastifyPluginAsync = async (fastify) => {
   fastify.post(
@@ -28,60 +59,20 @@ export const registerRoute: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      const { email, password, firstName, lastName, phone } = parsed.data
-      const normalizedEmail = email.trim().toLowerCase()
-      const passwordHash = await hashPassword(password)
+      const email = parsed.data.email.trim().toLowerCase()
+      // Hashed even for a taken address: the answer must cost the same either way.
+      const passwordHash = await hashPassword(parsed.data.password)
+      if (await warnIfTaken(email, request)) return reply.code(202).send(CHECK_INBOX)
 
       try {
-        const [created] = await db
-          .insert(users)
-          .values({
-            email: normalizedEmail,
-            passwordHash,
-            firstname: firstName,
-            lastname: lastName,
-            phone: phone ?? null,
-            role: "customer",
-            rgpdConsentAt: new Date(),
-            rgpdConsentVersion: CURRENT_RGPD_CONSENT_VERSION,
-          })
-          .returning({
-            id: users.id,
-            email: users.email,
-            firstname: users.firstname,
-            lastname: users.lastname,
-            role: users.role,
-            createdAt: users.createdAt,
-          })
-
-        await recordAuditEvent({
-          userId: created.id,
-          userRole: created.role,
-          entityType: "user",
-          entityId: created.id,
-          action: "user.registered",
-          ipAddress: request.ip,
-          userAgent: request.headers["user-agent"] ?? null,
-        })
-
-        return reply.code(201).send({
-          id: created.id,
-          email: created.email,
-          firstName: created.firstname,
-          lastName: created.lastname,
-          role: created.role,
-          createdAt: created.createdAt,
+        const created = await createCustomer(parsed.data, email, passwordHash, request)
+        sendSignupWelcomeEmail(email, { userId: created.id }).catch((err) => {
+          request.log.error({ err }, "register: failed to send the welcome e-mail")
         })
       } catch (err) {
-        if (isUniqueViolation(err)) {
-          return reply.code(409).send({
-            error: "EmailAlreadyRegistered",
-            message: "An account with this email already exists",
-          })
-        }
-        request.log.error({ err }, "register: unexpected error")
-        return reply.code(500).send({ error: "InternalServerError" })
+        if (!isUniqueViolation(err) || !(await warnIfTaken(email, request))) throw err
       }
+      return reply.code(202).send(CHECK_INBOX)
     },
   )
 }

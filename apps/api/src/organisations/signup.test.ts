@@ -7,7 +7,11 @@ import { buildApp } from "../app.js"
 import { generateRefreshToken, hashRefreshToken } from "../auth/tokens.js"
 import { db } from "../db/client.js"
 import { auditLogs, organisations, refreshTokens, users } from "../db/schema.js"
-import { sendOrganisationRequestAlertEmail, sendOrganisationRequestReceivedEmail } from "../email.js"
+import {
+  sendOrganisationRequestAlertEmail,
+  sendOrganisationRequestReceivedEmail,
+  sendSignupAddressTakenEmail,
+} from "../email.js"
 import { lookUpEstablishment, type RegistryLookup } from "./registry.js"
 
 vi.mock("./registry.js", () => ({ lookUpEstablishment: vi.fn() }))
@@ -15,11 +19,15 @@ vi.mock("../email.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../email.js")>()),
   sendOrganisationRequestReceivedEmail: vi.fn().mockResolvedValue(undefined),
   sendOrganisationRequestAlertEmail: vi.fn().mockResolvedValue(undefined),
+  sendSignupAddressTakenEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
 const EMAIL_SUFFIX = "@pro-signup.local"
 const PASSWORD = "MotDePasseTresLong123!"
 const DAY_MS = 24 * 60 * 60 * 1000
+const CHECK_INBOX = { message: "Check your inbox to continue." }
+// The e-mails leave after the answer: room for a loaded CI runner.
+const WAIT = { timeout: 5_000 }
 
 /** A fresh, well-keyed SIRET: test files share the database, so no fixed number. */
 function newSiret(): string {
@@ -96,6 +104,18 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
     return row?.organisation
   }
 
+  /** Signs up and finds what was created: the answer itself names nothing (sign-up without enumeration). */
+  async function signedUp(payload: ReturnType<typeof signupPayload>) {
+    const res = await signup(payload)
+    expect(res.statusCode).toBe(202)
+    expect(res.json()).toEqual(CHECK_INBOX)
+    const [account] = await db.select({ id: users.id }).from(users).where(eq(users.email, payload.email))
+    if (!account) throw new Error(`no account for ${payload.email}`)
+    const organisation = await organisationOf(account.id)
+    if (!organisation) throw new Error(`no organisation for ${payload.email}`)
+    return { id: account.id, organisation }
+  }
+
   beforeAll(async () => {
     app = await buildApp()
     await app.ready()
@@ -157,12 +177,8 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
       const siret = newSiret()
       const payload = signupPayload(siret)
 
-      const res = await signup({ ...payload, siret: `${siret.slice(0, 3)} ${siret.slice(3)}` })
+      const { id, organisation } = await signedUp({ ...payload, siret: `${siret.slice(0, 3)} ${siret.slice(3)}` })
 
-      expect(res.statusCode).toBe(201)
-      const body = res.json().data
-      expect(body).toMatchObject({ email: payload.email, organisation: { status: "pending", siret } })
-      const organisation = await organisationOf(body.id)
       expect(organisation).toMatchObject({
         legalName: "Armurerie Armand",
         siret,
@@ -182,32 +198,32 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
         billingCity: "LYON",
         billingCountry: "FR",
       })
-      const [user] = await db.select().from(users).where(eq(users.id, body.id))
+      const [user] = await db.select().from(users).where(eq(users.id, id))
       expect(user?.role).toBe("customer")
       expect(user?.passwordHash.startsWith("$argon2id$")).toBe(true)
     })
 
     it("journals the request and mails the applicant and SCS", async () => {
-      const res = await signup(signupPayload(newSiret()))
-      const { id, email, organisation } = res.json().data
+      const payload = signupPayload(newSiret())
+      const { id, organisation } = await signedUp(payload)
 
       const events = await db.select().from(auditLogs).where(eq(auditLogs.entityId, organisation.id))
       expect(events.map((event) => event.action)).toEqual(["organisation.requested"])
       expect(events[0]?.userId).toBe(id)
-      expect(sendOrganisationRequestReceivedEmail).toHaveBeenCalledWith(
-        email,
-        { legalName: "Armurerie Armand" },
-        { userId: id },
-      )
-      expect(sendOrganisationRequestAlertEmail).toHaveBeenCalledOnce()
+      await vi.waitFor(() => {
+        expect(sendOrganisationRequestReceivedEmail).toHaveBeenCalledWith(
+          payload.email,
+          { legalName: "Armurerie Armand" },
+          { userId: id },
+        )
+        expect(sendOrganisationRequestAlertEmail).toHaveBeenCalledOnce()
+      }, WAIT)
     })
 
     it("takes the request when the registry is down, flagged unverified", async () => {
       registry.mockResolvedValueOnce({ status: "unavailable" })
-      const res = await signup(signupPayload(newSiret()))
+      const { organisation } = await signedUp(signupPayload(newSiret()))
 
-      expect(res.statusCode).toBe(201)
-      const organisation = await organisationOf(res.json().data.id)
       expect(organisation?.registryCheck).toBe("unavailable")
       expect(organisation?.registrySnapshot).toBeNull()
       expect(organisation?.billingLine1).toBeNull()
@@ -216,12 +232,10 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
     it("flags a closed establishment and an unknown number", async () => {
       const closed = newSiret()
       registry.mockResolvedValueOnce(found(closed, { active: false }))
-      const closedRes = await signup(signupPayload(closed))
-      expect((await organisationOf(closedRes.json().data.id))?.registryCheck).toBe("inactive")
+      expect((await signedUp(signupPayload(closed))).organisation.registryCheck).toBe("inactive")
 
       registry.mockResolvedValueOnce({ status: "not_found" })
-      const unknownRes = await signup(signupPayload(newSiret()))
-      expect((await organisationOf(unknownRes.json().data.id))?.registryCheck).toBe("not_found")
+      expect((await signedUp(signupPayload(newSiret()))).organisation.registryCheck).toBe("not_found")
     })
 
     it("refuses a SIRET whose key is wrong, on the siret field", async () => {
@@ -231,27 +245,61 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
       expect(registry).not.toHaveBeenCalled()
     })
 
-    it("refuses a taken e-mail and leaves no organisation behind", async () => {
+    it("answers a taken e-mail like a free one, leaves nothing behind and warns its owner", async () => {
       const first = signupPayload(newSiret())
-      await signup(first)
+      const { id: ownerId } = await signedUp(first)
+      vi.mocked(sendOrganisationRequestReceivedEmail).mockClear()
       const siret = newSiret()
 
-      const res = await signup({ ...signupPayload(siret), email: first.email })
+      const res = await signup({ ...signupPayload(siret), email: first.email.toUpperCase() })
+
+      expect(res.statusCode).toBe(202)
+      expect(res.json()).toEqual(CHECK_INBOX)
+      expect(await db.select().from(organisations).where(eq(organisations.siret, siret))).toHaveLength(0)
+      await vi.waitFor(
+        () => expect(sendSignupAddressTakenEmail).toHaveBeenCalledWith(first.email, { userId: ownerId }, { pro: true }),
+        WAIT,
+      )
+      expect(sendOrganisationRequestReceivedEmail).not.toHaveBeenCalled()
+    })
+
+    it("does not wait for the taken-address e-mail", async () => {
+      const first = signupPayload(newSiret())
+      await signedUp(first)
+      vi.mocked(sendSignupAddressTakenEmail).mockImplementationOnce(() => new Promise<void>(() => {}))
+
+      const res = await signup({ ...signupPayload(newSiret()), email: first.email })
+
+      expect(res.statusCode).toBe(202)
+    })
+
+    it("does not wait for the request's receipt and alert", async () => {
+      vi.mocked(sendOrganisationRequestReceivedEmail).mockImplementationOnce(() => new Promise<void>(() => {}))
+      vi.mocked(sendOrganisationRequestAlertEmail).mockImplementationOnce(() => new Promise<void>(() => {}))
+
+      await signedUp(signupPayload(newSiret()))
+    })
+
+    it("still tells a taken SIRET, which is public, even when the e-mail is taken too", async () => {
+      const first = signupPayload(newSiret())
+      const { organisation } = await signedUp(first)
+      await db.update(organisations).set({ status: "approved" }).where(eq(organisations.id, organisation.id))
+
+      const res = await signup({ ...signupPayload(first.siret), email: first.email })
 
       expect(res.statusCode).toBe(409)
-      expect(res.json().error).toBe("EmailAlreadyRegistered")
-      expect(await db.select().from(organisations).where(eq(organisations.siret, siret))).toHaveLength(0)
+      expect(res.json().error).toBe("SiretAlreadyRegistered")
+      expect(sendSignupAddressTakenEmail).not.toHaveBeenCalled()
     })
 
     // Story 12.9g — a first claimant must not lock the real company out: only a
     // validated organisation (approved, or suspended) holds its SIRET.
     it("lets pending requests share a SIRET, and refuses only one a validated organisation holds", async () => {
       const siret = newSiret()
-      const first = await signup(signupPayload(siret))
-      const second = await signup(signupPayload(siret))
-      expect([first.statusCode, second.statusCode]).toEqual([201, 201])
+      const first = await signedUp(signupPayload(siret))
+      await signedUp(signupPayload(siret))
 
-      const firstId = first.json().data.organisation.id
+      const firstId = first.organisation.id
       await db.update(organisations).set({ status: "approved" }).where(eq(organisations.id, firstId))
       const refused = await signup(signupPayload(siret))
       expect(refused.statusCode).toBe(409)
@@ -261,7 +309,7 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
       expect((await signup(signupPayload(siret))).statusCode).toBe(409)
 
       await db.update(organisations).set({ status: "rejected" }).where(eq(organisations.id, firstId))
-      expect((await signup(signupPayload(siret))).statusCode).toBe(201)
+      expect((await signup(signupPayload(siret))).statusCode).toBe(202)
     })
   })
 

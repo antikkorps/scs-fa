@@ -41,8 +41,10 @@ describe("inscription.vue", () => {
     expect(wrapper.text()).toContain("Vous devez accepter la politique de confidentialité.")
   })
 
-  it("registers and redirects when the form is valid", async () => {
-    register.mockResolvedValue({ status: "signed_in", user: { role: "customer" } })
+  // Sign-up without enumeration: the same answer whether the address was free
+  // or taken, so no session and no "already exists" — the mailbox tells.
+  it("registers, then sends the visitor to the mailbox without signing in", async () => {
+    register.mockResolvedValue(undefined)
     const wrapper = await mountSuspended(Inscription)
     await fillValidForm(wrapper)
     await wrapper.find('input[type="checkbox"]').setValue(true)
@@ -50,33 +52,23 @@ describe("inscription.vue", () => {
     await flushPromises()
 
     expect(register).toHaveBeenCalledOnce()
-    expect(navigateToMock).toHaveBeenCalledWith("/")
-  })
-
-  it("surfaces a friendly message when the email already exists (409)", async () => {
-    register.mockRejectedValue({ response: { status: 409 } })
-    const wrapper = await mountSuspended(Inscription)
-    await fillValidForm(wrapper)
-    await wrapper.find('input[type="checkbox"]').setValue(true)
-    await wrapper.find("form").trigger("submit")
-    await flushPromises()
-
-    expect(wrapper.text()).toContain("Un compte existe déjà")
     expect(navigateToMock).not.toHaveBeenCalled()
-  })
-
-  it("asks for the code mailed to confirm the address, instead of signing in (audit 2026-11-15, M1)", async () => {
-    register.mockResolvedValue({ status: "code_required", method: "email_code", expiresIn: 600 })
-    const wrapper = await mountSuspended(Inscription)
-    await fillValidForm(wrapper)
-    await wrapper.find('input[type="checkbox"]').setValue(true)
-    await wrapper.find("form").trigger("submit")
-    await flushPromises()
-
-    expect(navigateToMock).not.toHaveBeenCalled()
-    expect(wrapper.find('input[autocomplete="one-time-code"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain("Pour confirmer votre adresse")
+    expect(wrapper.find("form").exists()).toBe(false)
+    expect(wrapper.text()).toContain("Vérifiez votre boîte mail")
     expect(wrapper.text()).toContain("buyer@example.com")
+    expect(wrapper.find('a[href^="/connexion"]').exists()).toBe(true)
+  })
+
+  it("keeps the form and says so when the sign-up fails", async () => {
+    register.mockRejectedValue({ response: { status: 500 } })
+    const wrapper = await mountSuspended(Inscription)
+    await fillValidForm(wrapper)
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Inscription impossible")
+    expect(wrapper.find("form").exists()).toBe(true)
   })
 
   it("points professionals to their own signup", async () => {
@@ -98,14 +90,18 @@ describe("inscription.test.ts before the opening (story 12.10)", () => {
 describe("inscription.vue — coming from the cart", () => {
   const FROM_CART = "/inscription?redirect=%2Fboutique%2Ffusil-x%3Fajouter%3Dv2&motif=panier"
 
-  it("goes back to the product, with the item to add, once the account is created", async () => {
-    register.mockResolvedValue({ status: "signed_in", user: { role: "customer" } })
+  it("keeps the way back to the product, with the item to add, on the login link once the account is created", async () => {
+    register.mockResolvedValue(undefined)
     const wrapper = await mountSuspended(Inscription, { route: FROM_CART })
     await fillValidForm(wrapper)
     await wrapper.find('input[type="checkbox"]').setValue(true)
     await wrapper.find("form").trigger("submit")
     await flushPromises()
-    expect(navigateToMock).toHaveBeenCalledWith("/boutique/fusil-x?ajouter=v2")
+    expect(returnOf(wrapper.find('a[href^="/connexion"]').attributes("href"))).toEqual({
+      path: "/connexion",
+      redirect: "/boutique/fusil-x?ajouter=v2",
+      motif: "panier",
+    })
   })
 
   it("says the item will be added, and keeps the way back on the login link", async () => {
