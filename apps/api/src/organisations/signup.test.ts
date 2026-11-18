@@ -116,6 +116,14 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
     return { id: account.id, organisation }
   }
 
+  /** The warning is journalled after the answer: wait for it, or the cleanup races its foreign key. */
+  async function takenAddressJournalled(userId: string) {
+    await vi.waitFor(async () => {
+      const events = await db.select().from(auditLogs).where(eq(auditLogs.userId, userId))
+      expect(events.map((event) => event.action)).toContain("user.signup_on_taken_address")
+    }, WAIT)
+  }
+
   beforeAll(async () => {
     app = await buildApp()
     await app.ready()
@@ -261,16 +269,18 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
         WAIT,
       )
       expect(sendOrganisationRequestReceivedEmail).not.toHaveBeenCalled()
+      await takenAddressJournalled(ownerId)
     })
 
     it("does not wait for the taken-address e-mail", async () => {
       const first = signupPayload(newSiret())
-      await signedUp(first)
+      const { id: ownerId } = await signedUp(first)
       vi.mocked(sendSignupAddressTakenEmail).mockImplementationOnce(() => new Promise<void>(() => {}))
 
       const res = await signup({ ...signupPayload(newSiret()), email: first.email })
 
       expect(res.statusCode).toBe(202)
+      await takenAddressJournalled(ownerId)
     })
 
     it("does not wait for the request's receipt and alert", async () => {

@@ -58,6 +58,18 @@ describe("POST /api/auth/register", () => {
   const register = (email: string) =>
     app.inject({ method: "POST", url: "/api/auth/register", payload: validPayload(email) })
 
+  /** The warning is journalled after the answer: wait for it, or the cleanup races its foreign key. */
+  async function takenAddressJournalled(email: string) {
+    const [owner] = await db.select({ id: users.id }).from(users).where(eq(users.email, email))
+    await vi.waitFor(async () => {
+      const events = await db
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.userId, owner?.id ?? ""))
+      expect(events.map((event) => event.action)).toContain("user.signup_on_taken_address")
+    }, WAIT)
+  }
+
   // Story "sign-up without enumeration": a free address and a taken one get
   // the same answer; only the mailbox learns which case it was.
   it("creates the account, answers 202 without the profile, and welcomes the address", async () => {
@@ -102,13 +114,7 @@ describe("POST /api/auth/register", () => {
       WAIT,
     )
     expect(sendSignupWelcomeEmail).not.toHaveBeenCalled()
-    await vi.waitFor(async () => {
-      const events = await db
-        .select()
-        .from(auditLogs)
-        .where(eq(auditLogs.userId, owner?.id ?? ""))
-      expect(events.map((event) => event.action)).toContain("user.signup_on_taken_address")
-    }, WAIT)
+    await takenAddressJournalled(email)
   })
 
   it("does not wait for the e-mail: a slow relay cannot tell a taken address by the delay", async () => {
@@ -120,6 +126,7 @@ describe("POST /api/auth/register", () => {
     const res = await register(email)
 
     expect(res.statusCode).toBe(202)
+    await takenAddressJournalled(email)
   })
 
   it("does not wait for the welcome e-mail either", async () => {
@@ -139,6 +146,7 @@ describe("POST /api/auth/register", () => {
     await register(email)
 
     expect(hashPassword).toHaveBeenCalledOnce()
+    await takenAddressJournalled(email)
   })
 
   it("returns 400 on weak password", async () => {
