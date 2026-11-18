@@ -59,6 +59,8 @@ type EmailType =
   | "unpaid_order_cancelled"
   | "account_deleted"
   | "inactive_account_warning"
+  | "signup_welcome"
+  | "signup_address_taken"
 
 /**
  * Story 12.11 — e-mails whose journal line must not name the recipient: the
@@ -188,6 +190,42 @@ export async function sendLoginCodeEmail(
       `<p>Il est valable ${validMinutes} minutes et ne sert qu'une fois.</p>` +
       `<p>Si vous n'êtes pas à l'origine de cette connexion, quelqu'un connaît votre mot de passe : changez-le sans attendre.</p>`,
   })
+}
+
+/**
+ * Sign-up without enumeration — the answer on screen is the same whether the
+ * address was free or not, so the mailbox is where its owner learns which.
+ */
+export async function sendSignupWelcomeEmail(to: string, about: EmailAbout = {}): Promise<void> {
+  await deliverParagraphs("signup_welcome", about, to, "Bienvenue chez SCS Firearms", [
+    "Bonjour,",
+    "Votre compte SCS Firearms est créé.",
+    `Connectez-vous pour l'utiliser : ${env.WEB_BASE_URL}/connexion`,
+    "À votre première connexion, un code vous sera envoyé par e-mail après votre mot de passe : il confirme que cette adresse est bien la vôtre.",
+    "Si vous n'êtes pas à l'origine de cette inscription, ignorez ce message : sans cette confirmation, le compte ne sert à rien.",
+  ])
+}
+
+/**
+ * Someone tried to open an account with an address that already has one:
+ * nothing was created. `pro`: it came with a pro request, which was not filed
+ * either, while the page said "request sent".
+ */
+export async function sendSignupAddressTakenEmail(
+  to: string,
+  about: EmailAbout = {},
+  options: { pro?: boolean } = {},
+): Promise<void> {
+  const login = options.pro
+    ? `Si c'était vous, votre demande de compte professionnel n'a pas été enregistrée : connectez-vous, puis faites-la depuis votre espace client : ${env.WEB_BASE_URL}/connexion`
+    : `Si c'était vous, connectez-vous : ${env.WEB_BASE_URL}/connexion`
+  await deliverParagraphs("signup_address_taken", about, to, "Votre adresse a déjà un compte SCS Firearms", [
+    "Bonjour,",
+    "Quelqu'un vient de demander la création d'un compte SCS Firearms avec cette adresse. Elle en a déjà un : nous n'en avons pas créé d'autre.",
+    login,
+    `Mot de passe oublié ? Choisissez-en un nouveau : ${env.WEB_BASE_URL}/mot-de-passe-oublie`,
+    "Si ce n'était pas vous, ignorez ce message : votre compte n'a pas changé.",
+  ])
 }
 
 /** Story 12.11 — the account is gone: what was erased, and what the law keeps. */

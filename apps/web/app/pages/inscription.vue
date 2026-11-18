@@ -15,8 +15,9 @@ const form = reactive({
   password: "",
   rgpdConsent: false,
 })
-// Audit 2026-11-15 (M1): the account exists, its address waits for the mailed code.
-const awaitingCode = ref(false)
+// Sign-up without enumeration: the answer is the same whether the address was
+// free or taken, so the page can only send the visitor to their mailbox.
+const sent = ref(false)
 const fieldErrors = ref<Record<string, string>>({})
 const error = ref("")
 const loading = ref(false)
@@ -49,30 +50,14 @@ async function submit() {
 
   loading.value = true
   try {
-    const outcome = await register(parsed.data)
-    if (outcome.status === "code_required") {
-      awaitingCode.value = true
-      form.password = ""
-      return
-    }
-    await navigateTo(redirectTo.value)
-  } catch (err) {
-    const status = authErrorStatus(err)
-    if (status === 409) error.value = "Un compte existe déjà avec cette adresse email."
-    else error.value = "Inscription impossible. Réessayez."
+    await register(parsed.data)
+    sent.value = true
+    form.password = ""
+  } catch {
+    error.value = "Inscription impossible. Réessayez."
   } finally {
     loading.value = false
   }
-}
-
-/** The code can no longer be used: the account exists, a login sends a new one. */
-function restart(message: string) {
-  awaitingCode.value = false
-  error.value = `${message} Votre compte est créé : connectez-vous pour recevoir un nouveau code.`
-}
-
-async function signedIn() {
-  await navigateTo(redirectTo.value)
 }
 </script>
 
@@ -84,16 +69,19 @@ async function signedIn() {
       <h1 class="auth-card__title">Créer un compte</h1>
       <SalesClosedNotice what="La création de compte" />
     </section>
-    <section v-else-if="awaitingCode" class="auth-card">
+    <section v-else-if="sent" class="auth-card" role="status">
       <p class="eyebrow">Espace client</p>
-      <h1 class="auth-card__title">Confirmez votre adresse</h1>
-      <LoginCodeStep
-        :email="form.email"
-        method="email_code"
-        purpose="signup"
-        @signed-in="signedIn"
-        @restart="restart"
-      />
+      <h1 class="auth-card__title">Vérifiez votre boîte mail</h1>
+      <p class="auth-card__lede">
+        Nous venons d'écrire à <strong>{{ form.email }}</strong> pour la suite. Le message peut mettre quelques minutes
+        à arriver : pensez à regarder dans les indésirables.
+      </p>
+      <p class="auth-card__lede">
+        À votre première connexion, un code envoyé à cette adresse confirmera qu'elle est bien la vôtre.
+      </p>
+      <NuxtLink :to="{ path: '/connexion', query: returnQuery }" class="btn btn-primary auth-submit">
+        Se connecter
+      </NuxtLink>
     </section>
     <form v-else class="auth-card" novalidate @submit.prevent="submit">
       <p class="eyebrow">Espace client</p>

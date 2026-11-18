@@ -5,12 +5,10 @@ import type { CodeOutcome, LoginEnrolment, LoginMethod } from "~/composables/use
 // 12.8a), the authenticator app's code or a recovery code, or the app's
 // enrolment for an admin without it (story 12.8e) — whose recovery codes are
 // shown before going on. Shared by the shop's login and the back-office's.
-// "signup": the same mailed code, presented as confirming the new address (M1).
 const props = defineProps<{
   email: string
   method: LoginMethod
   enrollment?: LoginEnrolment
-  purpose?: "login" | "signup"
 }>()
 const emit = defineEmits<{
   signedIn: [outcome: CodeOutcome]
@@ -111,10 +109,7 @@ async function resend() {
 
   <form v-else novalidate @submit.prevent="submit">
     <template v-if="method === 'email_code'">
-      <p v-if="purpose === 'signup'" class="auth-card__lede">
-        Pour confirmer votre adresse, saisissez le code envoyé à <strong>{{ email }}</strong>. Il est valable 10 minutes.
-      </p>
-      <p v-else class="auth-card__lede">
+      <p class="auth-card__lede">
         Un code de connexion vient d'être envoyé à <strong>{{ email }}</strong>. Il est valable 10 minutes.
       </p>
     </template>

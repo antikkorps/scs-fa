@@ -52,9 +52,6 @@ async function submit() {
     const code = apiErrorCode(err)
     if (code === "SiretAlreadyRegistered") {
       fieldErrors.value = { siret: SIRET_TAKEN_MESSAGE }
-    } else if (code === "EmailAlreadyRegistered") {
-      error.value =
-        "Un compte existe déjà avec cette adresse. Connectez-vous et faites la demande depuis votre espace client."
     } else {
       error.value = "La demande n'a pas pu être envoyée. Réessayez."
     }
@@ -70,8 +67,9 @@ async function submit() {
       <p class="eyebrow">Espace professionnel</p>
       <h1 class="auth-card__title">Demande envoyée</h1>
       <p class="auth-card__lede">
-        Merci. Notre équipe vérifie votre demande et vous écrit dès qu'elle est validée. Vous pouvez déjà vous connecter :
-        à chaque connexion, un code vous sera envoyé par e-mail après votre mot de passe.
+        Merci. Vérifiez votre boîte mail : nous venons d'écrire à <strong>{{ form.email }}</strong> pour la suite.
+        Notre équipe vérifie chaque demande et vous écrit dès qu'elle est validée. À chaque connexion, un code vous sera
+        envoyé par e-mail après votre mot de passe.
       </p>
       <NuxtLink to="/connexion" class="btn btn-primary auth-submit">Se connecter</NuxtLink>
     </section>
