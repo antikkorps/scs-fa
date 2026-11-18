@@ -5,22 +5,20 @@ import { z } from "zod"
 import { authenticate } from "../auth/authenticate.js"
 import { hashPassword } from "../auth/password.js"
 import { requireRole } from "../auth/require-role.js"
-import { accountByEmail, CHECK_INBOX, warnIfTaken, warnTakenAddress } from "../auth/signup-address.js"
+import { CHECK_INBOX } from "../auth/signup-address.js"
 import { CAPPED_SESSION_DAYS } from "../auth/tokens.js"
 import { db } from "../db/client.js"
-import { isUniqueViolation } from "../db/errors.js"
 import { organisations, refreshTokens, users } from "../db/schema.js"
 import { validationError } from "../http.js"
 import { requireShopOpen } from "../shop-settings/require-shop-open.js"
 import { lookUpEstablishment } from "./registry.js"
 import {
   announceOrganisationRequest,
-  assertSiretFree,
   MEMBER_ORGANISATION_COLUMNS,
   openOrganisation,
   SiretHeldError,
 } from "./service.js"
-import { createProAccount } from "./signup.js"
+import { signUpPro } from "./signup.js"
 
 const SIRET_TAKEN = {
   error: "SiretAlreadyRegistered",
@@ -28,8 +26,6 @@ const SIRET_TAKEN = {
 }
 const ALREADY_MEMBER = { error: "AlreadyInOrganisation", message: "This account already belongs to an organisation" }
 const NO_ORGANISATION = { error: "NotFound", message: "This account belongs to no organisation" }
-
-const PRO_SIGNUP = { pro: true } as const
 
 const lookupQuerySchema = z.object({ siret: siretSchema })
 
@@ -74,30 +70,15 @@ export const organisationRoutes: FastifyPluginAsync = async (fastify) => {
       const lookup = await lookUpEstablishment(parsed.data.siret)
       // Hashed even for a taken address: the answer must cost the same either way.
       const passwordHash = await hashPassword(parsed.data.password)
-      const owner = await accountByEmail(email)
       try {
-        if (owner) {
-          await assertSiretFree(db, parsed.data.siret)
-          warnTakenAddress(owner, email, request, PRO_SIGNUP)
-          return reply.code(202).send(CHECK_INBOX)
-        }
-        const { user, organisation, registryVerified } = await createProAccount(
-          parsed.data,
-          { email, passwordHash },
-          lookup,
-          request,
-        )
-        announceOrganisationRequest(user, organisation, registryVerified, request.log).catch((err) => {
-          request.log.error({ err }, "pro signup: announcing the request failed")
-        })
-        return reply.code(202).send(CHECK_INBOX)
+        await signUpPro(parsed.data, { email, passwordHash }, lookup, request)
       } catch (err) {
         if (err instanceof SiretHeldError) return reply.code(409).send(SIRET_TAKEN)
-        if (isUniqueViolation(err, "users_email_unique") && (await warnIfTaken(email, request, PRO_SIGNUP))) {
-          return reply.code(202).send(CHECK_INBOX)
-        }
-        throw err
+        // Any other failure keeps the same answer: a 500 on the free path alone
+        // would tell a free address from a taken one (audit of #275).
+        request.log.error({ err }, "pro signup: the account could not be opened")
       }
+      return reply.code(202).send(CHECK_INBOX)
     },
   )
 

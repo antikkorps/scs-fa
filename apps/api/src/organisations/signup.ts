@@ -3,10 +3,14 @@ import { CURRENT_RGPD_CONSENT_VERSION, type ProSignupInput } from "@armurier/sha
 import { eq } from "drizzle-orm"
 import type { FastifyRequest } from "fastify"
 import { recordAuditEvent } from "../audit/record.js"
+import { accountByEmail, warnIfTaken, warnTakenAddress } from "../auth/signup-address.js"
 import { db } from "../db/client.js"
+import { isUniqueViolation } from "../db/errors.js"
 import { users } from "../db/schema.js"
 import type { RegistryLookup } from "./registry.js"
-import { openOrganisation } from "./service.js"
+import { announceOrganisationRequest, assertSiretFree, openOrganisation } from "./service.js"
+
+const PRO_SIGNUP = { pro: true } as const
 
 export interface ProAccountSecrets {
   /** Normalised (trimmed, lower-cased). */
@@ -14,8 +18,36 @@ export interface ProAccountSecrets {
   passwordHash: string
 }
 
+/**
+ * Opens the account and its request, or warns the owner of a taken address.
+ * Throws `SiretHeldError` either way — the registry is public — or an
+ * unexpected error, which the route must answer like a success.
+ */
+export async function signUpPro(
+  input: ProSignupInput,
+  secrets: ProAccountSecrets,
+  lookup: RegistryLookup,
+  request: FastifyRequest,
+): Promise<void> {
+  const owner = await accountByEmail(secrets.email)
+  if (owner) {
+    await assertSiretFree(db, input.siret)
+    return warnTakenAddress(owner, secrets.email, request, PRO_SIGNUP)
+  }
+  try {
+    const { user, organisation, registryVerified } = await createProAccount(input, secrets, lookup, request)
+    announceOrganisationRequest(user, organisation, registryVerified, request.log).catch((err) => {
+      request.log.error({ err }, "pro signup: announcing the request failed")
+    })
+  } catch (err) {
+    // Lost the race to a concurrent sign-up with the same address.
+    if (isUniqueViolation(err, "users_email_unique") && (await warnIfTaken(secrets.email, request, PRO_SIGNUP))) return
+    throw err
+  }
+}
+
 /** Throws a unique violation when the address is taken, `SiretHeldError` when the SIRET is. */
-export async function createProAccount(
+async function createProAccount(
   input: ProSignupInput,
   secrets: ProAccountSecrets,
   lookup: RegistryLookup,

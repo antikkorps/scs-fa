@@ -6,10 +6,15 @@ import { db } from "../db/client.js"
 import { auditLogs, users } from "../db/schema.js"
 import { sendSignupAddressTakenEmail, sendSignupWelcomeEmail } from "../email.js"
 import { hashPassword } from "./password.js"
+import { warnIfTaken } from "./signup-address.js"
 
 vi.mock("./password.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("./password.js")>()
   return { ...original, hashPassword: vi.fn(original.hashPassword) }
+})
+vi.mock("./signup-address.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./signup-address.js")>()
+  return { ...original, warnIfTaken: vi.fn(original.warnIfTaken) }
 })
 vi.mock("../email.js", () => ({
   sendSignupWelcomeEmail: vi.fn().mockResolvedValue(undefined),
@@ -126,6 +131,40 @@ describe("POST /api/auth/register", () => {
     const res = await register(email)
 
     expect(res.statusCode).toBe(202)
+    await takenAddressJournalled(email)
+  })
+
+  // Audit of #275: a value the database refuses (a NUL byte) used to fail the
+  // insert of a free address only — a 500 against a 202, an exact oracle.
+  it("answers a payload the database refuses exactly like a taken address", async () => {
+    const taken = `nul-taken-${Date.now()}${TEST_EMAIL_SUFFIX}`
+    await register(taken)
+    const free = `nul-free-${Date.now()}${TEST_EMAIL_SUFFIX}`
+    const refused = (email: string) =>
+      app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        payload: { ...validPayload(email), firstName: "Jean\u0000" },
+      })
+
+    const [onTaken, onFree] = [await refused(taken), await refused(free)]
+
+    expect([onFree.statusCode, onFree.json()]).toEqual([onTaken.statusCode, onTaken.json()])
+    expect(onFree.statusCode).toBe(202)
+    expect(await db.select().from(users).where(eq(users.email, free))).toHaveLength(0)
+    await takenAddressJournalled(taken)
+  })
+
+  it("answers a sign-up that lost the race to the same address like a taken one", async () => {
+    const email = `race-${Date.now()}${TEST_EMAIL_SUFFIX}`
+    await register(email)
+    // The other sign-up committed between our check and our insert.
+    vi.mocked(warnIfTaken).mockResolvedValueOnce(false)
+
+    const res = await register(email)
+
+    expect(res.statusCode).toBe(202)
+    expect(await db.select().from(users).where(eq(users.email, email))).toHaveLength(1)
     await takenAddressJournalled(email)
   })
 

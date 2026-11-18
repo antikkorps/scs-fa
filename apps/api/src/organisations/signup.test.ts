@@ -4,6 +4,7 @@ import { eq, inArray, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { buildApp } from "../app.js"
+import { accountByEmail } from "../auth/signup-address.js"
 import { generateRefreshToken, hashRefreshToken } from "../auth/tokens.js"
 import { db } from "../db/client.js"
 import { auditLogs, organisations, refreshTokens, users } from "../db/schema.js"
@@ -15,6 +16,10 @@ import {
 import { lookUpEstablishment, type RegistryLookup } from "./registry.js"
 
 vi.mock("./registry.js", () => ({ lookUpEstablishment: vi.fn() }))
+vi.mock("../auth/signup-address.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../auth/signup-address.js")>()
+  return { ...original, accountByEmail: vi.fn(original.accountByEmail) }
+})
 vi.mock("../email.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../email.js")>()),
   sendOrganisationRequestReceivedEmail: vi.fn().mockResolvedValue(undefined),
@@ -288,6 +293,36 @@ describe("pro accounts — signup and requests (story 12.8b)", () => {
       vi.mocked(sendOrganisationRequestAlertEmail).mockImplementationOnce(() => new Promise<void>(() => {}))
 
       await signedUp(signupPayload(newSiret()))
+    })
+
+    // Audit of #275: a value the database refuses must not fail the free path alone.
+    it("answers a payload the database refuses exactly like a taken address", async () => {
+      const first = signupPayload(newSiret())
+      const { id: ownerId } = await signedUp(first)
+      const refused = (email: string) => signup({ ...signupPayload(newSiret(), email), legalName: "Armurerie\u0000" })
+      const free = `nul-free-${Date.now()}${EMAIL_SUFFIX}`
+
+      const [onTaken, onFree] = [await refused(first.email), await refused(free)]
+
+      expect([onFree.statusCode, onFree.json()]).toEqual([onTaken.statusCode, onTaken.json()])
+      expect(onFree.statusCode).toBe(202)
+      expect(await db.select().from(users).where(eq(users.email, free))).toHaveLength(0)
+      await takenAddressJournalled(ownerId)
+    })
+
+    it("answers a sign-up that lost the race to the same address like a taken one", async () => {
+      const first = signupPayload(newSiret())
+      const { id: ownerId } = await signedUp(first)
+      vi.mocked(accountByEmail).mockResolvedValueOnce(undefined)
+
+      const res = await signup({ ...signupPayload(newSiret()), email: first.email })
+
+      expect(res.statusCode).toBe(202)
+      await vi.waitFor(
+        () => expect(sendSignupAddressTakenEmail).toHaveBeenCalledWith(first.email, { userId: ownerId }, { pro: true }),
+        WAIT,
+      )
+      await takenAddressJournalled(ownerId)
     })
 
     it("still tells a taken SIRET, which is public, even when the e-mail is taken too", async () => {
