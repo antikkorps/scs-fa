@@ -23,7 +23,7 @@ browser ──443──▶ Cloudflare ──443──▶ caddy ──/api/*, /he
 > go-live steps are runnable, not copy-pasted. Install with `apt install just`
 > (Ubuntu 24.04+) or `brew install just`, then run `just` from the repo root to list them:
 > `just deploy` · `just migrate` · `just seed` · `just update` · `just logs api` ·
-> `just ps` · `just psql` · `just db-roles` · `just backup` · `just restore <key> [dump]`. They complement
+> `just ps` · `just psql` (`just psql-ro` to look without any risk of writing) · `just db-roles` · `just backup` · `just restore <key> [dump]`. They complement
 > the pnpm scripts (dev/build/test stay in `package.json`).
 
 ## 1. Prepare the server
