@@ -108,7 +108,7 @@ fi
 
 echo "[check-backup] restore drill"
 backup_run "$IMAGE" backup.sh >/dev/null 2>&1
-drill() { backup_run -v "$WORK/identity.txt:/run/age-identity:ro" "$IMAGE" restore-drill.sh "$@"; }
+drill() { backup_run --tmpfs /tmp/drill -v "$WORK/identity.txt:/run/age-identity:ro" "$IMAGE" restore-drill.sh "$@"; }
 if drill >"$WORK/drill.log" 2>&1 && grep -q "drill passed" "$WORK/drill.log"; then
   pass "restore-drill.sh restores the latest dump aside and finds every row"
 else
@@ -128,6 +128,15 @@ else
   fail "the drill changed the live database"
 fi
 owner_sql "DELETE FROM secrets WHERE id = 2"
+owner_sql "CREATE TABLE created_after (id int)"
+if drill >"$WORK/drill-missing.log" 2>&1; then
+  fail "restore-drill.sh should fail when an empty live table is missing from the dump"
+elif grep -q "created_after live=0 restored=missing" "$WORK/drill-missing.log"; then
+  pass "restore-drill.sh reports a table missing from the dump, even an empty one"
+else
+  fail "restore-drill.sh failed without reporting the missing table: $(tail -3 "$WORK/drill-missing.log")"
+fi
+owner_sql "DROP TABLE created_after"
 if backup_run "$IMAGE" restore-drill.sh >/dev/null 2>&1; then
   fail "restore-drill.sh should refuse to run without the private key"
 else

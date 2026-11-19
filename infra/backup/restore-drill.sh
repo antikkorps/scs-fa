@@ -26,18 +26,26 @@ aws_s3() { aws --endpoint-url "${S3_ENDPOINT}" --region "${S3_REGION}" s3 "$@"; 
 file="${1:-}"
 if [ -z "${file}" ]; then
   file="$(aws_s3 ls "s3://${S3_BUCKET}/${BACKUP_S3_PREFIX}/" \
-    | awk '{print $4}' | grep "^${PGDATABASE}_.*\.dump\.age$" | sort -r | head -n1)"
+    | awk '{print $4}' | { grep "^${PGDATABASE}_.*\.dump\.age$" || true; } | sort -r | head -n1)"
   [ -n "${file}" ] || { echo "[drill] no backups found under ${BACKUP_S3_PREFIX}/" >&2; exit 1; }
 fi
 
-# The throwaway server: a fresh cluster on a Unix socket only, gone with the container.
+# The throwaway server: a fresh cluster on a Unix socket only, gone with the
+# container. Its data is plaintext: `just restore-drill` mounts /tmp/drill as a
+# tmpfs so it stays in memory, never on the host's disk.
 DRILL_DIR=/tmp/drill
 SOCKET="${DRILL_DIR}/socket"
 mkdir -p "${SOCKET}"
 chown -R postgres:postgres "${DRILL_DIR}"
-gosu postgres initdb -D "${DRILL_DIR}/data" --auth=trust -U postgres --no-locale -E UTF8 >/dev/null 2>&1
-gosu postgres pg_ctl -D "${DRILL_DIR}/data" -o "-c listen_addresses='' -k ${SOCKET}" -w -l "${DRILL_DIR}/server.log" start >/dev/null
+gosu postgres initdb -D "${DRILL_DIR}/data" --auth=trust -U postgres --no-locale -E UTF8 >"${DRILL_DIR}/initdb.log" 2>&1 || {
+  cat "${DRILL_DIR}/initdb.log" >&2
+  exit 1
+}
 trap 'gosu postgres pg_ctl -D "${DRILL_DIR}/data" -m immediate stop >/dev/null 2>&1 || true' EXIT
+gosu postgres pg_ctl -D "${DRILL_DIR}/data" -o "-c listen_addresses='' -k ${SOCKET}" -w -l "${DRILL_DIR}/server.log" start >/dev/null || {
+  cat "${DRILL_DIR}/server.log" >&2
+  exit 1
+}
 gosu postgres createdb -h "${SOCKET}" -U postgres drill
 
 log "restoring ${file} into a throwaway database"
@@ -60,11 +68,15 @@ psql -h "${SOCKET}" -U postgres -d drill -tAq -v ON_ERROR_STOP=1 -c "${COUNT_ROW
 tables="$(wc -l < "${DRILL_DIR}/restored.txt" | tr -d ' ')"
 rows="$(awk '{sum += $2} END {print sum + 0}' "${DRILL_DIR}/restored.txt")"
 # "<table> live=<n> restored=<n>" for every table whose count differs or that only one side has.
+# Membership is tested before any read: reading an absent entry would create it, as 0.
 awk '
-  FNR == NR { live[$1] = $2; next }
+  FILENAME == ARGV[1] { live[$1] = $2; next }
   { restored[$1] = $2 }
   END {
-    for (t in live) if (live[t] != restored[t]) printf "  %s live=%s restored=%s\n", t, live[t], (t in restored ? restored[t] : "missing")
+    for (t in live) {
+      if (!(t in restored)) printf "  %s live=%s restored=missing\n", t, live[t]
+      else if (live[t] != restored[t]) printf "  %s live=%s restored=%s\n", t, live[t], restored[t]
+    }
     for (t in restored) if (!(t in live)) printf "  %s live=missing restored=%s\n", t, restored[t]
   }
 ' "${DRILL_DIR}/live.txt" "${DRILL_DIR}/restored.txt" > "${DRILL_DIR}/differences.txt"
