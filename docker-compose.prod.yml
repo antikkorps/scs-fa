@@ -339,6 +339,10 @@ services:
       BACKUP_OBJECTS_RETENTION_DAYS: ${BACKUP_OBJECTS_RETENTION_DAYS:-30}
       # Audience data older than 25 months is deleted daily (privacy policy).
       UMAMI_PURGE_CRON: ${UMAMI_PURGE_CRON:-30 3 * * *}
+    # The restore drill's throwaway cluster holds plaintext data: memory only,
+    # never the host's disk (`docker compose run` has no --tmpfs flag).
+    tmpfs:
+      - /tmp/drill
     depends_on:
       postgres:
         condition: service_healthy
