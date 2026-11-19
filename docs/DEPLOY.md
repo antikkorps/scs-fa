@@ -477,6 +477,10 @@ just restore-objects 2026-10-24    # what that day's run saw deleted or overwrit
 restored tables are owned by it and `scs_app` gets its grants back through the
 default privileges.
 
+**When data must come back, follow [RESTORE.md](RESTORE.md)**: the order of
+operations for a bad update, a wiped database, a lost server, a few wrong rows
+or deleted files.
+
 Verify scheduling and the last runs in the logs: `docker compose -f
 docker-compose.prod.yml logs -f backup`. **Test a restore periodically** — a
 backup you've never restored is a hypothesis, not a backup: `just restore-drill`
