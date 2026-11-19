@@ -588,6 +588,8 @@ back-office, so the DNS can move early.
 - [ ] Backups verified: `just backup` produces an encrypted dump and the object
       copy, **and** a `just restore-drill` passes with the identity file
       fetched from where it is kept (a backup you've never restored is a hypothesis).
+      _2026-11-19: drill passed on the server (50 tables, restored in 9 s);
+      the object copy is still to check (`just backup`, then the logs)._
 - [ ] age identity file and `BACKUP_OBJECTS_PASSWORD` stored off the server, with
       a second copy held by the client (§ 6 Keys).
 - [ ] Legal notice and privacy policy name the real host (IONOS entity on the
