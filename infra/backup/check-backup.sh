@@ -58,7 +58,7 @@ recipient="$(grep -o 'age1[a-z0-9]*' "$WORK/identity.txt")"
 
 # The backup container as the stack runs it, plus whatever the step adds.
 backup_run() {
-  docker run --rm --network "$NET" \
+  docker run --rm --network "$NET" --security-opt no-new-privileges:true \
     -e PGHOST="$PG" -e PGUSER=scs_backup -e PGPASSWORD=backup_pw -e PGDATABASE="$DB" \
     -e AWS_ACCESS_KEY_ID="$S3_KEY" -e AWS_SECRET_ACCESS_KEY="$S3_SECRET" \
     -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
@@ -104,6 +104,34 @@ if backup_run -e PGUSER=scs_owner -e PGPASSWORD=owner_pw "$IMAGE" restore.sh >/d
   fail "restore.sh should refuse to run without the private key"
 else
   pass "restore.sh refuses to run without the private key"
+fi
+
+echo "[check-backup] restore drill"
+backup_run "$IMAGE" backup.sh >/dev/null 2>&1
+drill() { backup_run -v "$WORK/identity.txt:/run/age-identity:ro" "$IMAGE" restore-drill.sh "$@"; }
+if drill >"$WORK/drill.log" 2>&1 && grep -q "drill passed" "$WORK/drill.log"; then
+  pass "restore-drill.sh restores the latest dump aside and finds every row"
+else
+  fail "restore-drill.sh failed on an unchanged database: $(tail -3 "$WORK/drill.log")"
+fi
+owner_sql "INSERT INTO secrets VALUES (2, 'written-after-the-dump')"
+if drill >"$WORK/drill-mismatch.log" 2>&1; then
+  fail "restore-drill.sh should fail when the live counts differ from the dump"
+elif grep -q "secrets" "$WORK/drill-mismatch.log"; then
+  pass "restore-drill.sh names the table whose count differs"
+else
+  fail "restore-drill.sh failed without naming the table: $(tail -3 "$WORK/drill-mismatch.log")"
+fi
+if [ "$(app_sql "SELECT count(*) FROM secrets" 2>/dev/null)" = "2" ]; then
+  pass "the drill leaves the live database untouched"
+else
+  fail "the drill changed the live database"
+fi
+owner_sql "DELETE FROM secrets WHERE id = 2"
+if backup_run "$IMAGE" restore-drill.sh >/dev/null 2>&1; then
+  fail "restore-drill.sh should refuse to run without the private key"
+else
+  pass "restore-drill.sh refuses to run without the private key"
 fi
 
 echo "[check-backup] objects"

@@ -457,6 +457,11 @@ age-keygen -o scs-backup-identity.txt     # prints "Public key: age1…"
 just backup                        # both jobs now (the cron's path)
 just backups                       # list the encrypted dumps
 
+# Restore drill — harmless: a fresh dump, restored into a throwaway database
+# inside the backup container, row counts compared with the live database.
+# Same identity file handling as below.
+just restore-drill ~/scs-backup-identity.txt
+
 # Restore the database — DESTRUCTIVE (pg_restore --clean). Copy the identity
 # file to the server for the run only, then delete it.
 just restore ~/scs-backup-identity.txt                                   # latest
@@ -474,7 +479,10 @@ default privileges.
 
 Verify scheduling and the last runs in the logs: `docker compose -f
 docker-compose.prod.yml logs -f backup`. **Test a restore periodically** — a
-backup you've never restored is a hypothesis, not a backup. On a dev machine,
+backup you've never restored is a hypothesis, not a backup: `just restore-drill`
+does it on the server without touching the live data, and fails on any table
+whose row count differs (a write between the dump and the count can explain a
+small difference on busy tables such as sessions; rerun). On a dev machine,
 `just check-backup` runs the whole cycle (dump, restore, objects, retention)
 against a throwaway Postgres and S3.
 
@@ -578,7 +586,7 @@ back-office, so the DNS can move early.
       A prerequisite, not an option: the Scaleway key expires every year (§ 6)
       and an expired key stops the backups without any visible error.
 - [ ] Backups verified: `just backup` produces an encrypted dump and the object
-      copy, **and** a `just restore` round-trip works with the identity file
+      copy, **and** a `just restore-drill` passes with the identity file
       fetched from where it is kept (a backup you've never restored is a hypothesis).
 - [ ] age identity file and `BACKUP_OBJECTS_PASSWORD` stored off the server, with
       a second copy held by the client (§ 6 Keys).
