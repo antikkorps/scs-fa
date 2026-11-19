@@ -138,6 +138,16 @@ restore key dump="":
     {{ compose }} run --rm -e PGUSER=scs_owner -e PGPASSWORD="$DB_OWNER_PASSWORD" \
       -v "$(realpath "{{ key }}"):/run/age-identity:ro" backup restore.sh {{ dump }}
 
+# Takes a fresh dump, restores it into a throwaway database inside the backup
+# container and compares row counts with the live one, which it only reads.
+# Restore drill, harmless to prod: `just restore-drill <age key file>`
+restore-drill key:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -r "{{ key }}" ] || { echo "No readable age private key at {{ key }}"; exit 1; }
+    {{ compose }} run --rm backup backup.sh
+    {{ compose }} run --rm --tmpfs /tmp/drill -v "$(realpath "{{ key }}"):/run/age-identity:ro" backup restore-drill.sh
+
 # Adds and overwrites, never deletes. With a day, restores what that day's run
 # saw deleted or overwritten.
 # Copy backed-up objects back into the bucket: `just restore-objects [YYYY-MM-DD]`

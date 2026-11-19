@@ -9,9 +9,9 @@ FROM postgres:18-alpine
 # age encrypts the dumps to a public key; rclone copies the objects, encrypted.
 RUN apk add --no-cache aws-cli age rclone
 
-COPY backup.sh restore.sh backup-objects.sh restore-objects.sh rclone-env.sh entrypoint.sh umami-purge.sh /usr/local/bin/
+COPY backup.sh restore.sh restore-drill.sh backup-objects.sh restore-objects.sh rclone-env.sh entrypoint.sh umami-purge.sh /usr/local/bin/
 COPY umami-purge.sql /usr/local/share/
-RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/restore.sh /usr/local/bin/backup-objects.sh \
+RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/restore.sh /usr/local/bin/restore-drill.sh /usr/local/bin/backup-objects.sh \
   /usr/local/bin/restore-objects.sh /usr/local/bin/entrypoint.sh /usr/local/bin/umami-purge.sh
 
 # crond is PID 1 so cron job stdout/stderr (redirected to /proc/1/fd/*) surface
