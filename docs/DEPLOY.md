@@ -652,8 +652,10 @@ tracker **only after the visitor accepts** the consent banner (Franck's choice,
 One-time setup:
 
 1. Secrets in `.env`: `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` (`openssl rand -hex 32`),
-   and the HTTP login Caddy puts in front of the whole dashboard (story 12.9g:
-   a fresh Umami answers `admin` / `umami` until step 3):
+   and the HTTP login Caddy puts in front of the dashboard's pages (story 12.9g:
+   a fresh Umami answers `admin` / `umami` until step 3; `/api/*` is left to
+   Umami's own token, which its interface sends in the same `Authorization`
+   header — locked too, the dashboard would spin forever):
    `UMAMI_BASIC_AUTH_USER`, and `UMAMI_BASIC_AUTH_HASH` from
    `docker run --rm caddy:2-alpine caddy hash-password --plaintext '<password>'`,
    **in single quotes** in `.env` (the hash is full of `$` that compose would
