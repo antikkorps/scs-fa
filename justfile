@@ -146,7 +146,7 @@ restore-drill key:
     set -euo pipefail
     [ -r "{{ key }}" ] || { echo "No readable age private key at {{ key }}"; exit 1; }
     {{ compose }} run --rm backup backup.sh
-    {{ compose }} run --rm --tmpfs /tmp/drill -v "$(realpath "{{ key }}"):/run/age-identity:ro" backup restore-drill.sh
+    {{ compose }} run --rm -v "$(realpath "{{ key }}"):/run/age-identity:ro" backup restore-drill.sh
 
 # Adds and overwrites, never deletes. With a day, restores what that day's run
 # saw deleted or overwritten.

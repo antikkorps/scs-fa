@@ -31,8 +31,8 @@ if [ -z "${file}" ]; then
 fi
 
 # The throwaway server: a fresh cluster on a Unix socket only, gone with the
-# container. Its data is plaintext: `just restore-drill` mounts /tmp/drill as a
-# tmpfs so it stays in memory, never on the host's disk.
+# container. Its data is plaintext: the compose `backup` service mounts
+# /tmp/drill as a tmpfs so it stays in memory, never on the host's disk.
 DRILL_DIR=/tmp/drill
 SOCKET="${DRILL_DIR}/socket"
 mkdir -p "${SOCKET}"
