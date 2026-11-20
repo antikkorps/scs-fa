@@ -100,7 +100,11 @@ stats.{$DOMAIN} {
 	# A first lock in front of Umami's login (story 12.9g): a fresh install
 	# answers admin / umami until someone changes it. The tracker is not
 	# concerned, it goes through www (/_a/ above).
-	basic_auth {
+	# /api/* is left to Umami's own token: its interface sends
+	# `Authorization: Bearer` on every call, which replaces the browser's Basic
+	# credentials — locked, every call would answer 401 and the dashboard spin.
+	@locked not path /api/*
+	basic_auth @locked {
 		{$UMAMI_BASIC_AUTH_USER} {$UMAMI_BASIC_AUTH_HASH}
 	}
 	header {

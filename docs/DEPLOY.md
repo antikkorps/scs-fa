@@ -477,6 +477,10 @@ just restore-objects 2026-10-24    # what that day's run saw deleted or overwrit
 restored tables are owned by it and `scs_app` gets its grants back through the
 default privileges.
 
+**When data must come back, follow [RESTORE.md](RESTORE.md)**: the order of
+operations for a bad update, a wiped database, a lost server, a few wrong rows
+or deleted files.
+
 Verify scheduling and the last runs in the logs: `docker compose -f
 docker-compose.prod.yml logs -f backup`. **Test a restore periodically** — a
 backup you've never restored is a hypothesis, not a backup: `just restore-drill`
@@ -588,6 +592,8 @@ back-office, so the DNS can move early.
 - [ ] Backups verified: `just backup` produces an encrypted dump and the object
       copy, **and** a `just restore-drill` passes with the identity file
       fetched from where it is kept (a backup you've never restored is a hypothesis).
+      _2026-11-19: drill passed on the server (50 tables, restored in 9 s);
+      the object copy is still to check (`just backup`, then the logs)._
 - [ ] age identity file and `BACKUP_OBJECTS_PASSWORD` stored off the server, with
       a second copy held by the client (§ 6 Keys).
 - [ ] Legal notice and privacy policy name the real host (IONOS entity on the
@@ -652,8 +658,10 @@ tracker **only after the visitor accepts** the consent banner (Franck's choice,
 One-time setup:
 
 1. Secrets in `.env`: `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` (`openssl rand -hex 32`),
-   and the HTTP login Caddy puts in front of the whole dashboard (story 12.9g:
-   a fresh Umami answers `admin` / `umami` until step 3):
+   and the HTTP login Caddy puts in front of the dashboard's pages (story 12.9g:
+   a fresh Umami answers `admin` / `umami` until step 3; `/api/*` is left to
+   Umami's own token, which its interface sends in the same `Authorization`
+   header — locked too, the dashboard would spin forever):
    `UMAMI_BASIC_AUTH_USER`, and `UMAMI_BASIC_AUTH_HASH` from
    `docker run --rm caddy:2-alpine caddy hash-password --plaintext '<password>'`,
    **in single quotes** in `.env` (the hash is full of `$` that compose would

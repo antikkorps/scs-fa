@@ -6,6 +6,7 @@
 # browsers; the origin only talks to Cloudflare, which trusts its Origin CA.
 # Usage, from the repo root, with Docker running: `just check-caddyfile`.
 # Also needs openssl and python3 (both present on macOS and Ubuntu).
+# Pulls curlimages/curl to send requests to a running Caddy.
 set -eu
 
 IMAGE=caddy:2-alpine
@@ -16,7 +17,12 @@ failures=0
 pass() { echo "  ok   $*"; }
 fail() { echo "  FAIL $*"; failures=$((failures + 1)); }
 
-cleanup() { rm -rf "$WORK"; }
+NET=scs-caddy-check
+cleanup() {
+  docker rm -f scs-caddy-check-edge scs-caddy-check-umami >/dev/null 2>&1 || true
+  docker network rm "$NET" >/dev/null 2>&1 || true
+  rm -rf "$WORK"
+}
 trap cleanup EXIT
 
 # A throwaway self-signed pair stands in for the origin certificate: validate
@@ -29,27 +35,32 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -pkeyopt ec_p
   -out "$WORK/certs/origin.pem" >/dev/null 2>&1 ||
   { echo "openssl failed: it is needed to make a throwaway certificate"; exit 1; }
 
+# The dashboard lock's password, hashed as DEPLOY.md says.
+STATS_PASSWORD=check-password
+STATS_HASH="$(docker run --rm "$IMAGE" caddy hash-password --plaintext "$STATS_PASSWORD")"
+
 # Runs caddy with the same mounts and variables as the compose service.
 caddy_run() {
   docker run --rm \
     -e DOMAIN=example.test \
     -e UMAMI_BASIC_AUTH_USER=check \
-    -e UMAMI_BASIC_AUTH_HASH='$2a$14$bMDA3leTI4qJhwhZSoVxFuYo2wXc3YpGp3Bd24lImH.6ITM4o1GKe' \
+    -e UMAMI_BASIC_AUTH_HASH="$STATS_HASH" \
     -v "$ROOT/Caddyfile:/etc/caddy/Caddyfile:ro" \
     -v "$WORK/certs:/etc/caddy/certs:ro" \
-    "$IMAGE" caddy "$@" --config /etc/caddy/Caddyfile --adapter caddyfile
+    "$@"
 }
+caddy_cmd() { caddy_run "$IMAGE" caddy "$@" --config /etc/caddy/Caddyfile --adapter caddyfile; }
 
 echo "Caddyfile check ($IMAGE)"
 
-if caddy_run validate >"$WORK/validate.log" 2>&1; then
+if caddy_cmd validate >"$WORK/validate.log" 2>&1; then
   pass "caddy validate accepts the Caddyfile"
 else
   fail "caddy validate rejects the Caddyfile:"
   sed 's/^/       /' "$WORK/validate.log"
 fi
 
-caddy_run adapt >"$WORK/config.json" 2>"$WORK/adapt.log" || true
+caddy_cmd adapt >"$WORK/config.json" 2>"$WORK/adapt.log" || true
 
 # Prints each host whose TLS connection policy selects the certificate loaded
 # from origin.pem — a site without `import origin_tls` is missing from it.
@@ -97,6 +108,32 @@ if grep -qx '/\{0,1\}certs/\{0,1\}' "$ROOT/.dockerignore"; then
   pass "certs/ is excluded from the Docker build context"
 else
   fail "certs/ is not in .dockerignore: the origin private key would ship in the API image"
+fi
+
+# The dashboard, served for real with a stand-in Umami behind it. Umami's own
+# interface sends `Authorization: Bearer <token>` on every API call, which
+# replaces the browser's Basic credentials: the lock must leave /api/* to
+# Umami's login, or every call answers 401 and the dashboard never loads.
+docker network create "$NET" >/dev/null
+docker run -d --name scs-caddy-check-umami --network "$NET" --network-alias umami "$IMAGE" \
+  caddy respond --listen :3000 --body umami-ok >/dev/null
+caddy_run -d --name scs-caddy-check-edge --network "$NET" "$IMAGE" \
+  caddy run --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+stats() {
+  docker run --rm --network "$NET" curlimages/curl:8.11.1 -sk -o /dev/null -w '%{http_code}' \
+    --resolve stats.example.test:443:"$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' scs-caddy-check-edge)" \
+    "$@"
+}
+for _ in 1 2 3 4 5 6 7 8 9 10; do [ "$(stats https://stats.example.test/)" != "000" ] && break; sleep 1; done
+code="$(stats https://stats.example.test/)"
+if [ "$code" = "401" ]; then pass "the dashboard asks for the lock's login"; else fail "the dashboard answered $code without the lock's login (want 401)"; fi
+code="$(stats -u "check:$STATS_PASSWORD" https://stats.example.test/)"
+if [ "$code" = "200" ]; then pass "the lock's login opens the dashboard"; else fail "the lock's login answered $code (want 200)"; fi
+code="$(stats -H 'Authorization: Bearer umami-token' https://stats.example.test/api/me)"
+if [ "$code" = "200" ]; then
+  pass "Umami's API calls (Bearer token) reach Umami"
+else
+  fail "Umami's API calls answered $code (want 200): the lock swallows their Bearer header"
 fi
 
 if [ "$failures" -gt 0 ]; then
