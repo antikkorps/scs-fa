@@ -104,4 +104,18 @@ describe("reset-password.vue", () => {
 
     expect(wrapper.text()).toContain("doit être différent de l'ancien")
   })
+
+  // 2026-11-20: an invited admin saw "Réessayez" on a 429, retried, and kept
+  // the limit (5 per 15 minutes) closed.
+  it("asks to wait, not to retry, once the attempts are used up (429)", async () => {
+    resetPassword.mockRejectedValue({ response: { status: 429 } })
+    const wrapper = await mountSuspended(ResetPassword, withToken)
+    const { password, confirm } = passwordInputs(wrapper)
+    await password.setValue("longenoughpassword")
+    await confirm.setValue("longenoughpassword")
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Trop de tentatives. Patientez 15 minutes avant de réessayer.")
+  })
 })
