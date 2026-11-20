@@ -56,6 +56,8 @@ admin-invite email firstname +lastname:
 seed-demo:
     {{ compose }} exec api node_modules/.bin/tsx src/db/seed-cli.ts --demo
 
+# Caddy reads its Caddyfile through a single-file mount: `git pull` replaces the
+# file, the running Caddy keeps the old one, so it is recreated when they differ.
 # Update (audit 2026-11-15, M2 + M4): fast-forward only; keep the running images as :previous
 # (`just rollback`); refresh the base images and build BEFORE touching the database (a failed
 # build leaves it as it was); check .env; back the database up; migrate; restart.
@@ -69,6 +71,7 @@ update:
     {{ compose }} run --rm backup backup.sh
     {{ compose }} --profile migrate run --rm --build migrate
     {{ compose }} up -d
+    {{ compose }} exec -T caddy cat /etc/caddy/Caddyfile | cmp -s - Caddyfile || {{ compose }} up -d --force-recreate --no-deps caddy
     docker image prune -f
 
 # Back to the images of before the last `just update`. The database stays migrated: migrations
