@@ -153,6 +153,16 @@ describe("justfile — the update procedure", () => {
     expect(position("backup.sh")).toBeLessThan(migrate)
   })
 
+  // 2026-11-20: the Caddyfile is a single-file bind mount; `git pull` replaces
+  // the file, the running Caddy keeps reading the old one, and `up -d` leaves
+  // it alone (same image, same compose config) — a Caddy fix never shipped.
+  it("recreates Caddy after the restart when the Caddyfile it reads differs from the checkout", () => {
+    const check = position("cat /etc/caddy/Caddyfile")
+    expect(check).toBeGreaterThan(position("up -d"))
+    expect(update()[check]).toContain("cmp -s - Caddyfile")
+    expect(update()[check]).toContain("up -d --force-recreate --no-deps caddy")
+  })
+
   it("offers a way back to the previous images", () => {
     const rollback = recipe(JUSTFILE, "rollback")
     expect(rollback.join("\n")).toContain("scs-api:previous scs-api:latest")
