@@ -38,6 +38,9 @@ async function submit() {
     const status = authErrorStatus(err)
     if (status === 422) error.value = "Le nouveau mot de passe doit être différent de l'ancien."
     else if (status === 400) error.value = "Ce lien est invalide ou a expiré. Refaites une demande."
+    // The API allows 5 attempts per 15 minutes: until the window closes, every
+    // retry is refused, so the message says to wait rather than to retry.
+    else if (status === 429) error.value = "Trop de tentatives. Patientez 15 minutes avant de réessayer."
     else error.value = "Réinitialisation impossible. Réessayez."
   } finally {
     loading.value = false
