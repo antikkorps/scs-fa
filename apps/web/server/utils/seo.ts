@@ -171,12 +171,6 @@ const LEGAL_LABELS: Record<string, string> = {
   none: "vente libre",
 }
 
-/**
- * Concise llms.txt (llmstxt.org convention): H1 + summary blockquote + curated
- * sections of links. Points agents at the structured feeds rather than dumping
- * everything (that's llms-full.txt). Describes BOTH universes — the armurerie
- * and Gun Art — which story 9.6 found still announced as "à terme".
- */
 /** The shop menu as nested links (story 12.15c); a heading has no page of its own. */
 function menuOutline(siteUrl: string, entries: ShopMenuEntry[], depth = 0): string {
   return entries
@@ -200,6 +194,12 @@ ${menuOutline(siteUrl, menu)}
 `
 }
 
+/**
+ * Concise llms.txt (llmstxt.org convention): H1 + summary blockquote + curated
+ * sections of links. Points agents at the structured feeds rather than dumping
+ * everything (that's llms-full.txt). Describes BOTH universes — the armurerie
+ * and Gun Art — which story 9.6 found still announced as "à terme" — and the shop menu (12.15c).
+ */
 export function buildLlmsTxt(siteUrl: string, stage: LlmsStage, menu: ShopMenuEntry[] = []): string {
   return `# SCS Firearms
 

@@ -1,7 +1,7 @@
 // Story 12.15b/c — the public menu: the tree the header draws, and its pages.
 
 import { productFiltersSchema } from "@armurier/shared"
-import { listCatalogue } from "../products/list.js"
+import { countCatalogue } from "../products/list.js"
 import { publicCatalogueVisible } from "../products/visibility.js"
 import { loadMenuEntries, type MenuEntry } from "./entries.js"
 
@@ -32,12 +32,24 @@ function filterOf(entry: MenuEntry): PublicMenuEntry["filter"] {
   }
 }
 
-/** The nested tree under `parentId`, siblings in the order loaded (display order). */
-export function branch(entries: MenuEntry[], parentId: string | null, parentPath: string): PublicMenuEntry[] {
+/** Each entry's address, its slugs from the top: the one walk every view shares. */
+function pathsById(entries: MenuEntry[]): Map<string, string> {
+  const paths = new Map<string, string>()
+  const place = (parentId: string | null, parentPath: string) => {
+    for (const entry of entries.filter((candidate) => candidate.parentId === parentId)) {
+      paths.set(entry.id, `${parentPath}/${entry.slug}`)
+      place(entry.id, `${parentPath}/${entry.slug}`)
+    }
+  }
+  place(null, "")
+  return paths
+}
+
+function nested(entries: MenuEntry[], parentId: string | null, paths: Map<string, string>): PublicMenuEntry[] {
   return entries
     .filter((entry) => entry.parentId === parentId)
     .map((entry) => {
-      const path = `${parentPath}/${entry.slug}`
+      const path = paths.get(entry.id) ?? ""
       return {
         slug: entry.slug,
         label: entry.label,
@@ -45,9 +57,14 @@ export function branch(entries: MenuEntry[], parentId: string | null, parentPath
         kind: entry.kind,
         href: hrefOf(entry, path),
         filter: filterOf(entry),
-        children: branch(entries, entry.id, path),
+        children: nested(entries, entry.id, paths),
       }
     })
+}
+
+/** The nested tree under `parentId`, siblings in the order loaded (display order). */
+export function branch(entries: MenuEntry[], parentId: string | null = null): PublicMenuEntry[] {
+  return nested(entries, parentId, pathsById(entries))
 }
 
 interface TrailStep {
@@ -77,7 +94,7 @@ export async function productCount(filter: NonNullable<PublicMenuEntry["filter"]
     legalCategory: filter.legalCategory ?? undefined,
     limit: 1,
   })
-  return (await listCatalogue(filters, publicCatalogueVisible())).pagination.total
+  return countCatalogue(filters, publicCatalogueVisible())
 }
 
 /** Only a filter entry has a page: a heading gathers, a link leads elsewhere. */
@@ -85,47 +102,35 @@ export function pageAt(entries: MenuEntry[], path: string) {
   const chain = chainAt(entries, path)
   const entry = chain?.at(-1)
   if (!chain || !entry || entry.kind !== "filter") return null
-  let ancestorPath = ""
-  const breadcrumb: TrailStep[] = chain.slice(0, -1).map((ancestor) => {
-    ancestorPath = `${ancestorPath}/${ancestor.slug}`
-    return { label: ancestor.label, href: hrefOf(ancestor, ancestorPath) }
-  })
+  const paths = pathsById(entries)
+  const breadcrumb: TrailStep[] = chain
+    .slice(0, -1)
+    .map((ancestor) => ({ label: ancestor.label, href: hrefOf(ancestor, paths.get(ancestor.id) ?? "") }))
   return {
     label: entry.label,
-    path,
+    // Rebuilt from the tree, never echoed: it becomes the page's canonical.
+    path: paths.get(entry.id) ?? path,
     description: entry.description,
     intro: entry.intro,
     filter: filterOf(entry),
     breadcrumb,
-    children: branch(entries, entry.id, path),
+    children: nested(entries, entry.id, paths),
   }
 }
 
 /**
  * The menu pages search engines may list (12.15c): the filter entries showing at
  * least one product, an empty one being kept out of the indexes. Dated by their
- * last edit. One count per entry: the caller caches (the sitemap does).
+ * last edit. One count query per entry, run together; the caller caches (the sitemap does).
  */
 export async function indexableMenuPages(): Promise<{ path: string; updatedAt: Date | null }[]> {
-  const entries = await loadMenuEntries()
-  const pages: { path: string; updatedAt: Date | null }[] = []
-  for (const { path, entry } of entriesWithPaths(entries, null, "")) {
-    if (entry.kind !== "filter") continue
-    const filter = filterOf(entry)
-    if (filter && (await productCount(filter)) > 0) pages.push({ path, updatedAt: entry.updatedAt })
-  }
-  return pages
-}
-
-/** Every entry with its path, depth first, in display order. */
-function* entriesWithPaths(
-  entries: MenuEntry[],
-  parentId: string | null,
-  parentPath: string,
-): Generator<{ path: string; entry: MenuEntry }> {
-  for (const entry of entries.filter((candidate) => candidate.parentId === parentId)) {
-    const path = `${parentPath}/${entry.slug}`
-    yield { path, entry }
-    yield* entriesWithPaths(entries, entry.id, path)
-  }
+  const entries = new Map((await loadMenuEntries()).map((entry) => [entry.id, entry]))
+  // The paths come depth first, in display order: the sitemap keeps it.
+  const pages = [...pathsById([...entries.values()])].flatMap(([id, path]) => {
+    const entry = entries.get(id)
+    const filter = entry && filterOf(entry)
+    return entry && filter ? [{ path, filter, updatedAt: entry.updatedAt }] : []
+  })
+  const counts = await Promise.all(pages.map((page) => productCount(page.filter)))
+  return pages.filter((_page, index) => (counts[index] ?? 0) > 0).map(({ path, updatedAt }) => ({ path, updatedAt }))
 }

@@ -55,6 +55,11 @@ a.mega__heading:hover {
   color: var(--paper);
   background: var(--ink);
 }
+/* An entry without a page reads as text: no hover promising a link. */
+.mega__link--plain:hover {
+  color: var(--paper-dim);
+  background: none;
+}
 
 .mega__cta {
   position: relative;

@@ -127,7 +127,7 @@ describe("GET /api/menu/page", () => {
     expect(data.intro).toMatch(/18 ans/)
   })
 
-  it.each(["/chasse/inconnue", "/chasse/accessoires", "/", "/chasse//armes-longues"])(
+  it.each(["/chasse/inconnue", "/chasse/accessoires", "/", "/chasse//armes-longues", "x/chasse", "chasse"])(
     "has no page at %s",
     async (path) => {
       expect((await page(path)).statusCode).toBe(404)

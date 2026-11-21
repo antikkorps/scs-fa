@@ -47,7 +47,9 @@ const paragraphs = computed(() =>
 
 /** The sub-entries to follow: a heading has no page, its own entries stand in its place. */
 const subentries = computed(() =>
-  page.value.children.flatMap((child) => (child.kind === "group" ? child.children : [child])).filter((e) => e.href),
+  page.value.children
+    .flatMap((child) => (child.kind === "group" ? child.children : [child]))
+    .filter((entry) => entry.href),
 )
 
 // « Carabines — Armes longues · Chasse »: the entry first, then where it sits.
@@ -63,6 +65,7 @@ usePageSeo({
   socialTitle: () => `${title.value} — SCS Firearms`,
   description,
   path: () => page.value.path,
+  // Read once: Nuxt mounts the page afresh for each path.
   noindex: noindex.value,
   // ShopCatalogue states the canonical: it knows the page of results.
   canonical: false,

@@ -17,7 +17,8 @@ const open = defineModel<boolean>("open", { default: false })
   >
     <span>{{ label }}</span><span class="mlink__chev" aria-hidden="true">›</span>
   </button>
-  <div class="msub-wrap" :class="{ 'is-open': open }">
+  <!-- Folded, its links leave the tab order: the whole menu tree sits in here. -->
+  <div class="msub-wrap" :class="{ 'is-open': open }" :inert="!open">
     <div class="msub-inner">
       <ul :id="panelId" class="msub" role="list">
         <slot />

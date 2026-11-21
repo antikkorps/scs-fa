@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { NuxtLink } from "#components"
 import type { ShopMenuEntry } from "#shared/utils/menu"
 
 // Story 12.15c — the header's second row: the shop menu's tabs, as Fred
@@ -23,22 +24,25 @@ const isOpen = (tab: ShopMenuEntry) => openPanel.value === tab.slug
         @open="openPanel = tab.slug"
         @close="openPanel = null"
       >
-        <NuxtLink
-          :to="tab.href ?? undefined"
+        <!-- A heading has no page: a button, so the keyboard can still focus it open. -->
+        <component
+          :is="tab.href ? NuxtLink : 'button'"
+          v-bind="tab.href ? { to: tab.href } : { type: 'button' }"
           class="shop-tab__link nav__trigger"
           :class="{ 'is-open': isOpen(tab) }"
           :aria-expanded="isOpen(tab)"
           :aria-controls="panelId(tab)"
         >
           {{ tab.label }}
-        </NuxtLink>
+        </component>
         <template #panel>
           <div v-for="column in tab.children" :key="column.path" class="mega__col">
             <NuxtLink v-if="column.href" :to="column.href" class="mega__heading">{{ column.label }}</NuxtLink>
             <p v-else class="mega__heading">{{ column.label }}</p>
-            <NuxtLink v-for="leaf in column.children" :key="leaf.path" :to="leaf.href ?? undefined" class="mega__link">
-              {{ leaf.label }}
-            </NuxtLink>
+            <template v-for="leaf in column.children" :key="leaf.path">
+              <NuxtLink v-if="leaf.href" :to="leaf.href" class="mega__link">{{ leaf.label }}</NuxtLink>
+              <span v-else class="mega__link mega__link--plain">{{ leaf.label }}</span>
+            </template>
           </div>
           <NuxtLink v-if="tab.href" :to="tab.href" class="mega__cta">
             <span class="mega__cta-title">

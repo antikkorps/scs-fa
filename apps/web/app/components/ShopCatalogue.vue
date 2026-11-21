@@ -73,11 +73,35 @@ const pinnedTags = computed(() => props.lockedTags ?? [])
 
 // `?tags=` carries a comma-separated selection, matching what the API accepts,
 // so a filtered view stays copy-pasteable and survives a page reload.
+// Tags of one facet add up (OR): a sibling of a pinned tag would widen the page
+// (« Chasse » showing sport shooting). Their facet holds the pinned tags only.
+const pinnedFacets = computed(
+  () =>
+    new Set(
+      facets.value
+        .filter((group) => group.tags.some((tag) => pinnedTags.value.includes(tag.slug)))
+        .map((group) => group.facet),
+    ),
+)
+const facetOfTag = computed(
+  () => new Map(facets.value.flatMap((group) => group.tags.map((tag) => [tag.slug, group.facet] as const))),
+)
+const refinableFacets = computed(() =>
+  facets.value.map((group) =>
+    pinnedFacets.value.has(group.facet)
+      ? { ...group, tags: group.tags.filter((tag) => pinnedTags.value.includes(tag.slug)) }
+      : group,
+  ),
+)
+
 const selectedTags = computed(() =>
   q("tags")
     .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean),
+    .map((slug) => slug.trim())
+    .filter((slug) => {
+      const facet = facetOfTag.value.get(slug)
+      return slug && !(facet && pinnedFacets.value.has(facet))
+    }),
 )
 
 // What the API is asked for: the page's own tag, then the visitor's.
@@ -316,7 +340,7 @@ useHead({
             <button v-if="hasFilters" type="button" class="filters__reset" @click="resetFilters">Réinitialiser</button>
           </div>
           <ProductTagFilters
-            :facets="facets"
+            :facets="refinableFacets"
             :selected="appliedTags"
             @toggle="toggleTag"
             @clear="navigate({ tags: undefined })"

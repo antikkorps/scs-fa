@@ -55,24 +55,9 @@ function catalogueOrder(sort: ProductSort, search: string | undefined): SQL[] {
   return [...primaryOrder(sort, search), asc(products.id)]
 }
 
-/**
- * One page of the catalogue, filtered and ranked, under the visibility the
- * caller sets: the public one, or the pro catalogue's (story 12.8c).
- */
-export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
-  const {
-    category,
-    subcategory,
-    tags: tagSlugs,
-    legalCategory,
-    search,
-    minPrice,
-    maxPrice,
-    page,
-    limit,
-    sort,
-  } = filters
-
+/** The catalogue's conditions for these filters, under the caller's visibility. */
+async function catalogueWhere(filters: ProductFilters, visibility: SQL): Promise<SQL | undefined> {
+  const { category, subcategory, tags: tagSlugs, legalCategory, search, minPrice, maxPrice } = filters
   const conditions: SQL[] = [visibility]
   if (category) conditions.push(eq(productCategories.slug, category))
   if (subcategory) conditions.push(eq(productSubcategories.slug, subcategory))
@@ -85,11 +70,10 @@ export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
     conditions.push(sql`${products.searchVector} @@ websearch_to_tsquery('french', ${search})`)
   }
   if (tagSlugs) conditions.push(...(await buildTagFilterConditions(tagSlugs)))
+  return and(...conditions)
+}
 
-  const where = and(...conditions)
-
-  const orderBy = catalogueOrder(sort, search)
-
+async function countWhere(where: SQL | undefined): Promise<number> {
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(products)
@@ -97,6 +81,23 @@ export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
     .leftJoin(productSubcategories, eq(products.subcategoryId, productSubcategories.id))
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
     .where(where)
+  return total
+}
+
+/** How many products these filters match: the count a catalogue page shows, without its rows. */
+export async function countCatalogue(filters: ProductFilters, visibility: SQL): Promise<number> {
+  return countWhere(await catalogueWhere(filters, visibility))
+}
+
+/**
+ * One page of the catalogue, filtered and ranked, under the visibility the
+ * caller sets: the public one, or the pro catalogue's (story 12.8c).
+ */
+export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
+  const { search, page, limit, sort } = filters
+  const where = await catalogueWhere(filters, visibility)
+  const orderBy = catalogueOrder(sort, search)
+  const total = await countWhere(where)
 
   const rows = await db
     .select({

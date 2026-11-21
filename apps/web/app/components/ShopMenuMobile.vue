@@ -16,12 +16,13 @@ const { menu } = useShopMenu()
           <span v-else class="msub__heading">{{ entry.label }}</span>
           <ul v-if="entry.children.length" class="msub__deep" role="list">
             <li v-for="leaf in entry.children" :key="leaf.path">
-              <NuxtLink :to="leaf.href ?? undefined" class="msub__link">{{ leaf.label }}</NuxtLink>
+              <NuxtLink v-if="leaf.href" :to="leaf.href" class="msub__link">{{ leaf.label }}</NuxtLink>
+              <span v-else class="msub__heading">{{ leaf.label }}</span>
             </li>
           </ul>
         </li>
       </MobileNavAccordion>
-      <NuxtLink v-else :to="tab.href ?? undefined" class="mlink">
+      <NuxtLink v-else-if="tab.href" :to="tab.href" class="mlink">
         <span>{{ tab.label }}</span><span class="mlink__chev" aria-hidden="true">›</span>
       </NuxtLink>
     </li>

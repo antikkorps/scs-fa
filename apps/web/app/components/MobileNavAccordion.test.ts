@@ -30,4 +30,12 @@ describe("MobileNavAccordion", () => {
     await toggle.trigger("click")
     expect(toggle.attributes("aria-expanded")).toBe("false")
   })
+
+  // Review of 12.15c: folded, its links must leave the tab order.
+  it("takes a folded panel out of the tab order", async () => {
+    const wrapper = await mountAccordion()
+    expect(wrapper.find(".msub-wrap").attributes("inert")).toBeDefined()
+    await wrapper.find("button").trigger("click")
+    expect(wrapper.find(".msub-wrap").attributes("inert")).toBeUndefined()
+  })
 })

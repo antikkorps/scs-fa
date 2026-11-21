@@ -1,12 +1,23 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
-import { describe, expect, it } from "vitest"
-import { fetchWithShopMenu } from "../../tests/helpers/shopMenu"
+import { afterEach, describe, expect, it } from "vitest"
+import { ref } from "vue"
+import type { ShopMenuEntry } from "../../shared/utils/menu"
+import { fetchWithShopMenu, SHOP_MENU } from "../../tests/helpers/shopMenu"
 import ShopMenuBar from "./ShopMenuBar.vue"
 
 // Story 12.15c — the header's second row: the shop menu's tabs, as Fred edits
 // them in the back-office, each with its mega-panel.
-mockNuxtImport("useFetch", () => fetchWithShopMenu)
+// A test may swap the menu for one of its own.
+let ownMenu: ShopMenuEntry[] | null = null
+mockNuxtImport(
+  "useFetch",
+  () => (url: string) =>
+    ownMenu && url.endsWith("/menu") ? { data: ref({ data: ownMenu }), error: ref(null) } : fetchWithShopMenu(url),
+)
+afterEach(() => {
+  ownMenu = null
+})
 
 async function openTab(slug: string) {
   const wrapper = await mountSuspended(ShopMenuBar)
@@ -68,5 +79,21 @@ describe("ShopMenuBar", () => {
   it("ends the row with a link to the whole shop", async () => {
     const wrapper = await mountSuspended(ShopMenuBar)
     expect(wrapper.find('a.shop-bar__all[href="/boutique"]').text()).toContain("Toute la boutique")
+  })
+
+  // Review of 12.15c: a heading has no page. As an <a> without href its tab
+  // could not take the keyboard focus that opens its panel.
+  it("draws a heading tab as a button and a leaf without a page as text", async () => {
+    const group = { ...SHOP_MENU[0], kind: "group", href: null } as ShopMenuEntry
+    const [column] = group.children
+    const [leaf] = column?.children ?? []
+    const leafless = { ...column, children: [{ ...leaf, href: null }] }
+    ownMenu = [{ ...group, children: [leafless as ShopMenuEntry] }]
+    const wrapper = await mountSuspended(ShopMenuBar)
+    const trigger = wrapper.find('button[aria-controls="mega-chasse"]')
+    expect(trigger.exists()).toBe(true)
+    await trigger.trigger("focusin")
+    expect(wrapper.find("#mega-chasse").text()).toContain("Fusils")
+    expect(wrapper.findAll("#mega-chasse a.mega__link")).toHaveLength(0)
   })
 })

@@ -31,7 +31,10 @@ mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
         data: [
           {
             facet: "etat",
-            tags: [{ slug: "occasion", name: "Occasion", facet: "etat", description: null, productCount: 3 }],
+            tags: [
+              { slug: "occasion", name: "Occasion", facet: "etat", description: null, productCount: 3 },
+              { slug: "neuf", name: "Neuf", facet: "etat", description: null, productCount: 2 },
+            ],
           },
         ],
       }),
@@ -101,6 +104,15 @@ describe("ShopCatalogue (story 9.6)", () => {
       const push = spyPush()
       await box.trigger("change")
       expect(push).toHaveBeenCalledWith({ path: "/boutique", query: { legalCategory: "B" } })
+    })
+
+    // Story 12.15c review: tags of one facet add up (OR), so a sibling of the
+    // page's tag would widen the page — « Chasse » showing sport shooting.
+    it("offers no other tag of the page's tag's facet, and ignores one in the address", async () => {
+      productQueries.length = 0
+      const wrapper = await mountSuspended(ShopCatalogue, { props: tagPage, route: "/boutique/tag/occasion?tags=neuf" })
+      expect(wrapper.findAll(".tagf__box")).toHaveLength(1)
+      expect(productQueries.at(-1)).toMatchObject({ tags: "occasion" })
     })
 
     it("links the categories and the whole catalogue cleanly, none of them as the current page", async () => {

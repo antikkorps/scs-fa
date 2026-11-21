@@ -116,19 +116,19 @@ export default defineEventHandler(async (event) => {
       priority: 0.8,
     })),
     ...d.productCategories
-      .filter((c) => !shortcuts.categories.has(c.slug))
-      .map((c) => ({
-        loc: `${siteUrl}/boutique/categorie/${c.slug}`,
-        lastmod: c.updatedAt,
+      .filter((category) => !shortcuts.categories.has(category.slug))
+      .map((category) => ({
+        loc: `${siteUrl}/boutique/categorie/${category.slug}`,
+        lastmod: category.updatedAt,
         changefreq: "weekly" as const,
         priority: 0.8,
       })),
     // Tag pages: only tags on at least one published product reach this list.
     ...d.tags
-      .filter((t) => !shortcuts.tags.has(t.slug))
-      .map((t) => ({
-        loc: `${siteUrl}/boutique/tag/${encodeURIComponent(t.slug)}`,
-        lastmod: t.updatedAt,
+      .filter((tag) => !shortcuts.tags.has(tag.slug))
+      .map((tag) => ({
+        loc: `${siteUrl}/boutique/tag/${encodeURIComponent(tag.slug)}`,
+        lastmod: tag.updatedAt,
         changefreq: "weekly" as const,
         priority: 0.6,
       })),
