@@ -28,6 +28,6 @@ ALTER TABLE "menu_entries" ADD CONSTRAINT "fk_menu_entries_parent" FOREIGN KEY (
 ALTER TABLE "menu_entries" ADD CONSTRAINT "fk_menu_entries_category" FOREIGN KEY ("category_id") REFERENCES "public"."product_categories"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "menu_entries" ADD CONSTRAINT "fk_menu_entries_subcategory_category" FOREIGN KEY ("subcategory_id","category_id") REFERENCES "public"."product_subcategories"("id","category_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "menu_entry_tags" ADD CONSTRAINT "fk_menu_entry_tags_entry" FOREIGN KEY ("entry_id") REFERENCES "public"."menu_entries"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "menu_entry_tags" ADD CONSTRAINT "fk_menu_entry_tags_tag" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "menu_entry_tags" ADD CONSTRAINT "fk_menu_entry_tags_tag" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_menu_entries_parent" ON "menu_entries" USING btree ("parent_id","position");--> statement-breakpoint
 CREATE INDEX "idx_menu_entry_tags_tag" ON "menu_entry_tags" USING btree ("tag_id");

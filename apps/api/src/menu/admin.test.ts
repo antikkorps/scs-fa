@@ -1,9 +1,9 @@
-import { like } from "drizzle-orm"
+import { eq, like } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { menuEntries } from "../db/schema.js"
+import { menuEntries, tags } from "../db/schema.js"
 import { createAccount, deleteAccounts, type TestAccount } from "../test/account-fixtures.js"
 
 const SUFFIX = "@menu-admin.test"
@@ -42,6 +42,7 @@ describe("admin menu", () => {
 
   async function cleanup() {
     await db.delete(menuEntries).where(like(menuEntries.slug, `${PREFIX}%`))
+    await db.delete(tags).where(like(tags.slug, `${PREFIX}%`))
     await deleteAccounts(SUFFIX)
   }
 
@@ -208,5 +209,24 @@ describe("admin menu", () => {
     expect((await call("DELETE", `${BASE}/${parent.id}`)).statusCode).toBe(204)
     expect((await list()).some((e) => e.id === child.id)).toBe(false)
     expect((await call("DELETE", `${BASE}/${parent.id}`)).statusCode).toBe(404)
+  })
+
+  // A deleted tag would silently widen every entry filtering on it.
+  it("refuses deleting a tag a menu entry filters on, naming the entry", async () => {
+    const [tag] = await db
+      .insert(tags)
+      .values({ slug: `${PREFIX}tag`, name: "Tag de test", facet: "usage" })
+      .returning({ id: tags.id })
+    if (!tag) throw new Error("test tag not inserted")
+    const entry = await top("tag-utilise", { tagSlugs: [`${PREFIX}tag`] })
+    const tagUrl = `/api/admin/tags/${tag.id}`
+
+    const refused = await call("DELETE", tagUrl)
+    expect(refused.statusCode).toBe(409)
+    expect(refused.json().message).toContain("tag-utilise")
+
+    await call("PATCH", `${BASE}/${entry.id}`, { tagSlugs: [] })
+    expect((await call("DELETE", tagUrl)).statusCode).toBe(204)
+    expect(await db.select().from(tags).where(eq(tags.id, tag.id))).toEqual([])
   })
 })

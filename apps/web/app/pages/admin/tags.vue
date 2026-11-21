@@ -50,7 +50,7 @@ const columns: AdminColumn[] = [
     new-label="Nouveau tag"
     empty-label="Aucun tag pour l'instant."
     endpoint="/admin/tags"
-    intro="Un produit porte une seule catégorie mais autant de tags que nécessaire. Supprimer un tag le retire des produits qui le portent, sans toucher aux produits eux-mêmes."
+    intro="Un produit porte une seule catégorie mais autant de tags que nécessaire. Supprimer un tag le retire des produits qui le portent, sans toucher aux produits eux-mêmes. Un tag utilisé par le menu de la boutique ne se supprime pas : retirez-le d'abord des entrées concernées."
     :fields="fields"
     :columns="columns"
   />

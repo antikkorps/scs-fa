@@ -872,9 +872,9 @@ export const menuEntryTags = pgTable(
     foreignKey({ name: "fk_menu_entry_tags_entry", columns: [t.entryId], foreignColumns: [menuEntries.id] }).onDelete(
       "cascade",
     ),
-    // Deleting a tag takes it off the entries that used it: they then show MORE
-    // products (one criterion fewer). Never a broken entry, but a wider one.
-    foreignKey({ name: "fk_menu_entry_tags_tag", columns: [t.tagId], foreignColumns: [tags.id] }).onDelete("cascade"),
+    // RESTRICT: a deleted tag would silently widen every entry filtering on it
+    // (one criterion fewer). The tag API names those entries instead.
+    foreignKey({ name: "fk_menu_entry_tags_tag", columns: [t.tagId], foreignColumns: [tags.id] }).onDelete("restrict"),
     index("idx_menu_entry_tags_tag").on(t.tagId),
   ],
 )

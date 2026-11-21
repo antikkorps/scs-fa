@@ -4,8 +4,10 @@ import type { FastifyPluginAsync } from "fastify"
 import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
+import { isRestrictViolation } from "../db/errors.js"
 import { productTags, tags } from "../db/schema.js"
 import { validationError } from "../http.js"
+import { entryLabelsWithTag } from "../menu/entries.js"
 
 // What a deletion would strip off the catalogue, shown before it happens.
 //
@@ -71,12 +73,24 @@ export const adminTagRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send({ data: row })
   })
 
-  /** DELETE /:id — the links to products cascade; the products themselves stay. */
+  /**
+   * DELETE /:id — the links to products cascade; the products themselves stay.
+   * A tag the shop menu filters on is refused (story 12.15b): gone, it would
+   * silently widen those entries. The foreign key decides, so no race slips by.
+   */
   fastify.delete("/:id", async (request, reply) => {
     const params = uuidParamSchema.safeParse(request.params)
     if (!params.success) return reply.code(400).send(validationError(params.error.issues))
-    const [row] = await db.delete(tags).where(eq(tags.id, params.data.id)).returning({ id: tags.id })
-    if (!row) return reply.code(404).send({ error: "NotFound", message: "Tag not found" })
-    return reply.code(204).send()
+    try {
+      const [row] = await db.delete(tags).where(eq(tags.id, params.data.id)).returning({ id: tags.id })
+      if (!row) return reply.code(404).send({ error: "NotFound", message: "Tag not found" })
+      return reply.code(204).send()
+    } catch (error) {
+      if (!isRestrictViolation(error, "fk_menu_entry_tags_tag")) throw error
+      const labels = (await entryLabelsWithTag(params.data.id)).join(", ")
+      return reply
+        .code(409)
+        .send({ error: "Conflict", message: `Menu entries filter on this tag: ${labels}. Take it off them first.` })
+    }
   })
 }

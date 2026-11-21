@@ -105,3 +105,14 @@ export async function setEntryTags(entryId: string, slugs: string[], tx: DbExecu
   await tx.delete(menuEntryTags).where(eq(menuEntryTags.entryId, entryId))
   if (tagIds.length > 0) await tx.insert(menuEntryTags).values(tagIds.map((tagId) => ({ entryId, tagId })))
 }
+
+/** The labels of the entries filtering on a tag, which hold it back from deletion. */
+export async function entryLabelsWithTag(tagId: string): Promise<string[]> {
+  const rows = await db
+    .select({ label: menuEntries.label })
+    .from(menuEntryTags)
+    .innerJoin(menuEntries, eq(menuEntries.id, menuEntryTags.entryId))
+    .where(eq(menuEntryTags.tagId, tagId))
+    .orderBy(asc(menuEntries.label))
+  return rows.map((row) => row.label)
+}
