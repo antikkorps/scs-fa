@@ -27,7 +27,14 @@ async function fetchAll<T>(url: string, headers: Record<string, string>): Promis
   return rows
 }
 
-const EMPTY_CATALOGUE: LlmsFullInput = { artworks: [], articles: [], series: [], products: [], categories: [] }
+const EMPTY_CATALOGUE: LlmsFullInput = {
+  artworks: [],
+  articles: [],
+  series: [],
+  products: [],
+  categories: [],
+  menu: [],
+}
 
 /**
  * The whole catalogue, read from the API at most every ten minutes (SEO audit
@@ -39,14 +46,15 @@ const cachedCatalogue = defineCachedFunction(
   async (): Promise<LlmsFullInput> => {
     const { base, headers } = serverUpstream()
     const get = <T>(path: string) => $fetch<T>(`${base}${path}`, { headers })
-    const [artworks, articles, series, products, categories] = await Promise.all([
+    const [artworks, articles, series, products, categories, menu] = await Promise.all([
       get<{ data: LlmsArtwork[] }>("/artworks").then((r) => r.data),
       fetchAll<LlmsArticle>(`${base}/blog`, headers),
       get<{ data: LlmsSeries[] }>("/artworks/series").then((r) => r.data),
       fetchAll<LlmsProduct>(`${base}/products`, headers),
       get<{ data: LlmsCategory[] }>("/product-categories").then((r) => r.data),
+      get<{ data: LlmsFullInput["menu"] }>("/menu").then((r) => r.data),
     ])
-    return { artworks, articles, series, products, categories }
+    return { artworks, articles, series, products, categories, menu }
   },
   { ...AGENT_FILE_CACHE, name: "llms-full-catalogue", getKey: () => "all" },
 )

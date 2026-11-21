@@ -8,5 +8,5 @@ export default defineEventHandler(async (event) => {
   setHeader(event, "content-type", "text/plain; charset=utf-8")
   // Short: the "sales not open yet" line must not outlive the opening by long.
   setHeader(event, "cache-control", "public, max-age=600")
-  return buildLlmsTxt(siteUrl, await llmsStage())
+  return buildLlmsTxt(siteUrl, await llmsStage(), await shopMenuOrNone())
 })

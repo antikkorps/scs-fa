@@ -16,8 +16,12 @@ import { legalCategoryLabel } from "~/utils/product"
 const props = defineProps<{
   /** Category slug locked by the page, or "" for the whole catalogue. */
   category: string
-  /** Tag slug locked by a tag page: always applied, unticking it leaves the page. */
-  tag?: string
+  /** Subcategory locked by a menu entry's page (story 12.15c). */
+  subcategory?: string
+  /** Tags locked by the page (a tag page, a menu entry): always applied, unticking one leaves the page. */
+  lockedTags?: string[]
+  /** Legal category locked by a menu entry's page: its filter is then not offered. */
+  lockedLegalCategory?: string
   /** Absolute path of the page hosting the catalogue, e.g. "/boutique". */
   basePath: string
   /** Name of the list in its ItemList structured data. */
@@ -44,7 +48,7 @@ const q = (key: string) => {
 }
 
 const term = ref(q("search"))
-const legalCategory = computed(() => q("legalCategory"))
+const legalCategory = computed(() => props.lockedLegalCategory || q("legalCategory"))
 const minPrice = computed(() => q("minPrice"))
 const maxPrice = computed(() => q("maxPrice"))
 // UX audit 2026-11-01 (I6). "relevance", the default, stays out of the address.
@@ -64,6 +68,8 @@ const page = computed(() => pageFromQuery(route.query.page))
 // Reference data for the filters (shared with the header mega-menu, one request).
 const { categories } = useProductCategories()
 const { facets } = useTags()
+const menuLinks = useShopMenu()
+const lockedTags = computed(() => props.lockedTags ?? [])
 
 // `?tags=` carries a comma-separated selection, matching what the API accepts,
 // so a filtered view stays copy-pasteable and survives a page reload.
@@ -75,10 +81,10 @@ const selectedTags = computed(() =>
 )
 
 // What the API is asked for: the page's own tag, then the visitor's.
-const appliedTags = computed(() => (props.tag ? [props.tag, ...selectedTags.value] : selectedTags.value))
+const appliedTags = computed(() => [...lockedTags.value, ...selectedTags.value])
 
 function toggleTag(slug: string) {
-  if (slug === props.tag) {
+  if (lockedTags.value.includes(slug)) {
     router.push({ path: categoryPath(""), query: filterQuery({}) })
     return
   }
@@ -92,6 +98,7 @@ function toggleTag(slug: string) {
 const apiQuery = computed(() => {
   const query: Record<string, string | number> = { limit: PAGE_SIZE, page: page.value }
   if (props.category) query.category = props.category
+  if (props.subcategory) query.subcategory = props.subcategory
   if (appliedTags.value.length > 0) query.tags = appliedTags.value.join(",")
   if (legalCategory.value) query.legalCategory = legalCategory.value
   if (term.value.trim()) query.search = term.value.trim()
@@ -102,7 +109,7 @@ const apiQuery = computed(() => {
 })
 
 const { data, error, pending } = await useApiFetch<ProductListResponse>(`/products`, {
-  key: `boutique-products-${props.category || "all"}-${props.tag ?? ""}`,
+  key: `boutique-products-${props.category || "all"}-${props.subcategory ?? ""}-${lockedTags.value.join(",")}-${props.lockedLegalCategory ?? ""}`,
   query: apiQuery,
 })
 
@@ -116,7 +123,7 @@ function filterQuery(overrides: Record<string, string | undefined>, resetPage = 
   const base = {
     search: term.value.trim(),
     tags: selectedTags.value.join(","),
-    legalCategory: legalCategory.value,
+    legalCategory: props.lockedLegalCategory ? "" : legalCategory.value,
     minPrice: minPrice.value,
     maxPrice: maxPrice.value,
     sort: sort.value === "relevance" ? "" : sort.value,
@@ -139,7 +146,7 @@ function navigate(overrides: Record<string, string | undefined>, resetPage = tru
  * would be a crawlable filtered duplicate.
  */
 function categoryLink(slug: string) {
-  return { path: categoryPath(slug), query: filterQuery({}) }
+  return { path: menuLinks.categoryPath(slug), query: filterQuery({}) }
 }
 
 /** Page N of these results: the first one without `?page`. */
@@ -174,8 +181,9 @@ function resetFilters() {
   router.push({ query: {} })
 }
 
+const visitorLegalCategory = computed(() => (props.lockedLegalCategory ? "" : legalCategory.value))
 const hasFiltersBesidesTags = computed(() =>
-  Boolean(legalCategory.value || minPrice.value || maxPrice.value || term.value.trim()),
+  Boolean(visitorLegalCategory.value || minPrice.value || maxPrice.value || term.value.trim()),
 )
 const hasFilters = computed(() => hasFiltersBesidesTags.value || selectedTags.value.length > 0)
 
@@ -183,14 +191,20 @@ const hasFilters = computed(() => hasFiltersBesidesTags.value || selectedTags.va
 // took ~900 px before the first product). The search and the sort stay out.
 const filtersOpen = ref(false)
 const activeFilterCount = computed(
-  () => [legalCategory.value, minPrice.value, maxPrice.value].filter(Boolean).length + selectedTags.value.length,
+  () => [visitorLegalCategory.value, minPrice.value, maxPrice.value].filter(Boolean).length + selectedTags.value.length,
 )
 const filtersToggleLabel = computed(() =>
   activeFilterCount.value > 0 ? `Filtres (${activeFilterCount.value})` : "Filtres",
 )
 
+// A page narrower than its category (a tag page, most menu entries) is not
+// that category's page: no category is shown as the current one.
+const narrowed = computed(() =>
+  Boolean(lockedTags.value.length || props.subcategory || props.lockedLegalCategory),
+)
+
 const canonicalPath = computed(() =>
-  catalogueCanonicalPath(props.basePath, selectedTags.value, hasFiltersBesidesTags.value),
+  catalogueCanonicalPath(props.basePath, selectedTags.value, hasFiltersBesidesTags.value, menuLinks.shortcuts.value),
 )
 
 useHead({
@@ -224,7 +238,7 @@ useHead({
 <template>
   <div class="catalogue">
     <section class="container">
-      <CategoryLinks :categories="categories" :current="tag ? null : category" :link-for="categoryLink" />
+      <CategoryLinks :categories="categories" :current="narrowed ? null : category" :link-for="categoryLink" />
       <form class="filters" role="search" @submit.prevent>
         <div class="filters__field filters__search">
           <label class="sr-only" for="shop-search">Rechercher</label>
@@ -261,7 +275,7 @@ useHead({
 
         <div id="shop-filters" class="filters__panel" :class="{ 'is-open': filtersOpen }">
           <div class="filters__fields">
-            <div class="filters__field">
+            <div v-if="!lockedLegalCategory" class="filters__field">
               <label class="sr-only" for="shop-legal">Catégorie légale</label>
               <select
                 id="shop-legal"

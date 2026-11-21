@@ -46,21 +46,28 @@ describe("stock helpers", () => {
   })
 })
 
+// Story 12.15c — a menu entry showing exactly a category or a tag stands for its page.
+const SHORTCUTS = {
+  categories: new Map([["coutellerie", "/coutellerie"]]),
+  tags: new Map([["chasse", "/chasse"]]),
+}
+
 describe("categoryPath", () => {
   it("gives a category its own page, and the whole catalogue for none", () => {
     expect(categoryPath("arme-poing")).toBe("/boutique/categorie/arme-poing")
     expect(categoryPath("")).toBe("/boutique")
   })
 
-  it("leads the knife category to its universe page (story 12.13)", () => {
-    expect(categoryPath("coutellerie")).toBe("/coutellerie")
+  it("leads a category to the menu entry standing for it", () => {
+    expect(categoryPath("coutellerie", SHORTCUTS)).toBe("/coutellerie")
+    expect(categoryPath("arme-poing", SHORTCUTS)).toBe("/boutique/categorie/arme-poing")
   })
 })
 
 describe("tagPath", () => {
-  it("gives a tag its own page, and the hunting tag its universe page (story 12.13)", () => {
-    expect(tagPath("occasion")).toBe("/boutique/tag/occasion")
-    expect(tagPath("chasse")).toBe("/chasse")
+  it("gives a tag its own page, or the menu entry standing for it", () => {
+    expect(tagPath("occasion", SHORTCUTS)).toBe("/boutique/tag/occasion")
+    expect(tagPath("chasse", SHORTCUTS)).toBe("/chasse")
   })
 })
 
@@ -108,6 +115,7 @@ describe("tag pages", () => {
 describe("catalogueCanonicalPath", () => {
   it("sends the whole catalogue filtered on a single tag to that tag's page", () => {
     expect(catalogueCanonicalPath("/boutique", ["occasion"], false)).toBe("/boutique/tag/occasion")
+    expect(catalogueCanonicalPath("/boutique", ["chasse"], false, SHORTCUTS)).toBe("/chasse")
   })
 
   it("keeps the page it filters otherwise", () => {

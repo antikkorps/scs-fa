@@ -1,10 +1,10 @@
 import { computePriceTtc, type ProductFilters, type ProductSort, productFiltersSchema } from "@armurier/shared"
-import { and, asc, desc, eq, ne, type SQL, sql } from "drizzle-orm"
+import { and, asc, desc, eq, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
 import { ancientWeapons, legalCategories, productCategories, productSubcategories, products } from "../db/schema.js"
 import { buildTagFilterConditions, productTagsJson } from "./tag-filter.js"
-import { publiclyVisible } from "./visibility.js"
+import { publicCatalogueVisible } from "./visibility.js"
 
 export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (request, reply) => {
@@ -18,12 +18,8 @@ export const listProductsRoute: FastifyPluginAsync = async (fastify) => {
         })),
       })
     }
-    // Only published products for everyone. Gun Art is its own universe served
-    // by /api/artworks, so its backing products are excluded here — this
-    // endpoint is the armurerie catalogue (firearms, ammo, accessories…).
-    return reply
-      .code(200)
-      .send(await listCatalogue(parsed.data, and(publiclyVisible(), ne(productCategories.category, "gun_art")) as SQL))
+    // The armurerie catalogue (firearms, ammo, accessories…), Gun Art aside.
+    return reply.code(200).send(await listCatalogue(parsed.data, publicCatalogueVisible()))
   })
 }
 

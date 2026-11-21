@@ -13,6 +13,7 @@ import {
   productTags,
   tags,
 } from "../db/schema.js"
+import { indexableMenuPages } from "../menu/pages.js"
 import { publiclyVisible } from "../products/visibility.js"
 
 /**
@@ -26,7 +27,7 @@ import { publiclyVisible } from "../products/visibility.js"
  */
 export const seoRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/sitemap", async (_request, reply) => {
-    const [productRows, categoryRows, tagRows, artworkRows, seriesRows, themeRows, artistRows, postRows] =
+    const [productRows, categoryRows, tagRows, artworkRows, seriesRows, themeRows, artistRows, postRows, menuPages] =
       await Promise.all([
         // Gun Art products only back the artworks, which live under /collection.
         db
@@ -123,6 +124,7 @@ export const seoRoutes: FastifyPluginAsync = async (fastify) => {
           .from(blogPosts)
           .where(eq(blogPosts.published, true))
           .orderBy(asc(blogPosts.slug)),
+        indexableMenuPages(),
       ])
 
     return reply.code(200).send({
@@ -140,6 +142,8 @@ export const seoRoutes: FastifyPluginAsync = async (fastify) => {
         artists: artistRows,
         // An article edited after publication is dated by its last edit.
         blogPosts: postRows.map(({ publishedAt, ...p }) => ({ ...p, updatedAt: p.updatedAt ?? publishedAt })),
+        // Story 12.15c — the shop menu's pages that show products.
+        menuPages,
       },
     })
   })

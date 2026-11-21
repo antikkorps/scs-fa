@@ -102,6 +102,16 @@ describe("GET /api/menu/page", () => {
     expect(data.children.map((child: { label: string }) => child.label)).toEqual(["Fusils", "Carabines", "Munitions"])
   })
 
+  // An empty page is kept out of the indexes: the page needs the count.
+  it("counts the products the entry shows, as the catalogue does", async () => {
+    const data = (await page("/chasse/armes-longues/carabines")).json().data
+    const catalogue = await app.inject({
+      method: "GET",
+      url: "/api/products?limit=1&category=arme-longue&subcategory=carabines&tags=chasse",
+    })
+    expect(data.productCount).toBe(catalogue.json().pagination.total)
+  })
+
   it("names a heading in the trail without a link", async () => {
     const data = (await page("/chasse/accessoires/nettoyage")).json().data
     expect(data.breadcrumb).toEqual([

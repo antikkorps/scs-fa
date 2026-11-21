@@ -21,6 +21,7 @@ export interface MenuEntry {
   tagSlugs: string[]
   description: string | null
   intro: string | null
+  updatedAt: Date | null
 }
 
 /** A change the menu refuses (unknown reference, broken tree rule): the route answers 400. */
@@ -55,6 +56,7 @@ export async function loadMenuEntries(tx: DbExecutor = db): Promise<MenuEntry[]>
         legalCategory: menuEntries.legalCategory,
         description: menuEntries.description,
         intro: menuEntries.intro,
+        updatedAt: menuEntries.updatedAt,
       })
       .from(menuEntries)
       .leftJoin(productCategories, eq(productCategories.id, menuEntries.categoryId))

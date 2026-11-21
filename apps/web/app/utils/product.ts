@@ -1,4 +1,4 @@
-import { universePathForCategory, universePathForTag } from "#shared/utils/universes"
+import type { MenuShortcuts } from "#shared/utils/menu"
 import type { LegalCategoryCode } from "~/types/product"
 
 // Short badge label for a French prefectural legal category. `none` means the
@@ -45,15 +45,20 @@ export function conditionLabel(condition: string | null | undefined): string {
   return CONDITION_LABELS[condition] ?? condition
 }
 
-/** The page of an armurerie category, or the whole catalogue for "" (story 9.6). */
-export function categoryPath(slug: string): string {
+const NO_SHORTCUTS: MenuShortcuts = { categories: new Map(), tags: new Map() }
+
+/**
+ * The page of an armurerie category, or the whole catalogue for "" (story 9.6):
+ * the menu entry showing exactly that category when there is one (12.15c).
+ */
+export function categoryPath(slug: string, shortcuts: MenuShortcuts = NO_SHORTCUTS): string {
   if (!slug) return "/boutique"
-  return universePathForCategory(slug) ?? `/boutique/categorie/${encodeURIComponent(slug)}`
+  return shortcuts.categories.get(slug) ?? `/boutique/categorie/${encodeURIComponent(slug)}`
 }
 
-/** The page of an armurerie tag: every published product carrying it. */
-export function tagPath(slug: string): string {
-  return universePathForTag(slug) ?? `/boutique/tag/${encodeURIComponent(slug)}`
+/** The page of an armurerie tag, or the menu entry showing exactly that tag (12.15c). */
+export function tagPath(slug: string, shortcuts: MenuShortcuts = NO_SHORTCUTS): string {
+  return shortcuts.tags.get(slug) ?? `/boutique/tag/${encodeURIComponent(slug)}`
 }
 
 const WHOLE_CATALOGUE_PATH = "/boutique"
@@ -63,9 +68,16 @@ const WHOLE_CATALOGUE_PATH = "/boutique"
  * its own, except one: the whole catalogue filtered on a single tag and nothing
  * else is exactly that tag's page, which gets the credit.
  */
-export function catalogueCanonicalPath(basePath: string, tags: string[], hasOtherFilters: boolean): string {
+export function catalogueCanonicalPath(
+  basePath: string,
+  tags: string[],
+  hasOtherFilters: boolean,
+  shortcuts: MenuShortcuts = NO_SHORTCUTS,
+): string {
   const [onlyTag] = tags
-  if (basePath === WHOLE_CATALOGUE_PATH && tags.length === 1 && onlyTag && !hasOtherFilters) return tagPath(onlyTag)
+  if (basePath === WHOLE_CATALOGUE_PATH && tags.length === 1 && onlyTag && !hasOtherFilters) {
+    return tagPath(onlyTag, shortcuts)
+  }
   return basePath
 }
 

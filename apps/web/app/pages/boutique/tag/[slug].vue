@@ -7,7 +7,9 @@ const slug = computed(() => String(route.params.slug))
 // is a real 404. A tag no product carries any more stays reachable for a link
 // someone kept, but out of the indexes: an empty grid is a thin page.
 const { facets, ready, error } = useTags()
-await ready
+// A menu entry showing exactly this tag is its canonical page (story 12.15c).
+const { tagPath, ready: menuReady } = useShopMenu()
+await Promise.all([ready, menuReady])
 const tag = computed(() => facets.value.flatMap((group) => group.tags).find((t) => t.slug === slug.value))
 if (!tag.value) {
   throw missingPageError(error.value, "Page introuvable")
@@ -38,7 +40,7 @@ usePageSeo({
     <ShopCatalogue
       :key="slug"
       category=""
-      :tag="slug"
+      :locked-tags="[slug]"
       :base-path="tagPath(slug)"
       :noindex="(tag?.productCount ?? 0) === 0"
       :list-name="`${name} — Boutique armurerie SCS Firearms`"

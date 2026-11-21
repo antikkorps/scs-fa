@@ -36,7 +36,8 @@ if (props.structured) {
     <ol class="crumbs__list">
       <li v-for="(item, i) in items" :key="`${i}-${item.name}`" class="crumbs__item">
         <NuxtLink v-if="item.to && i < items.length - 1" :to="item.to">{{ item.name }}</NuxtLink>
-        <span v-else class="crumbs__current" aria-current="page">{{ item.name }}</span>
+        <span v-else-if="i === items.length - 1" class="crumbs__current" aria-current="page">{{ item.name }}</span>
+        <span v-else>{{ item.name }}</span>
       </li>
     </ol>
   </nav>

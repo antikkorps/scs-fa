@@ -12,6 +12,14 @@ export function publiclyVisible(): SQL {
 }
 
 /**
+ * The public armurerie catalogue: Gun Art is its own universe, served by
+ * /api/artworks. The query must join `productCategories` on the product.
+ */
+export function publicCatalogueVisible(): SQL {
+  return and(publiclyVisible(), ne(productCategories.category, "gun_art")) as SQL
+}
+
+/**
  * What an approved pro may ask a quote for (story 12.8c): the published
  * armurerie, reserved for pros or not — never a collection piece nor a Gun Art
  * print, which a pro buys as anyone does. The query must join

@@ -20,11 +20,15 @@ export function breadcrumbJsonLd(siteUrl: string, items: { name: string; to?: st
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: items.map((item, i) => ({
-      "@type": "ListItem",
-      position: i + 1,
-      name: item.name,
-      ...(item.to && i < items.length - 1 ? { item: `${siteUrl}${item.to}` } : {}),
-    })),
+    // Before the last, a crumb without a page (a menu heading) would be an
+    // invalid ListItem: Google wants the URL of every one but the current page.
+    itemListElement: items
+      .filter((item, i) => item.to || i === items.length - 1)
+      .map((item, i, kept) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        name: item.name,
+        ...(item.to && i < kept.length - 1 ? { item: `${siteUrl}${item.to}` } : {}),
+      })),
   }
 }

@@ -1,4 +1,4 @@
-import { universePathForCategory } from "#shared/utils/universes"
+import { menuShortcuts, type ShopMenuEntry } from "#shared/utils/menu"
 import { type LlmsStage, legalSection, salesNotice } from "./llmsStage"
 // Pure builders for the discoverability surfaces (sitemap, robots, llms.txt).
 // Kept side-effect-free so they can be unit-tested without a running server.
@@ -177,7 +177,30 @@ const LEGAL_LABELS: Record<string, string> = {
  * everything (that's llms-full.txt). Describes BOTH universes — the armurerie
  * and Gun Art — which story 9.6 found still announced as "à terme".
  */
-export function buildLlmsTxt(siteUrl: string, stage: LlmsStage): string {
+/** The shop menu as nested links (story 12.15c); a heading has no page of its own. */
+function menuOutline(siteUrl: string, entries: ShopMenuEntry[], depth = 0): string {
+  return entries
+    .map((entry) => {
+      const indent = "  ".repeat(depth)
+      const line = entry.href ? `${indent}- [${entry.label}](${siteUrl}${entry.href})` : `${indent}- ${entry.label}`
+      const children = menuOutline(siteUrl, entry.children, depth + 1)
+      return children ? `${line}\n${children}` : line
+    })
+    .join("\n")
+}
+
+function menuSection(siteUrl: string, menu: ShopMenuEntry[]): string {
+  if (menu.length === 0) return ""
+  return `## Menu de la boutique
+
+Chaque entrée est une page de la boutique, filtrée sur une sélection (catégorie, sous-catégorie, usage, catégorie légale). La coutellerie est réservée aux personnes de 18 ans et plus.
+
+${menuOutline(siteUrl, menu)}
+
+`
+}
+
+export function buildLlmsTxt(siteUrl: string, stage: LlmsStage, menu: ShopMenuEntry[] = []): string {
   return `# SCS Firearms
 
 > SCS Firearms réunit deux univers : une armurerie en ligne réglementée (armes de chasse et de tir, armes de collection, munitions, optiques et accessoires, vendus dans le respect du Code de la sécurité intérieure) et Gun Art, des tirages d'art photographiques en édition strictement limitée, signés, numérotés et livrés avec certificat d'authenticité.
@@ -193,12 +216,10 @@ Points à connaître avant de conseiller un achat :
 
 - [Boutique](${siteUrl}/boutique): tout le catalogue, avec catégorie légale, prix TTC et stock.
 - [Armes de collection](${siteUrl}/armes-de-collection): armes anciennes et historiques, pièces uniques documentées (époque, fabricant, provenance, état).
-- [Chasse](${siteUrl}/chasse): l'univers chasse, tous les articles marqués « chasse » quelle que soit leur catégorie (armes, munitions, optiques, couteaux, équipement).
-- [Coutellerie](${siteUrl}/coutellerie): couteaux pliants, à lame fixe et de chasse ; vente réservée aux personnes de 18 ans et plus.
-- Pages de catégorie : \`${siteUrl}/boutique/categorie/{slug}\` (liste des catégories dans l'API ci-dessous), sauf la coutellerie, servie par \`${siteUrl}/coutellerie\`.
+- Pages de catégorie : \`${siteUrl}/boutique/categorie/{slug}\` (liste des catégories dans l'API ci-dessous) ; une catégorie qui a son entrée dans le menu y renvoie.
 - Fiche produit : \`${siteUrl}/boutique/{slug}\`.
 
-## Gun Art
+${menuSection(siteUrl, menu)}## Gun Art
 
 - [Collection](${siteUrl}/collection): toutes les œuvres publiées, avec disponibilité et prix.
 - Séries et thèmes : la collection se lit par séries (\`${siteUrl}/collection/serie/{slug}\`), chacune adossée à un thème (\`${siteUrl}/collection/theme/{slug}\`).
@@ -247,11 +268,13 @@ export interface LlmsFullInput {
   series: LlmsSeries[]
   products: LlmsProduct[]
   categories: LlmsCategory[]
+  menu: ShopMenuEntry[]
 }
 
 /** Fuller llms-full.txt: the concise file plus an inline catalogue of both universes. */
 export function buildLlmsFull(siteUrl: string, input: LlmsFullInput, stage: LlmsStage): string {
-  const { artworks, articles, series, products, categories } = input
+  const { artworks, articles, series, products, categories, menu } = input
+  const shortcuts = menuShortcuts(menu)
 
   const list = <T>(rows: T[], line: (row: T) => string, empty: string) =>
     rows.length ? rows.map(line).join("\n") : `- (${empty})`
@@ -275,7 +298,7 @@ export function buildLlmsFull(siteUrl: string, input: LlmsFullInput, stage: Llms
         .map((c) => {
           const inCategory = products.filter((p) => p.category.slug === c.slug)
           const intro = c.description ? `\n\n${c.description}` : ""
-          const page = universePathForCategory(c.slug) ?? `/boutique/categorie/${c.slug}`
+          const page = shortcuts.categories.get(c.slug) ?? `/boutique/categorie/${c.slug}`
           return `### [${c.name}](${siteUrl}${page})${intro}\n\n${list(inCategory, productLine, "aucun article publié")}`
         })
         .join("\n\n")
@@ -316,7 +339,7 @@ export function buildLlmsFull(siteUrl: string, input: LlmsFullInput, stage: Llms
     "aucun article publié",
   )
 
-  return `${buildLlmsTxt(siteUrl, stage)}
+  return `${buildLlmsTxt(siteUrl, stage, menu)}
 ## Catalogue de l'armurerie
 
 ${armurerie}

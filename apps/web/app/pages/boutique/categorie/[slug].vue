@@ -7,7 +7,9 @@ const slug = computed(() => String(route.params.slug))
 // The category must exist: an unknown slug is a real 404, not an empty grid a
 // crawler would index as a thin page.
 const { categories, ready, error } = useProductCategories()
-await ready
+// A menu entry showing exactly this category is its canonical page (story 12.15c).
+const { categoryPath, ready: menuReady } = useShopMenu()
+await Promise.all([ready, menuReady])
 const category = computed(() => categories.value.find((c) => c.slug === slug.value))
 if (!category.value) {
   throw missingPageError(error.value, "Catégorie introuvable")
