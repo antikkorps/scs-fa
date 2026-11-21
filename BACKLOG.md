@@ -1240,7 +1240,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [ ] 12.15d — Ranger le catalogue existant (sous-catégories et tags) — par Fred et Stéphane au back-office ou par le classeur Excel
 
 **Questions pour Fred**
-- [x] Ordre des onglets de premier niveau, avec Armes de collection et Gun Art ✅ _(Fred n'a pas de préférence, il veut un tunnel de vente efficace : on propose Chasse · Tir sportif · Munitions · Armes de défense · Coutellerie · Armes de collection · Gun Art — les rayons du plus vendu au plus rare, l'art à part en dernier ; modifiable au back-office, à revoir avec les chiffres d'Umami après l'ouverture)_
+- [x] Ordre des onglets de premier niveau, avec Armes de collection et Gun Art ✅ _(Fred n'a pas de préférence, il veut un tunnel de vente efficace : les rayons Chasse · Tir sportif · Munitions · Armes de défense · Coutellerie, du plus vendu au plus rare, modifiables au back-office et à revoir avec les chiffres d'Umami. **Armes de collection et Gun Art à part et mis en avant** (Franck 2026-11-21 : c'est ce qui distingue SCS des autres armureries) : groupe séparé du menu, au traitement visuel distinct, hors de l'arborescence éditable — pas relégués en fin de liste)_
 - [ ] « Couteau de chasse › Dagues » (Chasse) et Coutellerie : mêmes produits, ou les dagues seulement sous Chasse ?
 - [ ] Contact chez Flord et documentation de leur API — prévu, pas encore reçu ; **en attendant, un fichier catalogue de Flord** pour écrire l'adaptateur d'import
 
