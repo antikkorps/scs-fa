@@ -30,6 +30,7 @@ const groups = [
       { to: "/admin/fournisseurs", label: "Fournisseurs", icon: "◧" },
       { to: "/admin/armes-anciennes", label: "Armes de collection", icon: "⚑" },
       { to: "/admin/tags", label: "Tags", icon: "⌗" },
+      { to: "/admin/menu", label: "Menu de la boutique", icon: "☰" },
     ],
   },
   {

@@ -23,6 +23,7 @@ import {
   tags,
   users,
 } from "./schema.js"
+import { seedMenu } from "./seed-menu.js"
 import { seedSubcategories } from "./seed-subcategories.js"
 import { seedSuppliers } from "./seed-suppliers.js"
 
@@ -203,6 +204,7 @@ export async function seedReferenceData() {
 
   await seedSubcategories()
   await seedTags()
+  await seedMenu()
 
   console.log("🌱 Reference data complete!")
 }

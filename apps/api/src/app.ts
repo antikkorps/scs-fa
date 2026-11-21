@@ -41,6 +41,8 @@ import { legalDocumentRoutes } from "./legal-documents/index.js"
 import { startLegalDocSlaScheduler } from "./legal-documents/sla.js"
 import { buildLoggerOptions, genReqId, setupErrorAlerting } from "./logging/index.js"
 import { adminMediaRoutes, mediaRoutes } from "./media/index.js"
+import { adminMenuRoutes } from "./menu/admin.js"
+import { menuRoutes } from "./menu/index.js"
 import { adminMetricsRoutes } from "./metrics/admin.js"
 import { isInternalCall, rateLimitKey, trustDirectPrivatePeer } from "./net/client-ip.js"
 import { adminNewsletterRoutes } from "./newsletter/admin.js"
@@ -153,6 +155,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(productRoutes, { prefix: "/api/products" })
   await fastify.register(productCategoryRoutes, { prefix: "/api/product-categories" })
   await fastify.register(tagRoutes, { prefix: "/api/tags" })
+  await fastify.register(menuRoutes, { prefix: "/api/menu" })
   await fastify.register(ancientWeaponRoutes, { prefix: "/api/ancient-weapons" })
   await fastify.register(artworkRoutes, { prefix: "/api/artworks" })
   await fastify.register(artworkImageRoutes, { prefix: "/api/artworks/images" })
@@ -199,6 +202,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(adminArtworkEditorialRoutes, { prefix: "/api/admin/gun-art" })
   await fastify.register(adminProductRoutes, { prefix: "/api/admin/products" })
   await fastify.register(adminTagRoutes, { prefix: "/api/admin/tags" })
+  await fastify.register(adminMenuRoutes, { prefix: "/api/admin/menu" })
   await fastify.register(adminMediaRoutes, { prefix: "/api/admin/media" })
   await fastify.register(adminPayoutRoutes, { prefix: "/api/admin/finance" })
   await fastify.register(adminCatalogImportRoutes, { prefix: "/api/admin/catalog-imports" })

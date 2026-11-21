@@ -1,6 +1,8 @@
 // Postgres error codes the routes turn into HTTP answers.
 
 const PG_UNIQUE_VIOLATION = "23505"
+// ON DELETE RESTRICT raises its own code, not the generic 23503 of NO ACTION.
+const PG_RESTRICT_VIOLATION = "23001"
 
 type PgError = { code?: unknown; constraint?: unknown }
 
@@ -22,4 +24,9 @@ export function isUniqueViolation(error: unknown, constraint?: string): boolean 
   const pgError = pgErrorOf(error, PG_UNIQUE_VIOLATION)
   if (!pgError) return false
   return constraint === undefined || pgError.constraint === constraint
+}
+
+/** A RESTRICT foreign key refused a deletion: something still points at the row. */
+export function isRestrictViolation(error: unknown, constraint: string): boolean {
+  return pgErrorOf(error, PG_RESTRICT_VIOLATION)?.constraint === constraint
 }
