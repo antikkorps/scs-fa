@@ -91,11 +91,28 @@ function restart(message: string) {
       <button type="submit" class="btn btn-primary submit" :disabled="loading">
         {{ loading ? "Connexion…" : "Se connecter" }}
       </button>
+
+      <!-- The shared reset works for an admin too; the app's code is asked again at the next sign-in. -->
+      <p class="forgot"><NuxtLink to="/mot-de-passe-oublie">Mot de passe oublié ?</NuxtLink></p>
     </form>
   </main>
 </template>
 
 <style scoped>
+.forgot {
+  margin: 1.1rem 0 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+}
+.forgot a {
+  color: var(--paper-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.forgot a:hover,
+.forgot a:focus-visible {
+  color: var(--brass);
+}
 .auth {
   min-height: 100vh;
   display: grid;

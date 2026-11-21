@@ -29,11 +29,11 @@
   margin: 0 0.75rem 0 auto;
 }
 /* Second row: the shop menu. Desktop only, the burger carries it on mobile.
-   Header height is then 68px + 44px. */
+   Header height is then 68px + 50px: room for the signatures' pills to breathe
+   between the row's hairlines. */
 .hdr__shop {
   display: none;
-  height: 44px;
-  border-top: 1px solid var(--ink-line);
+  height: 50px;
 }
 
 /* Right cluster */
