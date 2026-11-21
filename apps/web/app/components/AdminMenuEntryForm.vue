@@ -2,7 +2,7 @@
 // Story 12.15b — one menu entry: its label and address, its kind, and the saved
 // filter that decides which products it shows. Each entry carries its whole
 // filter: a new sub-entry starts from its parent's, to narrow it.
-import { LEGAL_CATEGORIES, slugify } from "@armurier/shared"
+import { LEGAL_CATEGORIES, MENU_DESCRIPTION_MAX, MENU_INTRO_MAX, slugify } from "@armurier/shared"
 import type { AdminMenuEntry } from "~/types/menu"
 import type { ProductCategoryRef, ProductTag } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/menu-tree"
@@ -68,6 +68,9 @@ function payload() {
     subcategorySlug: isFilter ? form.subcategorySlug : null,
     legalCategory: isFilter ? form.legalCategory : null,
     tagSlugs: isFilter ? form.tagSlugs : [],
+    // Only a filter has a page to describe.
+    description: isFilter ? form.description : null,
+    intro: isFilter ? form.intro : null,
   }
 }
 
@@ -166,6 +169,20 @@ async function save() {
         </div>
         <span class="field__help">Plusieurs tags d'une même facette : l'un ou l'autre. De facettes différentes : tous.</span>
       </div>
+
+      <label class="field">
+        <span class="field__label">Description pour les moteurs de recherche</span>
+        <input v-model="form.description" name="description" class="ctl" :maxlength="MENU_DESCRIPTION_MAX" >
+        <span class="field__help">
+          {{ form.description?.length ?? 0 }} / {{ MENU_DESCRIPTION_MAX }} caractères. Vide : une description est
+          composée à partir du chemin de l'entrée.
+        </span>
+      </label>
+      <label class="field">
+        <span class="field__label">Introduction de la page</span>
+        <textarea v-model="form.intro" name="intro" class="ctl" rows="5" :maxlength="MENU_INTRO_MAX" />
+        <span class="field__help">Au-dessus des produits. Une ligne vide sépare deux paragraphes.</span>
+      </label>
     </template>
 
     <div class="actions">

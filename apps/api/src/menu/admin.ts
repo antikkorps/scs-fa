@@ -80,6 +80,8 @@ async function updateEntry(id: string, patch: UpdateMenuEntryInput, tx: DbExecut
       label: entry.label,
       kind: entry.kind,
       linkUrl: entry.linkUrl,
+      description: entry.description,
+      intro: entry.intro,
       ...(await filterColumns(entry, tx)),
       ...(moved ? { position: nextPosition(entries, entry.parentId) } : {}),
       updatedAt: new Date(),

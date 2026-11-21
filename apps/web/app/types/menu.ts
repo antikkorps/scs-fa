@@ -15,6 +15,9 @@ export interface AdminMenuEntry {
   subcategorySlug: string | null
   legalCategory: LegalCategoryCode | null
   tagSlugs: string[]
+  /** Story 12.15c — the entry's page: meta description and introduction. */
+  description: string | null
+  intro: string | null
 }
 
 /** An entry placed in the tree: its level (1 at the top) and its address. */
