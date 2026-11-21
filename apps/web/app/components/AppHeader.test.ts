@@ -2,6 +2,7 @@
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { nextTick, ref } from "vue"
+import { isShown } from "../../tests/helpers/panel"
 import { fetchWithShopMenu } from "../../tests/helpers/shopMenu"
 import AppHeader from "./AppHeader.vue"
 
@@ -24,21 +25,23 @@ beforeEach(() => {
 })
 
 describe("AppHeader", () => {
-  it("renders the collection, Gun Art, the journal and the house in the first row", async () => {
+  // Review of 12.15c (UI/UX): the first row is the house, the second
+  // everything one buys, the two signatures included.
+  it("keeps only the journal and the house in the first row", async () => {
     const wrapper = await mountSuspended(AppHeader)
-    const links = wrapper.findAll(".nav .nav__link").map((link) => link.text())
-    expect(links).toEqual(["Armes de collection", "Gun Art", "Journal", "À propos"])
+    const links = wrapper.findAll(".hdr__bar .nav__link").map((link) => link.text())
+    expect(links).toEqual(["Journal", "À propos"])
   })
 
-  it("highlights the collection and Gun Art, not the ordinary links", async () => {
+  it("highlights the collection and Gun Art in the second row", async () => {
     const wrapper = await mountSuspended(AppHeader)
-    const featured = wrapper.findAll(".nav__link--feature").map((link) => link.attributes("href"))
+    const featured = wrapper.findAll(".hdr__shop .nav__link--feature").map((link) => link.attributes("href"))
     expect(featured).toEqual(["/armes-de-collection", "/collection"])
   })
 
   it("draws the shop menu's tabs in a second row", async () => {
     const wrapper = await mountSuspended(AppHeader)
-    const tabs = wrapper.findAll(".hdr__shop .shop-tab__link").map((link) => link.text())
+    const tabs = wrapper.findAll(".hdr__shop .shop-tab .shop-tab__link").map((link) => link.text())
     expect(tabs).toEqual(["Chasse", "Munitions", "Armes de défense", "Coutellerie"])
   })
 
@@ -52,10 +55,10 @@ describe("AppHeader", () => {
   it("keeps a single panel open between Gun Art and the shop tabs", async () => {
     const wrapper = await mountSuspended(AppHeader)
     await wrapper.find('a[aria-controls="mega-chasse"]').trigger("focusin")
-    expect(wrapper.find("#mega-chasse").exists()).toBe(true)
+    expect(isShown(wrapper.find("#mega-chasse"))).toBe(true)
     await wrapper.find('a[aria-controls="mega-gunart"]').trigger("focusin")
-    expect(wrapper.find("#mega-chasse").exists()).toBe(false)
-    expect(wrapper.find("#mega-gunart").exists()).toBe(true)
+    expect(isShown(wrapper.find("#mega-chasse"))).toBe(false)
+    expect(isShown(wrapper.find("#mega-gunart"))).toBe(true)
   })
 
   it("shows a cart badge only when there are items", async () => {
@@ -85,10 +88,10 @@ describe("AppHeader", () => {
     const wrapper = await mountSuspended(AppHeader)
     // The label is a link to the collection, not a toggle: the panel opens on
     // hover and on keyboard focus, so a click never has to undo it.
-    expect(wrapper.find("#mega-gunart").exists()).toBe(false)
-    await wrapper.find(".nav .mega-item").trigger("pointerenter")
+    expect(isShown(wrapper.find("#mega-gunart"))).toBe(false)
+    await wrapper.find('a[aria-controls="mega-gunart"]').trigger("focusin")
     const mega = wrapper.find("#mega-gunart")
-    expect(mega.exists()).toBe(true)
+    expect(isShown(mega)).toBe(true)
     expect(mega.find('a[href="/collection"]').exists()).toBe(true)
   })
 

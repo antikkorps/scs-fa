@@ -5,7 +5,9 @@ const { menu } = useShopMenu()
 </script>
 
 <template>
-  <ul class="mnav" role="list">
+  <!-- Review of 12.15c (UI/UX): the list says what the tabs are. -->
+  <h2 id="mnav-universes" class="mnav__title">Nos univers</h2>
+  <ul class="mnav mnav--universes" aria-labelledby="mnav-universes" role="list">
     <li v-for="(tab, index) in menu" :key="tab.path" class="mnav__item" :style="{ '--i': index }">
       <MobileNavAccordion v-if="tab.children.length" :panel-id="`msub-${tab.slug}`" :label="tab.label">
         <li v-if="tab.href">
@@ -28,7 +30,7 @@ const { menu } = useShopMenu()
     </li>
     <li class="mnav__item" :style="{ '--i': menu.length }">
       <NuxtLink to="/boutique" class="mlink mlink--quiet">
-        <span>Toute la boutique</span><span class="mlink__chev" aria-hidden="true">›</span>
+        <span>Voir tous les univers</span><span class="mlink__chev" aria-hidden="true">›</span>
       </NuxtLink>
     </li>
   </ul>
@@ -36,6 +38,16 @@ const { menu } = useShopMenu()
 
 <style scoped src="../assets/css/header-mobile.css"></style>
 <style scoped>
+.mnav__title {
+  margin: 0;
+  padding: 0 0.25rem 0.25rem;
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--brass);
+}
 .msub__link--all {
   color: var(--brass);
 }

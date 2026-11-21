@@ -1,0 +1,55 @@
+/* The universes' row (ShopMenuBar and its tabs). The tabs are `position:
+   static`, so their panels anchor on the whole row instead of hanging off a tab
+   and running past the screen's edge for the tabs on the right. */
+
+.shop-tab__item,
+.shop-more {
+  position: static;
+  height: 100%;
+  --mega-gap: 1px;
+}
+.shop-tab__item {
+  --mega-right: 0;
+}
+/* « Plus » holds a column or two: its panel hangs under it, sized to them. */
+.shop-more {
+  position: relative;
+}
+.shop-tab__link {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-wide);
+  color: var(--paper-dim);
+  transition: color 0.3s var(--ease);
+}
+.shop-tab__link:hover,
+.shop-tab__link.router-link-active {
+  color: var(--paper);
+}
+button.shop-tab__link {
+  padding: 0;
+  font-family: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.mega__col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 170px;
+}
+.mega__cta {
+  margin-left: auto;
+  align-self: flex-start;
+}
+/* Set aside, still measurable: the row needs its width to know when it is due. */
+.shop-more--idle {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}

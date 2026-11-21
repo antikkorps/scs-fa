@@ -2,6 +2,7 @@
 import { mountSuspended } from "@nuxt/test-utils/runtime"
 import { describe, expect, it } from "vitest"
 import { h } from "vue"
+import { isShown } from "../../tests/helpers/panel"
 import MegaMenuItem from "./MegaMenuItem.vue"
 
 function mountItem(open: boolean) {
@@ -15,10 +16,15 @@ function mountItem(open: boolean) {
 }
 
 describe("MegaMenuItem", () => {
-  it("renders the panel, under its id, only while open", async () => {
-    expect((await mountItem(false)).find("#mega-test").exists()).toBe(false)
+  // Review of 12.15c: the panel's links stay in the server's HTML, so every
+  // page links the universes' deep pages for crawlers, and aria-controls always
+  // names an element that exists.
+  it("keeps the panel in the page while closed, and shows it only while open", async () => {
+    const closed = await mountItem(false)
+    expect(closed.find("#mega-test a.inner").exists()).toBe(true)
+    expect(isShown(closed.find("#mega-test"))).toBe(false)
     const open = await mountItem(true)
-    expect(open.find("#mega-test").text()).toContain("Sous-rayon")
+    expect(isShown(open.find("#mega-test"))).toBe(true)
   })
 
   it("asks to open on hover and on keyboard focus", async () => {

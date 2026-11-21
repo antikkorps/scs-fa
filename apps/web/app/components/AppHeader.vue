@@ -6,7 +6,8 @@ const { count: cartCount } = useCart()
 const mobileOpen = ref(false) // mobile full-screen menu
 const searchOpen = ref(false) // desktop search panel
 const accountOpen = ref(false) // desktop account dropdown
-// The one open mega-panel: "gunart", or the slug of a shop menu tab (story 12.15c).
+// The one open mega-panel of the universes' row: a tab's slug, "plus", or a
+// signature's key (story 12.15c).
 const megaOpen = ref<string | null>(null)
 
 function closeAll() {
@@ -57,29 +58,9 @@ async function signOut() {
         <AppLogo decorative />
       </NuxtLink>
 
-      <nav class="nav" aria-label="Navigation principale">
-        <!-- Story 12.15c: the house's two signature entries stand out; the shop
-             itself moved to the menu row below. -->
-        <NuxtLink to="/armes-de-collection" class="nav__link nav__link--feature">Armes de collection</NuxtLink>
-
-        <MegaMenuItem
-          panel-id="mega-gunart"
-          :open="megaOpen === 'gunart'"
-          @open="megaOpen = 'gunart'"
-          @close="megaOpen = null"
-        >
-          <NuxtLink
-            to="/collection"
-            class="nav__link nav__link--feature nav__trigger"
-            :class="{ 'is-open': megaOpen === 'gunart' }"
-            :aria-expanded="megaOpen === 'gunart'"
-            aria-controls="mega-gunart"
-          >
-            Gun Art
-          </NuxtLink>
-          <template #panel><GunArtMegaPanel /></template>
-        </MegaMenuItem>
-
+      <!-- Review of 12.15c (UI/UX): this row is the house; everything one
+           buys, the two signatures included, is in the row below. -->
+      <nav class="nav" aria-label="La maison">
         <NuxtLink to="/blog" class="nav__link">Journal</NuxtLink>
         <a href="/#about" class="nav__link">À propos</a>
       </nav>
@@ -171,7 +152,7 @@ async function signOut() {
       </div>
     </div>
 
-    <!-- Story 12.15c: the shop menu's tabs, a row of their own on desktop. -->
+    <!-- Story 12.15c: the universes and the signatures, a row of their own on desktop. -->
     <div class="container hdr__shop">
       <ShopMenuBar v-model:open="megaOpen" />
     </div>
@@ -212,5 +193,5 @@ async function signOut() {
   </header>
 </template>
 
-<style scoped src="../assets/css/header-mega.css"></style>
+<style scoped src="../assets/css/header-feature.css"></style>
 <style scoped src="../assets/css/header-bar.css"></style>

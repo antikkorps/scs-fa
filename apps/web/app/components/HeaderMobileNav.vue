@@ -7,7 +7,7 @@ const emit = defineEmits<{ "sign-out": [] }>()
 const { isAuthenticated, isAdmin } = useAuth()
 const { count: cartCount } = useCart()
 const { menu } = useShopMenu()
-// The rows after the shop tabs carry on the staggered reveal (+1: "Toute la boutique").
+// The rows after the universes carry on the staggered reveal (+1: their last row).
 const rank = (offset: number) => ({ "--i": menu.value.length + 1 + offset })
 
 function close() {
@@ -35,27 +35,19 @@ onBeforeUnmount(() => {
         <div class="mobile__body">
           <SearchBar class="mobile__search" @submit="close" />
 
+          <!-- Review of 12.15c (UI/UX): the house's signatures first, then the
+               universes, then the house. -->
+          <MobileSignatureCards />
+
           <ShopMenuMobile />
 
           <ul class="mnav" role="list">
             <li class="mnav__item" :style="rank(0)">
-              <NuxtLink to="/armes-de-collection" class="mlink mlink--feature">
-                <span>Armes de collection</span><span class="mlink__chev" aria-hidden="true">›</span>
-              </NuxtLink>
-            </li>
-            <li class="mnav__item" :style="rank(1)">
-              <MobileNavAccordion panel-id="msub-gunart" label="Gun Art" featured>
-                <li><NuxtLink to="/collection/artiste" class="msub__link">L'artiste</NuxtLink></li>
-                <li><NuxtLink to="/collection" class="msub__link">Voir la collection</NuxtLink></li>
-                <li class="msub__note">Éditions limitées ≤ 25, signées, numérotées &amp; certifiées</li>
-              </MobileNavAccordion>
-            </li>
-            <li class="mnav__item" :style="rank(2)">
               <NuxtLink to="/blog" class="mlink">
                 <span>Journal</span><span class="mlink__chev" aria-hidden="true">›</span>
               </NuxtLink>
             </li>
-            <li class="mnav__item" :style="rank(3)">
+            <li class="mnav__item" :style="rank(1)">
               <a href="/#about" class="mlink" @click="close">
                 <span>À propos</span><span class="mlink__chev" aria-hidden="true">›</span>
               </a>

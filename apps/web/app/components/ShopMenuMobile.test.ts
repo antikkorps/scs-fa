@@ -49,8 +49,11 @@ describe("ShopMenuMobile", () => {
     expect(wrapper.find('#msub-chasse a[href="/chasse/accessoires/nettoyage"]').exists()).toBe(true)
   })
 
-  it("ends with a link to the whole shop", async () => {
+  it("titles the list « Nos univers » and ends it with a link to them all", async () => {
     const wrapper = await mountSuspended(ShopMenuMobile)
-    expect(wrapper.find('a[href="/boutique"]').text()).toContain("Toute la boutique")
+    const list = wrapper.find("ul.mnav--universes")
+    const title = wrapper.find(`#${list.attributes("aria-labelledby")}`)
+    expect(title.text()).toBe("Nos univers")
+    expect(wrapper.find('a[href="/boutique"]').text()).toContain("Voir tous les univers")
   })
 })

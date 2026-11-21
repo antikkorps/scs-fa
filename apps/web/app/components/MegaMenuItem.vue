@@ -28,7 +28,9 @@ function onFocusOut(event: FocusEvent) {
   <div class="mega-item" @pointerenter="emit('open')" @pointerleave="close" @focusin="emit('open')" @focusout="onFocusOut">
     <slot />
     <Transition name="mega">
-      <div v-if="open" :id="panelId" class="mega">
+      <!-- v-show, not v-if: the links stay in the server's HTML for crawlers,
+           and aria-controls always names an element that exists. -->
+      <div v-show="open" :id="panelId" class="mega">
         <slot name="panel" />
       </div>
     </Transition>
@@ -47,6 +49,8 @@ function onFocusOut(event: FocusEvent) {
   position: absolute;
   top: calc(100% + var(--mega-gap));
   left: 0;
+  /* A row whose panels span it sets this to 0. */
+  right: var(--mega-right, auto);
   z-index: 70;
   display: flex;
   gap: 2.5rem;

@@ -1,7 +1,7 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { describe, expect, it } from "vitest"
-import { nextTick, ref } from "vue"
+import { ref } from "vue"
 import { fetchWithShopMenu } from "../../tests/helpers/shopMenu"
 import HeaderMobileNav from "./HeaderMobileNav.vue"
 
@@ -20,28 +20,26 @@ describe("HeaderMobileNav", () => {
     wrapper.unmount()
   })
 
-  it("lists the shop tabs, then the collection, Gun Art, the journal and the house", async () => {
+  // Review of 12.15c (UI/UX): the signatures first, as two cards, then the
+  // universes under their title, then the house.
+  it("opens with the two signatures as cards, above the universes", async () => {
     const wrapper = await mountSuspended(HeaderMobileNav, { props: { open: true } })
     expect(document.querySelector("#mobile-nav")?.getAttribute("aria-label")).toBe("Navigation mobile")
-    const rows = rowTexts()
-    expect(rows.indexOf("Armes de collection")).toBeGreaterThan(rows.indexOf("Coutellerie"))
-    expect(rows.slice(rows.indexOf("Armes de collection"))).toEqual([
-      "Armes de collection",
-      "Gun Art",
-      "Journal",
-      "À propos",
-    ])
-    expect(document.querySelector('a.mlink--feature[href="/armes-de-collection"]')).not.toBeNull()
+    const cards = [...document.querySelectorAll("#mobile-nav a.msig")].map((card) => card.getAttribute("href"))
+    expect(cards).toEqual(["/armes-de-collection", "/collection"])
+    const signatures = document.querySelector("#mobile-nav .msigs")
+    const universes = document.querySelector("#mobile-nav .mnav--universes")
+    expect(signatures && universes && signatures.compareDocumentPosition(universes)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     wrapper.unmount()
   })
 
-  it("expands the Gun Art accordion", async () => {
+  it("lists the house after the universes", async () => {
     const wrapper = await mountSuspended(HeaderMobileNav, { props: { open: true } })
-    const toggle = document.querySelector('button[aria-controls="msub-gunart"]') as HTMLElement | null
-    toggle?.click()
-    await nextTick()
-    expect(toggle?.getAttribute("aria-expanded")).toBe("true")
-    expect(document.querySelector('#msub-gunart a[href="/collection/artiste"]')).not.toBeNull()
+    const rows = rowTexts()
+    expect(rows.slice(-2)).toEqual(["Journal", "À propos"])
+    expect(rows.indexOf("Journal")).toBeGreaterThan(rows.indexOf("Coutellerie"))
     wrapper.unmount()
   })
 

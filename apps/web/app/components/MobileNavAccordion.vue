@@ -2,7 +2,7 @@
 // A row of the mobile overlay that folds out its sub-links (default slot, as
 // `<li>`s). It keeps its own state: closing the overlay unmounts it, which
 // folds every accordion back.
-defineProps<{ panelId: string; label: string; featured?: boolean }>()
+defineProps<{ panelId: string; label: string }>()
 const open = defineModel<boolean>("open", { default: false })
 </script>
 
@@ -10,7 +10,7 @@ const open = defineModel<boolean>("open", { default: false })
   <button
     type="button"
     class="mlink mlink--toggle"
-    :class="{ 'is-open': open, 'mlink--feature': featured }"
+    :class="{ 'is-open': open }"
     :aria-expanded="open"
     :aria-controls="panelId"
     @click="open = !open"

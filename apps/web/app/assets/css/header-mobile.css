@@ -1,5 +1,5 @@
-/* Shared by the rows of the header's mobile overlay (the shop menu's
-   accordions, Gun Art, the plain links). Each component pulls it in with
+/* Shared by the rows of the header's mobile overlay (the universes'
+   accordions, the plain links). Each component pulls it in with
    `<style scoped src>`, so the rules stay scoped while being written once. */
 
 .mnav {
@@ -24,17 +24,6 @@
 .mlink:active,
 .mlink.router-link-active {
   color: var(--brass);
-}
-/* The house's two signature entries stand out from the ordinary rows. */
-.mlink--feature {
-  color: var(--brass);
-}
-.mlink--feature > span:first-child::before {
-  /* Decorative: the empty alternative keeps screen readers from reading it. */
-  content: "✦" / "";
-  margin-right: 0.5em;
-  font-size: 0.6em;
-  vertical-align: 0.25em;
 }
 .mlink--quiet {
   font-size: var(--fs-base);

@@ -21,54 +21,13 @@
   --logo-height: 2.1rem;
 }
 
-/* Center spine */
+/* The house's links, beside the icons: what one buys is in the second row. */
 .nav {
   display: none;
   align-items: center;
   gap: clamp(1rem, 2.6vw - 0.5rem, 2rem);
-  margin: 0 auto;
+  margin: 0 0.75rem 0 auto;
 }
-.nav__link {
-  /* « Gun Art », « À propos » must never break onto two lines. */
-  white-space: nowrap;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  letter-spacing: var(--ls-wide);
-  color: var(--paper-dim);
-  transition: color 0.3s var(--ease);
-}
-.nav__link:hover,
-.nav__link.router-link-active {
-  color: var(--paper);
-}
-/* Story 12.15c: Armes de collection and Gun Art, the house's signature, read
-   apart from the ordinary links: brass, a hairline pill and an ornament. */
-.nav__link--feature {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.4rem 0.85rem;
-  color: var(--brass);
-  border: 1px solid color-mix(in srgb, var(--brass) 45%, transparent);
-  border-radius: 999px;
-  transition:
-    color 0.3s var(--ease),
-    border-color 0.3s var(--ease),
-    background 0.3s var(--ease);
-}
-.nav__link--feature::before {
-  /* Decorative: the empty alternative keeps screen readers from reading it. */
-  content: "✦" / "";
-  font-size: 0.7em;
-}
-.nav__link--feature:hover,
-.nav__link--feature.is-open,
-.nav__link--feature.router-link-active {
-  color: var(--paper);
-  border-color: var(--brass);
-  background: color-mix(in srgb, var(--brass) 10%, transparent);
-}
-
 /* Second row: the shop menu. Desktop only, the burger carries it on mobile.
    Header height is then 68px + 44px. */
 .hdr__shop {
