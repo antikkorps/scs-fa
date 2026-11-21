@@ -102,7 +102,11 @@ describe("an entry's page texts", () => {
   const base = { slug: "carabines", label: "Carabines" }
 
   it("keeps a description and an introduction, trimmed", () => {
-    const parsed = createMenuEntrySchema.parse({ ...base, description: "  Carabines de chasse. ", intro: "Un.\n\nDeux." })
+    const parsed = createMenuEntrySchema.parse({
+      ...base,
+      description: "  Carabines de chasse. ",
+      intro: "Un.\n\nDeux.",
+    })
     expect(parsed).toMatchObject({ description: "Carabines de chasse.", intro: "Un.\n\nDeux." })
   })
 

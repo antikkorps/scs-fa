@@ -166,7 +166,8 @@ describe("admin menu screen (story 12.15b)", () => {
     await wrapper.find('textarea[name="intro"]').setValue("Un.\n\nDeux.")
     await wrapper.find("form").trigger("submit")
     await flushPromises()
-    expect((callsWith("PATCH")[0]?.[1] as { body: Record<string, unknown> }).body).toMatchObject({
+    const [, options] = callsWith("PATCH")[0] ?? []
+    expect((options as { body: Record<string, unknown> }).body).toMatchObject({
       description: "Tout pour la chasse.",
       intro: "Un.\n\nDeux.",
     })

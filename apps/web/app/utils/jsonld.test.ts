@@ -22,7 +22,11 @@ describe("breadcrumbJsonLd", () => {
 
   // A ListItem before the last one needs its URL: a crumb without a page is left out.
   it("leaves out a crumb without a page before the current one", () => {
-    const ld = breadcrumbJsonLd(SITE, [{ name: "Chasse", to: "/chasse" }, { name: "Accessoires" }, { name: "Nettoyage" }])
+    const ld = breadcrumbJsonLd(SITE, [
+      { name: "Chasse", to: "/chasse" },
+      { name: "Accessoires" },
+      { name: "Nettoyage" },
+    ])
     expect(ld.itemListElement).toEqual([
       { "@type": "ListItem", position: 1, name: "Chasse", item: `${SITE}/chasse` },
       { "@type": "ListItem", position: 2, name: "Nettoyage" },

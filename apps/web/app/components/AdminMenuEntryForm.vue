@@ -5,7 +5,7 @@
 import { LEGAL_CATEGORIES, MENU_DESCRIPTION_MAX, MENU_INTRO_MAX, slugify } from "@armurier/shared"
 import type { AdminMenuEntry } from "~/types/menu"
 import type { ProductCategoryRef, ProductTag } from "~/types/product"
-import { legalCategoryLabel } from "~/utils/menu-tree"
+import { legalCategoryLabel } from "~/utils/product"
 
 type Draft = Omit<AdminMenuEntry, "id" | "position">
 

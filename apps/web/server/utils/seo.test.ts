@@ -4,7 +4,6 @@ import { absoluteImageUrl, buildLlmsFull, buildLlmsTxt, buildRobots, buildSitema
 
 const SITE = "https://www.scs-firearms.com"
 
-
 const menuEntry = (path: string, label: string, fields: Record<string, unknown> = {}) => ({
   slug: path.split("/").at(-1) ?? "",
   label,
@@ -148,7 +147,9 @@ describe("buildLlmsTxt", () => {
   it("lays out the shop menu, a heading without a link", () => {
     const txt = buildLlmsTxt(SITE, OPEN, MENU)
     expect(txt).toContain("## Menu de la boutique")
-    expect(txt).toContain(`- [Chasse](${SITE}/chasse)\n  - Accessoires\n    - [Nettoyage](${SITE}/chasse/accessoires/nettoyage)`)
+    expect(txt).toContain(
+      `- [Chasse](${SITE}/chasse)\n  - Accessoires\n    - [Nettoyage](${SITE}/chasse/accessoires/nettoyage)`,
+    )
     expect(txt).toContain(`- [Coutellerie](${SITE}/coutellerie)`)
     expect(txt).toContain("18 ans et plus")
   })

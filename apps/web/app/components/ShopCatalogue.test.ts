@@ -14,6 +14,7 @@ const { productQueries, pageAnswer } = vi.hoisted(() => ({
 }))
 
 mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
+  if (typeof url === "string" && url.endsWith("/menu")) return { data: ref({ data: [] }), error: ref(null) }
   if (typeof url === "string" && url.includes("/product-categories")) {
     return {
       data: ref({
@@ -82,7 +83,7 @@ describe("ShopCatalogue (story 9.6)", () => {
   })
 
   describe("on a tag page", () => {
-    const tagPage = { category: "", tag: "occasion", basePath: "/boutique/tag/occasion", listName: "x" }
+    const tagPage = { category: "", lockedTags: ["occasion"], basePath: "/boutique/tag/occasion", listName: "x" }
 
     it("lists the products carrying the page's tag", async () => {
       productQueries.length = 0
@@ -247,7 +248,7 @@ describe("ShopCatalogue on a page kept out of the indexes", () => {
 
   it("states no canonical when the page is noindex", async () => {
     await mountSuspended(ShopCatalogue, {
-      props: { category: "", tag: "noindex-check", basePath: PATH, listName: "x", noindex: true },
+      props: { category: "", lockedTags: ["noindex-check"], basePath: PATH, listName: "x", noindex: true },
       route: PATH,
       global: { stubs: { ProductCard: true } },
     })
@@ -257,7 +258,7 @@ describe("ShopCatalogue on a page kept out of the indexes", () => {
 
   it("states it otherwise", async () => {
     await mountSuspended(ShopCatalogue, {
-      props: { category: "", tag: "noindex-check", basePath: `${PATH}-on`, listName: "x" },
+      props: { category: "", lockedTags: ["noindex-check"], basePath: `${PATH}-on`, listName: "x" },
       route: `${PATH}-on`,
       global: { stubs: { ProductCard: true } },
     })

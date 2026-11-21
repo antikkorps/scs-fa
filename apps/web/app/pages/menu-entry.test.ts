@@ -74,7 +74,10 @@ describe("a menu entry's page", () => {
   it("shows the entry's name, introduction and trail", async () => {
     const wrapper = await mountAt(ARMES_LONGUES.path)
     expect(wrapper.find("h1").text()).toBe("Armes longues")
-    expect(wrapper.findAll(".intro__lede p").map((p) => p.text())).toEqual(["Premier paragraphe.", "Second paragraphe."])
+    expect(wrapper.findAll(".intro__lede p").map((p) => p.text())).toEqual([
+      "Premier paragraphe.",
+      "Second paragraphe.",
+    ])
     expect(wrapper.find(".crumbs").text()).toMatch(/Boutique.*Tir sportif.*Rubrique.*Armes longues/s)
     expect(wrapper.find('.crumbs a[href="/tir-sportif"]').exists()).toBe(true)
   })
@@ -104,7 +107,9 @@ describe("a menu entry's page", () => {
     const description = document.head.querySelector('meta[name="description"]')?.getAttribute("content")
     expect(description).toContain("Armes longues")
     expect(description).toContain("Tir sportif")
-    expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toMatch(/\/tir-sportif\/armes-longues$/)
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toMatch(
+      /\/tir-sportif\/armes-longues$/,
+    )
   })
 
   it("keeps an entry no product fills yet out of the indexes", async () => {

@@ -17,11 +17,14 @@ if (!tag.value) {
 
 const name = computed(() => tag.value?.name ?? "")
 
+// Computed in the script: a 404 thrown above leaves the template no function to call.
+const basePath = computed(() => tagPath(slug.value))
+
 usePageSeo({
   title: () => pagedTitle(`${name.value} — Boutique armurerie`, pageFromQuery(route.query.page)),
   socialTitle: () => `${name.value} — SCS Firearms`,
   description: () => tagMetaDescription(name.value, tag.value?.description),
-  path: () => tagPath(slug.value),
+  path: () => basePath.value,
   noindex: (tag.value?.productCount ?? 0) === 0,
   // ShopCatalogue states the canonical: it knows the page of results.
   canonical: false,
@@ -41,7 +44,7 @@ usePageSeo({
       :key="slug"
       category=""
       :locked-tags="[slug]"
-      :base-path="tagPath(slug)"
+      :base-path="basePath"
       :noindex="(tag?.productCount ?? 0) === 0"
       :list-name="`${name} — Boutique armurerie SCS Firearms`"
     />

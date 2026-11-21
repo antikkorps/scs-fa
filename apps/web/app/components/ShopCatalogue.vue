@@ -69,7 +69,7 @@ const page = computed(() => pageFromQuery(route.query.page))
 const { categories } = useProductCategories()
 const { facets } = useTags()
 const menuLinks = useShopMenu()
-const lockedTags = computed(() => props.lockedTags ?? [])
+const pinnedTags = computed(() => props.lockedTags ?? [])
 
 // `?tags=` carries a comma-separated selection, matching what the API accepts,
 // so a filtered view stays copy-pasteable and survives a page reload.
@@ -81,10 +81,10 @@ const selectedTags = computed(() =>
 )
 
 // What the API is asked for: the page's own tag, then the visitor's.
-const appliedTags = computed(() => [...lockedTags.value, ...selectedTags.value])
+const appliedTags = computed(() => [...pinnedTags.value, ...selectedTags.value])
 
 function toggleTag(slug: string) {
-  if (lockedTags.value.includes(slug)) {
+  if (pinnedTags.value.includes(slug)) {
     router.push({ path: categoryPath(""), query: filterQuery({}) })
     return
   }
@@ -109,7 +109,7 @@ const apiQuery = computed(() => {
 })
 
 const { data, error, pending } = await useApiFetch<ProductListResponse>(`/products`, {
-  key: `boutique-products-${props.category || "all"}-${props.subcategory ?? ""}-${lockedTags.value.join(",")}-${props.lockedLegalCategory ?? ""}`,
+  key: `boutique-products-${props.category || "all"}-${props.subcategory ?? ""}-${pinnedTags.value.join(",")}-${props.lockedLegalCategory ?? ""}`,
   query: apiQuery,
 })
 
@@ -199,9 +199,7 @@ const filtersToggleLabel = computed(() =>
 
 // A page narrower than its category (a tag page, most menu entries) is not
 // that category's page: no category is shown as the current one.
-const narrowed = computed(() =>
-  Boolean(lockedTags.value.length || props.subcategory || props.lockedLegalCategory),
-)
+const narrowed = computed(() => Boolean(pinnedTags.value.length || props.subcategory || props.lockedLegalCategory))
 
 const canonicalPath = computed(() =>
   catalogueCanonicalPath(props.basePath, selectedTags.value, hasFiltersBesidesTags.value, menuLinks.shortcuts.value),

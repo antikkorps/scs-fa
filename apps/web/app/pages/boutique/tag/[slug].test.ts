@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it } from "vitest"
 import { ref } from "vue"
 import TagPage from "./[slug].vue"
 
+// The shop menu the page reads; empty unless a test fills it.
+const menu: unknown[] = []
+
 const TAGS = [
   {
     facet: "etat",
@@ -22,6 +25,7 @@ const TAGS = [
 
 mockNuxtImport("useFetch", () => (url: string) => {
   if (url.includes("/tags")) return { data: ref({ data: TAGS }), error: ref(null) }
+  if (url.endsWith("/menu")) return { data: ref({ data: menu }), error: ref(null) }
   if (url.includes("/product-categories")) return { data: ref({ data: [] }), error: ref(null) }
   return {
     data: ref({ data: [], pagination: { page: 1, limit: 24, total: 60, totalPages: 3, hasMore: true } }),
@@ -65,5 +69,22 @@ describe("tag page", () => {
     await mountSuspended(TagPage, { route: "/boutique/tag/neuf" })
     await headWritten()
     expect(robots()).toBe("noindex, follow")
+  })
+
+  // Story 12.15c — a menu entry showing exactly this tag is the page to index.
+  it("names as canonical the menu entry showing exactly this tag", async () => {
+    menu.push({
+      slug: "occasions",
+      label: "Occasions",
+      path: "/occasions",
+      kind: "filter",
+      href: "/occasions",
+      filter: { category: null, subcategory: null, tags: ["occasion"], legalCategory: null },
+      children: [],
+    })
+    await mountSuspended(TagPage, { route: "/boutique/tag/occasion" })
+    await headWritten()
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toMatch(/\/occasions$/)
+    menu.length = 0
   })
 })

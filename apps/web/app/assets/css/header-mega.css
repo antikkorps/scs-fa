@@ -1,0 +1,94 @@
+/* Shared by the header's mega-panels (Gun Art, the shop menu's tabs).
+   Each component pulls it in with `<style scoped src>`, so the rules stay
+   scoped to the component using them while being written once. */
+
+/* A label that opens a panel: the chevron says so, and turns while open. */
+.nav__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.nav__trigger::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.25s var(--ease);
+}
+.nav__trigger.is-open,
+.nav__trigger:hover {
+  color: var(--paper);
+}
+.nav__trigger.is-open::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+
+.mega__label,
+.mega__heading {
+  margin: 0 0 0.6rem;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--brass);
+}
+a.mega__heading {
+  transition: color 0.2s var(--ease);
+}
+a.mega__heading:hover {
+  color: var(--paper);
+}
+.mega__link {
+  padding: 0.4rem 0.5rem;
+  margin: 0 -0.5rem;
+  font-size: var(--fs-base);
+  color: var(--paper-dim);
+  border-radius: var(--radius);
+  transition:
+    color 0.2s var(--ease),
+    background 0.2s var(--ease);
+}
+.mega__link:hover,
+.mega__link.router-link-active {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.mega__cta {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 190px;
+  padding: 1.25rem;
+  background: var(--ink);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  transition:
+    border-color 0.25s var(--ease),
+    transform 0.25s var(--ease);
+}
+.mega__cta:hover {
+  border-color: var(--brass);
+}
+.mega__cta-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  color: var(--paper);
+}
+.mega__cta-sub {
+  font-size: var(--fs-sm);
+  color: var(--paper-faint);
+}
+.mega__cta-arrow {
+  color: var(--brass);
+  transition: transform 0.25s var(--ease);
+}
+.mega__cta:hover .mega__cta-arrow {
+  transform: translateX(4px);
+}

@@ -2,6 +2,7 @@
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { nextTick, ref } from "vue"
+import { fetchWithShopMenu } from "../../tests/helpers/shopMenu"
 import AppHeader from "./AppHeader.vue"
 
 // Real refs so Vue auto-unwraps them in the template (plain objects would read
@@ -14,9 +15,7 @@ const logout = vi.fn()
 
 mockNuxtImport("useAuth", () => () => ({ isAuthenticated, isAdmin, user, logout }))
 mockNuxtImport("useCart", () => () => ({ count: cartCount }))
-mockNuxtImport("useProductCategories", () => () => ({
-  categories: ref([{ slug: "carabines", name: "Carabines", category: "arme", displayOrder: 1 }]),
-}))
+mockNuxtImport("useFetch", () => fetchWithShopMenu)
 
 beforeEach(() => {
   isAuthenticated.value = false
@@ -25,12 +24,38 @@ beforeEach(() => {
 })
 
 describe("AppHeader", () => {
-  it("renders the two universes and journal in the spine", async () => {
+  it("renders the collection, Gun Art, the journal and the house in the first row", async () => {
     const wrapper = await mountSuspended(AppHeader)
-    const links = wrapper.findAll(".nav__link").map((l) => l.text())
-    expect(links).toContain("Armurerie")
-    expect(links).toContain("Gun Art")
-    expect(links).toContain("Journal")
+    const links = wrapper.findAll(".nav .nav__link").map((link) => link.text())
+    expect(links).toEqual(["Armes de collection", "Gun Art", "Journal", "À propos"])
+  })
+
+  it("highlights the collection and Gun Art, not the ordinary links", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    const featured = wrapper.findAll(".nav__link--feature").map((link) => link.attributes("href"))
+    expect(featured).toEqual(["/armes-de-collection", "/collection"])
+  })
+
+  it("draws the shop menu's tabs in a second row", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    const tabs = wrapper.findAll(".hdr__shop .shop-tab__link").map((link) => link.text())
+    expect(tabs).toEqual(["Chasse", "Munitions", "Armes de défense", "Coutellerie"])
+  })
+
+  it("no longer has the Armurerie mega-menu nor the legal-category links", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    expect(wrapper.find('[aria-controls="mega-armurerie"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain("Armurerie")
+    expect(wrapper.find('a[href*="legalCategory"]').exists()).toBe(false)
+  })
+
+  it("keeps a single panel open between Gun Art and the shop tabs", async () => {
+    const wrapper = await mountSuspended(AppHeader)
+    await wrapper.find('a[aria-controls="mega-chasse"]').trigger("focusin")
+    expect(wrapper.find("#mega-chasse").exists()).toBe(true)
+    await wrapper.find('a[aria-controls="mega-gunart"]').trigger("focusin")
+    expect(wrapper.find("#mega-chasse").exists()).toBe(false)
+    expect(wrapper.find("#mega-gunart").exists()).toBe(true)
   })
 
   it("shows a cart badge only when there are items", async () => {
@@ -56,25 +81,12 @@ describe("AppHeader", () => {
     expect(menu).toContain("Déconnexion")
   })
 
-  it("opens the Armurerie mega-menu with category and legal links", async () => {
-    const wrapper = await mountSuspended(AppHeader)
-    expect(wrapper.find("#mega-armurerie").exists()).toBe(false)
-    // The label is a link to the universe now, not a toggle: the panel opens on
-    // hover and on keyboard focus, so a click never has to undo it.
-    await wrapper.find(".nav__item").trigger("pointerenter")
-    const mega = wrapper.find("#mega-armurerie")
-    expect(mega.exists()).toBe(true)
-    expect(mega.text()).toContain("Carabines") // category from the mocked list
-    expect(mega.text()).toContain("Vente libre") // legal category label
-    expect(mega.find('a[href="/boutique/categorie/carabines"]').exists()).toBe(true)
-  })
-
   it("opens the Gun Art mega-menu with a link to the collection", async () => {
     const wrapper = await mountSuspended(AppHeader)
-    // Second universe item: Gun Art.
-    const gunArt = wrapper.findAll(".nav__item")[1]
-    expect(gunArt).toBeDefined()
-    await gunArt?.trigger("pointerenter")
+    // The label is a link to the collection, not a toggle: the panel opens on
+    // hover and on keyboard focus, so a click never has to undo it.
+    expect(wrapper.find("#mega-gunart").exists()).toBe(false)
+    await wrapper.find(".nav .mega-item").trigger("pointerenter")
     const mega = wrapper.find("#mega-gunart")
     expect(mega.exists()).toBe(true)
     expect(mega.find('a[href="/collection"]').exists()).toBe(true)
@@ -96,17 +108,17 @@ describe("AppHeader", () => {
     wrapper.unmount()
   })
 
-  it("expands the Armurerie accordion in the mobile menu", async () => {
+  it("expands a shop tab's accordion in the mobile menu", async () => {
     const wrapper = await mountSuspended(AppHeader)
     await wrapper.find('button[aria-label="Ouvrir le menu"]').trigger("click")
-    const toggle = document.querySelector('button[aria-controls="msub-armurerie"]') as HTMLElement | null
+    const toggle = document.querySelector('button[aria-controls="msub-chasse"]') as HTMLElement | null
     expect(toggle).not.toBeNull()
     expect(toggle?.getAttribute("aria-expanded")).toBe("false")
     toggle?.click()
     await nextTick()
     expect(toggle?.getAttribute("aria-expanded")).toBe("true")
-    // The category sub-links come from the mocked useProductCategories.
-    expect(document.querySelector("#msub-armurerie")?.textContent).toContain("Carabines")
+    // The nested entries come from the mocked shop menu.
+    expect(document.querySelector("#msub-chasse")?.textContent).toContain("Carabines")
     wrapper.unmount()
   })
 
