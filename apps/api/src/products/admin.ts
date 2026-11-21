@@ -19,6 +19,7 @@ import {
   legalCategories,
   orders,
   productCategories,
+  productSubcategories,
   products,
   productTags,
   productVariants,
@@ -31,6 +32,7 @@ import { beneficiaryOfProduct } from "../payouts/index.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
 import { adminProductCrossSellRoutes } from "./cross-sell.js"
 import { replaceProductTagsBySlug } from "./product-tags.js"
+import { subcategoryIdIn, unknownSubcategoryMessage } from "./subcategory.js"
 
 type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db
 
@@ -115,6 +117,25 @@ class VariantInUseError extends Error {
   }
 }
 
+/**
+ * Story 12.15a — what a PATCH does to the subcategory: undefined leaves it.
+ * A new category without a new subcategory drops it, the old one belonging to
+ * the old category.
+ */
+async function patchedSubcategoryId(
+  existing: { categoryId: string },
+  newCategoryId: string | undefined,
+  subcategorySlug: string | null | undefined,
+  tx: DbExecutor,
+): Promise<string | null | undefined> {
+  const categoryId = newCategoryId ?? existing.categoryId
+  if (subcategorySlug === null) return null
+  if (subcategorySlug === undefined) return categoryId === existing.categoryId ? undefined : null
+  const id = await subcategoryIdIn(categoryId, subcategorySlug, tx)
+  if (!id) throw new UnknownReferenceError(unknownSubcategoryMessage(subcategorySlug))
+  return id
+}
+
 async function loadAdminProduct(id: string) {
   const [row] = await db
     .select({
@@ -141,12 +162,16 @@ async function loadAdminProduct(id: string) {
       beneficiaryId: products.beneficiaryId,
       beneficiarySharePct: products.beneficiarySharePct,
       parcelCount: products.parcelCount,
+      categoryId: products.categoryId,
       categorySlug: productCategories.slug,
       categoryName: productCategories.name,
+      subcategorySlug: productSubcategories.slug,
+      subcategoryName: productSubcategories.name,
       legalCategory: legalCategories.category,
     })
     .from(products)
     .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
+    .leftJoin(productSubcategories, eq(products.subcategoryId, productSubcategories.id))
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
     .where(and(eq(products.id, id), GENERIC_ONLY))
     .limit(1)
@@ -251,7 +276,7 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/", async (request, reply) => {
     const parsed = createProductSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send(validationError(parsed.error.issues))
-    const { categorySlug, legalCategory, tagSlugs, variants, ...body } = parsed.data
+    const { categorySlug, subcategorySlug, legalCategory, tagSlugs, variants, ...body } = parsed.data
 
     const [category] = await db
       .select({ id: productCategories.id })
@@ -260,6 +285,10 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
       .limit(1)
     if (!category) {
       return reply.code(400).send({ error: "ValidationError", message: `Unknown category: ${categorySlug}` })
+    }
+    const subcategoryId = subcategorySlug ? await subcategoryIdIn(category.id, subcategorySlug) : null
+    if (subcategorySlug && !subcategoryId) {
+      return reply.code(400).send({ error: "ValidationError", message: unknownSubcategoryMessage(subcategorySlug) })
     }
     const [legal] = await db
       .select({ id: legalCategories.id })
@@ -287,6 +316,7 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
           description: body.description,
           longDescription: body.longDescription ? sanitizeRichTextHtml(body.longDescription) : undefined,
           categoryId: category.id,
+          subcategoryId,
           legalCategoryId: legal.id,
           priceHt: body.priceHt.toFixed(2),
           vatPct: body.vatPct.toFixed(2),
@@ -330,7 +360,7 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
     const existing = await loadAdminProduct(params.data.id)
     if (!existing) return reply.code(404).send({ error: "NotFound", message: "Product not found" })
 
-    const { categorySlug, legalCategory, tagSlugs, variants, ...body } = parsed.data
+    const { categorySlug, subcategorySlug, legalCategory, tagSlugs, variants, ...body } = parsed.data
     if (existing.archivedAt && body.published === true) {
       return reply.code(409).send({
         error: "Conflict",
@@ -372,6 +402,7 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
           if (value !== undefined) patch[column] = value === null ? null : value.toFixed(2)
         }
 
+        let newCategoryId: string | undefined
         if (categorySlug) {
           const [category] = await tx
             .select({ id: productCategories.id })
@@ -380,7 +411,10 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
             .limit(1)
           if (!category) throw new UnknownReferenceError(`Unknown category: ${categorySlug}`)
           patch.categoryId = category.id
+          newCategoryId = category.id
         }
+        const subcategoryId = await patchedSubcategoryId(existing, newCategoryId, subcategorySlug, tx)
+        if (subcategoryId !== undefined) patch.subcategoryId = subcategoryId
         if (legalCategory) {
           const [legal] = await tx
             .select({ id: legalCategories.id })

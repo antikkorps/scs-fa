@@ -333,6 +333,8 @@ export type ProductSort = (typeof PRODUCT_SORTS)[number]
 export const productFiltersSchema = z
   .object({
     category: categorySlugSchema.optional(),
+    // Story 12.15a — a subcategory belongs to one category: no need to name both.
+    subcategory: categorySlugSchema.optional(),
     tags: tagsFilterSchema,
     legalCategory: z.enum(LEGAL_CATEGORIES).optional(),
     search: z.string().trim().min(1).max(200).optional(),
@@ -1030,6 +1032,8 @@ const productBaseSchema = z
     description: optionalText(1000),
     longDescription: optionalText(20000),
     categorySlug: categorySlugSchema,
+    // Story 12.15a — within the category; `null` clears it.
+    subcategorySlug: categorySlugSchema.nullish(),
     legalCategory: z.enum(LEGAL_CATEGORIES),
     priceHt: z.coerce.number().min(0).max(10_000_000),
     vatPct: z.coerce.number().min(0).max(100).default(20),

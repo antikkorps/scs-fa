@@ -259,6 +259,9 @@ export const CATALOG_IMPORT_COLUMNS = [
   { key: "name", header: "Nom", required: true },
   { key: "brand", header: "Marque", required: false },
   { key: "category", header: "Catégorie", required: true },
+  // Story 12.15a: within the category, by name or slug. Blank leaves an
+  // existing product's subcategory as it is; « Aucune » takes it off.
+  { key: "subcategory", header: "Sous-catégorie", required: false },
   { key: "legalCategory", header: "Catégorie légale", required: true },
   // Story 12.13: tags by name or slug ("Chasse, Occasion"). Blank leaves an
   // existing product's tags as they are; a listed set replaces them.
@@ -321,6 +324,11 @@ export interface CatalogImportRow {
   brand: string | null
   /** Category slug or display name — resolved against the database by the API. */
   category: string
+  /**
+   * Subcategory name or slug within the category; false when the sheet says
+   * « Aucune » (taken off) — a value no cell can hold; null when blank (kept).
+   */
+  subcategory: string | false | null
   legalCategory: LegalCategory
   costPriceHt: number | null
   priceHt: number
@@ -376,6 +384,7 @@ const TEXT_LIMITS = {
   name: 255,
   brand: 100,
   category: 100,
+  subcategory: 100,
   description: 1000,
   longDescription: 20000,
   sourceCategory: 255,
@@ -437,6 +446,8 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
   const name = text("name", "Nom", true)
   const brand = text("brand", "Marque", false)
   const category = text("category", "Catégorie", true)
+  const subcategoryCell = text("subcategory", "Sous-catégorie", false)
+  const subcategory = subcategoryCell && NONE_SPELLINGS.has(normaliseHeader(subcategoryCell)) ? false : subcategoryCell
   const description = text("description", "Description courte", false)
   const longDescription = text("longDescription", "Description longue", false)
   const sourceCategory = text("sourceCategory", "Famille fournisseur", false)
@@ -518,6 +529,7 @@ function parseRow(get: (key: CatalogImportColumnKey) => string, line: number): P
       name,
       brand,
       category,
+      subcategory,
       legalCategory,
       costPriceHt,
       priceHt: round2(priceHt),

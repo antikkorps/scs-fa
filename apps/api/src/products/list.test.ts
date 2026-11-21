@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { legalCategories, productCategories, products } from "../db/schema.js"
+import { legalCategories, productCategories, productSubcategories, products } from "../db/schema.js"
 
 const SKU_PREFIX = "TEST21-"
 
@@ -14,6 +14,16 @@ async function categoryId(slug: string): Promise<string> {
     .where(eq(productCategories.slug, slug))
     .limit(1)
   if (!row) throw new Error(`Missing seeded product category: ${slug} (run db:seed)`)
+  return row.id
+}
+
+async function subcategoryId(slug: string): Promise<string> {
+  const [row] = await db
+    .select({ id: productSubcategories.id })
+    .from(productSubcategories)
+    .where(eq(productSubcategories.slug, slug))
+    .limit(1)
+  if (!row) throw new Error(`Missing seeded subcategory: ${slug} (run db:seed)`)
   return row.id
 }
 
@@ -38,6 +48,7 @@ describe("GET /api/products", () => {
 
     const armePoing = await categoryId("arme-poing")
     const armeLongue = await categoryId("arme-longue")
+    const carabines = await subcategoryId("carabines")
     const munition = await categoryId("munition")
     const accessoire = await categoryId("accessoire-tireur")
     const gunArt = await categoryId("gun-art")
@@ -64,6 +75,7 @@ describe("GET /api/products", () => {
         name: "Carabine Test Beta",
         description: "Carabine de chasse robuste",
         categoryId: armeLongue,
+        subcategoryId: carabines,
         legalCategoryId: legalC,
         priceHt: "1200.00",
         requiresLegalVerification: true,
@@ -179,6 +191,24 @@ describe("GET /api/products", () => {
     expect(res.statusCode).toBe(200)
     const skus = testSkus(res.json())
     expect(skus).toEqual([`${SKU_PREFIX}gamma`])
+  })
+
+  // Story 12.15a
+  it("filters by subcategory slug, and says each product's subcategory", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/products?subcategory=carabines&limit=100" })
+    expect(res.statusCode).toBe(200)
+    expect(testSkus(res.json())).toEqual([`${SKU_PREFIX}beta`])
+    const beta = res.json().data.find((p: { sku: string }) => p.sku === `${SKU_PREFIX}beta`)
+    expect(beta.subcategory).toEqual({ slug: "carabines", name: "Carabines" })
+
+    const all = await app.inject({ method: "GET", url: "/api/products?category=arme-poing&limit=100" })
+    const alpha = all.json().data.find((p: { sku: string }) => p.sku === `${SKU_PREFIX}alpha`)
+    expect(alpha.subcategory).toBeNull()
+  })
+
+  it("returns 400 on an invalid subcategory slug", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/products?subcategory=Pas%20un%20slug" })
+    expect(res.statusCode).toBe(400)
   })
 
   it("filters by legal category", async () => {

@@ -21,6 +21,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -710,6 +711,38 @@ export const productCategories = pgTable("product_categories", {
 
 export const productCategoriesRelations = relations(productCategories, ({ many }) => ({
   products: many(products),
+  subcategories: many(productSubcategories),
+}))
+
+// Story 12.15a — one level under the category (Fusils, Carabines under Armes
+// longues). A table of its own rather than a parent in product_categories: the
+// category stays what a product IS, read as before by the age check, parcels,
+// quotes and the cart; the subcategory only narrows it for browsing.
+export const productSubcategories = pgTable(
+  "product_subcategories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    categoryId: uuid("category_id").notNull(),
+    slug: varchar("slug", { length: 100 }).unique().notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    displayOrder: integer("display_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.categoryId], foreignColumns: [productCategories.id] }),
+    index("idx_product_subcategories_category").on(t.categoryId, t.displayOrder),
+    // Target of the products' (subcategory, category) key: a product's
+    // subcategory always belongs to its category.
+    unique("uq_product_subcategories_id_category").on(t.id, t.categoryId),
+  ],
+)
+
+export const productSubcategoriesRelations = relations(productSubcategories, ({ one, many }) => ({
+  category: one(productCategories, {
+    fields: [productSubcategories.categoryId],
+    references: [productCategories.id],
+  }),
+  products: many(products),
 }))
 
 // ============================================================================
@@ -869,6 +902,8 @@ export const products = pgTable(
 
     // Catégorisation
     categoryId: uuid("category_id").notNull(),
+    // Story 12.15a — optional: a product can stay at its category's level.
+    subcategoryId: uuid("subcategory_id"),
     legalCategoryId: uuid("legal_category_id"), // null pour gun art, 'none' pour accessoires
 
     // Fournisseur
@@ -945,6 +980,7 @@ export const products = pgTable(
   },
   (t) => [
      index("idx_products_category").on(t.categoryId),
+     index("idx_products_subcategory").on(t.subcategoryId),
      index("idx_products_legal_category").on(t.legalCategoryId),
      index("idx_products_slug").on(t.slug),
      index("idx_products_published").on(t.published),
@@ -966,6 +1002,13 @@ export const products = pgTable(
       columns: [t.categoryId],
       foreignColumns: [productCategories.id],
     }),
+     // Story 12.15a — the pair, not the subcategory alone: the database refuses
+     // a Carabine filed under Munitions. A NULL subcategory skips the check.
+     foreignKey({
+      name: "fk_products_subcategory_category",
+      columns: [t.subcategoryId, t.categoryId],
+      foreignColumns: [productSubcategories.id, productSubcategories.categoryId],
+    }),
      foreignKey({
       columns: [t.legalCategoryId],
       foreignColumns: [legalCategories.id],
@@ -981,6 +1024,10 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   category: one(productCategories, {
     fields: [products.categoryId],
     references: [productCategories.id],
+  }),
+  subcategory: one(productSubcategories, {
+    fields: [products.subcategoryId],
+    references: [productSubcategories.id],
   }),
   legalCategory: one(legalCategories, {
     fields: [products.legalCategoryId],

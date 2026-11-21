@@ -56,12 +56,19 @@ export interface TagFacetGroup {
   tags: TagRef[]
 }
 
+export interface ProductSubcategoryRef {
+  slug: string
+  name: string
+}
+
 export interface ProductCategoryRef {
   slug: string
   name: string
   category: string
   displayOrder: number | null
   description: string | null
+  /** Story 12.15a — in display order; empty for a category without any. */
+  subcategories: ProductSubcategoryRef[]
 }
 
 export interface LegalCategoryRef {

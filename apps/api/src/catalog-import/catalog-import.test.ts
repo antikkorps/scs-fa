@@ -14,6 +14,7 @@ import {
   catalogImports,
   legalCategories,
   media,
+  productSubcategories,
   products,
   productTags,
   suppliers,
@@ -312,6 +313,72 @@ describe("admin catalogue import (story 12.2)", () => {
     })
   })
 
+  // Story 12.15a — the menu's subcategories, filled from the sheet.
+  describe("subcategory", () => {
+    const subcategoryOf = async (ref: string) => {
+      const product = await productByRef(ref)
+      if (!product?.product.subcategoryId) return null
+      const [sub] = await db
+        .select({ slug: productSubcategories.slug })
+        .from(productSubcategories)
+        .where(eq(productSubcategories.id, product.product.subcategoryId))
+      return sub?.slug ?? null
+    }
+    const sub = (over: Cells) =>
+      sheet([row({ supplierSku: "SUB-1", name: "Testcatimp Sous Cat", imageUrls: "", ...over })])
+
+    it("files a new product under a subcategory, by name or slug", async () => {
+      await importFile(sub({ subcategory: "viseurs point rouge" }))
+      expect(await subcategoryOf("SUB-1")).toBe("viseurs-point-rouge")
+    })
+
+    it("keeps it when the cell is blank, changes it when filled, takes it off on « Aucune »", async () => {
+      await importFile(sub({ subcategory: "" }))
+      expect(await subcategoryOf("SUB-1")).toBe("viseurs-point-rouge")
+      await importFile(sub({ subcategory: "lunettes-de-visee" }))
+      expect(await subcategoryOf("SUB-1")).toBe("lunettes-de-visee")
+      await importFile(sub({ subcategory: "Aucune" }))
+      expect(await subcategoryOf("SUB-1")).toBeNull()
+    })
+
+    it("refuses a subcategory that is not one of the category's", async () => {
+      const { preview } = await importFile(sub({ supplierSku: "SUB-2", subcategory: "Carabines" }))
+      expect(preview.rows[0].action).toBe("invalid")
+      expect(preview.rows[0].errors.join()).toMatch(/Sous-catégorie inconnue pour « Aides à la visée » : « Carabines »/)
+    })
+
+    // Without overwrite, the product keeps its category: the subcategory is read within that one.
+    it("reads the subcategory within the category the product keeps", async () => {
+      await importFile(sub({ subcategory: "Lunettes de visée" }))
+      const { preview } = await importFile(sub({ category: "Munitions", subcategory: "Canon rayé" }))
+      expect(preview.rows[0].errors.join()).toMatch(/Sous-catégorie inconnue pour « Aides à la visée »/)
+    })
+
+    it("refuses, on an overwrite to another category, a subcategory of the old one", async () => {
+      await importFile(sub({ category: "Aides à la visée", subcategory: "Lunettes de visée" }), true)
+      const { preview } = await importFile(sub({ category: "Munitions", subcategory: "Lunettes de visée" }), true)
+      expect(preview.rows[0].errors.join()).toMatch(/Sous-catégorie inconnue pour « Munitions »/)
+    })
+
+    it("leaves the subcategory alone when the sheet predates an edit made in the back-office", async () => {
+      await importFile(sub({ category: "Aides à la visée", subcategory: "Lunettes de visée" }), true)
+      const product = await productByRef("SUB-1")
+      const exportedAt = new Date(Date.now() - 60_000).toISOString()
+      const { preview } = await importFile(sub({ subcategory: "Viseurs point rouge", version: exportedAt }))
+      expect(preview.rows[0].warnings.join()).toMatch(/Sous-catégorie conservée/)
+      expect(await subcategoryOf("SUB-1")).toBe("lunettes-de-visee")
+      expect(product?.product.updatedAt?.getTime()).toBeGreaterThan(new Date(exportedAt).getTime())
+    })
+
+    it("drops the subcategory when an overwrite moves the product to another category", async () => {
+      await importFile(sub({ subcategory: "Lunettes de visée" }))
+      await importFile(sub({ category: "Munitions" }), true)
+      expect(await subcategoryOf("SUB-1")).toBeNull()
+      await importFile(sub({ category: "Munitions", subcategory: "Canon rayé" }), true)
+      expect(await subcategoryOf("SUB-1")).toBe("munitions-canon-raye")
+    })
+  })
+
   it("overwrites everything when asked to", async () => {
     const { preview, res } = await importFile(
       sheet([row({ costPriceHt: "310", priceHt: "450", legalCategory: "C", description: "Nouvelle" })]),
@@ -595,6 +662,15 @@ describe("admin catalogue import (story 12.2)", () => {
       // A slug never holds a separator; a name such as « Chasse, gros gibier » would split on re-import.
       expect(line[col("tags")]?.split(", ").sort()).toEqual(["arme-ancienne", "occasion"])
       expect(table.find((r) => r[col("supplierSku")] === "RT-1")?.[col("tags")] ?? "").toBe("")
+    })
+
+    it("exports the subcategory by name, so a round trip keeps it (story 12.15a)", async () => {
+      await importFile(
+        sheet([rt({ supplierSku: "RT-3", name: "Testcatimp Rt Sangle", subcategory: "viseurs-point-rouge" })]),
+      )
+      const { table, col } = await exportTable()
+      expect(table.find((r) => r[col("supplierSku")] === "RT-3")?.[col("subcategory")]).toBe("Viseurs point rouge")
+      expect(table.find((r) => r[col("supplierSku")] === "RT-1")?.[col("subcategory")] ?? "").toBe("")
     })
 
     it("leaves the tags alone when the sheet predates an edit made in the back-office", async () => {

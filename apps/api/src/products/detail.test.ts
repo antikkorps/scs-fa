@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { buildApp } from "../app.js"
 import { db } from "../db/client.js"
-import { legalCategories, productCategories, products, productVariants } from "../db/schema.js"
+import { legalCategories, productCategories, productSubcategories, products, productVariants } from "../db/schema.js"
 
 const SKU_PREFIX = "TEST22-"
 
@@ -40,6 +40,10 @@ describe("GET /api/products/:id", () => {
     await db.delete(products).where(like(products.sku, `${SKU_PREFIX}%`))
 
     const armePoing = await categoryId("arme-poing")
+    const [pistolets] = await db
+      .select({ id: productSubcategories.id })
+      .from(productSubcategories)
+      .where(eq(productSubcategories.slug, "pistolets"))
     const accessoire = await categoryId("accessoire-tireur")
     const legalB = await legalCategoryId("B")
     const legalNone = await legalCategoryId("none")
@@ -54,6 +58,7 @@ describe("GET /api/products/:id", () => {
           description: "Un pistolet de compétition très précis",
           longDescription: "Description longue détaillée du pistolet Alpha",
           categoryId: armePoing,
+          subcategoryId: pistolets?.id,
           legalCategoryId: legalB,
           priceHt: "800.00",
           ageMinRequired: 18,
@@ -135,6 +140,8 @@ describe("GET /api/products/:id", () => {
       ageMinRequired: 18,
     })
     expect(body.category).toMatchObject({ slug: "arme-poing", name: "Armes de poing" })
+    // Story 12.15a — for the breadcrumb.
+    expect(body.subcategory).toEqual({ slug: "pistolets", name: "Pistolets" })
     expect(body.seo).toBeDefined()
     // For the structured data (SEO audit 2026-11-15, finding 5).
     expect(body).toMatchObject({ brand: "Glock", ean: "9120039381234" })

@@ -2,6 +2,7 @@
 import { defaultParcelCount, LEGAL_CATEGORIES } from "@armurier/shared"
 import type { AdminProductDetail, AdminProductVariant } from "~/types/admin-catalogue"
 import type { AdminProfitability } from "~/types/admin-finance"
+import type { ProductCategoryRef } from "~/types/product"
 import { formatDateTime, formatPercent } from "~/utils/format"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
@@ -20,6 +21,7 @@ const form = reactive({
   description: "",
   longDescription: "",
   categorySlug: "",
+  subcategorySlug: "",
   legalCategory: "none" as (typeof LEGAL_CATEGORIES)[number],
   priceHt: 0,
   vatPct: 20,
@@ -65,7 +67,7 @@ const saveError = ref<string | null>(null)
 const saving = ref(false)
 
 const { data: categoriesData } = await useAsyncData("admin-product-categories", () =>
-  api<{ data: Array<{ slug: string; name: string }> }>("/product-categories"),
+  api<{ data: ProductCategoryRef[] }>("/product-categories"),
 )
 const { data: tagsData } = await useAsyncData("admin-tags-opts", () =>
   api<{ data: Array<{ slug: string; name: string; facet: string }> }>("/admin/tags"),
@@ -78,6 +80,16 @@ const { data: beneficiariesData } = await useAsyncData("admin-beneficiary-opts",
 const beneficiaryOptions = computed(() => beneficiariesData.value?.data ?? [])
 const categories = computed(() => (categoriesData.value?.data ?? []).filter((c) => c.slug !== "gun-art"))
 const allTags = computed(() => tagsData.value?.data ?? [])
+// Story 12.15a — only the chosen category's: the server refuses any other.
+const subcategories = computed(() => categories.value.find((c) => c.slug === form.categorySlug)?.subcategories ?? [])
+// On a change of category only: the load sets the category from "" and must
+// keep the product's subcategory, even if the list has not come.
+watch(
+  () => form.categorySlug,
+  (_next, previous) => {
+    if (previous && !subcategories.value.some((s) => s.slug === form.subcategorySlug)) form.subcategorySlug = ""
+  },
+)
 
 async function load() {
   if (isNew.value) return
@@ -90,6 +102,7 @@ async function load() {
       description: d.description ?? "",
       longDescription: d.longDescription ?? "",
       categorySlug: d.categorySlug,
+      subcategorySlug: d.subcategorySlug ?? "",
       legalCategory: (d.legalCategory ?? "none") as (typeof LEGAL_CATEGORIES)[number],
       priceHt: d.priceHt,
       vatPct: d.vatPct,
@@ -157,6 +170,7 @@ function payload() {
   const body: Record<string, unknown> = {
     name: form.name,
     categorySlug: form.categorySlug,
+    subcategorySlug: form.subcategorySlug || null,
     legalCategory: form.legalCategory,
     priceHt: Number(form.priceHt),
     vatPct: Number(form.vatPct),
@@ -280,6 +294,14 @@ async function save() {
             <option value="">— choisir —</option>
             <option v-for="c in categories" :key="c.slug" :value="c.slug">{{ c.name }}</option>
           </select>
+        </label>
+        <label v-if="subcategories.length" class="field">
+          <span class="field__label">Sous-catégorie</span>
+          <select v-model="form.subcategorySlug" name="subcategorySlug" class="ctl">
+            <option value="">— aucune —</option>
+            <option v-for="s in subcategories" :key="s.slug" :value="s.slug">{{ s.name }}</option>
+          </select>
+          <span class="field__help">Range le produit dans le menu de la boutique (Carabines, Pistolets…).</span>
         </label>
         <label class="field">
           <span class="field__label">Catégorie légale *</span>
