@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { ProductTag } from "~/types/product"
 
-// The tags of a product, each a link to its own page (/boutique/tag/:slug):
+// The tags of a product, each a link to its own page (/boutique/tag/:slug, or
+// the menu entry showing exactly that tag):
 // the way a visitor — and a crawler — finds the other pieces like this one.
 defineProps<{ tags: Pick<ProductTag, "slug" | "name">[] }>()
+const { tagPath } = useShopMenu()
 </script>
 
 <template>

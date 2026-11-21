@@ -14,6 +14,7 @@ const { productQueries, pageAnswer } = vi.hoisted(() => ({
 }))
 
 mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
+  if (typeof url === "string" && url.endsWith("/menu")) return { data: ref({ data: [] }), error: ref(null) }
   if (typeof url === "string" && url.includes("/product-categories")) {
     return {
       data: ref({
@@ -30,7 +31,10 @@ mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
         data: [
           {
             facet: "etat",
-            tags: [{ slug: "occasion", name: "Occasion", facet: "etat", description: null, productCount: 3 }],
+            tags: [
+              { slug: "occasion", name: "Occasion", facet: "etat", description: null, productCount: 3 },
+              { slug: "neuf", name: "Neuf", facet: "etat", description: null, productCount: 2 },
+            ],
           },
         ],
       }),
@@ -82,7 +86,7 @@ describe("ShopCatalogue (story 9.6)", () => {
   })
 
   describe("on a tag page", () => {
-    const tagPage = { category: "", tag: "occasion", basePath: "/boutique/tag/occasion", listName: "x" }
+    const tagPage = { category: "", lockedTags: ["occasion"], basePath: "/boutique/tag/occasion", listName: "x" }
 
     it("lists the products carrying the page's tag", async () => {
       productQueries.length = 0
@@ -100,6 +104,15 @@ describe("ShopCatalogue (story 9.6)", () => {
       const push = spyPush()
       await box.trigger("change")
       expect(push).toHaveBeenCalledWith({ path: "/boutique", query: { legalCategory: "B" } })
+    })
+
+    // Story 12.15c review: tags of one facet add up (OR), so a sibling of the
+    // page's tag would widen the page — « Chasse » showing sport shooting.
+    it("offers no other tag of the page's tag's facet, and ignores one in the address", async () => {
+      productQueries.length = 0
+      const wrapper = await mountSuspended(ShopCatalogue, { props: tagPage, route: "/boutique/tag/occasion?tags=neuf" })
+      expect(wrapper.findAll(".tagf__box")).toHaveLength(1)
+      expect(productQueries.at(-1)).toMatchObject({ tags: "occasion" })
     })
 
     it("links the categories and the whole catalogue cleanly, none of them as the current page", async () => {
@@ -247,7 +260,7 @@ describe("ShopCatalogue on a page kept out of the indexes", () => {
 
   it("states no canonical when the page is noindex", async () => {
     await mountSuspended(ShopCatalogue, {
-      props: { category: "", tag: "noindex-check", basePath: PATH, listName: "x", noindex: true },
+      props: { category: "", lockedTags: ["noindex-check"], basePath: PATH, listName: "x", noindex: true },
       route: PATH,
       global: { stubs: { ProductCard: true } },
     })
@@ -257,7 +270,7 @@ describe("ShopCatalogue on a page kept out of the indexes", () => {
 
   it("states it otherwise", async () => {
     await mountSuspended(ShopCatalogue, {
-      props: { category: "", tag: "noindex-check", basePath: `${PATH}-on`, listName: "x" },
+      props: { category: "", lockedTags: ["noindex-check"], basePath: `${PATH}-on`, listName: "x" },
       route: `${PATH}-on`,
       global: { stubs: { ProductCard: true } },
     })

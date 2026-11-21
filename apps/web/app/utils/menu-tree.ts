@@ -2,6 +2,7 @@
 
 import type { AdminMenuEntry, PlacedMenuEntry } from "~/types/menu"
 import type { ProductCategoryRef } from "~/types/product"
+import { legalCategoryLabel } from "~/utils/product"
 
 /** The children of `parentId`, in display order. */
 export function childrenOf(entries: AdminMenuEntry[], parentId: string | null): AdminMenuEntry[] {
@@ -29,8 +30,6 @@ export function descendantCount(entries: AdminMenuEntry[], id: string): number {
 export function branchHeight(entries: AdminMenuEntry[], id: string): number {
   return 1 + Math.max(0, ...childrenOf(entries, id).map((child) => branchHeight(entries, child.id)))
 }
-
-export const legalCategoryLabel = (code: string) => (code === "none" ? "Hors catégorie légale" : `Catégorie ${code}`)
 
 /** The filter in words: « Armes longues › Carabines · Chasse · Catégorie C ». */
 export function filterSummary(

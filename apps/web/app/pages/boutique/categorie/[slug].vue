@@ -7,7 +7,9 @@ const slug = computed(() => String(route.params.slug))
 // The category must exist: an unknown slug is a real 404, not an empty grid a
 // crawler would index as a thin page.
 const { categories, ready, error } = useProductCategories()
-await ready
+// A menu entry showing exactly this category is its canonical page (story 12.15c).
+const { categoryPath, ready: menuReady } = useShopMenu()
+await Promise.all([ready, menuReady])
 const category = computed(() => categories.value.find((c) => c.slug === slug.value))
 if (!category.value) {
   throw missingPageError(error.value, "Catégorie introuvable")
@@ -17,11 +19,14 @@ const name = computed(() => category.value?.name ?? "")
 const pageUrl = computed(() => `${siteUrl}${categoryPath(slug.value)}`)
 const description = computed(() => categoryMetaDescription(name.value, category.value?.description))
 
+// Computed in the script: a 404 thrown above leaves the template no function to call.
+const basePath = computed(() => categoryPath(slug.value))
+
 usePageSeo({
   title: () => pagedTitle(`${name.value} — Boutique armurerie`, pageFromQuery(route.query.page)),
   socialTitle: () => `${name.value} — SCS Firearms`,
   description,
-  path: () => categoryPath(slug.value),
+  path: () => basePath.value,
   // ShopCatalogue states the canonical: it knows the page of results.
   canonical: false,
 })
@@ -39,7 +44,7 @@ usePageSeo({
     <ShopCatalogue
       :key="slug"
       :category="slug"
-      :base-path="categoryPath(slug)"
+      :base-path="basePath"
       :list-name="`${name} — Boutique armurerie SCS Firearms`"
     />
   </div>

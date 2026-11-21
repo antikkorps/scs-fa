@@ -139,6 +139,17 @@ describe("admin menu", () => {
     expect(second.position).toBeGreaterThan(first.position)
   })
 
+  // Story 12.15c — the texts of the entry's page.
+  it("saves an entry's page texts and clears them", async () => {
+    const entry = await top("textes", { description: "Les carabines.", intro: "Un.\n\nDeux." })
+    expect((await list()).find((e) => e.id === entry.id)).toMatchObject({
+      description: "Les carabines.",
+      intro: "Un.\n\nDeux.",
+    })
+    const res = await call("PATCH", `${BASE}/${entry.id}`, { description: "" })
+    expect(res.json().data).toMatchObject({ description: null, intro: "Un.\n\nDeux." })
+  })
+
   it("renames an entry and replaces its tags", async () => {
     const entry = await top("renomme", { tagSlugs: ["chasse"] })
     const res = await call("PATCH", `${BASE}/${entry.id}`, { label: "Renommée", tagSlugs: ["tir-sportif"] })

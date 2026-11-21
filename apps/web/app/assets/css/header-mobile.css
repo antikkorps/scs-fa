@@ -1,0 +1,75 @@
+/* Shared by the rows of the header's mobile overlay (the universes'
+   accordions, the plain links). Each component pulls it in with
+   `<style scoped src>`, so the rules stay scoped while being written once. */
+
+.mnav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mlink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1.15rem 0.25rem;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-normal);
+  color: var(--paper);
+  border-bottom: 1px solid var(--ink-line);
+  transition: color 0.25s var(--ease);
+}
+.mlink:hover,
+.mlink:active,
+.mlink.router-link-active {
+  color: var(--brass);
+}
+.mlink--quiet {
+  font-size: var(--fs-base);
+  color: var(--paper-dim);
+}
+.mlink__chev {
+  color: var(--brass);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+  transition: transform 0.25s var(--ease);
+}
+
+.msub__link {
+  display: block;
+  padding: 0.6rem 0.25rem 0.6rem 1rem;
+  font-size: var(--fs-base);
+  color: var(--paper-dim);
+  transition: color 0.2s var(--ease);
+}
+.msub__link:hover,
+.msub__link:active,
+.msub__link.router-link-active {
+  color: var(--paper);
+}
+.msub__note {
+  padding: 0.5rem 0.25rem 0.5rem 1rem;
+  font-size: var(--fs-sm);
+  color: var(--paper-faint);
+}
+
+/* Staggered reveal: each row sets its rank in `--i`, the overlay's search and
+   account links a fixed `--delay`. Kept with its keyframes in one block, since
+   scoped styles rename keyframes per block. */
+.mnav__item,
+.mobile__search,
+.mobile__foot > * {
+  animation: riseIn 0.4s var(--ease) both;
+  animation-delay: var(--delay, calc(var(--i, 0) * 55ms + 0.1s));
+}
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

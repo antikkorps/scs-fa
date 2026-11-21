@@ -55,6 +55,20 @@ const menuLinkUrlSchema = z
   .max(500)
   .regex(/^\/(?!\/)[^\s\\]*$/, "Must be a path on this site")
 
+/** The longest description a search result shows in full. */
+export const MENU_DESCRIPTION_MAX = 160
+export const MENU_INTRO_MAX = 3000
+
+// Optional page text: blank means none, so a cleared field reads back as null.
+const menuPageText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((text) => text || null)
+    .nullable()
+    .default(null)
+
 const menuEntryFields = z.object({
   parentId: z.string().uuid().nullable().default(null),
   slug: menuSlugSchema,
@@ -69,6 +83,10 @@ const menuEntryFields = z.object({
     .max(MAX_TAG_FILTERS)
     .transform((slugs) => [...new Set(slugs)])
     .default([]),
+  // Story 12.15c — the entry's page: its meta description and its introduction
+  // (plain paragraphs separated by a blank line).
+  description: menuPageText(MENU_DESCRIPTION_MAX),
+  intro: menuPageText(MENU_INTRO_MAX),
 })
 
 export type MenuEntryShape = Pick<

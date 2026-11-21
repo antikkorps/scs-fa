@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { UNIVERSES } from "#shared/utils/universes"
-
+const { menu, tagPath } = useShopMenu()
+const tabs = computed(() => menu.value.filter((tab) => tab.href))
 const year = new Date().getFullYear()
 // Changing one's mind must be as easy as the first choice (story 9.6).
 const { reopen } = useConsent()
@@ -20,8 +20,12 @@ const { reopen } = useConsent()
       <nav class="ft__col" aria-label="Explorer">
         <h2 class="ft__h">Explorer</h2>
         <NuxtLink to="/boutique">Armurerie</NuxtLink>
-        <NuxtLink v-for="universe in UNIVERSES" :key="universe.path" :to="universe.path">{{ universe.name }}</NuxtLink>
+        <!-- Story 12.15c: the shop menu's tabs, as Fred arranges them. -->
+        <NuxtLink v-for="tab in tabs" :key="tab.path" :to="tab.href ?? ''">{{ tab.label }}</NuxtLink>
         <NuxtLink to="/armes-de-collection">Armes de collection</NuxtLink>
+        <!-- Moved from the old Armurerie mega-menu (story 12.15c); the tag's own
+             page, or the menu entry standing for it. -->
+        <NuxtLink :to="tagPath('occasion')">Armes d'occasion</NuxtLink>
         <NuxtLink to="/collection">Gun Art</NuxtLink>
         <NuxtLink to="/collection/artiste">L'artiste</NuxtLink>
         <NuxtLink to="/blog">Journal</NuxtLink>

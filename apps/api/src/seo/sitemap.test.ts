@@ -34,6 +34,7 @@ interface SitemapPayload {
   series: { slug: string }[]
   themes: { slug: string; updatedAt: string }[]
   blogPosts: { slug: string; updatedAt: string }[]
+  menuPages: { path: string; updatedAt: string | null }[]
 }
 
 describe("GET /api/seo/sitemap (story 9.6)", () => {
@@ -187,5 +188,20 @@ describe("GET /api/seo/sitemap (story 9.6)", () => {
     const posts = mine(data.blogPosts)
     expect(posts.map((p) => p.slug)).toEqual([`${SLUG}article`])
     expect(posts[0]?.updatedAt).toBe("2026-06-15T00:00:00.000Z")
+  })
+
+  // Story 12.15c — a menu page is listed if and only if it shows a product:
+  // an empty one is kept out of the indexes.
+  it("lists the menu pages that show products, and only them", async () => {
+    const menu = (await app.inject({ method: "GET", url: "/api/menu" })).json().data
+    const walk = (entries: { path: string; kind: string; children: never[] }[]): string[] =>
+      entries.flatMap((entry) => [...(entry.kind === "filter" ? [entry.path] : []), ...walk(entry.children)])
+    const withProducts: string[] = []
+    for (const path of walk(menu)) {
+      const page = await app.inject({ method: "GET", url: `/api/menu/page?path=${encodeURIComponent(path)}` })
+      if (page.json().data.productCount > 0) withProducts.push(path)
+    }
+    expect(data.menuPages.map((page) => page.path)).toEqual(withProducts)
+    expect(withProducts.length).toBeGreaterThan(0)
   })
 })

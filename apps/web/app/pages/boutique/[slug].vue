@@ -116,6 +116,7 @@ const description = computed(
 
 // Boutique › category › product: the category is the page a visitor (and a
 // crawler) climbs back to.
+const { categoryPath } = useShopMenu()
 const crumbs = computed(() => [
   { name: "Boutique", to: "/boutique" },
   ...(product.value.category.slug && product.value.category.name

@@ -1,0 +1,261 @@
+/* The header's bar: brand, the two rows of links, the icons and their overlays (AppHeader.vue). */
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(14, 14, 16, 0.78);
+  backdrop-filter: saturate(150%) blur(12px);
+  border-bottom: 1px solid var(--ink-line);
+}
+.hdr__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 68px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  --logo-height: 2.1rem;
+}
+
+/* The house's links, beside the icons: what one buys is in the second row. */
+.nav {
+  display: none;
+  align-items: center;
+  gap: clamp(1rem, 2.6vw - 0.5rem, 2rem);
+  margin: 0 0.75rem 0 auto;
+}
+/* Second row: the shop menu. Desktop only, the burger carries it on mobile.
+   Header height is then 68px + 44px. */
+.hdr__shop {
+  display: none;
+  height: 44px;
+  border-top: 1px solid var(--ink-line);
+}
+
+/* Right cluster */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.icon-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--paper-dim);
+  cursor: pointer;
+  transition: color 0.3s var(--ease);
+}
+.icon-btn:hover {
+  color: var(--brass);
+}
+.icon-btn.is-on {
+  color: var(--brass);
+}
+.icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+.cart__badge {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: #1a1407;
+  background: var(--brass);
+  border-radius: 999px;
+}
+
+/* Account dropdown */
+.account {
+  position: relative;
+}
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  min-width: 200px;
+  padding: 0.5rem;
+  background: var(--ink-soft);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+.menu__hello {
+  padding: 0.5rem 0.7rem;
+  margin: 0 0 0.25rem;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
+  color: var(--brass);
+  border-bottom: 1px solid var(--ink-line);
+}
+.menu__item {
+  text-align: left;
+  padding: 0.65rem 0.7rem;
+  font-size: var(--fs-base);
+  color: var(--paper);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.menu__item:hover {
+  background: var(--ink);
+  color: var(--brass);
+}
+
+/* Transparent click-outside scrim for the account dropdown */
+.hdr-scrim {
+  position: fixed;
+  inset: 0;
+  /* ⚠️ Must stay BELOW the header's z-index (50), not above it.
+     `.hdr` is `position: sticky` with a z-index, so it opens a stacking
+     context: the dropdown's own `z-index: 60` only ranks it inside the header,
+     and the whole header still stacks at 50. A scrim at 55 therefore covered
+     the menu it was meant to sit behind — every click landed on the scrim,
+     which just closed the menu. The dropdown rendered perfectly and did
+     nothing, connexion and inscription included.
+     Below the header, the menu is clickable and a click anywhere else still
+     closes it. */
+  z-index: 40;
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+/* Search overlay (dims the page, panel near the top) */
+.searchov {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  padding: clamp(4rem, 14vh, 9rem) var(--gutter) 2rem;
+  background: rgba(8, 8, 10, 0.7);
+  backdrop-filter: blur(6px);
+}
+.searchov__panel {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  height: max-content;
+}
+.searchov__close {
+  position: absolute;
+  top: -2.6rem;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  font-size: var(--fs-base);
+  color: var(--paper);
+  background: transparent;
+  border: 1px solid var(--ink-line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.searchov__close:hover {
+  color: var(--brass);
+  border-color: var(--brass);
+}
+
+/* Burger */
+.burger {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.burger span,
+.burger span::before,
+.burger span::after {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 1.5px;
+  background: var(--paper);
+  transition: transform 0.3s var(--ease);
+}
+.burger span {
+  position: relative;
+}
+.burger span::before {
+  position: absolute;
+  top: -6px;
+}
+.burger span::after {
+  position: absolute;
+  top: 6px;
+}
+.burger span.is-open {
+  background: transparent;
+}
+.burger span.is-open::before {
+  transform: translateY(6px) rotate(45deg);
+}
+.burger span.is-open::after {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* Transitions */
+.searchov-enter-active,
+.searchov-leave-active {
+  transition: opacity 0.2s var(--ease);
+}
+.searchov-enter-active .searchov__panel,
+.searchov-leave-active .searchov__panel {
+  transition: transform 0.25s var(--ease);
+}
+.searchov-enter-from,
+.searchov-leave-to {
+  opacity: 0;
+}
+.searchov-enter-from .searchov__panel,
+.searchov-leave-to .searchov__panel {
+  transform: translateY(-12px);
+}
+.drop-enter-active,
+.drop-leave-active {
+  transition:
+    opacity 0.18s var(--ease),
+    transform 0.18s var(--ease);
+}
+.drop-enter-from,
+.drop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+@media (min-width: 980px) {
+  .nav,
+  .hdr__shop {
+    display: flex;
+  }
+  .burger {
+    display: none;
+  }
+  .brand {
+    --logo-height: 2.5rem;
+  }
+}

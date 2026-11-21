@@ -27,7 +27,14 @@ async function fetchAll<T>(url: string, headers: Record<string, string>): Promis
   return rows
 }
 
-const EMPTY_CATALOGUE: LlmsFullInput = { artworks: [], articles: [], series: [], products: [], categories: [] }
+const EMPTY_CATALOGUE: LlmsFullInput = {
+  artworks: [],
+  articles: [],
+  series: [],
+  products: [],
+  categories: [],
+  menu: [],
+}
 
 /**
  * The whole catalogue, read from the API at most every ten minutes (SEO audit
@@ -46,7 +53,8 @@ const cachedCatalogue = defineCachedFunction(
       fetchAll<LlmsProduct>(`${base}/products`, headers),
       get<{ data: LlmsCategory[] }>("/product-categories").then((r) => r.data),
     ])
-    return { artworks, articles, series, products, categories }
+    // The menu degrades on its own: its failure never empties the catalogue.
+    return { artworks, articles, series, products, categories, menu: await shopMenuOrNone() }
   },
   { ...AGENT_FILE_CACHE, name: "llms-full-catalogue", getKey: () => "all" },
 )

@@ -11,6 +11,8 @@ interface SeedEntry {
   subcategory?: string
   legal?: LegalCategory
   tags?: string[]
+  description?: string
+  intro?: string
   children?: SeedEntry[]
 }
 
@@ -22,6 +24,21 @@ const ammunitionBy = (tags: string[]): SeedEntry[] => [
   { slug: "canon-lisse", label: "Canon lisse", category: "munition", subcategory: "munitions-canon-lisse", tags },
 ]
 
+// Story 12.15c — the texts of the universe pages these two tabs replace (12.13),
+// first drafts still to be read by Fred.
+const HUNTING_PAGE = {
+  description:
+    "Carabines et fusils de chasse, munitions, optiques, couteaux et équipement du chasseur. Prix TTC et stock en temps réel.",
+  intro:
+    "Carabines et fusils de chasse, munitions, optiques, couteaux et équipement du chasseur : tout ce qu'il faut pour la saison, choisi par notre armurerie.\n\nChaque arme indique sa catégorie légale et les pièces exigées : pour une arme de catégorie C, un permis de chasser validé ou une licence de tir, avec une pièce d'identité.",
+}
+const KNIVES_PAGE = {
+  description:
+    "La coutellerie SCS Firearms : couteaux pliants, à lame fixe et de chasse, des meilleures marques. Vente réservée aux personnes majeures.",
+  intro:
+    "Couteaux pliants, à lame fixe et de chasse : une sélection de lames pour l'usage comme pour la collection.\n\nVente réservée aux personnes de 18 ans et plus : vous le certifiez sur l'honneur à la commande. Le port d'un couteau sans motif légitime est interdit.",
+}
+
 // Story 12.15b — Fred's menu (mail of 2026-11-21), the initial content of the
 // tree he then edits from the back-office. The tabs run from the best seller to
 // the rarest; Armes de collection and Gun Art stand apart, outside this tree.
@@ -31,6 +48,7 @@ export const INITIAL_MENU: SeedEntry[] = [
     slug: "chasse",
     label: "Chasse",
     tags: HUNTING,
+    ...HUNTING_PAGE,
     children: [
       {
         slug: "armes-longues",
@@ -149,7 +167,7 @@ export const INITIAL_MENU: SeedEntry[] = [
     ],
   },
   { slug: "armes-de-defense", label: "Armes de défense", category: "arme-defense" },
-  { slug: "coutellerie", label: "Coutellerie", category: "coutellerie" },
+  { slug: "coutellerie", label: "Coutellerie", category: "coutellerie", ...KNIVES_PAGE },
 ]
 
 async function insertEntry(entry: SeedEntry, parentId: string | null, position: number, tx: DbExecutor) {
@@ -163,7 +181,16 @@ async function insertEntry(entry: SeedEntry, parentId: string | null, position: 
   )
   const [row] = await tx
     .insert(menuEntries)
-    .values({ parentId, slug: entry.slug, label: entry.label, kind: entry.kind, position, ...columns })
+    .values({
+      parentId,
+      slug: entry.slug,
+      label: entry.label,
+      kind: entry.kind,
+      description: entry.description,
+      intro: entry.intro,
+      position,
+      ...columns,
+    })
     .returning({ id: menuEntries.id })
   if (!row) throw new Error(`Menu entry ${entry.slug} not inserted`)
   await setEntryTags(row.id, entry.tags ?? [], tx)

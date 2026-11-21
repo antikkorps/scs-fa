@@ -15,6 +15,8 @@ const entry = (fields: Record<string, unknown>) => ({
   subcategorySlug: null,
   legalCategory: null,
   tagSlugs: [],
+  description: null,
+  intro: null,
   ...fields,
 })
 
@@ -154,6 +156,28 @@ describe("admin menu screen (story 12.15b)", () => {
       label: "Chasse & battue",
       tagSlugs: ["chasse", "tir-sportif"],
     })
+  })
+
+  // Story 12.15c — the entry's page texts.
+  it("saves the texts of the entry's page", async () => {
+    const wrapper = await mountSuspended(MenuPage)
+    await rowOf(wrapper, "Chasse").find('[aria-label="Modifier"]').trigger("click")
+    await wrapper.find('input[name="description"]').setValue("Tout pour la chasse.")
+    await wrapper.find('textarea[name="intro"]').setValue("Un.\n\nDeux.")
+    await wrapper.find("form").trigger("submit")
+    await flushPromises()
+    const [, options] = callsWith("PATCH")[0] ?? []
+    expect((options as { body: Record<string, unknown> }).body).toMatchObject({
+      description: "Tout pour la chasse.",
+      intro: "Un.\n\nDeux.",
+    })
+  })
+
+  it("asks no page texts of a link", async () => {
+    const wrapper = await mountSuspended(MenuPage)
+    await wrapper.find(".btn-add").trigger("click")
+    await wrapper.find('select[name="kind"]').setValue("link")
+    expect(wrapper.find('textarea[name="intro"]').exists()).toBe(false)
   })
 
   // Chasse spans three levels: under any tab it would reach a fourth.

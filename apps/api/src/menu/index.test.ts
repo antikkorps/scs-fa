@@ -74,3 +74,68 @@ describe("GET /api/menu", () => {
     expect(JSON.stringify(menu)).not.toMatch(/"(id|parentId)"/)
   })
 })
+
+// Story 12.15c — what an entry's page needs, by its address.
+describe("GET /api/menu/page", () => {
+  let app: FastifyInstance
+  const page = (path: string) => app.inject({ method: "GET", url: `/api/menu/page?path=${encodeURIComponent(path)}` })
+
+  beforeAll(async () => {
+    app = await buildApp()
+    await app.ready()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  it("gives the entry, its filter, its trail and its sub-entries", async () => {
+    const res = await page("/chasse/armes-longues")
+    expect(res.statusCode).toBe(200)
+    const data = res.json().data
+    expect(data).toMatchObject({
+      label: "Armes longues",
+      path: "/chasse/armes-longues",
+      filter: { category: "arme-longue", subcategory: null, tags: ["chasse"], legalCategory: null },
+      breadcrumb: [{ label: "Chasse", href: "/chasse" }],
+    })
+    expect(data.children.map((child: { label: string }) => child.label)).toEqual(["Fusils", "Carabines", "Munitions"])
+  })
+
+  // An empty page is kept out of the indexes: the page needs the count.
+  it("counts the products the entry shows, as the catalogue does", async () => {
+    const data = (await page("/chasse/armes-longues/carabines")).json().data
+    const catalogue = await app.inject({
+      method: "GET",
+      url: "/api/products?limit=1&category=arme-longue&subcategory=carabines&tags=chasse",
+    })
+    expect(data.productCount).toBe(catalogue.json().pagination.total)
+  })
+
+  it("names a heading in the trail without a link", async () => {
+    const data = (await page("/chasse/accessoires/nettoyage")).json().data
+    expect(data.breadcrumb).toEqual([
+      { label: "Chasse", href: "/chasse" },
+      { label: "Accessoires", href: null },
+    ])
+  })
+
+  // The seeded tabs keep the texts of the universe pages they replace.
+  it("gives a tab its page texts", async () => {
+    const data = (await page("/coutellerie")).json().data
+    expect(data.description).toMatch(/majeures/)
+    expect(data.intro).toMatch(/18 ans/)
+  })
+
+  it.each(["/chasse/inconnue", "/chasse/accessoires", "/", "/chasse//armes-longues", "x/chasse", "chasse"])(
+    "has no page at %s",
+    async (path) => {
+      expect((await page(path)).statusCode).toBe(404)
+    },
+  )
+
+  it("keeps the texts out of the tree the header reads", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/menu" })
+    expect(res.body).not.toMatch(/"(intro|description)"/)
+  })
+})

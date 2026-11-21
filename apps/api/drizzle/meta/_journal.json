@@ -379,6 +379,13 @@
       "when": 1795257253558,
       "tag": "0053_menu_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1795265906576,
+      "tag": "0054_menu_entry_page_texts",
+      "breakpoints": true
     }
   ]
 }

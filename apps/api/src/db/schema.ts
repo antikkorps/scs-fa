@@ -836,6 +836,9 @@ export const menuEntries = pgTable(
     categoryId: uuid("category_id"),
     subcategoryId: uuid("subcategory_id"),
     legalCategory: legalCategoryEnum("legal_category"),
+    // Story 12.15c — the entry's page: meta description and introduction.
+    description: varchar("description", { length: 160 }),
+    intro: text("intro"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },

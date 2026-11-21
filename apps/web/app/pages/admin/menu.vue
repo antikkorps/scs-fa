@@ -71,6 +71,8 @@ const BLANK: Draft = {
   subcategorySlug: null,
   legalCategory: null,
   tagSlugs: [],
+  description: null,
+  intro: null,
 }
 
 function startCreate(parent: AdminMenuEntry | null) {

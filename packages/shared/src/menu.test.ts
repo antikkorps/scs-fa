@@ -96,3 +96,29 @@ describe("reorderMenuSchema", () => {
     expect(reorderMenuSchema.safeParse({ parentId: null, ids: [id, id] }).success).toBe(false)
   })
 })
+
+// Story 12.15c — the texts of an entry's page, both optional.
+describe("an entry's page texts", () => {
+  const base = { slug: "carabines", label: "Carabines" }
+
+  it("keeps a description and an introduction, trimmed", () => {
+    const parsed = createMenuEntrySchema.parse({
+      ...base,
+      description: "  Carabines de chasse. ",
+      intro: "Un.\n\nDeux.",
+    })
+    expect(parsed).toMatchObject({ description: "Carabines de chasse.", intro: "Un.\n\nDeux." })
+  })
+
+  it("stores a blank text as none", () => {
+    expect(createMenuEntrySchema.parse({ ...base, description: "   " }).description).toBeNull()
+    expect(createMenuEntrySchema.parse(base)).toMatchObject({ description: null, intro: null })
+    expect(updateMenuEntrySchema.parse({ intro: "" })).toEqual({ intro: null })
+  })
+
+  // A search result shows about 160 characters of the description.
+  it("caps the description at a search snippet's length", () => {
+    expect(createMenuEntrySchema.safeParse({ ...base, description: "x".repeat(161) }).success).toBe(false)
+    expect(createMenuEntrySchema.safeParse({ ...base, intro: "x".repeat(3001) }).success).toBe(false)
+  })
+})

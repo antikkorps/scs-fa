@@ -123,7 +123,8 @@ async function submit() {
   flex-direction: column;
   gap: 0.8rem;
   margin-bottom: 1.75rem;
-  scroll-margin-top: 6rem;
+  /* Clears the sticky header: 68px, plus the 44px shop menu row on desktop. */
+  scroll-margin-top: 8rem;
 }
 .pro-panel__h {
   font-size: var(--fs-md);

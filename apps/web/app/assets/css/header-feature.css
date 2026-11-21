@@ -1,0 +1,42 @@
+/* The header's text links and the house's two signatures (Armes de collection,
+   Gun Art): AppHeader's first row and the universes' row both use them, each
+   through `<style scoped src>`. */
+.nav__link {
+  /* « Gun Art », « À propos » must never break onto two lines. */
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-wide);
+  color: var(--paper-dim);
+  transition: color 0.3s var(--ease);
+}
+.nav__link:hover,
+.nav__link.router-link-active {
+  color: var(--paper);
+}
+/* The signatures read apart from the universes: brass, a hairline pill and an ornament. */
+.nav__link--feature {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.85rem;
+  color: var(--brass);
+  border: 1px solid color-mix(in srgb, var(--brass) 45%, transparent);
+  border-radius: 999px;
+  transition:
+    color 0.3s var(--ease),
+    border-color 0.3s var(--ease),
+    background 0.3s var(--ease);
+}
+.nav__link--feature::before {
+  /* Decorative: the empty alternative keeps screen readers from reading it. */
+  content: "✦" / "";
+  font-size: 0.7em;
+}
+.nav__link--feature:hover,
+.nav__link--feature.is-open,
+.nav__link--feature.router-link-active {
+  color: var(--paper);
+  border-color: var(--brass);
+  background: color-mix(in srgb, var(--brass) 10%, transparent);
+}

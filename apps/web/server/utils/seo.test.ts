@@ -4,6 +4,33 @@ import { absoluteImageUrl, buildLlmsFull, buildLlmsTxt, buildRobots, buildSitema
 
 const SITE = "https://www.scs-firearms.com"
 
+const menuEntry = (path: string, label: string, fields: Record<string, unknown> = {}) => ({
+  slug: path.split("/").at(-1) ?? "",
+  label,
+  path,
+  kind: "filter" as const,
+  href: path,
+  filter: { category: null, subcategory: null, tags: [], legalCategory: null },
+  children: [],
+  ...fields,
+})
+
+const MENU = [
+  menuEntry("/chasse", "Chasse", {
+    children: [
+      menuEntry("/chasse/accessoires", "Accessoires", {
+        kind: "group",
+        href: null,
+        filter: null,
+        children: [menuEntry("/chasse/accessoires/nettoyage", "Nettoyage")],
+      }),
+    ],
+  }),
+  menuEntry("/coutellerie", "Coutellerie", {
+    filter: { category: "coutellerie", subcategory: null, tags: [], legalCategory: null },
+  }),
+]
+
 describe("escapeXml", () => {
   it("escapes XML-significant characters", () => {
     expect(escapeXml(`a<b>&'"`)).toBe("a&lt;b&gt;&amp;&apos;&quot;")
@@ -116,10 +143,14 @@ describe("buildLlmsTxt", () => {
     expect(txt).toContain(`GET ${SITE}/api/ancient-weapons`)
   })
 
-  it("presents the hunting and knife universes, and that knives are for adults (story 12.13)", () => {
-    const txt = buildLlmsTxt(SITE, OPEN)
-    expect(txt).toContain(`[Chasse](${SITE}/chasse)`)
-    expect(txt).toContain(`[Coutellerie](${SITE}/coutellerie)`)
+  // Story 12.15c — the shop menu, as the visitor reads it, headings without a link.
+  it("lays out the shop menu, a heading without a link", () => {
+    const txt = buildLlmsTxt(SITE, OPEN, MENU)
+    expect(txt).toContain("## Menu de la boutique")
+    expect(txt).toContain(
+      `- [Chasse](${SITE}/chasse)\n  - Accessoires\n    - [Nettoyage](${SITE}/chasse/accessoires/nettoyage)`,
+    )
+    expect(txt).toContain(`- [Coutellerie](${SITE}/coutellerie)`)
     expect(txt).toContain("18 ans et plus")
   })
 
@@ -156,7 +187,7 @@ describe("buildComingSoonAgentText", () => {
   })
 })
 
-const EMPTY = { artworks: [], articles: [], series: [], products: [], categories: [] }
+const EMPTY = { artworks: [], articles: [], series: [], products: [], categories: [], menu: [] }
 
 describe("buildLlmsFull", () => {
   it("appends a catalogue of works and articles", () => {
@@ -254,6 +285,16 @@ describe("buildLlmsFull", () => {
     expect(txt).toContain("19,80 € TTC")
     expect(txt).toContain(`${SITE}/boutique/luger-p08-dat%C3%A9-1917`)
     expect(txt).toContain(`### [Munitions](${SITE}/boutique/categorie/munition)\n\n- (aucun article publié)`)
+  })
+
+  // Story 12.15c — a category with its menu entry is read there.
+  it("links a category to the menu entry standing for it", () => {
+    const txt = buildLlmsFull(
+      SITE,
+      { ...EMPTY, menu: MENU, categories: [{ slug: "coutellerie", name: "Coutellerie", description: null }] },
+      OPEN,
+    )
+    expect(txt).toContain(`### [Coutellerie](${SITE}/coutellerie)`)
   })
 
   it("degrades gracefully with no content", () => {
