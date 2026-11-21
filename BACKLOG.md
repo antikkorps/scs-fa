@@ -1204,6 +1204,46 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] Test de la route BFF `register.post.ts` (premier test de route serveur : les auto-imports de Nitro sont fournis en globals)
 - [ ] Reste ouvert : rien ne limite le nombre de mails « adresse prise » envoyés à une même adresse (seule la limite de 5 inscriptions par minute et par IP s'applique). À reprendre si un abus apparaît.
 
+**Story 12.15** — Menu de la boutique en arborescence (Chasse, Tir sportif, Munitions, Armes de défense, Coutellerie) — 📝 **CADRÉE** (décisions de Franck le 2026-11-21) _(demande de Fred par mail, transmise par Franck le 2026-11-21)_
+
+> Besoin (mail de Fred, premier retour après sa connexion au back-office) : depuis la boutique, les onglets suivants.
+>
+> - **Chasse** : Armes longues (Fusils, Carabines, Munitions) · Optique (Lunette, Point rouge) · Couteau de chasse (Dagues) · Accessoires (Nettoyage ; Sécurité & transport : protections auditives, verrou de pontet, sacoche, valise… ; Appeau)
+> - **Tir sportif** : Armes longues (Catégorie C, Catégorie B) · Armes de poing (Revolver, Pistolet) · Optique (Lunettes : Premier plan focal FFP, Second plan focal SFP, Thermique et calculateur intégré ; Viseurs point rouge)
+> - **Munitions** : Chasse (canon rayé, canon lisse) · Tir sportif (canon rayé, canon lisse)
+> - **Armes de défense**
+> - **Coutellerie** : partenariat avec un coutelier, Flord Coutellerie (www.flordcoutellerie.com)
+>
+> Réponses de Franck (2026-11-21) : **SCS vend pour Flord** (leur catalogue intégré au nôtre ; ils auraient une API) ; **Armes de collection et Gun Art restent au menu** ; les munitions de chasse apparaissent **à la fois** sous « Chasse › Armes longues » et sous « Munitions › Chasse ».
+>
+> Constats dans le code (2026-11-21) :
+> - Un produit porte **une catégorie** (liste plate, `product_categories`, rangée par l'enum `product_category`), **des tags** par facette (`etat`, `epoque`, `caracteristique`, `usage` avec `chasse`) et **une catégorie légale** (A, B, C, D).
+> - Le méga-menu (`AppHeader.vue`) liste les catégories à plat, plus des liens écrits en dur (collection, occasion…) ; `/chasse` et `/coutellerie` existent (12.13b).
+> - L'arborescence demandée croise **deux axes** : l'usage (Chasse, Tir sportif) et la nature du produit (armes longues, optique, munitions). Un même produit y figure à plusieurs endroits (une carabine C : chasse et tir sportif ; les munitions de chasse : deux fois). En faire de vraies catégories obligerait à ranger chaque produit dans plusieurs cases à la main.
+
+**Proposition de structure (à valider par Franck)**
+- **Le produit est décrit une seule fois** : sa catégorie, **un niveau de sous-catégorie en plus** (Fusils / Carabines, Pistolet / Revolver, Lunette / Point rouge, Dagues…), ses tags (usage `chasse` / `tir-sportif` ; caractéristiques canon rayé / lisse, FFP / SFP / thermique…) et sa catégorie légale.
+- **Le menu est une arborescence à part, éditable au back-office** : chaque entrée est un libellé + un **filtre enregistré** (catégorie, sous-catégorie, tags, catégorie légale), ou un lien (page éditoriale, Gun Art). « Tir sportif › Armes longues › Catégorie B » = armes longues + `tir-sportif` + B ; « Munitions › Chasse › Canon rayé » = munitions + `chasse` + canon rayé. Un produit bien rangé apparaît partout où il doit, sans double saisie, et Fred réorganise le menu sans nous.
+- Chaque entrée a son URL indexable (page de liste filtrée, titre, description, fil d'Ariane), dans le sitemap et `llms.txt`.
+
+**Décisions à prendre**
+- [x] **D1 — Menu = filtres enregistrés** (proposé) ou vraie arborescence de catégories avec un produit dans plusieurs catégories ✅ _(Franck 2026-11-21 : filtres enregistrés)_
+- [x] **D2 — Sous-catégories** : un niveau sous la catégorie (`parent_id`, migration) (proposé) ou des tags pour les sortes (pas de migration, mais « fusil » et « carabine » deviennent des filtres et non une nature) ✅ _(Franck 2026-11-21 : un niveau de sous-catégorie)_
+- [x] **D3 — Profondeur du menu** : jusqu'à 4 niveaux chez Fred (Tir sportif › Optique › Lunettes › FFP) ; méga-menu sur 3 niveaux affichés et le 4e en filtres de la page ? Version mobile ✅ _(Franck 2026-11-21 : 3 niveaux dans le menu, le 4e en filtres de la page)_
+- [x] **D4 — URL des entrées** : `/chasse/armes-longues/carabines` (chemin du menu) ou les pages de filtre existantes ; redirections depuis les anciennes ✅ _(Franck 2026-11-21 : le chemin du menu, redirections 301 depuis les anciennes pages)_
+- [x] **D5 — Flord Coutellerie** : intégration de leur catalogue par leur API (stock, prix, images, fréquence de synchronisation), qui passe la commande chez eux, qui expédie (SCS ou Flord en direct), facturation et reversement. Probablement une story à part (lien avec 12.13d et l'idée « stock fournisseur par API ») ✅ _(Franck 2026-11-21 : **Flord est un fournisseur comme les autres** — SCS achète, vend et expédie ; leur catalogue entre par le classeur d'import, un adaptateur `tools/catalog-collect` comme en 12.13d, en attendant la documentation de leur API. Une vente en expédition directe par le fournisseur pourrait venir plus tard : **pas construite maintenant**, mais rien dans 12.15 ne doit supposer que SCS expédie tout — à cadrer en story à part le jour venu)_
+
+**Découpage proposé (une PR par lot, après les décisions)**
+- [ ] 12.15a — Sous-catégories (schéma, back-office, import/export Excel) et nouveaux tags (`tir-sportif`, canon rayé / lisse, FFP / SFP / thermique…)
+- [ ] 12.15b — Arborescence du menu : schéma, API, écran du back-office (ajouter, renommer, déplacer, filtre de chaque entrée), arborescence de Fred comme contenu initial
+- [ ] 12.15c — Méga-menu et menu mobile du site, pages des entrées (SEO, fil d'Ariane, sitemap, `llms.txt`)
+- [ ] 12.15d — Ranger le catalogue existant (sous-catégories et tags) — par Fred et Stéphane au back-office ou par le classeur Excel
+
+**Questions pour Fred**
+- [x] Ordre des onglets de premier niveau, avec Armes de collection et Gun Art ✅ _(Fred n'a pas de préférence, il veut un tunnel de vente efficace : les rayons Chasse · Tir sportif · Munitions · Armes de défense · Coutellerie, du plus vendu au plus rare, modifiables au back-office et à revoir avec les chiffres d'Umami. **Armes de collection et Gun Art à part et mis en avant** (Franck 2026-11-21 : c'est ce qui distingue SCS des autres armureries) : groupe séparé du menu, au traitement visuel distinct, hors de l'arborescence éditable — pas relégués en fin de liste)_
+- [ ] « Couteau de chasse › Dagues » (Chasse) et Coutellerie : mêmes produits, ou les dagues seulement sous Chasse ?
+- [ ] Contact chez Flord et documentation de leur API — prévu, pas encore reçu ; **en attendant, un fichier catalogue de Flord** pour écrire l'adaptateur d'import
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
