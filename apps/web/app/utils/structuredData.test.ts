@@ -98,7 +98,7 @@ describe("productJsonLd", () => {
 describe("artworkJsonLd", () => {
   const artwork = {
     siteUrl: SITE,
-    pageUrl: `${SITE}/collection/eclat`,
+    pageUrl: `${SITE}/gun-art/eclat`,
     title: "Éclat",
     description: "Un tirage.",
     image: undefined,
@@ -113,8 +113,8 @@ describe("artworkJsonLd", () => {
     const ld = artworkJsonLd(artwork)
     expect(ld["@type"]).toEqual(["VisualArtwork", "Product"])
     expect(ld.offers).toMatchObject({ "@type": "AggregateOffer", lowPrice: 216, offerCount: 4 })
-    expect(ld.creator?.url).toBe(`${SITE}/collection/artiste/sylvain`)
-    expect(ld.isPartOf?.url).toBe(`${SITE}/collection/serie/age-d-or`)
+    expect(ld.creator?.url).toBe(`${SITE}/gun-art/artiste/sylvain`)
+    expect(ld.isPartOf?.url).toBe(`${SITE}/gun-art/serie/age-d-or`)
   })
 
   it("stays a work of art alone while the shop's sales are closed (SEO audit 2026-11-15, finding 3)", () => {

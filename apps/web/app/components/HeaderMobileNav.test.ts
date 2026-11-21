@@ -26,7 +26,7 @@ describe("HeaderMobileNav", () => {
     const wrapper = await mountSuspended(HeaderMobileNav, { props: { open: true } })
     expect(document.querySelector("#mobile-nav")?.getAttribute("aria-label")).toBe("Navigation mobile")
     const cards = [...document.querySelectorAll("#mobile-nav a.msig")].map((card) => card.getAttribute("href"))
-    expect(cards).toEqual(["/armes-de-collection", "/collection"])
+    expect(cards).toEqual(["/armes-de-collection", "/gun-art"])
     const signatures = document.querySelector("#mobile-nav .msigs")
     const universes = document.querySelector("#mobile-nav .mnav--universes")
     expect(signatures && universes && signatures.compareDocumentPosition(universes)).toBe(

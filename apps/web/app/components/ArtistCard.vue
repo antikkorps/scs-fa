@@ -6,7 +6,7 @@ import { artworkImage, IMAGE_SIZES } from "~/utils/format"
 // the house sells someone's work, and a visitor who does not know whose is
 // looking at objects rather than at a body of work.
 //
-// `lead` is the first card on /collection, laid out wider with the biography
+// `lead` is the first card on /gun-art, laid out wider with the biography
 // showing. The others stay compact, so a second artist changes the row without
 // changing the component.
 const props = withDefaults(defineProps<{ artist: ArtistListItem; lead?: boolean }>(), { lead: false })
@@ -18,7 +18,7 @@ const portrait = computed(() =>
 </script>
 
 <template>
-  <NuxtLink :to="`/collection/artiste/${artist.slug}`" class="artist" :class="{ 'artist--lead': lead }">
+  <NuxtLink :to="`/gun-art/artiste/${artist.slug}`" class="artist" :class="{ 'artist--lead': lead }">
     <ResponsiveImage
       class="artist__portrait"
       :image="portrait"

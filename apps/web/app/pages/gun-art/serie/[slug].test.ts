@@ -38,9 +38,9 @@ const series = {
 
 mockNuxtImport("useFetch", () => () => ({ data: ref({ data: series }), error: ref(null) }))
 
-const mounted = () => mountSuspended(SeriesPage, { route: "/collection/serie/age-d-or" })
+const mounted = () => mountSuspended(SeriesPage, { route: "/gun-art/serie/age-d-or" })
 
-describe("collection/serie/[slug].vue", () => {
+describe("gun-art/serie/[slug].vue", () => {
   it("leads with the presentation text — the series is an editorial unit", async () => {
     const wrapper = await mounted()
     expect(wrapper.find("h1").text()).toBe("Âge d'or")
@@ -51,8 +51,8 @@ describe("collection/serie/[slug].vue", () => {
   it("links to the artist and to the theme", async () => {
     const wrapper = await mounted()
     const hrefs = wrapper.findAll("a").map((a) => a.attributes("href"))
-    expect(hrefs).toContain("/collection/artiste/camille-vasseur")
-    expect(hrefs).toContain("/collection/theme/cinema")
+    expect(hrefs).toContain("/gun-art/artiste/camille-vasseur")
+    expect(hrefs).toContain("/gun-art/theme/cinema")
   })
 
   it("renders the artworks in the order the API returned them", async () => {

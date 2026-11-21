@@ -88,7 +88,7 @@ describe("useLaunch (story 12.10)", () => {
       const launch = useLaunch()
 
       await launch.recheckAdmin("/boutique")
-      await launch.recheckAdmin("/collection")
+      await launch.recheckAdmin("/gun-art")
 
       expect(launchStatus).toHaveBeenCalledOnce()
       expect(launch.waitingPageFor("/boutique")).toBe(false)

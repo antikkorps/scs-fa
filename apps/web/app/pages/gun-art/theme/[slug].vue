@@ -17,7 +17,7 @@ if (error.value || !data.value?.data) {
 const theme = computed(() => data.value?.data as ArtworkThemeDetail)
 const series = computed(() => theme.value.series)
 
-const pageUrl = `${siteUrl}/collection/theme/${slug}`
+const pageUrl = `${siteUrl}/gun-art/theme/${slug}`
 const description = computed(
   () => theme.value.description ?? `Les séries Gun Art réunies autour du thème « ${theme.value.name} ».`,
 )
@@ -25,7 +25,7 @@ const description = computed(
 usePageSeo({
   title: () => theme.value.name,
   description,
-  path: `/collection/theme/${slug}`,
+  path: `/gun-art/theme/${slug}`,
 })
 
 useHead({
@@ -42,7 +42,7 @@ useHead({
           hasPart: series.value.map((s) => ({
             "@type": "CreativeWorkSeries",
             name: s.title,
-            url: `${siteUrl}/collection/serie/${s.slug}`,
+            url: `${siteUrl}/gun-art/serie/${s.slug}`,
           })),
         }),
       ),
@@ -54,7 +54,7 @@ useHead({
 <template>
   <div class="theme">
     <section class="container intro">
-      <AppBreadcrumbs :items="[{ name: 'Collection', to: '/collection' }, { name: theme.name }]" />
+      <AppBreadcrumbs :items="[{ name: 'Gun Art', to: '/gun-art' }, { name: theme.name }]" />
 
       <p class="eyebrow">Thème</p>
       <h1 class="intro__title">{{ theme.name }}</h1>

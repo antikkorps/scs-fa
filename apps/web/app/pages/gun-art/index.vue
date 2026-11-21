@@ -34,14 +34,14 @@ const artists = computed(() => artistsData.value?.data ?? [])
 const leadArtist = computed(() => artists.value[0] ?? null)
 const otherArtists = computed(() => artists.value.slice(1))
 
-const pageUrl = `${siteUrl}/collection`
+const pageUrl = `${siteUrl}/gun-art`
 const description =
   "Découvrez la collection Gun Art : des tirages d'art photographiques en édition strictement limitée, signés, numérotés et livrés avec certificat d'authenticité."
 
 usePageSeo({
   title: "La collection Gun Art",
   description,
-  path: "/collection",
+  path: "/gun-art",
   image: () => artworks.value[0]?.featuredImageUrl,
   imageAlt: () => artworks.value[0]?.title,
 })
@@ -54,7 +54,7 @@ useHead({
         serializeJsonLd(
           itemListJsonLd(
             "Collection Gun Art",
-            artworks.value.map((a) => ({ url: `${siteUrl}/collection/${a.slug}`, name: a.title })),
+            artworks.value.map((a) => ({ url: `${siteUrl}/gun-art/${a.slug}`, name: a.title })),
           ),
         ),
       ),
@@ -90,7 +90,7 @@ useHead({
       <div class="block__head">
         <h2 id="series-h" class="section__h">Les séries</h2>
         <nav v-if="themes.length > 0" class="themes" aria-label="Navigation par thème">
-          <NuxtLink v-for="t in themes" :key="t.id" :to="`/collection/theme/${t.slug}`" class="themes__chip">
+          <NuxtLink v-for="t in themes" :key="t.id" :to="`/gun-art/theme/${t.slug}`" class="themes__chip">
             {{ t.name }}
           </NuxtLink>
         </nav>

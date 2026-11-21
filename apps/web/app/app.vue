@@ -54,9 +54,9 @@ useHead({
           },
           {
             "@type": "OnlineStore",
-            "@id": `${siteUrl}/collection#store`,
+            "@id": `${siteUrl}/gun-art#store`,
             name: "Gun Art — SCS Firearms",
-            url: `${siteUrl}/collection`,
+            url: `${siteUrl}/gun-art`,
           },
         ],
       }),

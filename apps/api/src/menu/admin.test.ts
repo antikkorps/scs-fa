@@ -118,7 +118,7 @@ describe("admin menu", () => {
   })
 
   it("puts nothing under a link", async () => {
-    const link = await top("lien", { kind: "link", linkUrl: "/collection" })
+    const link = await top("lien", { kind: "link", linkUrl: "/gun-art" })
     const res = await call("POST", BASE, { parentId: link.id, slug: "enfant", label: "Enfant" })
     expect(res.statusCode).toBe(400)
   })

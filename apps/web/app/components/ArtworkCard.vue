@@ -18,7 +18,7 @@ const img = computed(() =>
 
 <template>
   <article class="card" :class="{ 'is-soldout': soldOut }">
-    <NuxtLink :to="`/collection/${artwork.slug}`" class="card__link">
+    <NuxtLink :to="`/gun-art/${artwork.slug}`" class="card__link">
       <div class="card__media">
         <ResponsiveImage
           protect

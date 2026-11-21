@@ -57,13 +57,13 @@ const { artist } = vi.hoisted(() => ({
 
 mockNuxtImport("useFetch", () => () => ({ data: ref({ data: artist.value }), error: ref(null) }))
 
-const mounted = () => mountSuspended(ArtistPage, { route: "/collection/artiste/camille-vasseur" })
+const mounted = () => mountSuspended(ArtistPage, { route: "/gun-art/artiste/camille-vasseur" })
 
 beforeEach(() => {
   artist.value = { ...artist.value, book: { title: "Matières armées", url: "https://www.amazon.fr/dp/2010000001" } }
 })
 
-describe("collection/artiste/[slug].vue", () => {
+describe("gun-art/artiste/[slug].vue", () => {
   it("shows the name, the headline, the bio and the journey", async () => {
     const wrapper = await mounted()
     expect(wrapper.find("h1").text()).toBe("Camille Vasseur")
@@ -97,8 +97,8 @@ describe("collection/artiste/[slug].vue", () => {
   it("lists the series and the body of work", async () => {
     const wrapper = await mounted()
     const hrefs = wrapper.findAll("a").map((a) => a.attributes("href"))
-    expect(hrefs).toContain("/collection/serie/age-d-or")
-    expect(hrefs).toContain("/collection/eclat-de-bronze")
+    expect(hrefs).toContain("/gun-art/serie/age-d-or")
+    expect(hrefs).toContain("/gun-art/eclat-de-bronze")
   })
 
   it("does not reserve a portrait column when there is no portrait", async () => {

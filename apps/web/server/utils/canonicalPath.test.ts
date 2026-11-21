@@ -4,7 +4,7 @@ import { canonicalPath } from "./canonicalPath"
 describe("canonicalPath (story 9.6)", () => {
   it("drops a trailing slash", () => {
     expect(canonicalPath("/boutique/")).toBe("/boutique")
-    expect(canonicalPath("/collection/serie/age-d-or//")).toBe("/collection/serie/age-d-or")
+    expect(canonicalPath("/gun-art/serie/age-d-or//")).toBe("/gun-art/serie/age-d-or")
   })
 
   it("lower-cases a path typed or linked in capitals", () => {

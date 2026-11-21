@@ -224,7 +224,7 @@ export const getProductBySlugRoute: FastifyPluginAsync = async (fastify) => {
       return reply.code(400).send({ error: "ValidationError", message: "Invalid slug" })
     }
 
-    // An artwork's product is reached through /collection, never as a shop page
+    // An artwork's product is reached through /gun-art, never as a shop page
     // (SEO audit 2026-11-15, finding 10), as the list, search and sitemap already do.
     // `and` of two conditions is never undefined; Drizzle's type allows it for an empty list.
     const notAnArtwork = and(eq(products.slug, slug), ne(productCategories.category, "gun_art")) as SQL

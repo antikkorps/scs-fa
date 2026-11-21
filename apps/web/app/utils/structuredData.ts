@@ -138,7 +138,7 @@ export function artworkJsonLd(a: ArtworkLdInput) {
     artform: "Photographie",
     artMedium: "Tirage pigmentaire",
     ...(a.artist?.name && {
-      creator: { "@type": "Person", name: a.artist.name, url: `${a.siteUrl}/collection/artiste/${a.artist.slug}` },
+      creator: { "@type": "Person", name: a.artist.name, url: `${a.siteUrl}/gun-art/artiste/${a.artist.slug}` },
     }),
     // The series is the editorial unit: saying which one this print belongs to
     // is what lets a search engine read the collection as a body of work.
@@ -146,7 +146,7 @@ export function artworkJsonLd(a: ArtworkLdInput) {
       isPartOf: {
         "@type": "CreativeWorkSeries",
         name: a.series.title,
-        url: `${a.siteUrl}/collection/serie/${a.series.slug}`,
+        url: `${a.siteUrl}/gun-art/serie/${a.series.slug}`,
       },
     }),
     ...(onSale && {

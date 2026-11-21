@@ -33,7 +33,7 @@ const columns: AdminColumn[] = [
     new-label="Nouveau thème"
     empty-label="Aucun thème pour l'instant."
     endpoint="/admin/gun-art/themes"
-    intro="Un thème regroupe des séries (un film, un univers de référence) et porte sa propre page /collection/theme/…. Supprimer un thème ne supprime pas ses séries : elles perdent seulement leur étiquette."
+    intro="Un thème regroupe des séries (un film, un univers de référence) et porte sa propre page /gun-art/theme/…. Supprimer un thème ne supprime pas ses séries : elles perdent seulement leur étiquette."
     :fields="fields"
     :columns="columns"
   />

@@ -37,7 +37,7 @@ const formatName = (id: string) => art.value.availableFormats?.find((f) => f.id 
 const availablePrints = computed(() => art.value.prints.filter((p) => p.status === "available"))
 const soldOut = computed(() => availablePrints.value.length === 0)
 
-// Buying a print (UX audit 2026-11-01: the button only led back to /collection).
+// Buying a print (UX audit 2026-11-01: the button only led back to /gun-art).
 // The visitor picks a numbered print; the first one available is the default.
 const { isAuthenticated } = useAuth()
 const { salesOpen } = useLaunch()
@@ -83,12 +83,12 @@ async function addChosenPrint() {
   }
 }
 
-const pageUrl = `${siteUrl}/collection/${slug}`
+const pageUrl = `${siteUrl}/gun-art/${slug}`
 
-// Collection › series (when published) › artwork.
+// Gun Art › series (when published) › artwork.
 const crumbs = computed(() => [
-  { name: "Collection", to: "/collection" },
-  ...(series.value?.title ? [{ name: series.value.title, to: `/collection/serie/${series.value.slug}` }] : []),
+  { name: "Gun Art", to: "/gun-art" },
+  ...(series.value?.title ? [{ name: series.value.title, to: `/gun-art/serie/${series.value.slug}` }] : []),
   { name: art.value.title },
 ])
 const description = computed(
@@ -98,7 +98,7 @@ const description = computed(
 usePageSeo({
   title: () => art.value.title,
   description,
-  path: `/collection/${slug}`,
+  path: `/gun-art/${slug}`,
   image: () => art.value.featuredImageUrl,
   imageAlt: heroAlt,
 })
@@ -152,17 +152,17 @@ useHead({
         <ImageLightbox v-model="lightboxOpen" :image="hero" :alt="heroAlt" protect />
 
         <div class="detail__info">
-          <NuxtLink v-if="artist" :to="`/collection/artiste/${artist.slug}`" class="eyebrow eyebrow--link">
+          <NuxtLink v-if="artist" :to="`/gun-art/artiste/${artist.slug}`" class="eyebrow eyebrow--link">
             {{ artist.name }}
           </NuxtLink>
           <h1 class="detail__title">{{ art.title }}</h1>
 
           <p v-if="series" class="detail__series">
             Série
-            <NuxtLink :to="`/collection/serie/${series.slug}`">{{ series.title }}</NuxtLink>
+            <NuxtLink :to="`/gun-art/serie/${series.slug}`">{{ series.title }}</NuxtLink>
             <template v-if="series.theme">
               ·
-              <NuxtLink :to="`/collection/theme/${series.theme.slug}`">{{ series.theme.name }}</NuxtLink>
+              <NuxtLink :to="`/gun-art/theme/${series.theme.slug}`">{{ series.theme.name }}</NuxtLink>
             </template>
           </p>
 

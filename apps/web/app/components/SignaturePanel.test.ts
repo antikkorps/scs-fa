@@ -16,7 +16,7 @@ describe("SignaturePanel", () => {
     expect(wrapper.find(".mega__label").text()).toBe("Gun Art")
     expect(wrapper.text()).toContain("Signées & numérotées")
     const targets = wrapper.findAll("a.mega__cta").map((cta) => cta.attributes("href"))
-    expect(targets).toEqual(["/collection/artiste", "/collection"])
+    expect(targets).toEqual(["/gun-art/artiste", "/gun-art"])
   })
 
   it("pitches the collection with its pieces for sale and those already sold", async () => {

@@ -67,28 +67,28 @@ mockNuxtImport("useFetch", () => (url: string) => {
   return { data: ref({ data: payload.artworks }), error: ref(null) }
 })
 
-describe("collection/index.vue — editorial navigation (story 11.6)", () => {
+describe("gun-art/index.vue — editorial navigation (story 11.6)", () => {
   it("offers the series as an entry point, above the flat grid", async () => {
-    const wrapper = await mountSuspended(CollectionPage, { route: "/collection" })
+    const wrapper = await mountSuspended(CollectionPage, { route: "/gun-art" })
     const hrefs = wrapper.findAll("a").map((a) => a.attributes("href"))
-    expect(hrefs).toContain("/collection/serie/age-d-or")
+    expect(hrefs).toContain("/gun-art/serie/age-d-or")
     expect(wrapper.text()).toContain("Les séries")
     expect(wrapper.text()).toContain("Toutes les œuvres")
   })
 
   it("never advertises an empty series or a theme with no series", async () => {
-    const wrapper = await mountSuspended(CollectionPage, { route: "/collection" })
+    const wrapper = await mountSuspended(CollectionPage, { route: "/gun-art" })
     const hrefs = wrapper.findAll("a").map((a) => a.attributes("href"))
-    expect(hrefs).not.toContain("/collection/serie/serie-vide")
-    expect(hrefs).not.toContain("/collection/theme/vide")
-    expect(hrefs).toContain("/collection/theme/cinema")
+    expect(hrefs).not.toContain("/gun-art/serie/serie-vide")
+    expect(hrefs).not.toContain("/gun-art/theme/vide")
+    expect(hrefs).toContain("/gun-art/theme/cinema")
   })
 
   it("still renders the grid when the editorial calls come back empty", async () => {
     const saved = { ...payload }
     payload.series = []
     payload.themes = []
-    const wrapper = await mountSuspended(CollectionPage, { route: "/collection" })
+    const wrapper = await mountSuspended(CollectionPage, { route: "/gun-art" })
     expect(wrapper.find(".serieslist").exists()).toBe(false)
     expect(wrapper.findAll(".grid li")).toHaveLength(1)
     payload.series = saved.series
