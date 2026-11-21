@@ -14,7 +14,9 @@ export const MENU_MAX_DEPTH = 3
  * A tab's address is /<slug>: these are the site's own top-level pages (and
  * the API), which a tab would hide or be hidden by. Kept in step with
  * apps/web/app/pages by a test there. /chasse and /coutellerie are not in it:
- * their menu pages replace them (story 12.15c).
+ * their menu pages replace them (story 12.15c). /collection stays reserved
+ * though it has no page any more: it moves Gun Art's old addresses to /gun-art
+ * (story 12.15c-bis).
  */
 export const RESERVED_MENU_SLUGS = [
   "admin",

@@ -67,7 +67,7 @@ mockNuxtImport("useAuth", () => () => ({ isAuthenticated: ref(auth.authenticated
 mockNuxtImport("useLaunch", () => () => ({ salesOpen: ref(launch.open), recheckAdmin: vi.fn() }))
 mockNuxtImport("navigateTo", () => navigateToMock)
 
-const mounted = async (route = "/collection/eclat-de-bronze") => {
+const mounted = async (route = "/gun-art/eclat-de-bronze") => {
   const wrapper = await mountSuspended(ArtworkPage, { route })
   await flushPromises()
   return wrapper
@@ -80,7 +80,7 @@ beforeEach(() => {
   launch.open = true
 })
 
-describe("collection/[slug].vue — buying a print (UX audit 2026-11-01)", () => {
+describe("gun-art/[slug].vue — buying a print (UX audit 2026-11-01)", () => {
   it("offers each available print as a choice, and adds the chosen one to the cart", async () => {
     const wrapper = await mounted()
     const choices = wrapper.findAll("input[name='print']")
@@ -110,7 +110,7 @@ describe("collection/[slug].vue — buying a print (UX audit 2026-11-01)", () =>
     await flushPromises()
     expect(addPrintMock).not.toHaveBeenCalled()
     expect(navigateToMock).toHaveBeenCalledWith(
-      "/connexion?redirect=%2Fcollection%2Feclat-de-bronze%3Fexemplaire%3Dp7&motif=panier",
+      "/connexion?redirect=%2Fgun-art%2Feclat-de-bronze%3Fexemplaire%3Dp7&motif=panier",
     )
   })
 
@@ -137,24 +137,24 @@ describe("collection/[slug].vue — buying a print (UX audit 2026-11-01)", () =>
 
 // UX audit 2026-11-01 (I3): back from the login or the sign-up, the print the
 // visitor chose lands in the cart without a second click.
-describe("collection/[slug].vue — back from the login", () => {
+describe("gun-art/[slug].vue — back from the login", () => {
   it("adds the print chosen before signing in, once, and clears it from the address", async () => {
-    const wrapper = await mounted("/collection/eclat-de-bronze?exemplaire=p7")
+    const wrapper = await mounted("/gun-art/eclat-de-bronze?exemplaire=p7")
     expect(addPrintMock).toHaveBeenCalledOnce()
     expect(addPrintMock).toHaveBeenCalledWith("p7")
-    expect(navigateToMock).toHaveBeenCalledWith({ path: "/collection/eclat-de-bronze", query: {} }, { replace: true })
+    expect(navigateToMock).toHaveBeenCalledWith({ path: "/gun-art/eclat-de-bronze", query: {} }, { replace: true })
     expect(wrapper.find("[role='status']").text()).toContain("7/25")
   })
 
   it("says so when that print was sold meanwhile, and adds nothing", async () => {
-    const wrapper = await mounted("/collection/eclat-de-bronze?exemplaire=p1")
+    const wrapper = await mounted("/gun-art/eclat-de-bronze?exemplaire=p1")
     expect(addPrintMock).not.toHaveBeenCalled()
     expect(wrapper.find("[role='alert']").text()).toMatch(/n'est plus disponible/)
   })
 
   it("adds nothing while the visitor is still signed out", async () => {
     auth.authenticated = false
-    await mounted("/collection/eclat-de-bronze?exemplaire=p7")
+    await mounted("/gun-art/eclat-de-bronze?exemplaire=p7")
     expect(addPrintMock).not.toHaveBeenCalled()
   })
 })

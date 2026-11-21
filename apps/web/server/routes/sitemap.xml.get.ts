@@ -85,7 +85,7 @@ export default defineEventHandler(async (event) => {
     },
     // The two universes.
     { loc: `${siteUrl}/boutique`, lastmod: latest(d.products.map(dated)), changefreq: "daily", priority: 0.9 },
-    { loc: `${siteUrl}/collection`, lastmod: latest(d.artworks.map(dated)), changefreq: "daily", priority: 0.9 },
+    { loc: `${siteUrl}/gun-art`, lastmod: latest(d.artworks.map(dated)), changefreq: "daily", priority: 0.9 },
     ...(ancient.length > 0
       ? [
           {
@@ -96,7 +96,7 @@ export default defineEventHandler(async (event) => {
           },
         ]
       : []),
-    // (/collection/artiste is deliberately absent: a noindex router page.)
+    // (/gun-art/artiste is deliberately absent: a noindex router page.)
     { loc: `${siteUrl}/blog`, lastmod: latest(d.blogPosts.map(dated)), changefreq: "weekly", priority: 0.7 },
     { loc: `${siteUrl}/contact`, changefreq: "yearly", priority: 0.4 },
     // The pro signup page is indexable (nuxt.config): listed so it is found.
@@ -142,27 +142,27 @@ export default defineEventHandler(async (event) => {
 
     // Gun Art. The series is the editorial unit, so it ranks above a single work.
     ...d.series.map((s) => ({
-      loc: `${siteUrl}/collection/serie/${s.slug}`,
+      loc: `${siteUrl}/gun-art/serie/${s.slug}`,
       lastmod: s.updatedAt,
       changefreq: "weekly" as const,
       priority: 0.85,
       images: images(s),
     })),
     ...d.artworks.map((a) => ({
-      loc: `${siteUrl}/collection/${a.slug}`,
+      loc: `${siteUrl}/gun-art/${a.slug}`,
       lastmod: a.updatedAt,
       changefreq: "weekly" as const,
       priority: 0.8,
       images: images(a),
     })),
     ...d.themes.map((t) => ({
-      loc: `${siteUrl}/collection/theme/${t.slug}`,
+      loc: `${siteUrl}/gun-art/theme/${t.slug}`,
       lastmod: t.updatedAt,
       changefreq: "monthly" as const,
       priority: 0.6,
     })),
     ...d.artists.map((a) => ({
-      loc: `${siteUrl}/collection/artiste/${a.slug}`,
+      loc: `${siteUrl}/gun-art/artiste/${a.slug}`,
       lastmod: a.updatedAt,
       changefreq: "monthly" as const,
       priority: 0.7,

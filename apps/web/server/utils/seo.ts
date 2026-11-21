@@ -221,9 +221,9 @@ Points à connaître avant de conseiller un achat :
 
 ${menuSection(siteUrl, menu)}## Gun Art
 
-- [Collection](${siteUrl}/collection): toutes les œuvres publiées, avec disponibilité et prix.
-- Séries et thèmes : la collection se lit par séries (\`${siteUrl}/collection/serie/{slug}\`), chacune adossée à un thème (\`${siteUrl}/collection/theme/{slug}\`).
-- [L'artiste](${siteUrl}/collection/artiste): le photographe, son parcours et son œuvre.
+- [Galerie Gun Art](${siteUrl}/gun-art): toutes les œuvres publiées, avec disponibilité et prix.
+- Séries et thèmes : la collection se lit par séries (\`${siteUrl}/gun-art/serie/{slug}\`), chacune adossée à un thème (\`${siteUrl}/gun-art/theme/{slug}\`).
+- [L'artiste](${siteUrl}/gun-art/artiste): le photographe, son parcours et son œuvre.
 
 ## Éditorial
 
@@ -311,7 +311,7 @@ export function buildLlmsFull(siteUrl: string, input: LlmsFullInput, stage: Llms
       const dispo = a.availableCount > 0 ? `${a.availableCount} disponible(s)` : "épuisée"
       const by = a.artistName ? ` (par ${a.artistName})` : ""
       const desc = a.description ? ` ${a.description}` : ""
-      return `- [${a.title}](${siteUrl}/collection/${a.slug})${by}${price} — ${dispo}.${desc}`
+      return `- [${a.title}](${siteUrl}/gun-art/${a.slug})${by}${price} — ${dispo}.${desc}`
     },
     "aucune œuvre publiée",
   )
@@ -324,7 +324,7 @@ export function buildLlmsFull(siteUrl: string, input: LlmsFullInput, stage: Llms
       const ref = s.reference ? ` — référence : ${s.reference}` : ""
       const count = ` — ${s.artworkCount} œuvre(s)`
       const intro = s.intro ? ` ${s.intro}` : ""
-      return `- [${s.title}](${siteUrl}/collection/serie/${s.slug})${by}${theme}${ref}${count}.${intro}`
+      return `- [${s.title}](${siteUrl}/gun-art/serie/${s.slug})${by}${theme}${ref}${count}.${intro}`
     },
     "aucune série publiée",
   )

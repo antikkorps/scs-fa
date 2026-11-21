@@ -61,7 +61,7 @@ describe("home (unified)", () => {
   it("links to both the boutique and the collection", async () => {
     const wrapper = await mountSuspended(IndexPage)
     expect(wrapper.find('a[href="/boutique"]').exists()).toBe(true)
-    expect(wrapper.find('a[href="/collection"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/gun-art"]').exists()).toBe(true)
   })
 
   it("renders a selection from each universe", async () => {

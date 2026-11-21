@@ -7,7 +7,7 @@ defineProps<{ series: Omit<ArtworkSeriesListItem, "artworkCount"> & { artworkCou
 </script>
 
 <template>
-  <NuxtLink :to="`/collection/serie/${series.slug}`" class="card">
+  <NuxtLink :to="`/gun-art/serie/${series.slug}`" class="card">
     <p v-if="series.theme" class="card__theme">{{ series.theme.name }}</p>
     <h3 class="card__title">{{ series.title }}</h3>
     <p v-if="series.intro" class="card__intro">{{ series.intro }}</p>

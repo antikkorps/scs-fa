@@ -22,7 +22,7 @@ function goBoutique() {
   return clearError({ redirect: "/boutique" })
 }
 function goCollection() {
-  return clearError({ redirect: "/collection" })
+  return clearError({ redirect: "/gun-art" })
 }
 
 // Error pages carry no SEO value and must never be indexed.

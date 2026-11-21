@@ -67,7 +67,7 @@ usePageSeo({
         </p>
         <div class="hero__actions">
           <NuxtLink to="/boutique" class="btn btn-primary">Entrer dans la boutique</NuxtLink>
-          <NuxtLink to="/collection" class="btn btn-ghost">Découvrir Gun Art</NuxtLink>
+          <NuxtLink to="/gun-art" class="btn btn-ghost">Découvrir Gun Art</NuxtLink>
         </div>
       </div>
     </section>
@@ -84,14 +84,14 @@ usePageSeo({
         <span class="btn btn-primary universe__cta">Explorer la boutique <span aria-hidden="true">→</span></span>
       </NuxtLink>
 
-      <NuxtLink to="/collection" class="universe universe--art">
+      <NuxtLink to="/gun-art" class="universe universe--art">
         <p class="eyebrow">Gun Art</p>
         <h2 class="universe__title">La collection</h2>
         <p class="universe__text">
           Des tirages photographiques d'exception, signés et numérotés, tirés à un nombre strictement limité
           d'exemplaires, avec certificat d'authenticité.
         </p>
-        <span class="btn btn-primary universe__cta">Voir la collection <span aria-hidden="true">→</span></span>
+        <span class="btn btn-primary universe__cta">Voir la galerie <span aria-hidden="true">→</span></span>
       </NuxtLink>
     </section>
 
@@ -123,7 +123,7 @@ usePageSeo({
         </li>
       </ul>
       <div class="selection__more">
-        <NuxtLink to="/collection" class="btn btn-ghost">Voir toute la collection</NuxtLink>
+        <NuxtLink to="/gun-art" class="btn btn-ghost">Voir toute la galerie</NuxtLink>
       </div>
     </section>
 
@@ -140,7 +140,7 @@ usePageSeo({
         Même maison, même soin du détail&nbsp;: conseil rigoureux, traçabilité, et un accompagnement de la commande
         jusqu'à la conformité réglementaire. Découvrez la
         <NuxtLink to="/boutique" class="about__link">boutique</NuxtLink> ou la
-        <NuxtLink to="/collection" class="about__link">collection Gun Art</NuxtLink>.
+        <NuxtLink to="/gun-art" class="about__link">collection Gun Art</NuxtLink>.
       </p>
     </section>
   </div>

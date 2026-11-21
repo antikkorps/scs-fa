@@ -36,7 +36,7 @@ describe("AppHeader", () => {
   it("highlights the collection and Gun Art in the second row", async () => {
     const wrapper = await mountSuspended(AppHeader)
     const featured = wrapper.findAll(".hdr__shop .nav__link--feature").map((link) => link.attributes("href"))
-    expect(featured).toEqual(["/armes-de-collection", "/collection"])
+    expect(featured).toEqual(["/armes-de-collection", "/gun-art"])
   })
 
   it("draws the shop menu's tabs in a second row", async () => {
@@ -92,7 +92,7 @@ describe("AppHeader", () => {
     await wrapper.find('a[aria-controls="mega-gunart"]').trigger("focusin")
     const mega = wrapper.find("#mega-gunart")
     expect(isShown(mega)).toBe(true)
-    expect(mega.find('a[href="/collection"]').exists()).toBe(true)
+    expect(mega.find('a[href="/gun-art"]').exists()).toBe(true)
   })
 
   it("toggles the search overlay (teleported to body)", async () => {

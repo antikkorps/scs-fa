@@ -4,7 +4,7 @@ import { isPageRequest, showsWaitingPage } from "./launch"
 describe("showsWaitingPage", () => {
   const closed = { stage: "coming_soon", adminPreview: false } as const
 
-  it.each(["/", "/boutique", "/boutique/carabine-x", "/collection", "/connexion", "/inscription", "/cgv"])(
+  it.each(["/", "/boutique", "/boutique/carabine-x", "/gun-art", "/connexion", "/inscription", "/cgv"])(
     "hides %s behind the waiting page before the opening",
     (path) => {
       expect(showsWaitingPage({ ...closed, path })).toBe(true)

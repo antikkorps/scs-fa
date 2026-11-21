@@ -18,7 +18,7 @@ if (error.value || !data.value?.data) {
 const series = computed(() => data.value?.data as ArtworkSeriesDetail)
 const artworks = computed(() => series.value.artworks)
 
-const pageUrl = `${siteUrl}/collection/serie/${slug}`
+const pageUrl = `${siteUrl}/gun-art/serie/${slug}`
 const description = computed(
   () => series.value.intro ?? `${series.value.title}, série d'éditions limitées de la collection Gun Art.`,
 )
@@ -26,7 +26,7 @@ const description = computed(
 usePageSeo({
   title: () => series.value.title,
   description,
-  path: `/collection/serie/${slug}`,
+  path: `/gun-art/serie/${slug}`,
   // Never the placeholder artworkImage() may return: a stored image, or the brand card.
   image: () => series.value.coverImageUrl ?? artworks.value[0]?.featuredImageUrl,
   imageAlt: () => series.value.title,
@@ -47,14 +47,14 @@ useHead({
             creator: {
               "@type": "Person",
               name: series.value.artist.name,
-              url: `${siteUrl}/collection/artiste/${series.value.artist.slug}`,
+              url: `${siteUrl}/gun-art/artiste/${series.value.artist.slug}`,
             },
           }),
           ...(series.value.theme && { genre: series.value.theme.name }),
           hasPart: artworks.value.map((a) => ({
             "@type": "VisualArtwork",
             name: a.title,
-            url: `${siteUrl}/collection/${a.slug}`,
+            url: `${siteUrl}/gun-art/${a.slug}`,
           })),
         }),
       ),
@@ -66,7 +66,7 @@ useHead({
 <template>
   <div class="series">
     <section class="container intro">
-      <AppBreadcrumbs :items="[{ name: 'Collection', to: '/collection' }, { name: series.title }]" />
+      <AppBreadcrumbs :items="[{ name: 'Gun Art', to: '/gun-art' }, { name: series.title }]" />
 
       <p class="eyebrow">Série</p>
       <h1 class="intro__title">{{ series.title }}</h1>
@@ -76,11 +76,11 @@ useHead({
       <dl class="meta">
         <div v-if="series.artist">
           <dt>Artiste</dt>
-          <dd><NuxtLink :to="`/collection/artiste/${series.artist.slug}`">{{ series.artist.name }}</NuxtLink></dd>
+          <dd><NuxtLink :to="`/gun-art/artiste/${series.artist.slug}`">{{ series.artist.name }}</NuxtLink></dd>
         </div>
         <div v-if="series.theme">
           <dt>Thème</dt>
-          <dd><NuxtLink :to="`/collection/theme/${series.theme.slug}`">{{ series.theme.name }}</NuxtLink></dd>
+          <dd><NuxtLink :to="`/gun-art/theme/${series.theme.slug}`">{{ series.theme.name }}</NuxtLink></dd>
         </div>
         <div v-if="series.reference">
           <dt>Référence</dt>

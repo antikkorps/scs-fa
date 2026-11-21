@@ -26,8 +26,8 @@ const { reopen } = useConsent()
         <!-- Moved from the old Armurerie mega-menu (story 12.15c); the tag's own
              page, or the menu entry standing for it. -->
         <NuxtLink :to="tagPath('occasion')">Armes d'occasion</NuxtLink>
-        <NuxtLink to="/collection">Gun Art</NuxtLink>
-        <NuxtLink to="/collection/artiste">L'artiste</NuxtLink>
+        <NuxtLink to="/gun-art">Gun Art</NuxtLink>
+        <NuxtLink to="/gun-art/artiste">L'artiste</NuxtLink>
         <NuxtLink to="/blog">Journal</NuxtLink>
       </nav>
 

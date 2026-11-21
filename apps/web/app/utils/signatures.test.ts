@@ -5,7 +5,7 @@ describe("SIGNATURES", () => {
   it("lists the collection, then Gun Art, each leading to its own section", () => {
     expect(SIGNATURES.map((signature) => [signature.key, signature.to])).toEqual([
       ["collection", "/armes-de-collection"],
-      ["gunart", "/collection"],
+      ["gunart", "/gun-art"],
     ])
   })
 
@@ -18,6 +18,6 @@ describe("SIGNATURES", () => {
 
   it("leads Gun Art to the artist before the gallery", () => {
     const gunArt = SIGNATURES.find((signature) => signature.key === "gunart")
-    expect(gunArt?.ctas.map((cta) => cta.to)).toEqual(["/collection/artiste", "/collection"])
+    expect(gunArt?.ctas.map((cta) => cta.to)).toEqual(["/gun-art/artiste", "/gun-art"])
   })
 })

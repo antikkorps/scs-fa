@@ -39,16 +39,16 @@ export const SIGNATURES: Signature[] = [
     key: "gunart",
     label: "Gun Art",
     shortLabel: "Gun Art",
-    to: "/collection",
+    to: "/gun-art",
     tagline: "Éditions d'art limitées",
     lede: "Des tirages photographiques d'exception, signés et numérotés, en édition strictement limitée.",
     points: ["Éditions limitées ≤ 25 exemplaires", "Signées & numérotées", "Certificat d'authenticité"],
     // The artist comes first: the house sells someone's work, and that is the
-    // entry point into Gun Art (Franck, 2026-09-23). `/collection/artiste`
+    // entry point into Gun Art (Franck, 2026-09-23). `/gun-art/artiste`
     // routes to the artist when there is one, and lists them once there are more.
     ctas: [
-      { to: "/collection/artiste", title: "L'artiste", sub: "Celui dont vous accrochez le travail" },
-      { to: "/collection", title: "Découvrir la galerie", sub: "Toutes les œuvres Gun Art" },
+      { to: "/gun-art/artiste", title: "L'artiste", sub: "Celui dont vous accrochez le travail" },
+      { to: "/gun-art", title: "Découvrir la galerie", sub: "Toutes les œuvres Gun Art" },
     ],
   },
 ]

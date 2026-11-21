@@ -14,7 +14,7 @@ if (error.value || !data.value?.data) {
 
 const artist = computed(() => data.value?.data as ArtistDetail)
 
-const pageUrl = `${siteUrl}/collection/artiste/${slug}`
+const pageUrl = `${siteUrl}/gun-art/artiste/${slug}`
 // A headline alone is a few words; framed with who and where, it describes the page.
 const description = computed(
   () =>
@@ -30,7 +30,7 @@ usePageSeo({
   title: () => artist.value.metaTitle ?? artist.value.name ?? "",
   socialTitle: () => `${artist.value.name} — SCS Firearms`,
   description,
-  path: `/collection/artiste/${slug}`,
+  path: `/gun-art/artiste/${slug}`,
   type: "profile",
   image: () => artist.value.portraitUrl,
   imageAlt: () => artist.value.name,
@@ -55,7 +55,7 @@ useHead({
             subjectOf: artist.value.series.map((s) => ({
               "@type": "CreativeWorkSeries",
               name: s.title,
-              url: `${siteUrl}/collection/serie/${s.slug}`,
+              url: `${siteUrl}/gun-art/serie/${s.slug}`,
             })),
           }),
         }),
@@ -68,7 +68,7 @@ useHead({
 <template>
   <div class="artist">
     <section class="container intro">
-      <AppBreadcrumbs :items="[{ name: 'Collection', to: '/collection' }, { name: artist.name }]" />
+      <AppBreadcrumbs :items="[{ name: 'Gun Art', to: '/gun-art' }, { name: artist.name }]" />
 
       <div class="hero" :class="{ 'hero--portrait': artist.portraitUrl }">
         <img

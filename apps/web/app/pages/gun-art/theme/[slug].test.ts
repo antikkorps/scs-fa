@@ -30,14 +30,14 @@ const { theme } = vi.hoisted(() => ({
 
 mockNuxtImport("useFetch", () => () => ({ data: ref({ data: theme.value }), error: ref(null) }))
 
-const mounted = () => mountSuspended(ThemePage, { route: "/collection/theme/cinema" })
+const mounted = () => mountSuspended(ThemePage, { route: "/gun-art/theme/cinema" })
 
-describe("collection/theme/[slug].vue", () => {
+describe("gun-art/theme/[slug].vue", () => {
   it("presents the theme and the series it gathers", async () => {
     const wrapper = await mounted()
     expect(wrapper.find("h1").text()).toBe("Cinéma")
     expect(wrapper.text()).toContain("Les armes telles que le cinéma les a fixées.")
-    expect(wrapper.findAll("a").map((a) => a.attributes("href"))).toContain("/collection/serie/age-d-or")
+    expect(wrapper.findAll("a").map((a) => a.attributes("href"))).toContain("/gun-art/serie/age-d-or")
   })
 
   it("says so plainly rather than showing an empty page", async () => {

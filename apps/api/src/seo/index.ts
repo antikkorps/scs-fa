@@ -29,7 +29,7 @@ export const seoRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/sitemap", async (_request, reply) => {
     const [productRows, categoryRows, tagRows, artworkRows, seriesRows, themeRows, artistRows, postRows, menuPages] =
       await Promise.all([
-        // Gun Art products only back the artworks, which live under /collection.
+        // Gun Art products only back the artworks, which live under /gun-art.
         db
           .select({
             slug: products.slug,

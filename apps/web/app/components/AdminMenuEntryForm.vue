@@ -125,7 +125,7 @@ async function save() {
 
     <label v-if="form.kind === 'link'" class="field">
       <span class="field__label">Page *</span>
-      <input v-model="form.linkUrl" name="linkUrl" class="ctl" required placeholder="/collection" >
+      <input v-model="form.linkUrl" name="linkUrl" class="ctl" required placeholder="/gun-art" >
       <span class="field__help">Une page du site, son adresse commençant par « / ».</span>
     </label>
 

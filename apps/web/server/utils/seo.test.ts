@@ -75,7 +75,7 @@ describe("buildSitemap — story 9.6", () => {
   })
 
   it("lists a page's images", () => {
-    const xml = buildSitemap([{ loc: `${SITE}/collection/x`, images: [`${SITE}/api/media/x.webp`] }])
+    const xml = buildSitemap([{ loc: `${SITE}/gun-art/x`, images: [`${SITE}/api/media/x.webp`] }])
     expect(xml).toContain(`<image:image><image:loc>${SITE}/api/media/x.webp</image:loc></image:image>`)
   })
 })
@@ -120,7 +120,7 @@ describe("buildLlmsTxt", () => {
     const txt = buildLlmsTxt(SITE, OPEN)
     expect(txt.startsWith("# SCS Firearms")).toBe(true)
     expect(txt).toContain("> SCS Firearms")
-    expect(txt).toContain(`[Collection](${SITE}/collection)`)
+    expect(txt).toContain(`[Galerie Gun Art](${SITE}/gun-art)`)
     expect(txt).toContain(`${SITE}/llms-full.txt`)
     expect(txt).toContain(`GET ${SITE}/api/artworks`)
   })
@@ -210,7 +210,7 @@ describe("buildLlmsFull", () => {
       OPEN,
     )
     expect(txt).toContain("## Gun Art — œuvres")
-    expect(txt).toContain(`[Éclat](${SITE}/collection/eclat)`)
+    expect(txt).toContain(`[Éclat](${SITE}/gun-art/eclat)`)
     expect(txt).toContain("à partir de 216,00 € TTC")
     expect(txt).toContain("3 disponible(s)")
     expect(txt).toContain(`[Histoire](${SITE}/blog/histoire)`)
@@ -236,7 +236,7 @@ describe("buildLlmsFull", () => {
       OPEN,
     )
     expect(txt).toContain("## Gun Art — séries")
-    expect(txt).toContain(`[Âge d'or](${SITE}/collection/serie/age-d-or)`)
+    expect(txt).toContain(`[Âge d'or](${SITE}/gun-art/serie/age-d-or)`)
     expect(txt).toContain("thème : Cinéma")
     expect(txt).toContain("référence : Le cinéma d'espionnage")
     expect(txt).toContain("2 œuvre(s)")

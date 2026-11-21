@@ -223,7 +223,7 @@ describe("GET /api/products/:id", () => {
   })
 
   // SEO audit 2026-11-15, finding 10: every artwork has a product « art-… »;
-  // its own page is /collection/…, never a duplicate shop page.
+  // its own page is /gun-art/…, never a duplicate shop page.
   it("returns 404 for the product behind a Gun Art piece", async () => {
     await db.insert(products).values({
       sku: `${SKU_PREFIX}art`,

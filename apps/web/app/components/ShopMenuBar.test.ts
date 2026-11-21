@@ -95,7 +95,7 @@ describe("ShopMenuBar", () => {
     const signatures = wrapper.find(".shop-bar__signatures")
     expect(signatures.attributes("aria-label")).toBe("Signatures de la maison")
     const links = signatures.findAll("a.nav__link--feature").map((link) => link.attributes("href"))
-    expect(links).toEqual(["/armes-de-collection", "/collection"])
+    expect(links).toEqual(["/armes-de-collection", "/gun-art"])
   })
 
   it("opens a panel for each signature, so both behave alike", async () => {
@@ -103,7 +103,7 @@ describe("ShopMenuBar", () => {
     await wrapper.find('a[aria-controls="mega-collection"]').trigger("focusin")
     expect(isShown(wrapper.find("#mega-collection"))).toBe(true)
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual(["collection"])
-    expect(wrapper.find('#mega-gunart a[href="/collection/artiste"]').exists()).toBe(true)
+    expect(wrapper.find('#mega-gunart a[href="/gun-art/artiste"]').exists()).toBe(true)
   })
 
   it("keeps the deep links in the page with the panels closed", async () => {

@@ -56,12 +56,12 @@ describe("menuEntryShapeIssue", () => {
   it("accepts a filter, a group and a link of the right shape", () => {
     expect(menuEntryShapeIssue({ ...entry, categorySlug: "munition", tagSlugs: ["chasse"] })).toBeNull()
     expect(menuEntryShapeIssue({ ...entry, kind: "group" })).toBeNull()
-    expect(menuEntryShapeIssue({ ...entry, kind: "link", linkUrl: "/collection" })).toBeNull()
+    expect(menuEntryShapeIssue({ ...entry, kind: "link", linkUrl: "/gun-art" })).toBeNull()
   })
 
   it("asks a link for its address, and only a link", () => {
     expect(menuEntryShapeIssue({ ...entry, kind: "link" })).toMatch(/address/)
-    expect(menuEntryShapeIssue({ ...entry, linkUrl: "/collection" })).toMatch(/address/)
+    expect(menuEntryShapeIssue({ ...entry, linkUrl: "/gun-art" })).toMatch(/address/)
   })
 
   it("keeps criteria off a group and a link", () => {

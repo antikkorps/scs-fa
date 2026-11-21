@@ -77,7 +77,7 @@ const id = identity
     <p>
       La structure du site, ses textes, sa charte graphique et ses logos sont la propriété de SCS Firearms. Les œuvres de
       la galerie Gun Art et leurs reproductions sont protégées par le droit d'auteur et appartiennent à
-      <NuxtLink to="/collection/artiste">leur artiste</NuxtLink>. Toute reproduction ou diffusion, totale ou
+      <NuxtLink to="/gun-art/artiste">leur artiste</NuxtLink>. Toute reproduction ou diffusion, totale ou
       partielle, sans autorisation écrite préalable est interdite (articles L122-4 et L335-2 du Code de la propriété
       intellectuelle).
     </p>

@@ -32,6 +32,6 @@ describe("bffBodyRefusal (story 12.9f)", () => {
   })
 
   it("ignores what is not the BFF", () => {
-    expect(bffBodyRefusal("/collection", { contentLength: String(BFF_PROXY_BODY_LIMIT_BYTES * 2) })).toBeNull()
+    expect(bffBodyRefusal("/gun-art", { contentLength: String(BFF_PROXY_BODY_LIMIT_BYTES * 2) })).toBeNull()
   })
 })
