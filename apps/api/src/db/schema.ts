@@ -812,6 +812,74 @@ export const productTagsRelations = relations(productTags, ({ one }) => ({
 }))
 
 // ============================================================================
+// MENU DE LA BOUTIQUE (story 12.15b)
+// ============================================================================
+// The shop menu is a tree of its own, edited from the back-office: each entry
+// is a SAVED FILTER over the catalogue (category, subcategory, tags, legal
+// category), a group heading, or a link to a page. A product is described
+// once and shows up under every entry whose filter it matches — no double
+// filing. Each entry carries its whole filter (no inheritance from the
+// parent): « Chasse › Armes longues › Munitions » is not a long gun.
+export const menuEntryKindEnum = pgEnum("menu_entry_kind", ["filter", "group", "link"])
+
+export const menuEntries = pgTable(
+  "menu_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    parentId: uuid("parent_id"),
+    // One URL segment: the entry's address is its path in the tree (D4).
+    slug: varchar("slug", { length: 100 }).notNull(),
+    label: varchar("label", { length: 100 }).notNull(),
+    position: integer("position").notNull().default(0),
+    kind: menuEntryKindEnum("kind").notNull().default("filter"),
+    linkUrl: varchar("link_url", { length: 500 }),
+    categoryId: uuid("category_id"),
+    subcategoryId: uuid("subcategory_id"),
+    legalCategory: legalCategoryEnum("legal_category"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [
+    foreignKey({ name: "fk_menu_entries_parent", columns: [t.parentId], foreignColumns: [t.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_menu_entries_category", columns: [t.categoryId], foreignColumns: [productCategories.id] }),
+    // As on products: an entry's subcategory belongs to its category.
+    foreignKey({
+      name: "fk_menu_entries_subcategory_category",
+      columns: [t.subcategoryId, t.categoryId],
+      foreignColumns: [productSubcategories.id, productSubcategories.categoryId],
+    }),
+    // Siblings never share a slug, top-level entries included: they share a URL prefix.
+    unique("uq_menu_entries_parent_slug").on(t.parentId, t.slug).nullsNotDistinct(),
+    index("idx_menu_entries_parent").on(t.parentId, t.position),
+    // MATCH SIMPLE skips the composite key when the category is null.
+    check("chk_menu_entries_subcategory_category", sql`${t.subcategoryId} IS NULL OR ${t.categoryId} IS NOT NULL`),
+    check("chk_menu_entries_link", sql`(${t.kind} = 'link') = (${t.linkUrl} IS NOT NULL)`),
+    check(
+      "chk_menu_entries_filter",
+      sql`${t.kind} = 'filter' OR (${t.categoryId} IS NULL AND ${t.legalCategory} IS NULL)`,
+    ),
+  ],
+)
+
+export const menuEntryTags = pgTable(
+  "menu_entry_tags",
+  {
+    entryId: uuid("entry_id").notNull(),
+    tagId: uuid("tag_id").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.entryId, t.tagId] }),
+    foreignKey({ name: "fk_menu_entry_tags_entry", columns: [t.entryId], foreignColumns: [menuEntries.id] }).onDelete(
+      "cascade",
+    ),
+    // Deleting a tag takes it off the entries that used it: they then show MORE
+    // products (one criterion fewer). Never a broken entry, but a wider one.
+    foreignKey({ name: "fk_menu_entry_tags_tag", columns: [t.tagId], foreignColumns: [tags.id] }).onDelete("cascade"),
+    index("idx_menu_entry_tags_tag").on(t.tagId),
+  ],
+)
+
+// ============================================================================
 export const legalCategories = pgTable("legal_categories", {
   id: uuid("id").primaryKey().defaultRandom(),
   category: legalCategoryEnum("category").notNull().unique(), // A, B, C, D, none

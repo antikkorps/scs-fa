@@ -2,7 +2,7 @@
 // A row action in an admin list, as an icon (Franck, 2026-11-01): its name is
 // the accessible label and a tooltip shown on hover AND on keyboard focus —
 // `title` alone never shows to a keyboard user.
-type RowActionIcon = "edit" | "archive" | "restore" | "delete"
+type RowActionIcon = "edit" | "archive" | "restore" | "delete" | "up" | "down" | "add"
 
 const props = defineProps<{ icon: RowActionIcon; label: string; to?: string; danger?: boolean }>()
 defineEmits<{ click: [] }>()
@@ -14,6 +14,9 @@ const PATHS: Record<RowActionIcon, string> = {
   archive: "M3 4h18v4H3z M5 8v12h14V8 M10 12h4",
   restore: "M4 12a8 8 0 1 0 2.3-5.6L4 8.7 M4 4v4.7h4.7",
   delete: "M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13 M10 11v6 M14 11v6",
+  up: "M12 19V5 M6 11l6-6 6 6",
+  down: "M12 5v14 M6 13l6 6 6-6",
+  add: "M12 5v14 M5 12h14",
 }
 </script>
 

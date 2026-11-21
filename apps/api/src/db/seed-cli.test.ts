@@ -83,6 +83,8 @@ describe("seed CLI (deployment)", () => {
     expect(await countRows("product_categories")).toBe(9) // coutellerie, story 12.13
     expect(await countRows("tags")).toBe(8) // chasse, story 12.13; tir sportif + FFP, SFP, thermique, 12.15a
     expect(await countRows("product_subcategories")).toBe(12) // story 12.15a
+    expect(await countRows("menu_entries")).toBe(33) // Fred's menu, story 12.15b
+    expect(await countRows("menu_entry_tags")).toBe(25)
     expect(await countRows("suppliers")).toBe(6)
     expect(await countRows("users", "role = 'admin'")).toBe(1)
 
