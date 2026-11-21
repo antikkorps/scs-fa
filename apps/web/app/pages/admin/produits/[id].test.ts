@@ -17,6 +17,8 @@ const DETAIL = {
   longDescription: null,
   categorySlug: "arme-longue",
   categoryName: "Armes longues",
+  subcategorySlug: "carabines",
+  subcategoryName: "Carabines",
   legalCategory: "C",
   priceHt: 800,
   vatPct: 20,
@@ -52,8 +54,17 @@ function routeApi(url: string) {
   if (String(url).includes("/product-categories")) {
     return Promise.resolve({
       data: [
-        { slug: "arme-longue", name: "Armes longues" },
-        { slug: "gun-art", name: "Gun Art" },
+        {
+          slug: "arme-longue",
+          name: "Armes longues",
+          subcategories: [
+            { slug: "fusils", name: "Fusils" },
+            { slug: "carabines", name: "Carabines" },
+          ],
+        },
+        { slug: "munition", name: "Munitions", subcategories: [{ slug: "munitions-canon-raye", name: "Canon rayé" }] },
+        { slug: "arme-defense", name: "Armes de défense", subcategories: [] },
+        { slug: "gun-art", name: "Gun Art", subcategories: [] },
       ],
     })
   }
@@ -91,6 +102,73 @@ describe("admin product form (story 7.5a)", () => {
       .map((o) => o.text())
     expect(options).toContain("Armes longues")
     expect(options).not.toContain("Gun Art")
+  })
+
+  // Story 12.15a — the subcategory, among the chosen category's only.
+  describe("subcategory", () => {
+    const select = (wrapper: Awaited<ReturnType<typeof mountEdit>>) => wrapper.find('select[name="subcategorySlug"]')
+    const patchBody = () =>
+      (
+        apiMock.mock.calls.find(([, o]) => (o as { method?: string })?.method === "PATCH")?.[1] as
+          | { body: Record<string, unknown> }
+          | undefined
+      )?.body
+
+    it("offers the category's subcategories, with the product's selected", async () => {
+      const wrapper = await mountEdit()
+      expect(
+        select(wrapper)
+          .findAll("option")
+          .map((o) => o.text()),
+      ).toEqual(["— aucune —", "Fusils", "Carabines"])
+      expect((select(wrapper).element as HTMLSelectElement).value).toBe("carabines")
+    })
+
+    it("sends the chosen subcategory, and null for none", async () => {
+      const wrapper = await mountEdit()
+      await select(wrapper).setValue("fusils")
+      apiMock.mockResolvedValueOnce({ data: DETAIL })
+      await wrapper.find(".btn-primary").trigger("click")
+      await flushPromises()
+      expect(patchBody()?.subcategorySlug).toBe("fusils")
+
+      apiMock.mockClear()
+      await select(wrapper).setValue("")
+      apiMock.mockResolvedValueOnce({ data: DETAIL })
+      await wrapper.find(".btn-primary").trigger("click")
+      await flushPromises()
+      expect(patchBody()?.subcategorySlug).toBeNull()
+    })
+
+    it("empties the subcategory when the category changes", async () => {
+      const wrapper = await mountEdit()
+      await wrapper.findAll("select")[0]?.setValue("munition")
+      expect((select(wrapper).element as HTMLSelectElement).value).toBe("")
+      expect(
+        select(wrapper)
+          .findAll("option")
+          .map((o) => o.text()),
+      ).toEqual(["— aucune —", "Canon rayé"])
+    })
+
+    // Review of 12.15a: an empty list once meant "not one of the category's",
+    // and the next save wiped the product's subcategory.
+    it("keeps the product's subcategory when the category list fails to load", async () => {
+      apiMock.mockImplementation((url: string) =>
+        String(url).includes("/product-categories") ? Promise.reject(new Error("down")) : routeApi(url),
+      )
+      const wrapper = await mountEdit()
+      apiMock.mockResolvedValueOnce({ data: DETAIL })
+      await wrapper.find(".btn-primary").trigger("click")
+      await flushPromises()
+      expect(patchBody()?.subcategorySlug).toBe("carabines")
+    })
+
+    it("hides the choice for a category without subcategories", async () => {
+      const wrapper = await mountEdit()
+      await wrapper.findAll("select")[0]?.setValue("arme-defense")
+      expect(select(wrapper).exists()).toBe(false)
+    })
   })
 
   /** Mirrors the server: the flag is derived from the legal category, never typed in. */

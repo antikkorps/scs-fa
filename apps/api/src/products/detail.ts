@@ -2,7 +2,14 @@ import { computePriceTtc, productIdParamSchema } from "@armurier/shared"
 import { and, asc, eq, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
-import { ancientWeapons, legalCategories, productCategories, products, productVariants } from "../db/schema.js"
+import {
+  ancientWeapons,
+  legalCategories,
+  productCategories,
+  productSubcategories,
+  products,
+  productVariants,
+} from "../db/schema.js"
 import { publicCrossSellsFor } from "./cross-sell.js"
 import { productTagsJson } from "./tag-filter.js"
 import { publiclyVisible } from "./visibility.js"
@@ -35,6 +42,8 @@ export async function fetchPublishedProduct(match: SQL, visibility: SQL = public
       keywords: products.keywords,
       categorySlug: productCategories.slug,
       categoryName: productCategories.name,
+      subcategorySlug: productSubcategories.slug,
+      subcategoryName: productSubcategories.name,
       legalCategoryCode: legalCategories.category,
       legalCategoryName: legalCategories.name,
       legalCategoryDescription: legalCategories.description,
@@ -63,6 +72,7 @@ export async function fetchPublishedProduct(match: SQL, visibility: SQL = public
     })
     .from(products)
     .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
+    .leftJoin(productSubcategories, eq(products.subcategoryId, productSubcategories.id))
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
     .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
     .where(and(match, visibility))
@@ -145,6 +155,7 @@ export async function fetchPublishedProduct(match: SQL, visibility: SQL = public
       keywords: row.keywords,
     },
     category: { slug: row.categorySlug, name: row.categoryName },
+    subcategory: row.subcategorySlug ? { slug: row.subcategorySlug, name: row.subcategoryName } : null,
     crossSells,
     tags: row.tags,
     // Null for an ordinary product; the whole historical dossier for a

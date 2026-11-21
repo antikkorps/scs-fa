@@ -10,7 +10,15 @@ import { slugify } from "@armurier/shared"
 import { type CatalogSheetRow, writeCatalogWorkbook } from "@armurier/shared/spreadsheet"
 import { and, asc, eq, isNull, sql } from "drizzle-orm"
 import { db } from "../db/client.js"
-import { ancientWeapons, artworks, legalCategories, productCategories, products, suppliers } from "../db/schema.js"
+import {
+  ancientWeapons,
+  artworks,
+  legalCategories,
+  productCategories,
+  productSubcategories,
+  products,
+  suppliers,
+} from "../db/schema.js"
 import { productTagsJson } from "../products/tag-filter.js"
 
 const EXCLUDED_CATEGORY_SLUG = "gun-art"
@@ -82,6 +90,8 @@ const README = [
   "• Supprimer une ligne : le produit est ARCHIVÉ (jamais effacé) seulement si vous cochez « Archiver les produits absents du",
   "  fichier » à l'import, et seulement pour les fournisseurs présents dans le fichier. Il se réactive depuis l'écran Produits.",
   "• Pour que vos prix et textes remplacent ceux du site, cochez « Écraser » à l'import ; sinon seuls les champs vides sont remplis.",
+  "• Sous-catégorie : choisissez-en une de la catégorie de la ligne (Carabines pour une arme longue…). Vide ne change rien,",
+  "  « Aucune » la retire. L'import refuse une sous-catégorie qui n'appartient pas à la catégorie.",
   "• Le stock n'est pas dans ce fichier : il bouge avec les ventes, un fichier ne le modifie jamais.",
   "• Fournisseur : choisissez-le dans la liste. Un nouveau fournisseur se crée d'abord dans l'administration",
   "  (Catalogue → Fournisseurs) : l'import refuse une ligne d'un fournisseur inconnu.",
@@ -141,6 +151,7 @@ export async function exportCatalogWorkbook(
       name: products.name,
       brand: products.brand,
       category: productCategories.name,
+      subcategory: productSubcategories.name,
       legalCategory: legalCategories.category,
       costPrice: products.costPrice,
       priceHt: products.priceHt,
@@ -158,6 +169,7 @@ export async function exportCatalogWorkbook(
     .from(products)
     .innerJoin(suppliers, eq(suppliers.id, products.supplierId))
     .innerJoin(productCategories, eq(productCategories.id, products.categoryId))
+    .leftJoin(productSubcategories, eq(productSubcategories.id, products.subcategoryId))
     .leftJoin(legalCategories, eq(legalCategories.id, products.legalCategoryId))
     .where(exportable())
     .orderBy(asc(suppliers.name), asc(products.name))
@@ -187,6 +199,7 @@ export async function exportCatalogWorkbook(
     name: r.name,
     brand: r.brand,
     category: r.category,
+    subcategory: r.subcategory,
     legalCategory: legalLabel(r.legalCategory),
     costPriceHt: money(r.costPrice),
     priceHt: money(r.priceHt),
@@ -205,6 +218,12 @@ export async function exportCatalogWorkbook(
     .select({ name: productCategories.name, slug: productCategories.slug })
     .from(productCategories)
     .orderBy(asc(productCategories.name))
+
+  const subcategories = await db
+    .select({ name: productSubcategories.name })
+    .from(productSubcategories)
+    .innerJoin(productCategories, eq(productCategories.id, productSubcategories.categoryId))
+    .orderBy(asc(productCategories.displayOrder), asc(productSubcategories.displayOrder))
 
   const supplierList = await declaredSuppliers()
   const chosenSupplier = supplierList.find((supplier) => supplier.id === options.supplierId)
@@ -226,6 +245,7 @@ export async function exportCatalogWorkbook(
         .filter((category) => category.slug !== EXCLUDED_CATEGORY_SLUG)
         .map((category) => category.name),
       supplierNames: supplierList.map((supplier) => supplier.name),
+      subcategoryNames: subcategories.map((subcategory) => subcategory.name),
     },
     readme: [...README, "", ...summary],
   })

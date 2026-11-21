@@ -40,6 +40,20 @@ describe("GET /api/product-categories", () => {
     expect(orders).toEqual(sorted)
   })
 
+  // Story 12.15a — one level under the category, in display order.
+  it("lists each category's subcategories", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/product-categories" })
+    const body = res.json() as { data: (CategoryRow & { subcategories: { slug: string; name: string }[] })[] }
+    const bySlug = new Map(body.data.map((c) => [c.slug, c.subcategories]))
+
+    expect(bySlug.get("arme-longue")).toEqual([
+      { slug: "fusils", name: "Fusils" },
+      { slug: "carabines", name: "Carabines" },
+    ])
+    expect(bySlug.get("munition")?.map((s) => s.slug)).toEqual(["munitions-canon-raye", "munitions-canon-lisse"])
+    expect(bySlug.get("arme-defense")).toEqual([])
+  })
+
   it("excludes the gun_art category (it lives under /api/artworks)", async () => {
     const res = await app.inject({ method: "GET", url: "/api/product-categories" })
     const body = res.json() as { data: CategoryRow[] }

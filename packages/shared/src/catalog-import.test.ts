@@ -246,6 +246,17 @@ describe("parseCatalogImportTable", () => {
     expect(parse({ tags: " , ; " })?.data?.tags).toBeNull()
   })
 
+  // Story 12.15a — blank keeps an existing product's subcategory, as for tags;
+  // « Aucune » takes it off, as the legal category column spells « none ».
+  it("reads « Sous-catégorie » as a name or slug, « Aucune » to clear, or unchanged when blank", () => {
+    expect(CATALOG_IMPORT_COLUMNS.map((column) => column.header)).toContain("Sous-catégorie")
+    expect(parse({ subcategory: "Carabines" })?.data?.subcategory).toBe("Carabines")
+    expect(parse({ subcategory: " aucune " })?.data?.subcategory).toBe(false)
+    // A dash is a name like any other, never « Aucune » in disguise (review of 12.15a).
+    expect(parse({ subcategory: "-" })?.data?.subcategory).toBe("-")
+    expect(parse({})?.data?.subcategory).toBeNull()
+  })
+
   it("caps the tags of one row", () => {
     const many = Array.from({ length: 21 }, (_, i) => `tag-${i}`).join(",")
     expect(parse({ tags: many })?.errors.join()).toMatch(/20 tags au plus/)

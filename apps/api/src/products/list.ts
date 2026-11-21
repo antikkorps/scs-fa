@@ -2,7 +2,7 @@ import { computePriceTtc, type ProductFilters, type ProductSort, productFiltersS
 import { and, asc, desc, eq, ne, type SQL, sql } from "drizzle-orm"
 import type { FastifyPluginAsync } from "fastify"
 import { db } from "../db/client.js"
-import { ancientWeapons, legalCategories, productCategories, products } from "../db/schema.js"
+import { ancientWeapons, legalCategories, productCategories, productSubcategories, products } from "../db/schema.js"
 import { buildTagFilterConditions, productTagsJson } from "./tag-filter.js"
 import { publiclyVisible } from "./visibility.js"
 
@@ -64,10 +64,22 @@ function catalogueOrder(sort: ProductSort, search: string | undefined): SQL[] {
  * caller sets: the public one, or the pro catalogue's (story 12.8c).
  */
 export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
-  const { category, tags: tagSlugs, legalCategory, search, minPrice, maxPrice, page, limit, sort } = filters
+  const {
+    category,
+    subcategory,
+    tags: tagSlugs,
+    legalCategory,
+    search,
+    minPrice,
+    maxPrice,
+    page,
+    limit,
+    sort,
+  } = filters
 
   const conditions: SQL[] = [visibility]
   if (category) conditions.push(eq(productCategories.slug, category))
+  if (subcategory) conditions.push(eq(productSubcategories.slug, subcategory))
   if (legalCategory) conditions.push(eq(legalCategories.category, legalCategory))
   // Tax included, as displayed (decision Franck 2026-11-02). The pro catalogue
   // never passes a price bound: it would give the public price away.
@@ -86,6 +98,7 @@ export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
     .select({ total: sql<number>`count(*)::int` })
     .from(products)
     .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
+    .leftJoin(productSubcategories, eq(products.subcategoryId, productSubcategories.id))
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
     .where(where)
 
@@ -104,6 +117,8 @@ export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
       featuredImageUrl: products.featuredImageUrl,
       categorySlug: productCategories.slug,
       categoryName: productCategories.name,
+      subcategorySlug: productSubcategories.slug,
+      subcategoryName: productSubcategories.name,
       legalCategory: legalCategories.category,
       tags: productTagsJson,
       // Distinguishes a piece that is gone for good from an ordinary product
@@ -115,6 +130,7 @@ export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
     })
     .from(products)
     .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
+    .leftJoin(productSubcategories, eq(products.subcategoryId, productSubcategories.id))
     .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
     .leftJoin(ancientWeapons, eq(ancientWeapons.productId, products.id))
     .where(where)
@@ -139,6 +155,7 @@ export async function listCatalogue(filters: ProductFilters, visibility: SQL) {
       requiresLegalVerification: r.requiresLegalVerification,
       featuredImageUrl: r.featuredImageUrl,
       category: { slug: r.categorySlug, name: r.categoryName },
+      subcategory: r.subcategorySlug ? { slug: r.subcategorySlug, name: r.subcategoryName } : null,
       tags: r.tags,
       isUnique: r.isUnique === true,
       legalCategory: r.legalCategory,

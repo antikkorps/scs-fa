@@ -35,6 +35,7 @@ import {
 } from "../db/schema.js"
 import { replaceProductTags } from "../products/product-tags.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
+import { resolveImportSubcategories } from "./subcategories.js"
 import { resolveImportTags } from "./tags.js"
 
 export class ImportFileError extends Error {}
@@ -43,6 +44,7 @@ export type ImportAction = "create" | "update" | "invalid" | "skipped"
 
 interface ExistingProduct {
   id: string
+  categoryId: string
   supplierSku: string
   name: string
   description: string | null
@@ -93,6 +95,8 @@ export interface ImportPlanRow {
   existing: ExistingProduct | null
   /** Story 12.13: the tags the row sets, or null when its « Tags » cell is blank (left as they are). */
   tagIds: string[] | null
+  /** Story 12.15a: the subcategory the row sets, null to take it off, undefined to leave it. */
+  subcategoryId?: string | null
 }
 
 export interface ImportPlan {
@@ -193,6 +197,7 @@ export async function planCatalogImport(
     const existing = await db
       .select({
         id: products.id,
+        categoryId: products.categoryId,
         supplierId: products.supplierId,
         supplierSku: products.supplierSku,
         name: products.name,
@@ -248,6 +253,10 @@ export async function planCatalogImport(
         row.tagIds = null
         row.warnings.push("Tags conservés : la fiche a changé depuis l'export")
       }
+      if (data.subcategory !== null) {
+        row.data = { ...data, subcategory: null }
+        row.warnings.push("Sous-catégorie conservée : la fiche a changé depuis l'export")
+      }
     }
     row.action = "update"
     row.existing = existing
@@ -266,6 +275,8 @@ export async function planCatalogImport(
       )
     }
   }
+
+  await resolveImportSubcategories(active(), overwrite, invalidate)
 
   // A new product must not collide with another one's SKU or page address —
   // neither in the database nor elsewhere in the file.
@@ -430,6 +441,7 @@ export async function commitCatalogImport(
             description: data.description,
             longDescription: html(data.longDescription),
             categoryId: row.categoryId,
+            subcategoryId: row.subcategoryId ?? null,
             legalCategoryId: lid,
             supplierId: sid,
             supplierSku: data.supplierSku,
@@ -488,6 +500,8 @@ export async function commitCatalogImport(
             ...(data.active === null ? {} : { published: data.active }),
             // Same for "Réservé pro".
             ...(data.proOnly === null ? {} : { audience: data.proOnly ? "pro" : "public" }),
+            // Settled by the plan: filled, « Aucune », or dropped with a category it left.
+            ...(row.subcategoryId === undefined ? {} : { subcategoryId: row.subcategoryId }),
             updatedAt: new Date(),
           })
           .where(eq(products.id, ex.id))

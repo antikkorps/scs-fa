@@ -101,6 +101,9 @@ export interface AdminProductVariant {
 }
 
 export interface AdminProductDetail extends Omit<AdminProductListItem, "variantCount"> {
+  /** Story 12.15a — null when the product sits at its category's level. */
+  subcategorySlug: string | null
+  subcategoryName: string | null
   // Rentabilité (story 11.10) — admin uniquement.
   costPriceHt: number | null
   chargesPct: number | null

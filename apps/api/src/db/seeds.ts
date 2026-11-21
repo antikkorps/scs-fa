@@ -23,6 +23,7 @@ import {
   tags,
   users,
 } from "./schema.js"
+import { seedSubcategories } from "./seed-subcategories.js"
 import { seedSuppliers } from "./seed-suppliers.js"
 
 /**
@@ -200,6 +201,7 @@ export async function seedReferenceData() {
 
   console.log("✅ Product categories seeded")
 
+  await seedSubcategories()
   await seedTags()
 
   console.log("🌱 Reference data complete!")
@@ -269,6 +271,36 @@ async function seedTags() {
       facet: "usage" as const,
       displayOrder: 1,
       description: "Armes, munitions, optiques, couteaux et équipement pour la chasse",
+    },
+    // Story 12.15a — the sport shooting side of the menu, and the sights' kinds
+    // (Tir sportif › Optique › Lunettes), which cut across the subcategories.
+    {
+      slug: "tir-sportif",
+      name: "Tir sportif",
+      facet: "usage" as const,
+      displayOrder: 2,
+      description: "Armes, munitions et optiques pour le tir sportif",
+    },
+    {
+      slug: "premier-plan-focal",
+      name: "Premier plan focal (FFP)",
+      facet: "caracteristique" as const,
+      displayOrder: 1,
+      description: "Lunette dont le réticule grossit avec l'image",
+    },
+    {
+      slug: "second-plan-focal",
+      name: "Second plan focal (SFP)",
+      facet: "caracteristique" as const,
+      displayOrder: 2,
+      description: "Lunette dont le réticule garde la même taille au grossissement",
+    },
+    {
+      slug: "thermique",
+      name: "Thermique et calculateur intégré",
+      facet: "caracteristique" as const,
+      displayOrder: 3,
+      description: "Optique thermique, avec calculateur balistique intégré",
     },
   ]
 

@@ -152,6 +152,8 @@ export interface CatalogSheetLists {
   categoryNames: string[]
   /** The declared suppliers (story 12.5); without it the column stays free text. */
   supplierNames?: string[]
+  /** Story 12.15a — every category's subcategories, offered with « Aucune »; without it, free text. */
+  subcategoryNames?: string[]
 }
 
 /**
@@ -164,7 +166,7 @@ export function addCatalogSheet(
   wb: ExcelJS.Workbook,
   name: string,
   rows: CatalogSheetRow[],
-  { categoryNames, supplierNames = [] }: CatalogSheetLists,
+  { categoryNames, supplierNames = [], subcategoryNames = [] }: CatalogSheetLists,
 ): ExcelJS.Worksheet {
   const ws = wb.addWorksheet(name, { views: [{ state: "frozen", ySplit: 1, xSplit: 6 }] })
   ws.columns = CATALOG_IMPORT_COLUMNS.map((c) => ({ header: c.header, key: c.key, width: COLUMN_WIDTHS[c.key] ?? 14 }))
@@ -181,6 +183,10 @@ export function addCatalogSheet(
   }
   fillListColumn(1, categoryNames)
   fillListColumn(2, supplierNames)
+  // Every category's together: Excel cannot narrow a list to the row's category
+  // without formulas; the import refuses a subcategory of another category.
+  const subcategoryChoices = subcategoryNames.length > 0 ? [...subcategoryNames, "Aucune"] : []
+  fillListColumn(3, subcategoryChoices)
   const col = (key: CatalogImportColumnKey) => ws.getColumn(key).letter
   // exceljs supports range validations but its typings omit them.
   const validations = (ws as unknown as { dataValidations: { add(range: string, v: ExcelJS.DataValidation): void } })
@@ -207,6 +213,12 @@ export function addCatalogSheet(
     )
   if (categoryNames.length > 0)
     list("category", `Listes!$A$1:$A$${categoryNames.length}`, "Choisissez une catégorie de la liste.")
+  if (subcategoryChoices.length > 0)
+    list(
+      "subcategory",
+      `Listes!$C$1:$C$${subcategoryChoices.length}`,
+      "Choisissez une sous-catégorie de la catégorie de la ligne, « Aucune », ou laissez vide.",
+    )
   for (const key of ["costPriceHt", "priceHt"] as const) ws.getColumn(key).numFmt = "#,##0.00 €"
   return ws
 }
