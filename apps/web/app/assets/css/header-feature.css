@@ -19,7 +19,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.4rem 0.85rem;
+  /* Slim enough to sit in the universes' row with air above and below. */
+  padding: 0.3rem 0.85rem;
+  line-height: var(--lh-snug);
   color: var(--brass);
   border: 1px solid color-mix(in srgb, var(--brass) 45%, transparent);
   border-radius: 999px;

@@ -28,6 +28,12 @@ async function signIn() {
 }
 
 describe("admin/login.vue (story 12.8e)", () => {
+  // Franck, 2026-11-21: an admin who forgot the password found no way out here.
+  it("offers the forgotten password page under the form", async () => {
+    const wrapper = await mountSuspended(Login, { route: "/admin/login" })
+    expect(wrapper.find('form a[href="/mot-de-passe-oublie"]').text()).toBe("Mot de passe oublié ?")
+  })
+
   it("asks an admin for the app's code, then opens the back-office", async () => {
     login.mockResolvedValue({ status: "code_required", method: "totp", expiresIn: 600 })
     verifyLoginCode.mockResolvedValue({ user: { role: "admin" } })

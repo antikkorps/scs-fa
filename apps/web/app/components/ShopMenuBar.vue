@@ -59,6 +59,9 @@ const isSpilled = (index: number) => index >= fitting.value
   gap: clamp(1rem, 2vw, 1.75rem);
   width: 100%;
   height: 100%;
+  /* The hairline above the row spans its content, edge to edge with the panels,
+     not the container's gutters. */
+  border-top: 1px solid var(--ink-line);
 }
 .shop-bar__label {
   display: inline-flex;
