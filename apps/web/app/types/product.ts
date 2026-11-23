@@ -38,7 +38,7 @@ export interface ProductCardItem {
 }
 
 // Facets group tags in the filter panel. Mirrors TAG_FACETS in @armurier/shared.
-export type TagFacet = "etat" | "epoque" | "caracteristique" | "usage"
+export type TagFacet = "etat" | "epoque" | "caracteristique" | "usage" | "calibre"
 
 export interface ProductTag {
   slug: string

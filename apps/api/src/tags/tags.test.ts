@@ -186,7 +186,7 @@ describe("Tags (story 11.1)", () => {
       const res = await app.inject({ method: "GET", url: "/api/tags" })
       expect(res.statusCode).toBe(200)
       const data = res.json().data as Array<{ facet: string; tags: Array<{ slug: string }> }>
-      expect(data.map((g) => g.facet)).toEqual(["etat", "epoque", "caracteristique", "usage"])
+      expect(data.map((g) => g.facet)).toEqual(["etat", "epoque", "caracteristique", "usage", "calibre"])
     })
 
     it("holds the hunting universe's tag in the 'usage' facet (story 12.13)", async () => {

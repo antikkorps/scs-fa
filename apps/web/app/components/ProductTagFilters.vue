@@ -1,17 +1,26 @@
 <script setup lang="ts">
-import type { TagFacetGroup } from "~/types/product"
+import type { TagFacet, TagFacetGroup } from "~/types/product"
 
 // Faceted tag filter. The API combines the boxes the way every shop does — OR
 // inside a facet, AND across facets — so no hint explains it: it read as jargon
 // (Franck, 2026-10-08). "Tag" stays an admin word; visitors read "Affiner".
+// A single-choice facet (the calibre) is a drop-down instead (story 12.15e).
 const props = defineProps<{
   facets: TagFacetGroup[]
   selected: string[]
 }>()
 
-const emit = defineEmits<{ toggle: [slug: string]; clear: [] }>()
+const emit = defineEmits<{ toggle: [slug: string]; pick: [facet: TagFacet, slug: string]; clear: [] }>()
 
 const { tagFacetLabel } = useTags()
+
+/** The tag chosen in each single-choice facet, "" for none: worked out once per render. */
+const chosen = computed(
+  () =>
+    new Map(
+      props.facets.map((group) => [group.facet, group.tags.find((tag) => selectedSet.value.has(tag.slug))?.slug ?? ""]),
+    ),
+)
 
 const selectedSet = computed(() => new Set(props.selected))
 const hasSelection = computed(() => props.selected.length > 0)
@@ -26,23 +35,40 @@ const hasSelection = computed(() => props.selected.length > 0)
       </button>
     </div>
 
-    <fieldset v-for="group in facets" :key="group.facet" class="tagf__group">
-      <legend class="tagf__legend">{{ tagFacetLabel(group.facet) }}</legend>
-      <ul class="tagf__list">
-        <li v-for="tag in group.tags" :key="tag.slug">
-          <label class="tagf__item" :class="{ 'tagf__item--on': selectedSet.has(tag.slug) }">
-            <input
-              type="checkbox"
-              class="tagf__box"
-              :checked="selectedSet.has(tag.slug)"
-              @change="emit('toggle', tag.slug)"
-            />
-            <span class="tagf__name">{{ tag.name }}</span>
-            <span class="tagf__count" :aria-label="`${tag.productCount} produits`">({{ tag.productCount }})</span>
-          </label>
-        </li>
-      </ul>
-    </fieldset>
+    <template v-for="group in facets" :key="group.facet">
+      <!-- `selected` on the options for the server's HTML, `value` for the live page. -->
+      <div v-if="isSingleChoiceFacet(group.facet)" class="tagf__group">
+        <label class="tagf__legend" :for="`tagf-${group.facet}`">{{ tagFacetLabel(group.facet) }}</label>
+        <select
+          :id="`tagf-${group.facet}`"
+          class="input tagf__select"
+          :value="chosen.get(group.facet)"
+          @change="emit('pick', group.facet, ($event.target as HTMLSelectElement).value)"
+        >
+          <option value="" :selected="!chosen.get(group.facet)">{{ anyChoiceLabel(group.facet) }}</option>
+          <option v-for="tag in group.tags" :key="tag.slug" :value="tag.slug" :selected="tag.slug === chosen.get(group.facet)">
+            {{ tag.name }} ({{ tag.productCount }})
+          </option>
+        </select>
+      </div>
+      <fieldset v-else class="tagf__group">
+        <legend class="tagf__legend">{{ tagFacetLabel(group.facet) }}</legend>
+        <ul class="tagf__list">
+          <li v-for="tag in group.tags" :key="tag.slug">
+            <label class="tagf__item" :class="{ 'tagf__item--on': selectedSet.has(tag.slug) }">
+              <input
+                type="checkbox"
+                class="tagf__box"
+                :checked="selectedSet.has(tag.slug)"
+                @change="emit('toggle', tag.slug)"
+              />
+              <span class="tagf__name">{{ tag.name }}</span>
+              <span class="tagf__count" :aria-label="`${tag.productCount} produits`">({{ tag.productCount }})</span>
+            </label>
+          </li>
+        </ul>
+      </fieldset>
+    </template>
   </div>
 </template>
 
@@ -89,6 +115,7 @@ const hasSelection = computed(() => props.selected.length > 0)
 }
 
 .tagf__legend {
+  display: block;
   font-size: var(--fs-sm);
   letter-spacing: var(--ls-wide);
   text-transform: uppercase;
@@ -97,6 +124,9 @@ const hasSelection = computed(() => props.selected.length > 0)
   margin-bottom: 0.4rem;
 }
 
+.tagf__select {
+  max-width: 16rem;
+}
 
 .tagf__list {
   display: flex;

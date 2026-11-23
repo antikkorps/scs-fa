@@ -7,6 +7,20 @@ const FACET_LABELS: Record<TagFacet, string> = {
   epoque: "Époque",
   caracteristique: "Caractéristiques",
   usage: "Usage",
+  calibre: "Calibre",
+}
+
+// Facets picked one tag at a time from a drop-down (story 12.15e, Fred): a
+// long list nobody combines, unlike the pills of the other facets.
+// Each maps to its drop-down's first option, the one choosing none.
+const SINGLE_CHOICE_FACETS: ReadonlyMap<TagFacet, string> = new Map([["calibre", "Tous calibres"]])
+
+export function isSingleChoiceFacet(facet: TagFacet): boolean {
+  return SINGLE_CHOICE_FACETS.has(facet)
+}
+
+export function anyChoiceLabel(facet: TagFacet): string {
+  return SINGLE_CHOICE_FACETS.get(facet) ?? "Tous"
 }
 
 export function tagFacetLabel(facet: TagFacet): string {
