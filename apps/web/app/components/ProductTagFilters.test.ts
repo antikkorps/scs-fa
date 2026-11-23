@@ -105,6 +105,39 @@ describe("ProductTagFilters", () => {
     })
   })
 
+  // Story 12.15e: the seed brings every common calibre; one no product carries
+  // yet stays out of the list, rather than reading « (0) ».
+  describe("an empty calibre", () => {
+    const calibres = (counts: number[]): TagFacetGroup[] => [
+      {
+        facet: "calibre",
+        tags: counts.map((productCount, index) => ({
+          slug: `calibre-${index}`,
+          name: `Calibre ${index}`,
+          facet: "calibre",
+          description: null,
+          productCount,
+        })),
+      },
+    ]
+
+    it("is left out of the list, unless it is the one chosen", async () => {
+      const wrapper = await mountSuspended(ProductTagFilters, {
+        props: { facets: calibres([3, 0, 0]), selected: ["calibre-2"] },
+      })
+      expect(wrapper.findAll("select.tagf__select option").map((option) => option.attributes("value"))).toEqual([
+        "",
+        "calibre-0",
+        "calibre-2",
+      ])
+    })
+
+    it("leaves no list at all when no calibre carries a product", async () => {
+      const wrapper = await mountSuspended(ProductTagFilters, { props: { facets: calibres([0, 0]), selected: [] } })
+      expect(wrapper.find("select.tagf__select").exists()).toBe(false)
+    })
+  })
+
   it("renders nothing when no facet carries a tag", async () => {
     const wrapper = await mountSuspended(ProductTagFilters, { props: { facets: [], selected: [] } })
     expect(wrapper.find(".tagf").exists()).toBe(false)
