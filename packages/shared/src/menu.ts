@@ -1,11 +1,18 @@
 // Story 12.15b — the shop menu, a tree of saved filters edited from the back-office.
 
-import { LEGAL_CATEGORIES, MAX_TAG_FILTERS } from "./constants.js"
+import { LEGAL_CATEGORIES, MAX_TAG_FILTERS, TAG_FACETS } from "./constants.js"
 import { categorySlugSchema, tagSlugSchema, toPatchSchema } from "./validation.js"
 import { z } from "./zod.js"
 
 export const MENU_ENTRY_KINDS = ["filter", "group", "link"] as const
 export type MenuEntryKind = (typeof MENU_ENTRY_KINDS)[number]
+
+/**
+ * The filters a menu entry's page can leave out (story 12.15e, Fred): the legal
+ * category and each tag facet. The price and the search always stay.
+ */
+export const MENU_FILTER_KEYS = ["legalCategory", ...TAG_FACETS] as const
+export type MenuFilterKey = (typeof MENU_FILTER_KEYS)[number]
 
 /** Three levels in the menu; a fourth would be the page's own filters (decision D3). */
 export const MENU_MAX_DEPTH = 3
@@ -89,6 +96,12 @@ const menuEntryFields = z.object({
   // (plain paragraphs separated by a blank line).
   description: menuPageText(MENU_DESCRIPTION_MAX),
   intro: menuPageText(MENU_INTRO_MAX),
+  // Hidden rather than offered: a new filter shows on every page until hidden.
+  hiddenFilters: z
+    .array(z.enum(MENU_FILTER_KEYS))
+    .max(MENU_FILTER_KEYS.length * 2)
+    .transform((keys) => [...new Set(keys)])
+    .default([]),
 })
 
 export type MenuEntryShape = Pick<

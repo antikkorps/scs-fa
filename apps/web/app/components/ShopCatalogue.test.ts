@@ -1,4 +1,5 @@
 // @vitest-environment nuxt
+import type { MenuFilterKey } from "@armurier/shared"
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import type { DOMWrapper } from "@vue/test-utils"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -199,6 +200,34 @@ describe("ShopCatalogue (story 9.6)", () => {
     const push = spyPush()
     await wrapper.find("select.tagf__select").setValue("")
     expect(push).toHaveBeenCalledWith({ path: "/boutique", query: { legalCategory: "C" } })
+  })
+
+  // Story 12.15e (Fred): a menu entry's page leaves out the filters it hides —
+  // Chasse without the legal category, Munitions with the calibre alone.
+  describe("on a page hiding filters", () => {
+    const hiding = {
+      category: "munition",
+      hiddenFilters: ["legalCategory", "etat"] as MenuFilterKey[],
+      basePath: "/chasse/munitions",
+      listName: "x",
+    }
+
+    it("offers neither the legal category nor the hidden facets, the others still", async () => {
+      const wrapper = await mountSuspended(ShopCatalogue, { props: hiding, route: "/chasse/munitions" })
+      expect(wrapper.find("#shop-legal").exists()).toBe(false)
+      expect(wrapper.findAll(".tagf__box")).toHaveLength(0)
+      expect(wrapper.find("select.tagf__select").exists()).toBe(true)
+    })
+
+    it("ignores a hidden filter in the address", async () => {
+      productQueries.length = 0
+      await mountSuspended(ShopCatalogue, {
+        props: hiding,
+        route: "/chasse/munitions?legalCategory=B&tags=occasion,calibre-12",
+      })
+      expect(productQueries.at(-1)).toMatchObject({ tags: "calibre-12" })
+      expect(productQueries.at(-1)).not.toHaveProperty("legalCategory")
+    })
   })
 
   describe("filters panel on a phone", () => {

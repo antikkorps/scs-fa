@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PRODUCT_SORTS, type ProductSort } from "@armurier/shared"
+import { type MenuFilterKey, PRODUCT_SORTS, type ProductSort } from "@armurier/shared"
 import type { LegalCategoryCode, ProductListResponse, TagFacet } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/product"
 
@@ -22,6 +22,8 @@ const props = defineProps<{
   lockedTags?: string[]
   /** Legal category locked by a menu entry's page: its filter is then not offered. */
   lockedLegalCategory?: string
+  /** Filters a menu entry's page leaves out (story 12.15e): the legal category, tag facets. */
+  hiddenFilters?: MenuFilterKey[]
   /** Absolute path of the page hosting the catalogue, e.g. "/boutique". */
   basePath: string
   /** Name of the list in its ItemList structured data. */
@@ -48,7 +50,9 @@ const q = (key: string) => {
 }
 
 const term = ref(q("search"))
-const legalCategory = computed(() => props.lockedLegalCategory || q("legalCategory"))
+const hidden = computed<ReadonlySet<string>>(() => new Set(props.hiddenFilters ?? []))
+const offersLegalCategory = computed(() => !props.lockedLegalCategory && !hidden.value.has("legalCategory"))
+const legalCategory = computed(() => props.lockedLegalCategory || (offersLegalCategory.value ? q("legalCategory") : ""))
 const minPrice = computed(() => q("minPrice"))
 const maxPrice = computed(() => q("maxPrice"))
 // UX audit 2026-11-01 (I6). "relevance", the default, stays out of the address.
@@ -71,38 +75,13 @@ const { facets } = useTags()
 const menuLinks = useShopMenu()
 const pinnedTags = computed(() => props.lockedTags ?? [])
 
-// `?tags=` carries a comma-separated selection, matching what the API accepts,
-// so a filtered view stays copy-pasteable and survives a page reload.
-// Tags of one facet add up (OR): a sibling of a pinned tag would widen the page
-// (« Chasse » showing sport shooting). Their facet holds the pinned tags only.
-const pinnedFacets = computed(
-  () =>
-    new Set(
-      facets.value
-        .filter((group) => group.tags.some((tag) => pinnedTags.value.includes(tag.slug)))
-        .map((group) => group.facet),
-    ),
-)
-const facetOfTag = computed(
-  () => new Map(facets.value.flatMap((group) => group.tags.map((tag) => [tag.slug, group.facet] as const))),
-)
-const refinableFacets = computed(() =>
-  facets.value.map((group) =>
-    pinnedFacets.value.has(group.facet)
-      ? { ...group, tags: group.tags.filter((tag) => pinnedTags.value.includes(tag.slug)) }
-      : group,
-  ),
-)
-
-const selectedTags = computed(() =>
-  q("tags")
-    .split(",")
-    .map((slug) => slug.trim())
-    .filter((slug) => {
-      const facet = facetOfTag.value.get(slug)
-      return slug && !(facet && pinnedFacets.value.has(facet))
-    }),
-)
+// `?tags=` carries the selection, so a filtered view stays copy-pasteable.
+const { pinnedFacets, facetOfTag, refinableFacets, selectedTags } = useCatalogueTags({
+  facets,
+  pinnedTags,
+  hiddenFacets: hidden,
+  queryTags: computed(() => q("tags")),
+})
 
 // What the API is asked for: the page's own tag, then the visitor's.
 const appliedTags = computed(() => [...pinnedTags.value, ...selectedTags.value])
@@ -312,7 +291,7 @@ useHead({
 
         <div id="shop-filters" class="filters__panel" :class="{ 'is-open': filtersOpen }">
           <div class="filters__fields">
-            <div v-if="!lockedLegalCategory" class="filters__field">
+            <div v-if="offersLegalCategory" class="filters__field">
               <label class="sr-only" for="shop-legal">Catégorie légale</label>
               <select
                 id="shop-legal"
