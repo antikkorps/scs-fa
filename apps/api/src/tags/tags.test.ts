@@ -197,6 +197,16 @@ describe("Tags (story 11.1)", () => {
       )
     })
 
+    // Story 12.15e — the common calibres, so Fred only tags his ammunition.
+    it("seeds the common calibres, smooth bores first", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/tags" })
+      const data = res.json().data as Array<{ facet: string; tags: Array<{ slug: string; name: string }> }>
+      const calibres = data.find((g) => g.facet === "calibre")?.tags ?? []
+      expect(calibres.slice(0, 4).map((t) => t.name)).toEqual(["12", "16", "20", "410 (36)"])
+      expect(calibres).toContainEqual(expect.objectContaining({ slug: "calibre-308-win", name: ".308 Win" }))
+      expect(calibres).toContainEqual(expect.objectContaining({ slug: "calibre-22-lr", name: ".22 LR" }))
+    })
+
     it("counts only published armurerie products, excluding Gun Art", async () => {
       const res = await app.inject({ method: "GET", url: "/api/tags" })
       const data = res.json().data as Array<{ facet: string; tags: Array<{ slug: string; productCount: number }> }>
