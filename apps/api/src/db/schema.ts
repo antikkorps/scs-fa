@@ -2,6 +2,7 @@
 // Schéma complet Drizzle ORM pour armurier e-commerce
 // Stack: PostgreSQL + Drizzle + TypeScript
 
+import type { MenuFilterKey } from "@armurier/shared"
 import { relations, sql } from "drizzle-orm"
 import {
   type AnyPgColumn,
@@ -759,7 +760,7 @@ export const productSubcategoriesRelations = relations(productSubcategories, ({ 
 // elles pilotent la requête) et vivent donc dans un enum ; les tags sont
 // éditoriaux (nombreux, renommables depuis le backoffice sans migration).
 // Story 12.13 — "usage": what a product is for (chasse), across categories.
-export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique", "usage"])
+export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique", "usage", "calibre"])
 
 export const tags = pgTable(
   "tags",
@@ -839,6 +840,8 @@ export const menuEntries = pgTable(
     // Story 12.15c — the entry's page: meta description and introduction.
     description: varchar("description", { length: 160 }),
     intro: text("intro"),
+    // Story 12.15e — the filters the entry's page and its branch's leave out.
+    hiddenFilters: text("hidden_filters").array().$type<MenuFilterKey[]>().notNull().default(sql`'{}'::text[]`),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },

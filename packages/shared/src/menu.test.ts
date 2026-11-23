@@ -20,6 +20,18 @@ describe("createMenuEntrySchema (story 12.15b)", () => {
     })
   })
 
+  // Story 12.15e (Fred): the filters an entry's page leaves out.
+  it("leaves every filter offered by default, and takes the ones to hide, once each", () => {
+    expect(createMenuEntrySchema.parse(filter).hiddenFilters).toEqual([])
+    expect(
+      createMenuEntrySchema.parse({ ...filter, hiddenFilters: ["legalCategory", "epoque", "epoque"] }).hiddenFilters,
+    ).toEqual(["legalCategory", "epoque"])
+  })
+
+  it("refuses hiding a filter that does not exist", () => {
+    expect(createMenuEntrySchema.safeParse({ ...filter, hiddenFilters: ["prix"] }).success).toBe(false)
+  })
+
   it("takes a link to a page of the site", () => {
     const parsed = createMenuEntrySchema.safeParse({
       slug: "journal",

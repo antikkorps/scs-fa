@@ -1,5 +1,6 @@
 // Story 12.15b — the admin menu tree, from the flat list the API returns.
 
+import type { MenuFilterKey } from "@armurier/shared"
 import type { AdminMenuEntry, PlacedMenuEntry } from "~/types/menu"
 import type { ProductCategoryRef } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/product"
@@ -19,6 +20,13 @@ export function placeEntries(entries: AdminMenuEntry[], parentId: string | null 
     placed.push({ entry, level, path }, ...placeEntries(entries, entry.id, level + 1, path))
   }
   return placed
+}
+
+/** The filters hidden on this entry and up its branch: those its sub-entries' pages leave out too. */
+export function hiddenAlongBranch(entries: AdminMenuEntry[], id: string | null): MenuFilterKey[] {
+  const entry = entries.find((candidate) => candidate.id === id)
+  if (!entry) return []
+  return [...new Set([...hiddenAlongBranch(entries, entry.parentId), ...entry.hiddenFilters])]
 }
 
 /** How many entries hang under this one, at any depth. */

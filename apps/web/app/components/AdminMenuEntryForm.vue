@@ -2,7 +2,7 @@
 // Story 12.15b — one menu entry: its label and address, its kind, and the saved
 // filter that decides which products it shows. Each entry carries its whole
 // filter: a new sub-entry starts from its parent's, to narrow it.
-import { LEGAL_CATEGORIES, MENU_DESCRIPTION_MAX, MENU_INTRO_MAX, slugify } from "@armurier/shared"
+import { LEGAL_CATEGORIES, MENU_DESCRIPTION_MAX, MENU_INTRO_MAX, type MenuFilterKey, slugify } from "@armurier/shared"
 import type { AdminMenuEntry } from "~/types/menu"
 import type { ProductCategoryRef, ProductTag } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/product"
@@ -17,11 +17,18 @@ const props = defineProps<{
   tags: ProductTag[]
   /** Where the entry may sit: the top, or one of these. */
   parents: Array<{ id: string; label: string }>
+  /** The filters hidden up the branch of a parent: the entry's page leaves them out too. */
+  hiddenAbove: (parentId: string | null) => MenuFilterKey[]
 }>()
 const emit = defineEmits<{ saved: []; cancel: [] }>()
 
 const api = useApi()
-const form = reactive<Draft>({ ...props.initial, tagSlugs: [...props.initial.tagSlugs] })
+const form = reactive<Draft>({
+  ...props.initial,
+  tagSlugs: [...props.initial.tagSlugs],
+  hiddenFilters: [...props.initial.hiddenFilters],
+})
+const inheritedHidden = computed(() => props.hiddenAbove(form.parentId))
 const slugTouched = ref(props.entryId !== null)
 const saving = ref(false)
 const error = ref<string | null>(null)
@@ -71,6 +78,8 @@ function payload() {
     // Only a filter has a page to describe.
     description: isFilter ? form.description : null,
     intro: isFilter ? form.intro : null,
+    // A heading's hidden filters still reach the pages of its branch.
+    hiddenFilters: form.kind === "link" ? [] : form.hiddenFilters,
   }
 }
 
@@ -184,6 +193,8 @@ async function save() {
         <span class="field__help">Au-dessus des produits. Une ligne vide sépare deux paragraphes.</span>
       </label>
     </template>
+
+    <AdminMenuFilterOffer v-if="form.kind !== 'link'" v-model="form.hiddenFilters" :inherited="inheritedHidden" />
 
     <div class="actions">
       <button class="btn btn-primary" type="submit" :disabled="saving">

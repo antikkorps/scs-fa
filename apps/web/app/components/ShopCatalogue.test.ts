@@ -1,4 +1,5 @@
 // @vitest-environment nuxt
+import type { MenuFilterKey } from "@armurier/shared"
 import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime"
 import type { DOMWrapper } from "@vue/test-utils"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -34,6 +35,13 @@ mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
             tags: [
               { slug: "occasion", name: "Occasion", facet: "etat", description: null, productCount: 3 },
               { slug: "neuf", name: "Neuf", facet: "etat", description: null, productCount: 2 },
+            ],
+          },
+          {
+            facet: "calibre",
+            tags: [
+              { slug: "calibre-12", name: "12", facet: "calibre", description: null, productCount: 4 },
+              { slug: "calibre-20", name: "20", facet: "calibre", description: null, productCount: 1 },
             ],
           },
         ],
@@ -168,6 +176,57 @@ describe("ShopCatalogue (story 9.6)", () => {
         route: "/boutique?sort=bogus",
       })
       expect(productQueries.at(-1)).not.toHaveProperty("sort")
+    })
+  })
+
+  // Story 12.15e: one calibre at a time, from a drop-down.
+  it("swaps the calibre for the one picked, keeping the other filters", async () => {
+    const wrapper = await mountSuspended(ShopCatalogue, {
+      props: { category: "munition", basePath: "/boutique/categorie/munition", listName: "x" },
+      route: "/boutique/categorie/munition?tags=occasion,calibre-12",
+    })
+    const push = spyPush()
+    await wrapper.find("select.tagf__select").setValue("calibre-20")
+    expect(push).toHaveBeenCalledWith({ query: { tags: "occasion,calibre-20" } })
+  })
+
+  // Review of 12.15e: a menu entry locking a calibre — « Tous calibres » leaves
+  // it, as unticking a locked box does, instead of silently doing nothing.
+  it("leaves a page locked on a calibre when any calibre is picked", async () => {
+    const wrapper = await mountSuspended(ShopCatalogue, {
+      props: { category: "munition", lockedTags: ["calibre-12"], basePath: "/munitions-12", listName: "x" },
+      route: "/munitions-12?legalCategory=C",
+    })
+    const push = spyPush()
+    await wrapper.find("select.tagf__select").setValue("")
+    expect(push).toHaveBeenCalledWith({ path: "/boutique", query: { legalCategory: "C" } })
+  })
+
+  // Story 12.15e (Fred): a menu entry's page leaves out the filters it hides —
+  // Chasse without the legal category, Munitions with the calibre alone.
+  describe("on a page hiding filters", () => {
+    const hiding = {
+      category: "munition",
+      hiddenFilters: ["legalCategory", "etat"] as MenuFilterKey[],
+      basePath: "/chasse/munitions",
+      listName: "x",
+    }
+
+    it("offers neither the legal category nor the hidden facets, the others still", async () => {
+      const wrapper = await mountSuspended(ShopCatalogue, { props: hiding, route: "/chasse/munitions" })
+      expect(wrapper.find("#shop-legal").exists()).toBe(false)
+      expect(wrapper.findAll(".tagf__box")).toHaveLength(0)
+      expect(wrapper.find("select.tagf__select").exists()).toBe(true)
+    })
+
+    it("ignores a hidden filter in the address", async () => {
+      productQueries.length = 0
+      await mountSuspended(ShopCatalogue, {
+        props: hiding,
+        route: "/chasse/munitions?legalCategory=B&tags=occasion,calibre-12",
+      })
+      expect(productQueries.at(-1)).toMatchObject({ tags: "calibre-12" })
+      expect(productQueries.at(-1)).not.toHaveProperty("legalCategory")
     })
   })
 

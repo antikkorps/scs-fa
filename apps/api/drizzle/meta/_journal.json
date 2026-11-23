@@ -386,6 +386,20 @@
       "when": 1795265906576,
       "tag": "0054_menu_entry_page_texts",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1795457208743,
+      "tag": "0055_tag_facet_calibre",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1795458277361,
+      "tag": "0056_menu_entry_hidden_filters",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 // Story 12.15b — menu entries as the API speaks of them: the filter by slugs,
 // stored by ids (foreign keys), so a renamed slug never breaks an entry.
 
-import type { LegalCategory, MenuEntryKind } from "@armurier/shared"
+import type { LegalCategory, MenuEntryKind, MenuFilterKey } from "@armurier/shared"
 import { asc, eq, inArray, sql } from "drizzle-orm"
 import { type DbExecutor, db } from "../db/client.js"
 import { menuEntries, menuEntryTags, productCategories, productSubcategories, tags } from "../db/schema.js"
@@ -21,6 +21,7 @@ export interface MenuEntry {
   tagSlugs: string[]
   description: string | null
   intro: string | null
+  hiddenFilters: MenuFilterKey[]
   updatedAt: Date | null
 }
 
@@ -56,6 +57,7 @@ export async function loadMenuEntries(tx: DbExecutor = db): Promise<MenuEntry[]>
         legalCategory: menuEntries.legalCategory,
         description: menuEntries.description,
         intro: menuEntries.intro,
+        hiddenFilters: menuEntries.hiddenFilters,
         updatedAt: menuEntries.updatedAt,
       })
       .from(menuEntries)

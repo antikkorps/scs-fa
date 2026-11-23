@@ -58,6 +58,53 @@ describe("ProductTagFilters", () => {
     expect(filtered.emitted("clear")).toHaveLength(1)
   })
 
+  // Story 12.15e (Fred): a long, single-choice list — the calibre — reads as a
+  // drop-down, not a cloud of pills.
+  describe("the calibre", () => {
+    const withCalibre: TagFacetGroup[] = [
+      ...facets,
+      {
+        facet: "calibre",
+        tags: [
+          { slug: "calibre-12", name: "12", facet: "calibre", description: null, productCount: 5 },
+          { slug: "calibre-308", name: ".308 Win", facet: "calibre", description: null, productCount: 3 },
+        ],
+      },
+    ]
+
+    it("is a labelled drop-down, any calibre first, with the counts", async () => {
+      const wrapper = await mountSuspended(ProductTagFilters, { props: { facets: withCalibre, selected: [] } })
+      const select = wrapper.find("select.tagf__select")
+      expect(wrapper.find(`label[for="${select.attributes("id")}"]`).text()).toBe("Calibre")
+      expect(select.findAll("option").map((option) => option.text())).toEqual([
+        "Tous calibres",
+        "12 (5)",
+        ".308 Win (3)",
+      ])
+      expect(wrapper.findAll("input[type=checkbox]")).toHaveLength(3)
+    })
+
+    it("shows the calibre chosen", async () => {
+      const wrapper = await mountSuspended(ProductTagFilters, {
+        props: { facets: withCalibre, selected: ["calibre-308"] },
+      })
+      expect((wrapper.find("select.tagf__select").element as HTMLSelectElement).value).toBe("calibre-308")
+    })
+
+    it("emits pick with the facet and the calibre, or none for any calibre", async () => {
+      const wrapper = await mountSuspended(ProductTagFilters, {
+        props: { facets: withCalibre, selected: ["calibre-12"] },
+      })
+      const select = wrapper.find("select.tagf__select")
+      await select.setValue("calibre-308")
+      await select.setValue("")
+      expect(wrapper.emitted("pick")).toEqual([
+        ["calibre", "calibre-308"],
+        ["calibre", ""],
+      ])
+    })
+  })
+
   it("renders nothing when no facet carries a tag", async () => {
     const wrapper = await mountSuspended(ProductTagFilters, { props: { facets: [], selected: [] } })
     expect(wrapper.find(".tagf").exists()).toBe(false)

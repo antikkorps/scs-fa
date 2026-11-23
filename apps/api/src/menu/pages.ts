@@ -1,6 +1,6 @@
 // Story 12.15b/c — the public menu: the tree the header draws, and its pages.
 
-import { productFiltersSchema } from "@armurier/shared"
+import { type MenuFilterKey, productFiltersSchema } from "@armurier/shared"
 import { countCatalogue } from "../products/list.js"
 import { publicCatalogueVisible } from "../products/visibility.js"
 import { loadMenuEntries, type MenuEntry } from "./entries.js"
@@ -97,6 +97,11 @@ export async function productCount(filter: NonNullable<PublicMenuEntry["filter"]
   return countCatalogue(filters, publicCatalogueVisible())
 }
 
+/** The filters the page at the end of `chain` leaves out: its own and its ancestors'. */
+function hiddenAlong(chain: MenuEntry[]): MenuFilterKey[] {
+  return [...new Set(chain.flatMap((entry) => entry.hiddenFilters))]
+}
+
 /** Only a filter entry has a page: a heading gathers, a link leads elsewhere. */
 export function pageAt(entries: MenuEntry[], path: string) {
   const chain = chainAt(entries, path)
@@ -113,6 +118,7 @@ export function pageAt(entries: MenuEntry[], path: string) {
     description: entry.description,
     intro: entry.intro,
     filter: filterOf(entry),
+    hiddenFilters: hiddenAlong(chain),
     breadcrumb,
     children: nested(entries, entry.id, paths),
   }

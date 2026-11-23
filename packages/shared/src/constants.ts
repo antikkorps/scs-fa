@@ -156,7 +156,8 @@ export const GUN_ART_MAX_PRINTS = 25
 // filtering: within a facet the selection is a union (OR), across facets an
 // intersection (AND). Facets are structural — adding one is a migration —
 // whereas the tags inside them are editable from the backoffice.
-export const TAG_FACETS = ["etat", "epoque", "caracteristique", "usage"] as const
+// "calibre" (story 12.15e) is a single choice, shown as a drop-down.
+export const TAG_FACETS = ["etat", "epoque", "caracteristique", "usage", "calibre"] as const
 export type TagFacet = (typeof TAG_FACETS)[number]
 
 // Cap on how many tags a single query may filter on. Each distinct facet in the
