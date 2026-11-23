@@ -42,6 +42,7 @@ const ARMES_LONGUES = {
     },
   ],
   productCount: 4,
+  hiddenFilters: [],
 }
 
 mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
@@ -117,6 +118,15 @@ describe("a menu entry's page", () => {
     await mountAt(ARMES_LONGUES.path)
     await headWritten()
     expect(robots()).toBe("noindex, follow")
+  })
+
+  // Story 12.15e: the filters the entry and its branch leave out.
+  it("leaves out of the catalogue the filters the entry hides", async () => {
+    const chasse = { ...ARMES_LONGUES, path: "/chasse", filter: { ...ARMES_LONGUES.filter, legalCategory: null } }
+    pages.set("/chasse", { ...chasse, hiddenFilters: ["legalCategory"] })
+    pages.set("/tir", { ...chasse, path: "/tir", hiddenFilters: [] })
+    expect((await mountAt("/chasse")).find("#shop-legal").exists()).toBe(false)
+    expect((await mountAt("/tir")).find("#shop-legal").exists()).toBe(true)
   })
 
   it("answers 404 where the menu has no page", async () => {

@@ -73,6 +73,7 @@ const BLANK: Draft = {
   tagSlugs: [],
   description: null,
   intro: null,
+  hiddenFilters: [],
 }
 
 function startCreate(parent: AdminMenuEntry | null) {
@@ -176,6 +177,7 @@ const isLast = (entry: AdminMenuEntry) => siblingsOf(entry).at(-1)?.id === entry
         :categories="categories"
         :tags="tags"
         :parents="parentOptions"
+        :hidden-above="(parentId) => hiddenAlongBranch(entries, parentId)"
         @saved="afterSave"
         @cancel="editing = null"
       />

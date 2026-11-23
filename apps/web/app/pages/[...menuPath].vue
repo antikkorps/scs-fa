@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { MenuFilterKey } from "@armurier/shared"
 import type { ShopMenuEntry, ShopMenuFilter } from "#shared/utils/menu"
 
 // Story 12.15c — the page of a menu entry, at its path in the menu
@@ -15,6 +16,8 @@ interface MenuPage {
   breadcrumb: { label: string; href: string | null }[]
   children: ShopMenuEntry[]
   productCount: number
+  /** The filters the entry and its branch leave out (story 12.15e). */
+  hiddenFilters: MenuFilterKey[]
 }
 
 const route = useRoute()
@@ -94,6 +97,7 @@ usePageSeo({
       :subcategory="page.filter.subcategory ?? undefined"
       :locked-tags="page.filter.tags"
       :locked-legal-category="page.filter.legalCategory ?? undefined"
+      :hidden-filters="page.hiddenFilters"
       :base-path="page.path"
       :noindex="noindex"
       :list-name="`${page.label} — SCS Firearms`"

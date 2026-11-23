@@ -17,13 +17,14 @@ const entry = (fields: Record<string, unknown>) => ({
   tagSlugs: [],
   description: null,
   intro: null,
+  hiddenFilters: [],
   ...fields,
 })
 
 // Deliberately out of order: the screen orders siblings by position.
 const ENTRIES = [
   entry({ id: "mun", slug: "munitions", label: "Munitions", position: 2, categorySlug: "munition" }),
-  entry({ id: "cha", slug: "chasse", label: "Chasse", position: 1, tagSlugs: ["chasse"] }),
+  entry({ id: "cha", slug: "chasse", label: "Chasse", position: 1, tagSlugs: ["chasse"], hiddenFilters: ["epoque"] }),
   entry({
     id: "al",
     parentId: "cha",
@@ -170,6 +171,34 @@ describe("admin menu screen (story 12.15b)", () => {
     expect((options as { body: Record<string, unknown> }).body).toMatchObject({
       description: "Tout pour la chasse.",
       intro: "Un.\n\nDeux.",
+    })
+  })
+
+  // Story 12.15e (Fred): the filters the entry's page offers.
+  describe("the filters offered", () => {
+    const offer = (wrapper: Wrapper, key: string) => wrapper.find(`input[name="offer"][value="${key}"]`)
+
+    it("offers every filter, and saves the ones unticked as hidden", async () => {
+      const wrapper = await mountSuspended(MenuPage)
+      await rowOf(wrapper, "Munitions").find('[aria-label="Modifier"]').trigger("click")
+      expect((offer(wrapper, "calibre").element as HTMLInputElement).checked).toBe(true)
+      await offer(wrapper, "legalCategory").setValue(false)
+      await offer(wrapper, "etat").setValue(false)
+      await wrapper.find("form").trigger("submit")
+      await flushPromises()
+      const [, options] = callsWith("PATCH")[0] ?? []
+      expect((options as { body: Record<string, unknown> }).body).toMatchObject({
+        hiddenFilters: ["legalCategory", "etat"],
+      })
+    })
+
+    it("shows a filter hidden higher in the branch as unticked, and locked", async () => {
+      const wrapper = await mountSuspended(MenuPage)
+      await rowOf(wrapper, "Carabines").find('[aria-label="Modifier"]').trigger("click")
+      const epoque = offer(wrapper, "epoque").element as HTMLInputElement
+      expect(epoque.checked).toBe(false)
+      expect(epoque.disabled).toBe(true)
+      expect(wrapper.text()).toContain("Masqué plus haut dans la branche")
     })
   })
 

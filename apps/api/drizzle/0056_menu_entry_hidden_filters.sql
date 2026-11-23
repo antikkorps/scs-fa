@@ -1,0 +1,1 @@
+ALTER TABLE "menu_entries" ADD COLUMN "hidden_filters" text[] DEFAULT '{}'::text[] NOT NULL;

@@ -150,6 +150,17 @@ describe("admin menu", () => {
     expect(res.json().data).toMatchObject({ description: null, intro: "Un.\n\nDeux." })
   })
 
+  // Story 12.15e: the filters an entry's page leaves out; its branch's pages
+  // leave them out too, Chasse's sub-entries hiding what Chasse hides.
+  it("saves the filters an entry hides, and its page hides its branch's too", async () => {
+    const parent = await top("masques", { hiddenFilters: ["legalCategory", "epoque"] })
+    const child = await create({ parentId: parent.id, slug: "munitions", label: "Munitions", hiddenFilters: ["etat"] })
+    const res = await call("PATCH", `${BASE}/${child.id}`, { hiddenFilters: ["etat", "usage"] })
+    expect(res.json().data).toMatchObject({ hiddenFilters: ["etat", "usage"] })
+    const page = await app.inject({ method: "GET", url: `/api/menu/page?path=/${PREFIX}masques/munitions` })
+    expect(page.json().data.hiddenFilters).toEqual(["legalCategory", "epoque", "etat", "usage"])
+  })
+
   it("renames an entry and replaces its tags", async () => {
     const entry = await top("renomme", { tagSlugs: ["chasse"] })
     const res = await call("PATCH", `${BASE}/${entry.id}`, { label: "Renommée", tagSlugs: ["tir-sportif"] })
