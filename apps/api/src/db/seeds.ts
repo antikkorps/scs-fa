@@ -23,6 +23,7 @@ import {
   tags,
   users,
 } from "./schema.js"
+import { CALIBRE_TAGS } from "./seed-calibres.js"
 import { seedMenu } from "./seed-menu.js"
 import { seedSubcategories } from "./seed-subcategories.js"
 import { seedSuppliers } from "./seed-suppliers.js"
@@ -306,11 +307,11 @@ async function seedTags() {
     },
   ]
 
-  for (const tag of tagsData) {
+  for (const tag of [...tagsData, ...CALIBRE_TAGS]) {
     await db.insert(tags).values(tag).onConflictDoNothing()
   }
 
-  console.log(`✅ Tags seeded (${tagsData.length})`)
+  console.log(`✅ Tags seeded (${tagsData.length + CALIBRE_TAGS.length})`)
 }
 
 // ==========================================================================

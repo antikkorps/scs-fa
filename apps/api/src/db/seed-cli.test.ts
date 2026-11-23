@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process"
 import pg from "pg"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { migrateDatabase, TEST_DATABASE_URL, withDatabaseName } from "../test/database.js"
+import { CALIBRE_TAGS } from "./seed-calibres.js"
 
 // The seed as a deployment runs it: a fresh database, the migrations, then the
 // CLI in its own process. The suite's database cannot answer this — it is
@@ -81,7 +82,7 @@ describe("seed CLI (deployment)", () => {
 
     expect(await countRows("legal_categories")).toBe(5)
     expect(await countRows("product_categories")).toBe(9) // coutellerie, story 12.13
-    expect(await countRows("tags")).toBe(8) // chasse, story 12.13; tir sportif + FFP, SFP, thermique, 12.15a
+    expect(await countRows("tags")).toBe(8 + CALIBRE_TAGS.length) // chasse, story 12.13; tir sportif + FFP, SFP, thermique, 12.15a; calibres, 12.15e
     expect(await countRows("product_subcategories")).toBe(12) // story 12.15a
     expect(await countRows("menu_entries")).toBe(33) // Fred's menu, story 12.15b
     expect(await countRows("menu_entry_tags")).toBe(25)

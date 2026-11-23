@@ -14,6 +14,18 @@ const emit = defineEmits<{ toggle: [slug: string]; pick: [facet: TagFacet, slug:
 
 const { tagFacetLabel } = useTags()
 
+// A drop-down lists only the tags some product carries (the seed brings every
+// common calibre), and the one chosen; a list left empty is not shown.
+const shown = computed(() =>
+  props.facets
+    .map((group) =>
+      isSingleChoiceFacet(group.facet)
+        ? { ...group, tags: group.tags.filter((tag) => tag.productCount > 0 || selectedSet.value.has(tag.slug)) }
+        : group,
+    )
+    .filter((group) => group.tags.length > 0),
+)
+
 /** The tag chosen in each single-choice facet, "" for none: worked out once per render. */
 const chosen = computed(
   () =>
@@ -27,7 +39,7 @@ const hasSelection = computed(() => props.selected.length > 0)
 </script>
 
 <template>
-  <div v-if="facets.length > 0" class="tagf">
+  <div v-if="shown.length > 0" class="tagf">
     <div class="tagf__head">
       <h2 class="tagf__title">Affiner</h2>
       <button v-if="hasSelection" type="button" class="tagf__clear" @click="emit('clear')">
@@ -35,7 +47,7 @@ const hasSelection = computed(() => props.selected.length > 0)
       </button>
     </div>
 
-    <template v-for="group in facets" :key="group.facet">
+    <template v-for="group in shown" :key="group.facet">
       <!-- `selected` on the options for the server's HTML, `value` for the live page. -->
       <div v-if="isSingleChoiceFacet(group.facet)" class="tagf__group">
         <label class="tagf__legend" :for="`tagf-${group.facet}`">{{ tagFacetLabel(group.facet) }}</label>

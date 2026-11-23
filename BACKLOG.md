@@ -1242,6 +1242,7 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [x] 12.15e — Retours de Fred sur les filtres (2026-11-23)
   - [x] Famille de tags « Calibre », proposée en liste déroulante (un calibre à la fois) ; Fred crée les calibres dans Tags (facette Calibre) et les pose sur les munitions
   - [x] Filtres proposés réglables par entrée du menu (back-office, « Filtres proposés sur la page ») : catégorie légale, état, époque, caractéristiques, usage, calibre ; les entrées en dessous héritent des filtres décochés. À régler par Fred : Chasse sans catégorie légale ni époque ni caractéristiques/usage ; chaque Munitions avec le calibre seul
+  - [x] Les calibres courants créés par le seed (lisse, rayé chasse, tir sportif) ; un calibre sans produit n'apparaît pas dans la liste
   - Hors code : « Munitions » après Optique dans Tir sportif — Fred l'ajoute dans Menu ; l'autorisation de commerce des armes reste obligatoire dans Identité (décision Franck)
 
 **Questions pour Fred**
