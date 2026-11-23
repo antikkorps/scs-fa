@@ -36,6 +36,13 @@ mockNuxtImport("useFetch", () => (url: string, opts?: { query?: unknown }) => {
               { slug: "neuf", name: "Neuf", facet: "etat", description: null, productCount: 2 },
             ],
           },
+          {
+            facet: "calibre",
+            tags: [
+              { slug: "calibre-12", name: "12", facet: "calibre", description: null, productCount: 4 },
+              { slug: "calibre-20", name: "20", facet: "calibre", description: null, productCount: 1 },
+            ],
+          },
         ],
       }),
     }
@@ -169,6 +176,29 @@ describe("ShopCatalogue (story 9.6)", () => {
       })
       expect(productQueries.at(-1)).not.toHaveProperty("sort")
     })
+  })
+
+  // Story 12.15e: one calibre at a time, from a drop-down.
+  it("swaps the calibre for the one picked, keeping the other filters", async () => {
+    const wrapper = await mountSuspended(ShopCatalogue, {
+      props: { category: "munition", basePath: "/boutique/categorie/munition", listName: "x" },
+      route: "/boutique/categorie/munition?tags=occasion,calibre-12",
+    })
+    const push = spyPush()
+    await wrapper.find("select.tagf__select").setValue("calibre-20")
+    expect(push).toHaveBeenCalledWith({ query: { tags: "occasion,calibre-20" } })
+  })
+
+  // Review of 12.15e: a menu entry locking a calibre — « Tous calibres » leaves
+  // it, as unticking a locked box does, instead of silently doing nothing.
+  it("leaves a page locked on a calibre when any calibre is picked", async () => {
+    const wrapper = await mountSuspended(ShopCatalogue, {
+      props: { category: "munition", lockedTags: ["calibre-12"], basePath: "/munitions-12", listName: "x" },
+      route: "/munitions-12?legalCategory=C",
+    })
+    const push = spyPush()
+    await wrapper.find("select.tagf__select").setValue("")
+    expect(push).toHaveBeenCalledWith({ path: "/boutique", query: { legalCategory: "C" } })
   })
 
   describe("filters panel on a phone", () => {

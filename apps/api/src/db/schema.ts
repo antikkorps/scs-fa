@@ -759,7 +759,7 @@ export const productSubcategoriesRelations = relations(productSubcategories, ({ 
 // elles pilotent la requête) et vivent donc dans un enum ; les tags sont
 // éditoriaux (nombreux, renommables depuis le backoffice sans migration).
 // Story 12.13 — "usage": what a product is for (chasse), across categories.
-export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique", "usage"])
+export const tagFacetEnum = pgEnum("tag_facet", ["etat", "epoque", "caracteristique", "usage", "calibre"])
 
 export const tags = pgTable(
   "tags",

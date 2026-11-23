@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PRODUCT_SORTS, type ProductSort } from "@armurier/shared"
-import type { LegalCategoryCode, ProductListResponse } from "~/types/product"
+import type { LegalCategoryCode, ProductListResponse, TagFacet } from "~/types/product"
 import { legalCategoryLabel } from "~/utils/product"
 
 /**
@@ -107,14 +107,29 @@ const selectedTags = computed(() =>
 // What the API is asked for: the page's own tag, then the visitor's.
 const appliedTags = computed(() => [...pinnedTags.value, ...selectedTags.value])
 
+// Dropping a tag the page locks means leaving the page, for its category's.
+function leaveLockedPage() {
+  router.push({ path: categoryPath(""), query: filterQuery({}) })
+}
+
 function toggleTag(slug: string) {
   if (pinnedTags.value.includes(slug)) {
-    router.push({ path: categoryPath(""), query: filterQuery({}) })
+    leaveLockedPage()
     return
   }
   const next = selectedTags.value.includes(slug)
     ? selectedTags.value.filter((s) => s !== slug)
     : [...selectedTags.value, slug]
+  navigate({ tags: next.join(",") || undefined })
+}
+
+// A drop-down facet (the calibre): the new choice replaces the previous one.
+function pickTag(facet: TagFacet, slug: string) {
+  if (pinnedFacets.value.has(facet)) {
+    leaveLockedPage()
+    return
+  }
+  const next = pickInFacet(selectedTags.value, facetOfTag.value, facet, slug)
   navigate({ tags: next.join(",") || undefined })
 }
 
@@ -343,6 +358,7 @@ useHead({
             :facets="refinableFacets"
             :selected="appliedTags"
             @toggle="toggleTag"
+            @pick="pickTag"
             @clear="navigate({ tags: undefined })"
           />
         </div>
