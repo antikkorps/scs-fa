@@ -6,7 +6,7 @@ FROM node:26-slim AS build
 ENV CI=1
 # Node 25+ no longer ships corepack: install it (pinned), then let it provide
 # the pnpm named by `packageManager` in the root package.json.
-RUN npm install -g corepack@0.35.0 && corepack enable
+RUN npm install -g corepack@0.36.0 && corepack enable
 WORKDIR /repo
 COPY . .
 RUN pnpm install --frozen-lockfile
