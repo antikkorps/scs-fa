@@ -10,7 +10,7 @@ import { db } from "../db/client.js"
 import { catalogImportImages, catalogImports, products, suppliers } from "../db/schema.js"
 import { env } from "../env.js"
 import { validationError } from "../http.js"
-import { exportableSuppliers, exportCatalogWorkbook } from "./export.js"
+import { exportableSuppliers, exportCatalogCsv, exportCatalogWorkbook } from "./export.js"
 import { drainCatalogImages, imageQueueStats } from "./images.js"
 import {
   commitCatalogImport,
@@ -92,7 +92,26 @@ const planOptions = (upload: Upload): PlanOptions => ({
 /** The preview lists at most this many products to archive; the count is always exact. */
 const ARCHIVE_PREVIEW_LIMIT = 500
 
-const exportQuerySchema = z.object({ supplierId: z.string().uuid().optional() })
+const exportQuerySchema = z.object({
+  supplierId: z.uuid().optional(),
+  // Story 12.16d: CSV for those who work in CSV; the workbook keeps the drop-downs.
+  format: z.enum(["xlsx", "csv"]).default("xlsx"),
+})
+
+const EXPORT_FORMATS = {
+  xlsx: { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", write: workbookFile },
+  csv: { contentType: "text/csv; charset=utf-8", write: csvFile },
+} as const
+
+async function workbookFile(supplierId?: string) {
+  const { workbook, rows } = await exportCatalogWorkbook({ supplierId })
+  return { file: workbook, rows }
+}
+
+async function csvFile(supplierId?: string) {
+  const { csv, rows } = await exportCatalogCsv({ supplierId })
+  return { file: csv, rows }
+}
 
 /** Public shape of a plan row — internal resolution details stay server-side. */
 function reportRow(row: ImportPlan["rows"][number]) {
@@ -178,21 +197,22 @@ export const adminCatalogImportRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/export", async (request, reply) => {
     const query = exportQuerySchema.safeParse(request.query)
     if (!query.success) return reply.code(400).send(validationError(query.error.issues))
-    const { supplierId } = query.data
+    const { supplierId, format } = query.data
     let label = ""
     if (supplierId) {
       const [supplier] = await db.select({ name: suppliers.name }).from(suppliers).where(eq(suppliers.id, supplierId))
       if (!supplier) return reply.code(404).send({ error: "NotFound", message: "Supplier not found" })
       label = `${slugify(supplier.name, 40)}-`
     }
-    const { workbook, rows } = await exportCatalogWorkbook({ supplierId })
+    const { contentType, write } = EXPORT_FORMATS[format]
+    const { file, rows } = await write(supplierId)
     const date = new Date().toISOString().slice(0, 10)
     return reply
-      .header("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-      .header("content-disposition", `attachment; filename="catalogue-${label}${date}.xlsx"`)
+      .header("content-type", contentType)
+      .header("content-disposition", `attachment; filename="catalogue-${label}${date}.${format}"`)
       .header("x-catalogue-rows", String(rows))
       .header("cache-control", "no-store")
-      .send(workbook)
+      .send(file)
   })
 
   /** GET /suppliers — suppliers with products to export, for the per-supplier export. */

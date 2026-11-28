@@ -247,3 +247,4 @@ export async function writeCatalogWorkbook(options: {
   readme.getCell(1, 1).font = { bold: true, size: 14 }
   return Buffer.from(await wb.xlsx.writeBuffer())
 }
+export { catalogSheetCsv } from "./catalog-csv.js"

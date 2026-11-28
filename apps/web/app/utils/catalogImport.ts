@@ -45,3 +45,8 @@ export function exportSupplierLabel(supplier: CatalogExportSupplier): string {
   if (supplier.products === 0) return `${supplier.name} (fichier vierge)`
   return `${supplier.name} (${plural(supplier.products, "produit")})`
 }
+
+/** The API's own message when it gives one (a refused file says why), else the fallback. */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  return (err as { data?: { message?: string } })?.data?.message ?? fallback
+}

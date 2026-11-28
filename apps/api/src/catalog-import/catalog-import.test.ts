@@ -712,6 +712,41 @@ describe("admin catalogue import (story 12.2)", () => {
       expect((await asAdmin(`${BASE}/export?supplierId=00000000-0000-4000-8000-000000000000`)).statusCode).toBe(404)
     })
 
+    // Story 12.16d: Fred and Stéphane work in CSV.
+    it("exports one supplier's part as CSV, which imports back as it is", async () => {
+      const list = await app.inject({
+        method: "GET",
+        url: `${BASE}/suppliers`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      const alpha = (list.json().data as { id: string; name: string }[]).find((s) => s.name === RT_A)
+      const res = await app.inject({
+        method: "GET",
+        url: `${BASE}/export?supplierId=${alpha?.id}&format=csv`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers["content-type"]).toBe("text/csv; charset=utf-8")
+      expect(res.headers["content-disposition"]).toMatch(
+        /^attachment; filename="catalogue-testcatimp-rt-alpha-.*\.csv"$/,
+      )
+
+      const table = await readSpreadsheet(res.rawPayload)
+      const refs = table.slice(1).map((line) => line[table[0]?.indexOf("Réf. fournisseur") ?? -1])
+      expect(refs.sort()).toEqual(["RT-1", "RT-2", "RT-3"])
+      const { preview } = await importFile(res.rawPayload)
+      expect(preview.rows.every((row: { errors: string[] }) => row.errors.length === 0)).toBe(true)
+    })
+
+    it("refuses an export format it does not write", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: `${BASE}/export?format=pdf`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      expect(res.statusCode).toBe(400)
+    })
+
     it("offers a supplier without products, whose export is a blank file to fill in (story 12.5)", async () => {
       const [fresh] = await db
         .insert(suppliers)

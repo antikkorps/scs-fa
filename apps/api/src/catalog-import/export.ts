@@ -7,7 +7,12 @@
 // collection pieces stay out — they have their own screens.
 
 import { slugify } from "@armurier/shared"
-import { type CatalogSheetRow, writeCatalogWorkbook } from "@armurier/shared/spreadsheet"
+import {
+  type CatalogSheetLists,
+  type CatalogSheetRow,
+  catalogSheetCsv,
+  writeCatalogWorkbook,
+} from "@armurier/shared/spreadsheet"
 import { and, asc, eq, isNull, sql } from "drizzle-orm"
 import { db } from "../db/client.js"
 import {
@@ -133,15 +138,11 @@ export async function exportableSuppliers(): Promise<{ id: string; name: string;
   return all.map((supplier) => ({ ...supplier, products: countBySupplier.get(supplier.id) ?? 0 }))
 }
 
-/**
- * Build the export workbook — the whole catalogue, or one supplier's part of
- * it. Duplicates are always looked for across EVERY supplier: the point is to
- * see, in a BGM file, that Cor Caroli sells the same thing.
- */
-export async function exportCatalogWorkbook(
-  options: { supplierId?: string } = {},
-): Promise<{ workbook: Buffer; rows: number }> {
-  const all = await db
+type ExportRow = Awaited<ReturnType<typeof loadExportRows>>[number]
+
+/** Every exportable product: duplicates are looked for across all suppliers. */
+async function loadExportRows() {
+  return db
     .select({
       id: products.id,
       supplierId: suppliers.id,
@@ -173,8 +174,10 @@ export async function exportCatalogWorkbook(
     .leftJoin(legalCategories, eq(legalCategories.id, products.legalCategoryId))
     .where(exportable())
     .orderBy(asc(suppliers.name), asc(products.name))
-  const rows = options.supplierId ? all.filter((r) => r.supplierId === options.supplierId) : all
+}
 
+/** Products entered by hand: no key for the round trip, so the export says they are missing. */
+async function countManualProducts(): Promise<number> {
   const [{ manual } = { manual: 0 }] = await db
     .select({ manual: sql<number>`count(*)::int` })
     .from(products)
@@ -186,68 +189,104 @@ export async function exportCatalogWorkbook(
         sql`not exists (select 1 from ${ancientWeapons} where ${ancientWeapons.productId} = ${products.id})`,
       ),
     )
+  return manual
+}
 
-  const duplicates = findPossibleDuplicates(all)
-  const money = (v: string | null) => (v === null ? null : Number(v))
-  const sheetRows: CatalogSheetRow[] = rows.map((r) => ({
+const money = (value: string | null) => (value === null ? null : Number(value))
+
+function toSheetRow(row: ExportRow, duplicates: Map<string, string>): CatalogSheetRow {
+  return {
     import: "oui",
-    active: r.published ? "oui" : "non",
-    proOnly: r.audience === "pro" ? "oui" : "non",
-    supplier: r.supplier,
-    supplierSku: r.supplierSku,
-    ean: r.ean,
-    name: r.name,
-    brand: r.brand,
-    category: r.category,
-    subcategory: r.subcategory,
-    legalCategory: legalLabel(r.legalCategory),
-    costPriceHt: money(r.costPrice),
-    priceHt: money(r.priceHt),
-    vatPct: money(r.vatPct),
-    description: r.description,
-    longDescription: r.longDescription,
-    sourceUrl: r.sourceUrl,
-    sku: r.sku,
+    active: row.published ? "oui" : "non",
+    proOnly: row.audience === "pro" ? "oui" : "non",
+    supplier: row.supplier,
+    supplierSku: row.supplierSku,
+    ean: row.ean,
+    name: row.name,
+    brand: row.brand,
+    category: row.category,
+    subcategory: row.subcategory,
+    legalCategory: legalLabel(row.legalCategory),
+    costPriceHt: money(row.costPrice),
+    priceHt: money(row.priceHt),
+    vatPct: money(row.vatPct),
+    description: row.description,
+    longDescription: row.longDescription,
+    sourceUrl: row.sourceUrl,
+    sku: row.sku,
     // Slugs, not names: a name may hold a separator and split on re-import.
-    tags: r.tags.map((tag) => tag.slug).join(", ") || null,
-    duplicates: duplicates.get(r.id) ?? null,
-    version: r.updatedAt?.toISOString() ?? null,
-  }))
+    tags: row.tags.map((tag) => tag.slug).join(", ") || null,
+    duplicates: duplicates.get(row.id) ?? null,
+    version: row.updatedAt?.toISOString() ?? null,
+  }
+}
 
+/** The drop-down lists of the workbook: categories, suppliers, subcategories. */
+async function sheetLists(supplierList: { name: string }[]): Promise<CatalogSheetLists> {
   const categories = await db
     .select({ name: productCategories.name, slug: productCategories.slug })
     .from(productCategories)
     .orderBy(asc(productCategories.name))
-
   const subcategories = await db
     .select({ name: productSubcategories.name })
     .from(productSubcategories)
     .innerJoin(productCategories, eq(productCategories.id, productSubcategories.categoryId))
     .orderBy(asc(productCategories.displayOrder), asc(productSubcategories.displayOrder))
+  return {
+    categoryNames: categories
+      .filter((category) => category.slug !== EXCLUDED_CATEGORY_SLUG)
+      .map((category) => category.name),
+    supplierNames: supplierList.map((supplier) => supplier.name),
+    subcategoryNames: subcategories.map((subcategory) => subcategory.name),
+  }
+}
 
-  const supplierList = await declaredSuppliers()
-  const chosenSupplier = supplierList.find((supplier) => supplier.id === options.supplierId)
-  const flagged = rows.filter((r) => duplicates.has(r.id)).length
-  const scope = chosenSupplier ? ` (${chosenSupplier.name})` : ""
-  const summary = [`${rows.length} produits exportés${scope}, ${flagged} avec un doublon possible.`]
+function exportSummary(count: number, flagged: number, manual: number, supplierName?: string): string[] {
+  const scope = supplierName ? ` (${supplierName})` : ""
+  const summary = [`${count} produits exportés${scope}, ${flagged} avec un doublon possible.`]
   // A supplier's file is not about hand-made products: only the full export mentions them.
-  if (manual > 0 && !options.supplierId) {
+  if (manual > 0 && !supplierName) {
     summary.push(
       `${manual} produits saisis à la main (sans fournisseur ou sans référence fournisseur) ne figurent pas ici : ils se modifient depuis l'écran Produits.`,
     )
   }
+  return summary
+}
+
+interface ExportOptions {
+  supplierId?: string
+}
+
+/**
+ * The whole catalogue, or one supplier's part of it. Duplicates are always
+ * looked for across EVERY supplier: the point is to see, in a BGM file, that
+ * Cor Caroli sells the same thing.
+ */
+async function catalogExportRows(options: ExportOptions) {
+  const all = await loadExportRows()
+  const rows = options.supplierId ? all.filter((row) => row.supplierId === options.supplierId) : all
+  const duplicates = findPossibleDuplicates(all)
+  return { rows, duplicates, sheetRows: rows.map((row) => toSheetRow(row, duplicates)) }
+}
+
+export async function exportCatalogWorkbook(options: ExportOptions = {}): Promise<{ workbook: Buffer; rows: number }> {
+  const { rows, duplicates, sheetRows } = await catalogExportRows(options)
+  const supplierList = await declaredSuppliers()
+  const chosen = supplierList.find((supplier) => supplier.id === options.supplierId)
+  const flagged = rows.filter((row) => duplicates.has(row.id)).length
+  const manual = options.supplierId ? 0 : await countManualProducts()
   const workbook = await writeCatalogWorkbook({
     creator: "SCS Firearms — export du catalogue",
     sheetName: "Catalogue",
     rows: sheetRows,
-    lists: {
-      categoryNames: categories
-        .filter((category) => category.slug !== EXCLUDED_CATEGORY_SLUG)
-        .map((category) => category.name),
-      supplierNames: supplierList.map((supplier) => supplier.name),
-      subcategoryNames: subcategories.map((subcategory) => subcategory.name),
-    },
-    readme: [...README, "", ...summary],
+    lists: await sheetLists(supplierList),
+    readme: [...README, "", ...exportSummary(rows.length, flagged, manual, chosen?.name)],
   })
   return { workbook, rows: rows.length }
+}
+
+/** Story 12.16d — the same rows as CSV: no drop-downs and no read-me, which a CSV cannot hold. */
+export async function exportCatalogCsv(options: ExportOptions = {}): Promise<{ csv: Buffer; rows: number }> {
+  const { rows, sheetRows } = await catalogExportRows(options)
+  return { csv: Buffer.from(catalogSheetCsv(sheetRows), "utf8"), rows: rows.length }
 }

@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { slugify } from "@armurier/shared"
 import type {
-  CatalogExportSupplier,
   CatalogFailedImage,
   CatalogImportHistoryRow,
   CatalogImportPreview,
   CatalogImportResult,
 } from "~/types/admin"
 import {
+  apiErrorMessage,
   exportSupplierLabel,
   filterPreviewRows,
   IMPORT_ACTION_META,
@@ -21,48 +20,19 @@ definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Import de catalogues — Administration SCS" })
 
 const api = useApi()
-const apiMessage = (err: unknown, fallback: string) =>
-  (err as { data?: { message?: string } })?.data?.message ?? fallback
+
+// --- Step 0: export (story 12.4, CSV since 12.16d) ---------------------------
+
+const exporter = await useCatalogExport()
+const {
+  supplier: exportSupplier,
+  format: exportFormat,
+  suppliers: exportSuppliers,
+  exporting,
+  error: exportError,
+} = exporter
 
 // --- Step 1: file + preview --------------------------------------------------
-
-// --- Step 0: export (story 12.4) ----------------------------------------------
-
-const exporting = ref(false)
-const exportError = ref("")
-// One supplier's file keeps the same flow as the triage files: sort, import,
-// and "archive what is missing" only ever touches that supplier.
-const exportSupplier = ref("")
-const { data: suppliersData } = await useAsyncData(
-  "admin-catalog-export-suppliers",
-  () => api<{ data: CatalogExportSupplier[] }>("/admin/catalog-imports/suppliers"),
-  { server: false },
-)
-const exportSuppliers = computed(() => suppliersData.value?.data ?? [])
-
-/** Download the catalogue in the import's columns, to edit in Excel and bring back. */
-async function runExport() {
-  exporting.value = true
-  exportError.value = ""
-  try {
-    const chosen = exportSuppliers.value.find((s) => s.id === exportSupplier.value)
-    const blob = await api<Blob>("/admin/catalog-imports/export", {
-      responseType: "blob",
-      query: chosen ? { supplierId: chosen.id } : {},
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    const label = chosen ? `${slugify(chosen.name, 40)}-` : ""
-    a.download = `catalogue-${label}${new Date().toISOString().slice(0, 10)}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch (err) {
-    exportError.value = apiMessage(err, "Export impossible.")
-  } finally {
-    exporting.value = false
-  }
-}
 
 const file = ref<File | null>(null)
 const overwrite = ref(false)
@@ -108,7 +78,7 @@ async function runPreview() {
     filter.value = res.data.summary.invalid > 0 ? "invalid" : "all"
     shown.value = PAGE
   } catch (err) {
-    previewError.value = apiMessage(err, "Lecture du fichier impossible.")
+    previewError.value = apiErrorMessage(err, "Lecture du fichier impossible.")
   } finally {
     previewing.value = false
   }
@@ -152,7 +122,7 @@ async function runCommit() {
     preview.value = null
     await refreshHistory()
   } catch (err) {
-    commitError.value = apiMessage(err, "L'import a échoué : rien n'a été écrit.")
+    commitError.value = apiErrorMessage(err, "L'import a échoué : rien n'a été écrit.")
   } finally {
     committing.value = false
   }
@@ -201,7 +171,7 @@ async function toggleFailures(id: string) {
   try {
     failures.value = (await api<{ data: CatalogFailedImage[] }>(`/admin/catalog-imports/${id}/failed-images`)).data
   } catch (err) {
-    failuresError.value = apiMessage(err, "Chargement impossible.")
+    failuresError.value = apiErrorMessage(err, "Chargement impossible.")
   }
 }
 
@@ -211,7 +181,7 @@ async function retry(id: string) {
     openFailures.value = null
     await refreshHistory()
   } catch (err) {
-    failuresError.value = apiMessage(err, "Relance impossible.")
+    failuresError.value = apiErrorMessage(err, "Relance impossible.")
   }
 }
 </script>
@@ -231,8 +201,8 @@ async function retry(id: string) {
         Téléchargez le catalogue dans les colonnes de l'import : modifiez prix et textes, ajoutez des lignes, passez
         <em>Actif</em> à « oui » ou « non » (même produit chez deux fournisseurs : une ligne active, l'autre non),
         <em>Réservé pro</em> à « oui » pour un article que seuls les comptes professionnels validés verront, listez
-        les <em>Tags</em> séparés par des virgules (« Chasse, Occasion » : vide = inchangés ; les tags se créent dans
-        Catalogue → Tags), puis déposez le fichier ci-dessous. Le stock n'y figure pas : un fichier ne le modifie jamais.
+        rangez chaque produit avec <em>Catégorie</em>, <em>Sous-catégorie</em> et <em>Tags</em> (calibres compris),
+        puis déposez le fichier ci-dessous. Le stock n'y figure pas : un fichier ne modifie jamais celui d'un produit existant.
       </p>
       <p class="hint">
         Nouveau fournisseur ? Déclarez-le d'abord dans
@@ -247,11 +217,22 @@ async function retry(id: string) {
             {{ exportSupplierLabel(supplier) }}
           </option>
         </select>
-        <button class="btn btn-ghost" type="button" :disabled="exporting" @click="runExport">
-          {{ exporting ? "Préparation…" : "Exporter le catalogue (.xlsx)" }}
+        <label class="sr-only" for="export-format">Format du fichier</label>
+        <select id="export-format" v-model="exportFormat" class="select">
+          <option value="xlsx">Excel (.xlsx), avec les listes déroulantes</option>
+          <option value="csv">CSV (.csv)</option>
+        </select>
+        <button class="btn btn-ghost" type="button" :disabled="exporting" @click="exporter.run()">
+          {{ exporting ? "Préparation…" : "Exporter le catalogue" }}
         </button>
         <span v-if="exportError" class="err" role="alert">{{ exportError }}</span>
       </div>
+      <p v-if="exportFormat === 'csv'" class="hint">
+        ⚠️ Ouvert d'un double clic, Excel abîme le CSV : il retire les zéros en tête des références (« 00123 »
+        devient « 123 », donc un nouveau produit) et écrit les EAN en « 4,00638E+12 », que l'import refuse. Pour
+        modifier dans Excel, préférez le .xlsx, ou ouvrez le CSV par Données → À partir d'un fichier texte, colonnes
+        en « Texte ».
+      </p>
     </section>
 
     <section class="panel" aria-labelledby="step-file">
@@ -272,14 +253,19 @@ async function retry(id: string) {
         <label class="check">
           <input v-model="overwrite" type="checkbox" />
           <span>
-            Écraser les fiches existantes
-            <small>Sinon, un produit déjà importé ne reçoit que les champs encore vides : vos retouches sont gardées.</small>
+            Remplacer les infos des produits déjà importés par celles du fichier
+            <small>
+              Concerne le nom, la catégorie, la catégorie légale, le prix de vente, la TVA, la marque, l'EAN et les
+              textes. Sans cette case, un produit déjà importé garde son nom, sa catégorie et ses prix, et ne reçoit
+              que les champs encore vides : vos retouches sont gardées. Sous-catégorie, tags, « Actif » et
+              « Réservé pro » suivent le fichier dès que la colonne est remplie.
+            </small>
           </span>
         </label>
         <label class="check">
           <input v-model="archiveMissing" type="checkbox" />
           <span>
-            Archiver les produits absents du fichier
+            Remplacer le catalogue du fournisseur : archiver les produits absents du fichier
             <small>
               Seulement pour les fournisseurs présents dans le fichier. Un produit archivé est retiré de la vente, jamais
               effacé, et se réactive depuis l'écran Produits. La liste exacte s'affiche avant confirmation.
@@ -293,6 +279,7 @@ async function retry(id: string) {
         </button>
         <span v-if="previewError" class="err" role="alert">{{ previewError }}</span>
       </div>
+      <AdminImportColumns />
     </section>
 
     <section v-if="result" class="panel panel--done" aria-live="polite">
