@@ -57,7 +57,7 @@ const portrait = computed(() =>
   border-color: var(--brass);
   transform: translateY(-2px);
 }
-.artist__portrait {
+.artist :deep(.artist__portrait) {
   width: 100%;
   /* `height` is set as an attribute so the browser reserves the right box before
      the portrait loads — but on an <img> that attribute maps to the CSS height
