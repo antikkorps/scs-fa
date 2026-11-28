@@ -23,6 +23,7 @@ import {
   tags,
   users,
 } from "./schema.js"
+import { countAdmins, productionAdminNotice } from "./seed-admin-notice.js"
 import { CALIBRE_TAGS } from "./seed-calibres.js"
 import { seedMenu } from "./seed-menu.js"
 import { seedSubcategories } from "./seed-subcategories.js"
@@ -37,10 +38,8 @@ import { seedSuppliers } from "./seed-suppliers.js"
 export async function seedReferenceData() {
   console.log("🌱 Seeding reference data...")
 
-  // Decision 2026-11-04: a live site's admins are invited, never created with
-  // a password from the .env (it would have to travel, and sit on the server).
   if (process.env.NODE_ENV === "production") {
-    console.log("ℹ️  No admin seeded in production: invite each one with `just admin-invite <email> <prénom> <nom>`")
+    console.log(productionAdminNotice(await countAdmins()))
   } else {
     await seedAdminUser()
   }
