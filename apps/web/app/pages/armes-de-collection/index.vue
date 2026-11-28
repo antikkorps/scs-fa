@@ -332,16 +332,16 @@ useHead({
   overflow: hidden;
   position: relative;
 }
-.card__media img {
+.card__media :deep(img) {
   height: 100%;
   object-fit: cover;
   transition: transform 0.4s ease;
   width: 100%;
 }
-.card:hover .card__media img {
+.card:hover .card__media :deep(img) {
   transform: scale(1.03);
 }
-.card--sold .card__media img {
+.card--sold .card__media :deep(img) {
   filter: grayscale(1);
   opacity: 0.55;
 }

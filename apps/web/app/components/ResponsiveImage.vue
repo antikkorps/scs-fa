@@ -8,9 +8,11 @@ import type { ImageSource } from "~/utils/format"
  * AVIF when it can and the width the layout needs, described by `sizes`. Before
  * this, every card fetched the 1400px WebP, including on a 390px phone.
  *
- * `<picture>` is `display: contents`, so the <img> lays out exactly as it did
- * when it was the element itself — the call sites' CSS is untouched. Extra
- * attributes (class, style…) land on the <img>.
+ * `<picture>` is `display: contents`, so the <img> lays out as if it were the
+ * element itself. Extra attributes (class, style…) land on the <img>. ⚠️ It is
+ * not the component's root though: a caller's scoped selector reaches it only
+ * through `:deep()`. Without it the `height` attribute wins and the photo comes
+ * out stretched (guarded by ResponsiveImage.styles.test.ts).
  *
  * `protect` is for Gun Art visuals (story 11.5). ⚠️ Deterrence, never
  * protection: everything displayed sits in the browser cache and a screenshot
