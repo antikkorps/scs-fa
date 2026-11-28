@@ -44,7 +44,8 @@ export function scanBuffer(
     socket.setTimeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
     socket.on("timeout", () => finish("error"))
     socket.on("error", () => finish("error"))
-    socket.on("data", (chunk) => replyChunks.push(chunk))
+    // No encoding is set, so chunks come as Buffers; the typings also allow a string.
+    socket.on("data", (chunk) => replyChunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk))
 
     socket.on("connect", () => {
       socket.write("zINSTREAM\0")

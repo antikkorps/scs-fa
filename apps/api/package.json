@@ -55,7 +55,7 @@
     "zod": "4.6.6"
   },
   "devDependencies": {
-    "@types/node": "24.13.3",
+    "@types/node": "26.4.0",
     "@types/nodemailer": "^8.0.0",
     "@types/pg": "8.23.1",
     "@types/sanitize-html": "2.16.1",
