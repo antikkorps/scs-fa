@@ -154,7 +154,7 @@ usePageSeo({
   align-items: flex-end;
   overflow: hidden;
 }
-.hero__bg {
+.hero :deep(.hero__bg) {
   position: absolute;
   inset: 0;
   width: 100%;

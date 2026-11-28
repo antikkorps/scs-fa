@@ -411,7 +411,7 @@ useHead({
   cursor: zoom-in;
   position: relative;
 }
-.detail__media img {
+.detail__media :deep(img) {
   width: 100%;
   height: 100%;
   object-fit: cover;

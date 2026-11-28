@@ -281,7 +281,7 @@ useHead({
   background: none;
   cursor: zoom-in;
 }
-.detail__media img {
+.detail__media :deep(img) {
   /* The figure carries the orientation aspect-ratio (bound inline); the image
      fills it so portrait and landscape pieces both display uncropped at scale. */
   width: 100%;
