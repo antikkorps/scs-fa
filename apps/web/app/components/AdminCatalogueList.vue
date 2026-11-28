@@ -9,7 +9,8 @@
  *
  * With `archivable` (products, story 12.4) each row also gets "Archiver" /
  * "Réactiver": the way out for a product that is on an order and can no longer
- * be deleted.
+ * be deleted. With `selectable` (story 12.16b) rows on sale can be ticked and
+ * archived in one go.
  */
 export interface CatalogueColumn {
   key: string
@@ -37,6 +38,10 @@ const props = defineProps<{
   noun: string
   /** Rows carry `archivedAt`; offer archive / restore next to delete. */
   archivable?: boolean
+  /** Rows on sale get a box; the ticked ones are archived in one call. */
+  selectable?: boolean
+  /** Said when there is no row, e.g. under a filter; defaults to "nothing yet". */
+  emptyMessage?: string
 }>()
 
 const emit = defineEmits<(e: "changed") => void>()
@@ -49,6 +54,14 @@ function cell(row: CatalogueRow, key: string): unknown {
 }
 
 const isArchived = (row: CatalogueRow) => Boolean(cell(row, "archivedAt"))
+
+const bulk = useBulkArchive({
+  rows: computed(() => props.rows.map((row) => ({ id: row.id, archivedAt: cell(row, "archivedAt") }))),
+  endpoint: toRef(props, "endpoint"),
+  noun: toRef(props, "noun"),
+  onArchived: () => emit("changed"),
+})
+const { selected, selectableIds, allSelected, someSelected, busy, message: bulkMessage, error: bulkError } = bulk
 
 async function toggleArchive(row: CatalogueRow) {
   const label = String(cell(row, props.labelKey) ?? row.id)
@@ -84,19 +97,48 @@ async function remove(row: CatalogueRow) {
 <template>
   <div>
     <p v-if="removeError" class="alert" role="alert">{{ removeError }}</p>
-    <p v-if="rows.length === 0" class="state">Aucun {{ noun }} pour l'instant.</p>
+    <p v-if="bulkError" class="alert" role="alert">{{ bulkError }}</p>
+    <!-- Always rendered: a live region inserted along with its text is often not read out. -->
+    <div role="status" aria-live="polite">
+      <p v-if="bulkMessage" class="notice">{{ bulkMessage }}</p>
+    </div>
+    <div v-if="selectable && selected.size" class="bulk">
+      <button type="button" class="bulk__archive" :disabled="busy" @click="bulk.archiveSelected()">
+        Archiver la sélection ({{ selected.size }})
+      </button>
+    </div>
+    <p v-if="rows.length === 0" class="state">{{ emptyMessage ?? `Aucun ${noun} pour l'instant.` }}</p>
 
     <section v-else class="panel">
-      <div class="tablewrap">
+      <AdminDualScroll>
         <table class="grid">
           <thead>
             <tr>
+              <th v-if="selectable" scope="col" class="cell--pick">
+                <input
+                  v-if="selectableIds.length"
+                  type="checkbox"
+                  :checked="allSelected"
+                  :indeterminate="someSelected"
+                  aria-label="Tout sélectionner"
+                  @change="bulk.toggleAll(($event.target as HTMLInputElement).checked)"
+                />
+              </th>
               <th v-for="c in columns" :key="c.key" scope="col">{{ c.label }}</th>
               <th scope="col"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in rows" :key="row.id" :class="{ 'row--archived': archivable && isArchived(row) }">
+              <td v-if="selectable" class="cell--pick">
+                <input
+                  v-if="!isArchived(row)"
+                  type="checkbox"
+                  :checked="selected.has(row.id)"
+                  :aria-label="`Sélectionner ${cell(row, labelKey)}`"
+                  @change="bulk.toggle(row.id, ($event.target as HTMLInputElement).checked)"
+                />
+              </td>
               <td v-for="(c, i) in columns" :key="c.key" :class="{ 'cell--num': c.numeric }">
                 <template v-if="i === 0">
                   <NuxtLink :to="`${editBase}/${row.id}`" class="title">{{ cell(row, c.key) }}</NuxtLink>
@@ -120,7 +162,7 @@ async function remove(row: CatalogueRow) {
             </tr>
           </tbody>
         </table>
-      </div>
+      </AdminDualScroll>
     </section>
   </div>
 </template>
@@ -131,11 +173,6 @@ async function remove(row: CatalogueRow) {
   border: 1px solid var(--ink-line);
   border-radius: var(--radius);
   padding: 1.3rem 1.4rem;
-}
-.tablewrap {
-  overflow-x: auto;
-  /* Anchors the visually-hidden header: positioned against the page, it widened it on mobile. */
-  position: relative;
 }
 .grid {
   width: 100%;
@@ -195,6 +232,35 @@ async function remove(row: CatalogueRow) {
   border-radius: var(--radius);
   margin: 0 0 1.2rem;
   font-size: var(--fs-sm);
+}
+.notice {
+  border: 1px solid var(--ink-line);
+  color: var(--paper-dim);
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius);
+  margin: 0 0 1.2rem;
+  font-size: var(--fs-sm);
+}
+.bulk {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+.bulk__archive {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--brass);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.bulk__archive:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.cell--pick {
+  width: 2rem;
 }
 .state {
   color: var(--paper-dim);

@@ -13,8 +13,6 @@ import { authenticate } from "../auth/authenticate.js"
 import { requireRole } from "../auth/require-role.js"
 import { db } from "../db/client.js"
 import {
-  ancientWeapons,
-  artworks,
   cartItems,
   legalCategories,
   orders,
@@ -23,6 +21,7 @@ import {
   products,
   productTags,
   productVariants,
+  suppliers,
   tags,
 } from "../db/schema.js"
 import { env } from "../env.js"
@@ -30,7 +29,9 @@ import { validationError } from "../http.js"
 import { deleteMediaForOwner } from "../media/service.js"
 import { beneficiaryOfProduct } from "../payouts/index.js"
 import { sanitizeRichTextHtml } from "../sanitize.js"
+import { adminProductBulkArchiveRoutes } from "./bulk-archive.js"
 import { adminProductCrossSellRoutes } from "./cross-sell.js"
+import { GENERIC_ONLY } from "./generic-only.js"
 import { replaceProductTagsBySlug } from "./product-tags.js"
 import { subcategoryIdIn, unknownSubcategoryMessage } from "./subcategory.js"
 
@@ -53,15 +54,6 @@ export async function orderedVariantIds(variantIds: string[], tx: DbExecutor = d
     )})`)
   return new Set(result.rows.map((r) => r.id))
 }
-
-/**
- * Products that back a Gun Art piece or a collection weapon are edited through
- * THEIR OWN screens, which know about editions and provenance. Letting them
- * through the generic product form would offer an admin a way to desynchronise
- * the pair.
- */
-const GENERIC_ONLY = sql`not exists (select 1 from ${artworks} where ${artworks.productId} = ${products.id})
-  and not exists (select 1 from ${ancientWeapons} where ${ancientWeapons.productId} = ${products.id})`
 
 /**
  * Reconcile the variant list sent by the form with what is in the database.
@@ -237,6 +229,8 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
   // Suggestions « fréquemment achetés ensemble » (story 11.8) : greffées ici
   // pour hériter de l'authentification et du rôle posés juste au-dessus.
   await fastify.register(adminProductCrossSellRoutes)
+  // Story 12.16b — archiving in bulk, registered here for the same reason.
+  await fastify.register(adminProductBulkArchiveRoutes)
 
   fastify.get("/", async (_request, reply) => {
     const rows = await db
@@ -255,11 +249,13 @@ export const adminProductRoutes: FastifyPluginAsync = async (fastify) => {
         categorySlug: productCategories.slug,
         categoryName: productCategories.name,
         legalCategory: legalCategories.category,
+        supplierName: suppliers.name,
         variantCount: sql<number>`(select count(*)::int from ${productVariants} where ${productVariants.productId} = ${products.id})`,
       })
       .from(products)
       .innerJoin(productCategories, eq(products.categoryId, productCategories.id))
       .leftJoin(legalCategories, eq(products.legalCategoryId, legalCategories.id))
+      .leftJoin(suppliers, eq(products.supplierId, suppliers.id))
       .where(GENERIC_ONLY)
       .orderBy(desc(products.featured), asc(products.name))
     return reply.send({ data: rows.map((r) => ({ ...r, priceHt: Number(r.priceHt) })) })

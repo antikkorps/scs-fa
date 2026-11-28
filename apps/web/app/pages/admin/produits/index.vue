@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CatalogueColumn } from "~/components/AdminCatalogueList.vue"
 import type { AdminProductListItem } from "~/types/admin-catalogue"
+import { keptChoice, supplierChoices, withSupplier } from "~/utils/supplier-filter"
 
 definePageMeta({ layout: "admin", middleware: "admin" })
 useHead({ title: "Produits — Administration SCS" })
@@ -15,6 +16,7 @@ const { data, pending, error, refresh } = await useAsyncData(
 const columns: CatalogueColumn[] = [
   { key: "name", label: "Nom" },
   { key: "sku", label: "SKU" },
+  { key: "supplierName", label: "Fournisseur" },
   { key: "categoryName", label: "Catégorie" },
   { key: "legalCategory", label: "Cat. légale" },
   { key: "priceHt", label: "Prix HT", numeric: true },
@@ -27,10 +29,16 @@ const columns: CatalogueColumn[] = [
 // Archived products (story 12.4) stay out of the way unless asked for.
 const showArchived = ref(false)
 const archivedCount = computed(() => (data.value?.data ?? []).filter((p) => p.archivedAt).length)
+const shown = computed(() => (data.value?.data ?? []).filter((p) => showArchived.value || !p.archivedAt))
+// Story 12.16b: one supplier's catalogue, to archive it in one go.
+const supplier = ref("")
+const suppliers = computed(() => supplierChoices(shown.value))
+// Archiving a supplier's whole catalogue takes it out of the choices.
+watch(suppliers, (choices) => {
+  supplier.value = keptChoice(supplier.value, choices)
+})
 const rows = computed(() =>
-  (data.value?.data ?? [])
-    .filter((p) => showArchived.value || !p.archivedAt)
-    .map((p) => ({ ...p, proOnly: p.audience === "pro" })),
+  withSupplier(shown.value, supplier.value).map((p) => ({ ...p, proOnly: p.audience === "pro" })),
 )
 </script>
 
@@ -49,10 +57,19 @@ const rows = computed(() =>
       ne puisse pas désynchroniser une pièce de son édition ou de sa provenance.
     </p>
 
-    <label v-if="archivedCount" class="toggle">
-      <input v-model="showArchived" type="checkbox" />
-      Afficher les produits archivés ({{ archivedCount }})
-    </label>
+    <div class="filters">
+      <label v-if="suppliers.length" class="filter">
+        Fournisseur
+        <select v-model="supplier">
+          <option value="">Tous les fournisseurs</option>
+          <option v-for="choice in suppliers" :key="choice.value" :value="choice.value">{{ choice.label }}</option>
+        </select>
+      </label>
+      <label v-if="archivedCount" class="toggle">
+        <input v-model="showArchived" type="checkbox" />
+        Afficher les produits archivés ({{ archivedCount }})
+      </label>
+    </div>
 
     <p v-if="pending" class="state">Chargement…</p>
     <p v-else-if="error" class="state state--error">Impossible de charger les produits.</p>
@@ -65,6 +82,8 @@ const rows = computed(() =>
       label-key="name"
       noun="produit"
       archivable
+      selectable
+      :empty-message="supplier ? 'Aucun produit pour ce fournisseur.' : undefined"
       @changed="refresh()"
     />
   </div>
@@ -109,11 +128,31 @@ h1 {
   font-size: var(--fs-base);
   line-height: var(--lh-relaxed);
 }
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin: 0 0 1rem;
+}
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--fs-sm);
+  color: var(--paper-dim);
+}
+.filter select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius);
+  background: var(--ink-soft);
+  color: var(--paper);
+}
 .toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 0 1rem;
   font-size: var(--fs-sm);
   color: var(--paper-dim);
   cursor: pointer;

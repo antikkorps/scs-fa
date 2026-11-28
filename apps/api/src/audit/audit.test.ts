@@ -160,6 +160,26 @@ describe("audit event helper (story 12.7b)", () => {
     expect(batch.find((row) => row.action === "test.batch-b")).toMatchObject({ result: "failure", error: "test.code" })
   })
 
+  // Story 12.16b: a bulk archive logs up to 5 000 products. One INSERT of that
+  // many rows would pass Postgres's 65 535 bind parameters.
+  it("writes thousands of events at once", async () => {
+    const events = Array.from({ length: 6000 }, (_, index) => ({
+      userId,
+      userRole: "admin",
+      entityType: "product",
+      entityId: crypto.randomUUID(),
+      action: "test.bulk",
+      newValue: { sku: `SKU-${index}`, source: "admin-bulk" },
+    }))
+    await recordAuditEvents(events)
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(auditLogs)
+      .where(eq(auditLogs.action, "test.bulk"))
+    expect(row?.count).toBe(6000)
+    await db.delete(auditLogs).where(eq(auditLogs.action, "test.bulk"))
+  })
+
   it("keeps the event when its order is deleted, only the link is dropped", async () => {
     const [doomed] = await db
       .insert(orders)
