@@ -87,6 +87,8 @@ export interface AdminProductListItem {
   categorySlug: string
   categoryName: string
   legalCategory: string | null
+  /** Story 12.16b: null for a product entered by hand. */
+  supplierName: string | null
   variantCount: number
 }
 
@@ -100,7 +102,7 @@ export interface AdminProductVariant {
   stockQty: number | null
 }
 
-export interface AdminProductDetail extends Omit<AdminProductListItem, "variantCount"> {
+export interface AdminProductDetail extends Omit<AdminProductListItem, "variantCount" | "supplierName"> {
   /** Story 12.15a — null when the product sits at its category's level. */
   subcategorySlug: string | null
   subcategoryName: string | null
