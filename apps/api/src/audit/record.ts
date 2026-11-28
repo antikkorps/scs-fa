@@ -43,10 +43,14 @@ export async function recordAuditEvent(event: AuditEvent, executor: DbExecutor =
   await recordAuditEvents([event], executor)
 }
 
-/** Several events in one insert (a catalogue import archives hundreds of rows). */
+// About 14 bind parameters per row: 1 000 rows stay well under Postgres's 65 535.
+const ROWS_PER_INSERT = 1000
+
+/** Several events in few inserts (a catalogue import or a bulk archive logs thousands of rows). */
 export async function recordAuditEvents(events: AuditEvent[], executor: DbExecutor = db): Promise<void> {
-  if (events.length === 0) return
-  await executor.insert(auditLogs).values(events.map(toRow))
+  for (let start = 0; start < events.length; start += ROWS_PER_INSERT) {
+    await executor.insert(auditLogs).values(events.slice(start, start + ROWS_PER_INSERT).map(toRow))
+  }
 }
 
 function toRow(event: AuditEvent): typeof auditLogs.$inferInsert {
