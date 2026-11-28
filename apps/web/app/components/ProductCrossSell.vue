@@ -88,7 +88,7 @@ const hasItems = computed(() => props.items.length > 0)
   border-color: var(--brass);
   transform: translateY(-2px);
 }
-.xsell__link img {
+.xsell__link :deep(img) {
   width: 100%;
   height: auto;
   aspect-ratio: 4 / 3;

@@ -79,7 +79,7 @@ onBeforeUnmount(() => {
   background: rgba(8, 8, 10, 0.92);
   backdrop-filter: blur(6px);
 }
-.lb__img {
+.lb :deep(.lb__img) {
   max-width: 92vw;
   max-height: 92vh;
   width: auto;

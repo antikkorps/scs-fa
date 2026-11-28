@@ -72,7 +72,7 @@ const img = computed(() =>
   background: var(--ink-soft);
   border: 1px solid var(--ink-line);
 }
-.card__media img {
+.card__media :deep(img) {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -80,10 +80,10 @@ const img = computed(() =>
     transform 0.9s var(--ease),
     filter 0.6s var(--ease);
 }
-.card:hover .card__media img {
+.card:hover .card__media :deep(img) {
   transform: scale(1.045);
 }
-.is-soldout .card__media img {
+.is-soldout .card__media :deep(img) {
   filter: grayscale(0.5) brightness(0.78);
 }
 .card__badge {

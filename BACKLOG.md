@@ -1250,6 +1250,26 @@ _Complément (2026-10-19, décision Franck)_ : statistiques Umami conservées **
 - [ ] « Couteau de chasse › Dagues » (Chasse) et Coutellerie : mêmes produits, ou les dagues seulement sous Chasse ?
 - [ ] Contact chez Flord et documentation de leur API — prévu, pas encore reçu ; **en attendant, un fichier catalogue de Flord** pour écrire l'adaptateur d'import
 
+**Story 12.16** — Retours de Fred après la saisie des premiers produits — 📝 **CADRÉE** (décisions de Franck le 2026-11-28) _(mail de Fred du 2026-11-28, transmis par Franck)_
+
+> Contexte : Fred et Stéphane ont commencé la saisie (environ 1 800 articles importés par CSV). Franck constate en plus que les photos mises en ligne sont étirées.
+
+- [ ] 12.16a — **Photos étirées** : une image stockée s'affiche dans un `<picture>`, son `<img>` n'est donc pas la racine de `ResponsiveImage` et le CSS scopé des appelants ne l'atteignait pas ; l'attribut `height` l'étirait. Les appelants passent par `:deep()`, un test garde-fou lit les sources (Franck)
+- [ ] 12.16b — **Archivage en masse au back-office** : cases à cocher dans la liste des produits, « Archiver la sélection » et « Tout archiver pour ce fournisseur », avec confirmation. **Archiver, jamais effacer** (comme l'import, 12.4) ; **les produits archivés masqués par défaut** dans la liste, un filtre pour les revoir _(Franck 2026-11-28 : ils passent surtout par le CSV)_
+- [ ] 12.16c — **Barre de défilement horizontale en haut** du tableau des produits, en plus de celle du bas (1 800 lignes)
+- [ ] 12.16d — **Import qui cumule** : la case « Archiver les produits absents du fichier » existe (12.4) ; vérifier en prod si Fred l'a cochée ou si ses fichiers n'ont pas de référence fournisseur stable (requête via `psql-ro`), puis corriger ou expliquer
+- [ ] 12.16e — **Page Chasse** : les pastilles de catégories (« Armes de poing », « Armes de défense »…) n'ont rien à y faire. Sur une page du menu, ne proposer que les catégories qui ont des produits dans la sélection de la page. Masquer aussi une famille de tags réduite au tag imposé par la page (« Usage : Chasse » sur Chasse). Le reste (catégorie légale, époque, caractéristiques) se règle par Fred au back-office (12.15e)
+- [ ] 12.16f — **« Entrer dans la boutique »** : /boutique ouvre sur les univers du menu en **cartes seules**, sans le catalogue complet en dessous _(Franck 2026-11-28)_
+- [ ] 12.16g — **« Armes de collection » devient « Armes historiques »**, libellé **et adresse** (`/armes-historiques`, redirection 301 de `/armes-de-collection` et de ses sous-pages) _(Franck 2026-11-28 : le site est encore en coming soon, le changement d'adresse ne coûte presque rien)_
+- [ ] 12.16h — **Accueil sans articles** : la sélection de produits et la sélection Gun Art quittent l'accueil, qui reste « choisis ton univers » _(Franck 2026-11-28)_
+- [ ] 12.16i — **« Poser une question » sur chaque fiche** : formulaire de contact avec la référence du produit jointe d'office, envoyé **par e-mail seulement** pour l'instant, comme une demande de contact _(Franck 2026-11-28)_
+- [ ] 12.16j — **« Parlons-en ensemble »** (icône téléphone) : lien vers la page de prise de rendez-vous **Cal.com** de la boutique, l'adresse saisie au back-office (pas de dépendance, un simple lien ; rien n'apparaît tant qu'elle est vide) _(Franck 2026-11-28 : ils ne pourront pas toujours répondre au téléphone)_
+- Hors code : une entrée « Occasion » sous Chasse et sous Tir sportif = une entrée du menu filtrée sur `occasion` + l'usage, à créer par Fred
+
+**Reportés**
+- [ ] **Dépôt-vente** dans Chasse et Tir sportif : à creuser avec Fred (mandat, commission, reversement au déposant, traçabilité de l'arme) _(Franck 2026-11-28 : plus tard)_
+- [ ] **Onglet « Galerie »** par univers : Franck n'y est pas favorable, il en parle avec Fred
+
 ## PHASE 10 — Front client (boutique armurerie, auth & tunnel d'achat)
 
 > Angle mort identifié 2026-06-10 : le **back** des deux univers (armurerie réglementée **et** Gun Art) est fait (Phases 1-4), mais le **front client** ne couvre que Gun Art (5.3). Ces stories = les écrans Nuxt manquants, au-dessus d'API déjà construites. Réutiliser l'identité « galerie » validée + baseline mobile-first/SSR/SEO de la 5.3 (cf. [[project_front_direction]] en mémoire).
