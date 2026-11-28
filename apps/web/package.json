@@ -37,7 +37,7 @@
     "@vue/language-core": "3.3.11",
     "@vue/test-utils": "2.5.0",
     "happy-dom": "21.0.4",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vitest": "^4.1.0",
     "vue-tsc": "3.3.11"
   }
